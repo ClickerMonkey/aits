@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/ai" },
+    { "path": "./packages/openai" },
+    { "path": "./packages/replicate" },
+    { "path": "./packages/google" },
+    { "path": "./packages/xai" },
+    { "path": "./packages/openrouter" }
+  ]
+}

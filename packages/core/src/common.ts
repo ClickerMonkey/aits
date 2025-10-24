@@ -1,0 +1,201 @@
+
+/**
+ * A flexible function type that can be:
+ * - A direct value of type R
+ * - A function that takes arguments A and returns R or Promise<R>
+ * - A Promise that resolves to R
+ */
+export type Fn<R, A extends [any?, ...any[]] = []> = R | ((...args: A) => (R | Promise<R>)) | Promise<R>;
+
+/**
+ * Computes the resulting type R from a flexible function type Fn.
+ */
+export type FnResult<R> = R extends Promise<infer U> 
+  ? U 
+  : R extends (...args: any[]) => infer V
+    ? V extends Promise<infer W>
+      ? W
+      : V
+    : R;
+
+/**
+ * Retrieves the argument types A from a flexible function type Fn.
+ */
+export type FnArgs<F, Assumed = never> = F extends (...args: infer A) => any ? A : Assumed;
+
+/**
+ * Resolves a flexible function type into its standardized async function form.
+ */
+export type FnResolved<F extends Fn<any, any> | undefined> = 
+  F extends undefined
+    ? () => Promise<undefined>
+    : F extends Fn<infer R, infer A>
+      ? (...args: A) => Promise<R>
+      : never
+;
+
+/**
+ * Converts a flexible function type into a standardized async function.
+ * Handles values, functions, and promises uniformly by wrapping them in async functions.
+ *
+ * @param fn - The flexible function type to convert.
+ * @param reprocess - Optional function to transform the resolved value.
+ * @returns An async function that takes the same arguments and returns a Promise of the resolved type.
+ * @example
+ * const fn1 = resolveFn(42); // () => Promise<42>
+ * const fn2 = resolveFn(() => 'hello'); // () => Promise<'hello'>
+ * const fn3 = resolveFn(Promise.resolve(10)); // () => Promise<10>
+ */
+export function resolveFn<R, A extends [any?, ...any[]] = []>(fn: undefined): ((...args: A) => Promise<undefined>)
+export function resolveFn<R, A extends [any?, ...any[]] = []>(fn: Fn<R, A>): ((...args: A) => Promise<R>)
+export function resolveFn<R, A extends [any?, ...any[]] = [], R2 = R>(fn: Fn<R, A>, reprocess: (r: R) => R2): ((...args: A) => Promise<R2>)
+export function resolveFn<R, A extends [any?, ...any[]] = []>(fn?: Fn<R, A>, reprocess?: (r: R) => R): ((...args: A) => Promise<R | undefined>) {
+  if (!fn) {
+    return async () => undefined;
+  }
+
+  const isFunc = (x: any): x is ((...args: A) => (R | Promise<R>)) => typeof x === 'function';
+
+  if (reprocess) {
+    return fn instanceof Promise
+      ? async () => reprocess(await fn)
+      : isFunc(fn)
+        ? async (...args: A) => reprocess(await fn(...args))
+        : (() => {
+            const cached = reprocess(fn);
+            return async () => cached;
+          })();
+  } else {
+    return fn instanceof Promise
+      ? () => fn
+      : isFunc(fn)
+        ? async (...args: A) => await fn(...args)
+        : async () => fn;
+  }
+}
+
+
+/**
+ * Checks if a promise has settled (either fulfilled or rejected).
+ *
+ * @param p - The promise to check.
+ * @returns A promise that resolves to true if settled, false otherwise.
+ */
+export async function isSettled(p: Promise<any>): Promise<boolean> {
+  return Promise.race([p.then(() => true), Promise.resolve(false)])
+}
+
+/**
+ * Type guard to check if a value is a Promise.
+ *
+ * @param value - The value to check.
+ * @returns True if the value is a Promise, false otherwise.
+ */
+export function isPromise<T = any>(value: any): value is Promise<T> {
+  return value !== null && typeof value === 'object' && typeof value.then === 'function';
+}
+
+/**
+ * Type guard to check if a value is an AsyncGenerator.
+ *
+ * @param value - The value to check.
+ * @returns True if the value is an AsyncGenerator, false otherwise.
+ */
+export function isAsyncGenerator(value: any): value is AsyncGenerator<any, any, any> {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    typeof (value as any)[Symbol.asyncIterator] === "function" &&
+    typeof (value as any).next === "function" &&
+    typeof (value as any).throw === "function" &&
+    typeof (value as any).return === "function"
+  );
+}
+
+/**
+ * Yields promises as they settle (either fulfill or reject), maintaining their original indices.
+ * Useful for processing multiple async operations as soon as each one completes.
+ *
+ * @param promises - Array of promises to yield as they settle.
+ * @returns An async generator yielding objects with the settled promise and its index.
+ * @example
+ * const promises = [delay(100), delay(50), delay(200)];
+ * for await (const { result, index } of yieldAll(promises)) {
+ *   console.log(`Promise ${index} settled`);
+ *   const value = await result;
+ * }
+ */
+export async function* yieldAll<T>(
+  promises: Promise<T>[]
+): AsyncGenerator<{ result: Promise<T>, index: number }> {
+  // Create index-tracking promises that resolve with their index
+  const indexPromises = promises.map((p, i) =>
+    // both fulfillment and rejection resolve to the index so the race
+    // tells us when a promise *settles* (either way)
+    p.then(() => i, () => i)
+  );
+
+  // Keep a Set of pending indices (stable ids that never shift)
+  const pending = new Set<number>(promises.map((_, i) => i));
+
+  while (pending.size > 0) {
+    // Race only the still-pending index-promises
+    const racers = Array.from(pending).map(i => indexPromises[i]);
+    const idx = await Promise.race(racers);
+
+    // Yield the original Promise<T> so the caller decides how to await/handle it
+    yield { result: promises[idx], index: idx };
+
+    // Remove by stable index (no shifting problems)
+    pending.delete(idx);
+  }
+}
+
+/**
+ * Resolves an output value from various input types.
+ * Handles promises, raw values, and AsyncGenerators uniformly.
+ * These are all common return types of AI components.
+ *
+ * @param input - The value to resolve (can be a value, Promise, or AsyncGenerator).
+ * @returns A promise that resolves to the final value.
+ * @example
+ * await resolve(42); // 42
+ * await resolve(Promise.resolve('hello')); // 'hello'
+ * await resolve(asyncGenerator()); // final return value
+ */
+export async function resolve(input: any): Promise<any> {
+  if (isPromise(input)) {
+    return await input;
+  } else if (isAsyncGenerator(input)) {
+    let result = await input.next();
+    while (!result.done) {
+      result = await input.next();
+    }
+    return result.value;
+  } else {
+    return Promise.resolve(input);
+  }
+}
+
+/**
+ * Consumes all values from an AsyncGenerator and returns them as an array.
+ * 
+ * @param gen - The AsyncGenerator to consume.
+ * @returns An array of all values yielded by the generator.
+ */
+export async function consumeAll<E>(gen: AsyncGenerator<E, any, any>): Promise<E[]> {
+  const results: E[] = [];
+  for await (const item of gen) {
+    results.push(item);
+  }
+  return results;
+}
+
+/**
+ * Resolves the type R from a value passed to `resolve`.
+ */
+export type Resolved<T> = T extends Promise<infer U> 
+  ? U 
+  : T extends AsyncGenerator<any, infer U, any> 
+    ? U 
+    : T;

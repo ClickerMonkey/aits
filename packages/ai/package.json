@@ -1,0 +1,46 @@
+{
+  "name": "@aits/ai",
+  "version": "0.1.0",
+  "description": "AITS AI - AI TypeScript library main functionality",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "typescript",
+    "core"
+  ],
+  "author": "ClickerMonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClickerMonkey/aits.git",
+    "directory": "packages/ai"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@aits/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "bugs": {
+    "url": "https://github.com/ClickerMonkey/aits/issues"
+  }
+}

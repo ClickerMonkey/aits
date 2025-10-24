@@ -1,0 +1,48 @@
+{
+  "name": "@aits/openai",
+  "version": "0.1.0",
+  "description": "AITS OpenAI - OpenAI integration for AITS",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "openai",
+    "typescript"
+  ],
+  "author": "ClickerMonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClickerMonkey/aits.git",
+    "directory": "packages/openai"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@aits/ai": "^0.1.0",
+    "@aits/core": "^0.1.0",
+    "openai": "^6.6.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "bugs": {
+    "url": "https://github.com/ClickerMonkey/aits/issues"
+  }
+}
