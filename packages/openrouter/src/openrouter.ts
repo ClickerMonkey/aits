@@ -5,7 +5,7 @@
  */
 
 import OpenAI from 'openai';
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo, Provider } from '@aits/ai';
 import type { Request, Response, Executor, Streamer, Chunk } from '@aits/core';
 import { detectTier, detectCapabilitiesFromModality } from '@aits/ai';
 import { OpenAIProvider, OpenAIConfig, ProviderError, RateLimitError } from '@aits/openai';
@@ -59,6 +59,61 @@ type OpenRouterChatRequest = OpenAI.Chat.ChatCompletionCreateParams & {
 };
 
 /**
+ * OpenRouter's extended usage information
+ */
+type OpenRouterUsage = {
+  completion_tokens?: number;
+  completion_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+  cost?: number;
+  cost_details?: {
+    upstream_inference_cost?: number;
+  };
+  prompt_tokens?: number;
+  prompt_tokens_details?: {
+    cached_tokens?: number;
+    audio_tokens?: number;
+  };
+  total_tokens?: number;
+}
+
+/**
+ * OpenRouter reasoning information
+ */
+type OpenRouterReasoning = {
+  reasoning?: string;
+  reasoning_details?: {
+    id?: string | null;
+    type: 'reasoning.encrypted' | 'reasoning.summary' | 'reasoning.text';
+    format: 'unknown' | 'openai-responses-v1' | 'xai-responses-v1' | 'anthropic-claude-v1';
+    index?: number;
+    summary?: string;
+    text?: string;
+    encrypted?: string;
+    signature?: string;
+    data?: string;
+  }[];
+};
+
+/**
+ * OpenRouter chunk with extended usage info
+ */
+type OpenRouterChatChunk = OpenAI.Chat.Completions.ChatCompletionChunk & {
+  usage?: (OpenRouterUsage & OpenAI.CompletionUsage) | null;
+} & OpenRouterReasoning;
+
+/**
+ * OpenRouter response with extended usage info
+ */
+type OpenRouterChatResponse = OpenAI.Chat.ChatCompletion & {
+  choices: Array<OpenAI.ChatCompletion.Choice & {
+    message: OpenAI.Chat.Completions.ChatCompletionMessage & OpenRouterReasoning;
+  }>;
+  usage?: OpenRouterUsage;
+};
+
+/**
  * OpenRouter model response from API
  */
 interface OpenRouterModel {
@@ -106,18 +161,6 @@ interface ZDRModel {
   status: number;
   uptime_last_30m: number | null;
   supports_implicit_caching: boolean;
-}
-
-/**
- * OpenRouter's extended usage information with cost
- */
-interface OpenRouterUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  total_cost?: number;
-  native_tokens_prompt?: number;
-  native_tokens_completion?: number;
 }
 
 /**
@@ -178,7 +221,7 @@ function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>
 /**
  * OpenRouter provider implementation extending base OpenAI-compatible provider
  */
-export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> {
+export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> implements Provider<OpenRouterConfig> {
   readonly name = 'openrouter';
 
   protected createClient(config: OpenRouterConfig): OpenAI {
@@ -210,16 +253,17 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> {
     };
   }
 
-  protected customizeChatParams(
-    params: OpenAI.Chat.ChatCompletionCreateParams,
-    config: OpenRouterConfig,
-    request: Request
-  ): OpenRouterChatRequest {
-    const orRequest: OpenRouterChatRequest = { ...params };
-
+  /**
+   * Augment chat request with OpenRouter-specific parameters
+   */
+  protected override augmentChatRequest(
+    params: OpenRouterChatRequest,
+    request: Request,
+    config: OpenRouterConfig
+  ) {
     // Add reasoning if specified
     if (request.reason) {
-      orRequest.reasoning = {
+      params.reasoning = {
         enabled: true,
         effort: request.reason.effort,
         max_tokens: request.reason.maxTokens,
@@ -230,7 +274,7 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> {
     if (config.defaultParams) {
       const dp = config.defaultParams;
 
-      orRequest.provider = {
+      params.provider = {
         allow_fallbacks: dp.allowFallbacks,
         require_parameters: dp.requireParameters,
         data_collection: dp.dataCollection,
@@ -239,250 +283,127 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> {
       };
 
       if (dp.transforms) {
-        orRequest.transforms = dp.transforms;
+        params.transforms = dp.transforms;
       }
     }
-
-    return orRequest;
   }
 
   /**
-   * Override createExecutor to include cost from OpenRouter's usage data
+   * 
+   * @param expected 
+   * @param response 
    */
-  createExecutor<TContext, TMetadata>(config?: OpenRouterConfig): Executor<TContext, TMetadata> {
-    const effectiveConfig = config || this.config;
-    const client = this.createClient(effectiveConfig);
-
-    return async (request: Request, _ctx: TContext, metadata?: TMetadata, signal?: AbortSignal): Promise<Response> => {
-      const model = (metadata as any)?.model;
-      if (!model) {
-        throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
+  protected override augmentChatResponse(
+    expected: OpenRouterChatResponse, 
+    response: Response,
+    config: OpenRouterConfig
+  ) {
+    const message = expected.choices?.[0]?.message;
+    if (message) {
+      if (message.reasoning) {
+        response.reasoning = message.reasoning;
+      } else if (message.reasoning_details) {
+        response.reasoning = message.reasoning_details
+          .map(rd => [rd.text, rd.summary])
+          .flat()
+          .filter(Boolean)
+          .join('\n');
       }
-
-      try {
-        const messages = this.convertMessages(request);
-        const tools = this.convertTools(request);
-        const tool_choice = this.convertToolChoice(request);
-        const response_format = this.convertResponseFormat(request);
-
-        let params: any = this.customizeChatParams({
-          model,
-          messages,
-          temperature: request.temperature,
-          top_p: request.topP,
-          max_tokens: request.maxTokens,
-          stop: request.stop,
-          tools,
-          tool_choice,
-          response_format,
-          stream: false,
-        }, effectiveConfig, request);
-
-        const completion = await client.chat.completions.create(params, { signal });
-
-        const choice = completion.choices[0];
-        if (!choice) {
-          throw new ProviderError(this.name, 'No choices in response');
-        }
-
-        const toolCalls = choice.message.tool_calls
-          ?.filter((tc) => tc.type === 'function')
-          .map((tc) => ({
-            id: tc.id,
-            name: tc.function.name,
-            arguments: tc.function.arguments,
-          }));
-
-        const reasoning = this.extractReasoning(choice.message);
-
-        // Extract cost from OpenRouter's extended usage field
-        const orUsage = completion.usage as any as OpenRouterUsage | undefined;
-        const cost = orUsage?.total_cost;
-
-        return {
-          content: choice.message.content || '',
-          toolCalls,
-          finishReason: choice.finish_reason as any || 'stop',
-          refusal: (choice.message as any).refusal || undefined,
-          reasoning,
-          usage: {
-            inputTokens: completion.usage?.prompt_tokens ?? -1,
-            outputTokens: completion.usage?.completion_tokens ?? -1,
-            totalTokens: completion.usage?.total_tokens ?? -1,
-            cost,
-          },
-        };
-      } catch (error) {
-        if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-          throw new RateLimitError(this.name, error.message);
-        }
-        if (error instanceof ProviderError) throw error;
-        throw new ProviderError(this.name, 'Request failed', error as Error);
+    }
+    const usage = expected.usage;
+    if (usage) {
+      if (!response.usage) {
+        response.usage = {};
       }
-    };
+      if (usage.completion_tokens) {
+        response.usage.outputTokens = usage.completion_tokens;
+      }
+      if (usage.prompt_tokens) {
+        response.usage.inputTokens = usage.prompt_tokens;
+      }
+      if (usage.total_tokens) {
+        response.usage.totalTokens = usage.total_tokens;
+      }
+      if (usage.cost) {
+        response.usage.cost = usage.cost;
+      }
+    }
   }
 
-  /**
-   * Override createStreamer to include cost from OpenRouter's usage data
-   */
-  createStreamer<TContext, TMetadata>(config?: OpenRouterConfig): Streamer<TContext, TMetadata> {
-    const effectiveConfig = config || this.config;
-    const client = this.createClient(effectiveConfig);
-
-    return async function* (
-      this: OpenRouterProvider,
-      request: Request,
-      _ctx: TContext,
-      metadata?: TMetadata,
-      signal?: AbortSignal
-    ): AsyncGenerator<Chunk> {
-      const model = (metadata as any)?.model;
-      if (!model) {
-        throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
+  protected override augmentChatChunk(
+    expected: OpenRouterChatChunk,
+    chunk: Chunk,
+    config: OpenRouterConfig
+  ) {
+    
+    const usage = expected.usage;
+    if (usage) {
+      if (!chunk.usage) {
+        chunk.usage = {};
       }
-
-      try {
-        const messages = this.convertMessages(request);
-        const tools = this.convertTools(request);
-        const tool_choice = this.convertToolChoice(request);
-        const response_format = this.convertResponseFormat(request);
-
-        let params: any = this.customizeChatParams({
-          model,
-          messages,
-          temperature: request.temperature,
-          top_p: request.topP,
-          max_tokens: request.maxTokens,
-          stop: request.stop,
-          tools,
-          tool_choice,
-          response_format,
-          stream: true,
-        }, effectiveConfig, request);
-
-        const stream = await client.chat.completions.create(params, { signal });
-
-        const toolCallsMap = new Map<number, { id?: string; name?: string; arguments: string }>();
-
-        for await (const chunk of stream) {
-          if (signal?.aborted) {
-            throw new Error('Request aborted');
-          }
-
-          const delta = chunk.choices[0]?.delta;
-          if (!delta) continue;
-
-          if (delta.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              const existing = toolCallsMap.get(tc.index) || { id: '', name: '', arguments: '' };
-
-              if (tc.id) existing.id = tc.id;
-              if (tc.function?.name) existing.name = tc.function.name;
-              if (tc.function?.arguments) existing.arguments += tc.function.arguments;
-
-              toolCallsMap.set(tc.index, existing);
-
-              if (existing.id && existing.name && existing.arguments) {
-                yield {
-                  toolCall: {
-                    id: existing.id,
-                    name: existing.name,
-                    arguments: existing.arguments,
-                  },
-                  finishReason: 'tool_calls',
-                };
-              }
-            }
-          }
-
-          const reasoning = this.extractChunkReasoning(delta);
-          const refusal = (delta as any).refusal || undefined;
-
-          // Extract cost from OpenRouter's extended usage field
-          const orUsage = chunk.usage as any as OpenRouterUsage | undefined;
-          const cost = orUsage?.total_cost;
-
-          yield {
-            content: delta.content || undefined,
-            finishReason: chunk.choices[0]?.finish_reason as any,
-            refusal,
-            reasoning,
-            usage: chunk.usage
-              ? {
-                  inputTokens: chunk.usage.prompt_tokens || 0,
-                  outputTokens: chunk.usage.completion_tokens || 0,
-                  totalTokens: chunk.usage.total_tokens || 0,
-                  cost,
-                }
-              : undefined,
-          };
-        }
-
-        if (toolCallsMap.size > 0) {
-          const toolCalls = Array.from(toolCallsMap.values())
-            .filter((tc) => tc.id && tc.name)
-            .map((tc) => ({
-              id: tc.id!,
-              name: tc.name!,
-              arguments: tc.arguments,
-            }));
-
-          for (const toolCall of toolCalls) {
-            yield {
-              toolCall,
-              finishReason: 'tool_calls',
-            };
-          }
-        }
-      } catch (error) {
-        if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-          throw new RateLimitError(this.name, error.message);
-        }
-        if (error instanceof ProviderError) throw error;
-        throw new ProviderError(this.name, 'Streaming failed', error as Error);
+      if (usage.completion_tokens) {
+        chunk.usage.outputTokens = usage.completion_tokens;
       }
-    }.bind(this);
+      if (usage.prompt_tokens) {
+        chunk.usage.inputTokens = usage.prompt_tokens;
+      }
+      if (usage.total_tokens) {
+        chunk.usage.totalTokens = usage.total_tokens;
+      }
+      if (usage.cost) {
+        chunk.usage.cost = usage.cost;
+      }
+    }
+    if (expected.reasoning) {
+      chunk.reasoning = expected.reasoning;
+    } else if (expected.reasoning_details) {
+      chunk.reasoning = expected.reasoning_details
+        .map(rd => [rd.text, rd.summary])
+        .flat()
+        .filter(Boolean)
+        .join('\n');
+    }
   }
 
   /**
    * OpenRouter does not support image generation
    */
-  generateImage = undefined;
+  override generateImage = undefined;
 
   /**
    * OpenRouter does not support image generation streaming
    */
-  generateImageStream = undefined;
+  override generateImageStream = undefined;
 
   /**
    * OpenRouter does not support image editing
    */
-  editImage = undefined;
+  override editImage = undefined;
+
+  /**
+   * OpenRouter does not support image editing
+   */
+  override editImageStream = undefined;
 
   /**
    * OpenRouter does not support audio transcription
    */
-  transcribe = undefined;
+  override transcribe = undefined;
 
   /**
    * OpenRouter does not support audio transcription streaming
    */
-  transcribeStream = undefined;
+  override transcribeStream = undefined;
 
   /**
    * OpenRouter does not support speech synthesis
    */
-  generateSpeech = undefined;
-
-  /**
-   * OpenRouter does not support speech synthesis streaming
-   */
-  generateSpeechStream = undefined;
+  override speech = undefined;
 
   /**
    * OpenRouter does not support embeddings
    */
-  embed = undefined;
+  override embed = undefined;
 
   /**
    * Override listModels to use OpenRouter's model API with ZDR support

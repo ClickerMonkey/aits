@@ -437,7 +437,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Requires a ModelTransformer for the specific model being used.
    */
-  async generateSpeech<TContext>(
+  async speech<TContext>(
     request: SpeechRequest,
     ctx: TContext,
     config?: ReplicateConfig

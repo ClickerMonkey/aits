@@ -100,12 +100,9 @@ async function fetchZDRModels(): Promise<Set<string>> {
 function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>): ModelInfo {
   const capabilities = detectCapabilitiesFromModality(model.architecture.modality, model.id);
   const tier = detectTier(model.name);
-  const supportsZDR = detectZDRFromModeration(model.top_provider.is_moderated);
-
+  
   // Update ZDR support from ZDR endpoint (more reliable)
   if (zdrModelIds.has(model.id)) {
-    capabilities.add('zdr');
-  } else if (supportsZDR) {
     capabilities.add('zdr');
   }
 

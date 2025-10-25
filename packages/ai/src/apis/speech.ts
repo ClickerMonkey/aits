@@ -8,14 +8,11 @@ import type { AI } from '../ai';
 import type {
   AIBaseTypes,
   AIContext,
-  AIProviderNames,
-  ModelHandler,
   ModelCapability,
+  ModelHandlerFor,
   SelectedModelFor,
-  SpeechChunk,
   SpeechRequest,
-  SpeechResponse,
-  ModelHandlerFor
+  SpeechResponse
 } from '../types';
 import { BaseAPI } from './base';
 
@@ -23,7 +20,7 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   T,
   SpeechRequest,
   SpeechResponse,
-  SpeechChunk
+  SpeechResponse
 > {
   constructor(ai: AI<T>) {
     super(ai);
@@ -58,7 +55,7 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     selected: SelectedModelFor<T>,
     ctx: AIContext<T>
   ): Promise<SpeechResponse> {
-    return await selected.provider.generateSpeech!(
+    return await selected.provider.speech!(
       request,
       ctx,
       selected.providerConfig
@@ -69,12 +66,8 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     request: SpeechRequest,
     selected: SelectedModelFor<T>,
     ctx: AIContext<T>
-  ): AsyncIterable<SpeechChunk> {
-    yield* selected.provider.generateSpeechStream!(
-      request,
-      ctx,
-      selected.providerConfig
-    );
+  ): AsyncIterable<SpeechResponse> {
+    yield this.executeRequest(request, selected, ctx);
   }
 
   // ============================================================================
@@ -82,13 +75,13 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   // ============================================================================
 
   protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.generateSpeech) {
+    if (!selected.provider.speech) {
       throw new Error(`Provider ${selected.model.provider} does not support speech generation`);
     }
   }
 
   protected validateProviderStreamingCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.generateSpeechStream) {
+    if (!selected.provider.speech) {
       throw new Error(`Provider ${selected.model.provider} does not support streaming speech generation`);
     }
   }
@@ -97,26 +90,12 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     return Math.ceil(request.text.length / 4);
   }
 
-  protected responseToChunk(response: SpeechResponse): SpeechChunk {
-    return {
-      audioData: response.audioBuffer,
-      done: true,
-    };
+  protected responseToChunk(response: SpeechResponse): SpeechResponse {
+    return response;
   }
 
-  protected chunksToResponse(chunks: SpeechChunk[]): SpeechResponse {
-    const buffers = chunks
-      .filter(c => c.audioData)
-      .map(c => c.audioData!);
-
-    const totalLength = buffers.reduce((sum, buf) => sum + buf.length, 0);
-    const combined = Buffer.concat(buffers, totalLength);
-
-    return {
-      audioBuffer: combined,
-      contentType: 'audio/mpeg',
-      model: 'unknown',
-    };
+  protected chunksToResponse(chunks: SpeechResponse[], model: string): SpeechResponse {
+    return chunks[0];
   }
 
   protected getHandlerGetMethod(
@@ -127,15 +106,15 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
 
   protected getHandlerStreamMethod(
     handler?: ModelHandlerFor<T>
-  ): ((request: SpeechRequest, ctx: AIContext<T>) => AsyncIterable<SpeechChunk>) | undefined {
-    return handler?.speech?.stream;
+  ): ((request: SpeechRequest, ctx: AIContext<T>) => AsyncIterable<SpeechResponse>) | undefined {
+    return undefined;
   }
 
   protected hasProviderExecutor(selected: SelectedModelFor<T>): boolean {
-    return !!selected.provider.generateSpeech;
+    return !!selected.provider.speech;
   }
 
   protected hasProviderStreamer(selected: SelectedModelFor<T>): boolean {
-    return !!selected.provider.generateSpeechStream;
+    return false;
   }
 }

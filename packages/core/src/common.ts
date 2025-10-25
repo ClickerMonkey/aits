@@ -1,3 +1,4 @@
+import { Usage } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -199,3 +200,38 @@ export type Resolved<T> = T extends Promise<infer U>
   : T extends AsyncGenerator<any, infer U, any> 
     ? U 
     : T;
+
+/**
+ * Accumulates usage statistics by adding values from one Usage object to another.
+ * 
+ * @param target - The target Usage object to accumulate into.
+ * @param add - The Usage object to add from.
+ * @returns 
+ */
+export function accumulateUsage(target: Usage, add?: Usage) {
+  if (!add) {
+    return;
+  }
+
+  target.cachedTokens = add.cachedTokens
+    ? (target.cachedTokens || 0) + add.cachedTokens
+    : target.cachedTokens;
+  target.cost = add.cost
+    ? (target.cost || 0) + add.cost
+    : target.cost;
+  target.inputTokens = add.inputTokens
+    ? (target.inputTokens || 0) + add.inputTokens
+    : target.inputTokens;
+  target.outputTokens = add.outputTokens
+    ? (target.outputTokens || 0) + add.outputTokens
+    : target.outputTokens;
+  target.reasoningTokens = add.reasoningTokens
+    ? (target.reasoningTokens || 0) + add.reasoningTokens
+    : target.reasoningTokens;
+  target.totalTokens = add.totalTokens
+    ? (target.totalTokens || 0) + add.totalTokens
+    : target.totalTokens;
+  target.seconds = add.seconds
+    ? (target.seconds || 0) + add.seconds
+    : target.seconds;
+}

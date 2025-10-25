@@ -13,8 +13,11 @@ import type {
   ModelInfo,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  ImageGenerationChunk,
+  ImageAnalyzeRequest,
   TranscriptionRequest,
   TranscriptionResponse,
+  TranscriptionChunk,
   SpeechRequest,
   SpeechResponse,
   EmbeddingRequest,
@@ -248,22 +251,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // Optional Override Methods for Request Customization
   // ============================================================================
 
-  /**
-   * Customize chat completion params before sending to API.
-   *
-   * Override this method to modify request parameters for custom providers
-   * or to add provider-specific features.
-   *
-   * @param params OpenAI chat completion parameters
-   * @param config Provider configuration
-   * @param request Original AITS request
-   * @returns Modified parameters
-   */
-  protected customizeChatParams?(
-    params: OpenAI.Chat.ChatCompletionCreateParams,
-    config: TConfig,
-    request: Request
-  ): OpenAI.Chat.ChatCompletionCreateParams | any;
 
   /**
    * Customize image generation params before sending to API.
@@ -302,42 +289,51 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   protected customizeEmbeddingParams?(params: any, config: TConfig): any;
 
   /**
-   * Extract reasoning content from response message.
-   * Override this method for provider-specific reasoning formats.
+   * Customize chat completion params before sending to API.
    *
-   * @param message Response message
-   * @returns Extracted reasoning text or undefined
+   * Override this method to modify request parameters for custom providers
+   * or to add provider-specific features.
+   *
+   * @param params OpenAI chat completion parameters
+   * @param config Provider configuration
+   * @param request Original AITS request
+   * @returns Modified parameters
    */
-  protected extractReasoning(message: any): string | undefined {
-    const reasoning =
-      'reasoning' in message && typeof message.reasoning === 'string'
-        ? message.reasoning
-        : undefined;
-    const reasoningDetails =
-      'reasoning_details' in message
-        ? (message.reasoning_details as Array<{ summary?: string; text?: string }> | undefined)
-        : undefined;
-
-    return reasoning ?? reasoningDetails?.map((r) => r.summary || r.text)?.filter(Boolean)?.join('\n');
+  protected augmentChatRequest<TExpected extends OpenAI.Chat.ChatCompletionCreateParams>(
+    params: TExpected,
+    request: Request,
+    config: TConfig,
+  ) {
+    // No-op by default
   }
 
   /**
-   * Extract reasoning content from streaming chunk delta.
-   * Override this method for provider-specific reasoning formats.
-   *
-   * @param delta Chunk delta
-   * @returns Extracted reasoning text or undefined
+   * Augment chat chunk with provider-specific data.
+   * 
+   * @param expected 
+   * @param chunk 
    */
-  protected extractChunkReasoning(delta: any): string | undefined {
-    const reasoningDetails =
-      'reasoning_details' in delta && delta.reasoning_details
-        ? (delta.reasoning_details as Array<{ summary?: string; text?: string }>)
-            .map((r) => r.summary || r.text)
-            .filter(Boolean)
-            .join('\n')
-        : undefined;
+  protected augmentChatChunk<TExpected extends OpenAI.Chat.Completions.ChatCompletionChunk>(
+    expected: TExpected, 
+    chunk: Chunk,
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
 
-    return reasoningDetails;
+  /**
+   * Augment chat response with provider-specific data.
+   * 
+   * @param openai OpenAI chat completion response
+   * @param response AITS response object to augment
+   * @returns 
+   */
+  protected augmentChatResponse<TExpected extends OpenAI.Chat.Completions.ChatCompletion>(
+    expected: TExpected, 
+    response: Response,
+    config: TConfig,
+  ) {
+    // No-op by default
   }
 
   // ============================================================================
@@ -758,17 +754,17 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           temperature: request.temperature,
           top_p: request.topP,
           max_tokens: request.maxTokens,
+          frequency_penalty: request.frequencyPenalty,
+          presence_penalty: request.presencePenalty,
           stop: request.stop,
           tools,
           tool_choice,
           response_format,
+          reasoning_effort: request.reason?.effort,
           stream: false,
         };
 
-        // Apply provider-specific customizations
-        if (this.customizeChatParams) {
-          params = this.customizeChatParams(params, effectiveConfig, request);
-        }
+        this.augmentChatRequest(params, request, effectiveConfig);
 
         const completion = await client.chat.completions.create(params, { signal });
 
@@ -785,21 +781,22 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             arguments: tc.function.arguments,
           }));
 
-        // Extract reasoning using overrideable method
-        const reasoning = this.extractReasoning(choice.message);
-
-        return {
+        const response: Response = {
           content: choice.message.content || '',
           toolCalls,
-          finishReason: (choice.finish_reason as FinishReason) || 'stop',
-          refusal: (choice.message as any).refusal || undefined,
-          reasoning,
+          finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : choice.finish_reason,
+          refusal: choice.finish_reason === 'content_filter' ? choice.message.content || undefined : undefined,
+          model,
           usage: {
             inputTokens: completion.usage?.prompt_tokens ?? -1,
             outputTokens: completion.usage?.completion_tokens ?? -1,
             totalTokens: completion.usage?.total_tokens ?? -1,
           },
         };
+
+        this.augmentChatResponse(completion, response, effectiveConfig);
+
+        return response;
       } catch (error) {
         if (error instanceof Error && 'status' in error && (error as any).status === 429) {
           throw new RateLimitError(this.name, error.message);
@@ -854,87 +851,102 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           tool_choice,
           response_format,
           stream: true,
+          stream_options: { include_usage: true },
         };
 
-        // Apply provider-specific customizations
-        if (this.customizeChatParams) {
-          params = this.customizeChatParams(params, effectiveConfig, request);
-        }
+        this.augmentChatRequest(params, request, effectiveConfig);
 
         const stream = await client.chat.completions.create(params, { signal });
 
         // Track accumulated tool calls
-        const toolCallsMap = new Map<number, { id?: string; name?: string; arguments: string }>();
-
+        type ToolCallItem = { id: string; name: string; arguments: string, named: boolean, finished: boolean, updated: boolean };
+        const toolCallsMap = new Map<number, ToolCallItem>();
+        const toolCalls: ToolCallItem[] = [];
+        
         for await (const chunk of stream) {
           if (signal?.aborted) {
             throw new Error('Request aborted');
           }
 
-          const delta = chunk.choices[0]?.delta;
-          if (!delta) continue;
+          const choice = chunk?.choices[0];
+          const delta = choice?.delta;
+          
+          const yieldChunk: Chunk = {
+            content: delta.content || undefined,
+            finishReason: choice?.finish_reason as FinishReason | undefined,
+            refusal: delta?.refusal ?? undefined,
+            usage: !chunk.usage ? undefined : {
+              inputTokens: chunk.usage.prompt_tokens || 0,
+              outputTokens: chunk.usage.completion_tokens || 0,
+              totalTokens: chunk.usage.total_tokens || 0,
+            },
+          };
 
           // Handle tool calls
-          if (delta.tool_calls) {
+          for (const toolCall of toolCalls) {
+            toolCall.updated = false;
+          }
+
+          if (delta?.tool_calls) {
             for (const tc of delta.tool_calls) {
-              const existing = toolCallsMap.get(tc.index) || { id: '', name: '', arguments: '' };
+              const existing = toolCallsMap.get(tc.index);
+              const toolCall = existing || { id: '', name: '', arguments: '', named: false, finished: false, updated: true };
 
-              if (tc.id) existing.id = tc.id;
-              if (tc.function?.name) existing.name = tc.function.name;
-              if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+              if (tc.id) {
+                toolCall.id = tc.id;
+                toolCall.updated = true;
+              }
+              if (tc.function?.name) {
+                toolCall.name = tc.function.name;
+                toolCall.updated = true;
+              }
+              if (tc.function?.arguments) {
+                toolCall.arguments += tc.function.arguments;
+                toolCall.updated = true;
+              }
+              if (!existing) {
+                toolCallsMap.set(tc.index, toolCall);
+                toolCalls.push(toolCall);
+              }
 
-              toolCallsMap.set(tc.index, existing);
-
-              // Yield tool call as it arrives if complete
-              if (existing.id && existing.name && existing.arguments) {
-                yield {
-                  toolCall: {
-                    id: existing.id,
-                    name: existing.name,
-                    arguments: existing.arguments,
-                  },
-                  finishReason: 'tool_calls' as FinishReason,
-                };
+              if (toolCall.arguments) {
+                if (!toolCall.named) {
+                  yieldChunk.toolCallNamed = existing;
+                  toolCall.named = true;
+                } else {
+                  yieldChunk.toolCallArguments = existing;
+                }
               }
             }
           }
 
-          // Handle reasoning using overrideable method
-          const reasoning = this.extractChunkReasoning(delta);
+          for (const toolCall of toolCalls) {
+            if (!toolCall.updated && !toolCall.finished) {
+              toolCall.finished = true;
+              yieldChunk.toolCall = toolCall;
+            }
+          }
 
-          // Handle refusal
-          const refusal = (delta as any).refusal || undefined;
+          // Augment chunk with provider-specific data
+          this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
 
-          yield {
-            content: delta.content || undefined,
-            finishReason: chunk.choices[0]?.finish_reason as FinishReason | undefined,
-            refusal,
-            reasoning,
-            usage: chunk.usage
-              ? {
-                  inputTokens: chunk.usage.prompt_tokens || 0,
-                  outputTokens: chunk.usage.completion_tokens || 0,
-                  totalTokens: chunk.usage.total_tokens || 0,
-                }
-              : undefined,
-          };
+          // Send it!
+          yield yieldChunk;
         }
 
-        // Emit any remaining tool calls that weren't yielded yet
-        if (toolCallsMap.size > 0) {
-          const toolCalls = Array.from(toolCallsMap.values())
-            .filter((tc) => tc.id && tc.name)
-            .map((tc) => ({
-              id: tc.id!,
-              name: tc.name!,
-              arguments: tc.arguments,
-            }));
+        // All tool calls should've been emitted, but just in case
+        for (const toolCall of toolCalls) {
+          if (!toolCall.finished) {
+            toolCall.finished = true;
 
-          for (const toolCall of toolCalls) {
-            yield {
-              toolCall,
-              finishReason: 'tool_calls' as FinishReason,
-            };
+            const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = { choices: [], created: 0, id: '', model: '', object: 'chat.completion.chunk' };
+            const yieldChunk: Chunk = { toolCall };
+
+            // Augment chunk with provider-specific data  
+            this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
+
+            // Send it!
+            yield { toolCall };
           }
         }
       } catch (error) {
@@ -959,23 +971,30 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async generateImage<TContext>(
+  generateImage: Provider['generateImage'] = async <TContext>(
     request: ImageGenerationRequest,
     _ctx: TContext,
     config?: TConfig
-  ): Promise<ImageGenerationResponse> {
+  ): Promise<ImageGenerationResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      let params: any = {
-        model: request.model || 'dall-e-3',
+      // TODO more flexible options on ImageGenerationRequest that is more in line with all the features
+      // of what image generation models can do. And then we narrow it down here.
+      // Ideally a party of model/provider selection is finding one that also supports the requested options.
+
+      const model = request.model || 'dall-e-3';
+
+      let params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
+        model,
         prompt: request.prompt,
         n: request.n,
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
         quality: request.quality as 'standard' | 'hd' | undefined,
         style: request.style as 'vivid' | 'natural' | undefined,
         response_format: request.responseFormat,
+        stream: false,
       };
 
       // Apply provider-specific customizations
@@ -991,7 +1010,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           b64_json: img.b64_json || undefined,
           revisedPrompt: img.revised_prompt || undefined,
         })),
-        model: request.model || 'dall-e-3',
+        model,
+        usage: {
+          inputTokens: response.usage?.input_tokens || 0,
+          outputTokens: response.usage?.output_tokens || 0,
+          totalTokens: response.usage?.total_tokens || 0,
+        },
       };
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
@@ -1014,7 +1038,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async *generateImageStream<TContext>(
+  generateImageStream: Provider['generateImageStream'] = async function* <TContext>(
+    this: OpenAIProvider<TConfig>,
     request: ImageGenerationRequest,
     _ctx: TContext,
     config?: TConfig
@@ -1030,40 +1055,39 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         done: false,
       };
 
-      let params: any = {
+      let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
+      let imageCount = 0;
+
+      let params: OpenAI.Images.ImageGenerateParamsStreaming = {
         model: request.model || 'dall-e-3',
         prompt: request.prompt,
-        n: request.n,
+        n: 1,
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
         quality: request.quality as 'standard' | 'hd' | undefined,
         style: request.style as 'vivid' | 'natural' | undefined,
+        partial_images: imageStreams,
         response_format: request.responseFormat,
+        stream: true,
       };
 
       if (this.customizeImageParams) {
         params = this.customizeImageParams(params, effectiveConfig);
       }
 
-      // Yield processing status
-      yield {
-        status: 'Generating image...',
-        progress: 50,
-        done: false,
-      };
-
       const response = await client.images.generate(params);
 
       // Yield completion with results
-      for (const img of response.data || []) {
+      for await (const img of response) {
+        const progress = (imageCount + 1) / (imageStreams + 1);
         yield {
-          status: 'Image generation complete',
-          progress: 100,
-          done: true,
+          status: `Image generation ${(progress * 100).toFixed(0)}`,
+          progress,
+          done: img.type === 'image_generation.completed',
           image: {
-            url: img.url || undefined,
             b64_json: img.b64_json || undefined,
           },
         };
+        imageCount++;
       }
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
@@ -1123,19 +1147,20 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If transcription fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async transcribe<TContext>(
+  transcribe: Provider['transcribe'] = async <TContext>(
     request: TranscriptionRequest,
     _ctx: TContext,
     config?: TConfig
-  ): Promise<TranscriptionResponse> {
+  ): Promise<TranscriptionResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
       // Convert audio to appropriate format
       let file: Uploadable = this.toUploadableAudio(request.audio);
+      const model = request.model || 'whisper-1';
       let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        model: request.model || 'whisper-1',
+        model,
         file,
         language: request.language,
         prompt: request.prompt,
@@ -1151,31 +1176,18 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
       const response = await client.audio.transcriptions.create(params);
 
-      // Handle different response formats
-      if (typeof response === 'string') {
-        return {
-          text: response,
-          model: request.model || 'whisper-1',
-        };
-      }
-
-      interface VerboseResponse {
-        text: string;
-        language?: string;
-        duration?: number;
-        words?: Array<{ word: string; start: number; end: number }>;
-        segments?: Array<{ text: string; start: number; end: number }>;
-      }
-
-      const verboseResponse = response as VerboseResponse;
-
       return {
-        text: verboseResponse.text,
-        language: verboseResponse.language,
-        duration: verboseResponse.duration,
-        words: verboseResponse.words,
-        segments: verboseResponse.segments,
-        model: request.model || 'whisper-1',
+        text: response.text,
+        model,
+        usage: {
+          ...(response.usage?.type === 'tokens' ? {
+            outputTokens: response.usage.output_tokens ?? 0,
+            inputTokens: response.usage.input_tokens ?? 0,
+            totalTokens: response.usage.total_tokens ?? 0,
+          }: {
+            seconds: response.usage?.seconds ?? 0,
+          }),
+        },
       };
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
@@ -1198,7 +1210,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If transcription fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async *transcribeStream<TContext>(
+  transcribeStream: Provider['transcribeStream'] = async function* <TContext>(
+    this: OpenAIProvider<TConfig>,
     request: TranscriptionRequest,
     _ctx: TContext,
     config?: TConfig
@@ -1308,132 +1321,50 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If speech generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async generateSpeech<TContext>(
+  speech: Provider['speech'] = async <TContext>(
     request: SpeechRequest,
     _ctx: TContext,
     config?: TConfig
-  ): Promise<SpeechResponse> {
+  ): Promise<SpeechResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      const voice = request.voice || 'alloy';
-      const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-      const selectedVoice = validVoices.includes(voice) ? voice : 'alloy';
+      const { text: input, instructions, speed, model: requestModel } = request;
 
-      let params: any = {
-        model: request.model || 'tts-1',
-        input: request.text,
-        voice: selectedVoice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
-        speed: request.speed,
-        response_format: request.responseFormat,
+      const model = requestModel || 'tts-1';
+      const voiceDefault = 'alloy' as const;
+      const voiceValid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
+      const voiceRequest = request.voice || voiceDefault;
+      const voice = (voiceValid as readonly string[]).includes(voiceRequest) ? voiceRequest : voiceDefault;
+      const responseFormat = request.responseFormat || 'opus';
+
+      let params: OpenAI.Audio.Speech.SpeechCreateParams = {
+        model,
+        input,
+        instructions,
+        voice,
+        speed,
+        response_format: responseFormat,
       };
 
-      // Apply provider-specific customizations
       if (this.customizeSpeechParams) {
         params = this.customizeSpeechParams(params, effectiveConfig);
       }
 
       const response = await client.audio.speech.create(params);
 
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-      const format = request.responseFormat || 'mp3';
-      const contentType =
-        format === 'mp3'
-          ? 'audio/mpeg'
-          : format === 'opus'
-          ? 'audio/opus'
-          : format === 'aac'
-          ? 'audio/aac'
-          : format === 'flac'
-          ? 'audio/flac'
-          : format === 'wav'
-          ? 'audio/wav'
-          : format === 'pcm'
-          ? 'audio/pcm'
-          : 'audio/mpeg';
-
       return {
-        audioBuffer,
-        contentType,
-        model: request.model || 'tts-1',
+        model,
+        audio: response.body as ReadableStream<any>,
+        responseFormat,
       };
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
         throw new RateLimitError(this.name, error.message);
       }
       throw new ProviderError(this.name, 'Speech generation failed', error as Error);
-    }
   }
-
-  /**
-   * Generate speech with streaming audio chunks.
-   *
-   * Note: OpenAI's API doesn't natively support streaming speech generation,
-   * so this implementation returns the complete audio with progress indicators.
-   *
-   * @param request Speech synthesis request parameters
-   * @param _ctx Context object (not used)
-   * @param config Optional configuration override
-   * @returns Async generator yielding speech chunks
-   * @throws {ProviderError} If speech generation fails
-   * @throws {RateLimitError} If rate limit is exceeded
-   */
-  async *generateSpeechStream<TContext>(
-    request: SpeechRequest,
-    _ctx: TContext,
-    config?: TConfig
-  ): AsyncIterable<SpeechChunk> {
-    const effectiveConfig = config || this.config;
-    const client = this.createClient(effectiveConfig);
-
-    try {
-      // Yield initial status
-      yield {
-        status: 'Starting speech generation...',
-        progress: 0,
-        done: false,
-      };
-
-      const voice = request.voice || 'alloy';
-      const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-      const selectedVoice = validVoices.includes(voice) ? voice : 'alloy';
-
-      let params: any = {
-        model: request.model || 'tts-1',
-        input: request.text,
-        voice: selectedVoice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
-        speed: request.speed,
-        response_format: request.responseFormat,
-      };
-
-      if (this.customizeSpeechParams) {
-        params = this.customizeSpeechParams(params, effectiveConfig);
-      }
-
-      // Yield processing status
-      yield {
-        status: 'Generating speech...',
-        progress: 50,
-        done: false,
-      };
-
-      const response = await client.audio.speech.create(params);
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-
-      // Yield complete audio
-      yield {
-        audioData: audioBuffer,
-        progress: 100,
-        status: 'Speech generation complete',
-        done: true,
-      };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Speech generation streaming failed', error as Error);
-    }
   }
 
   /**
@@ -1448,11 +1379,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If embedding generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async embed<TContext>(
+  embed: Provider['embed'] = async <TContext>(
     request: EmbeddingRequest,
     _ctx: TContext,
     config?: TConfig
-  ): Promise<EmbeddingResponse> {
+  ): Promise<EmbeddingResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
@@ -1490,6 +1421,123 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         throw new RateLimitError(this.name, error.message);
       }
       throw new ProviderError(this.name, 'Embedding generation failed', error as Error);
+    }
+  }
+
+  /**
+   * Analyze images using vision-capable models.
+   *
+   * This method converts the image analysis request into a chat request
+   * with image content and calls the chat API internally.
+   *
+   * @param request Image analysis request parameters
+   * @param _ctx Context object (not used)
+   * @param config Optional configuration override
+   * @returns Analysis response with text content
+   * @throws {ProviderError} If analysis fails
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  analyzeImage: Provider['analyzeImage'] = async <TContext>(
+    request: ImageAnalyzeRequest,
+    _ctx: TContext,
+    config?: TConfig
+  ): Promise<Response> => {
+    const effectiveConfig = config || this.config;
+    const executor = this.createExecutor(effectiveConfig);
+
+    try {
+      // Convert ImageAnalyzeRequest to chat Request
+      const chatRequest: Request = {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', content: request.prompt },
+              ...request.images.map((image): MessageContent => ({
+                type: 'image',
+                content: image,
+              })),
+            ],
+          },
+        ],
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+      };
+
+      // Use the chat executor to analyze the images
+      const response = await executor(
+        chatRequest,
+        _ctx,
+        { model: request.model } as any,
+        undefined
+      );
+
+      return response;
+    } catch (error) {
+      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
+        throw new RateLimitError(this.name, error.message);
+      }
+      if (error instanceof ProviderError) throw error;
+      throw new ProviderError(this.name, 'Image analysis failed', error as Error);
+    }
+  }
+
+  /**
+   * Analyze images with streaming response.
+   *
+   * This method converts the image analysis request into a chat request
+   * with image content and calls the streaming chat API internally.
+   *
+   * @param request Image analysis request parameters
+   * @param _ctx Context object (not used)
+   * @param config Optional configuration override
+   * @returns Async generator yielding response chunks
+   * @throws {ProviderError} If analysis fails
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  analyzeImageStream: Provider['analyzeImageStream'] = async function* <TContext>(
+    this: OpenAIProvider<TConfig>,
+    request: ImageAnalyzeRequest,
+    _ctx: TContext,
+    config?: TConfig
+  ): AsyncIterable<Chunk> {
+    const effectiveConfig = config || this.config;
+    const streamer = this.createStreamer(effectiveConfig);
+
+    try {
+      // Convert ImageAnalyzeRequest to chat Request
+      const chatRequest: Request = {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', content: request.prompt },
+              ...request.images.map((image): MessageContent => ({
+                type: 'image',
+                content: image,
+              })),
+            ],
+          },
+        ],
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+      };
+
+      // Use the chat streamer to analyze the images
+      for await (const chunk of streamer(
+        chatRequest,
+        _ctx,
+        { model: request.model } as any,
+        undefined
+      )) {
+        yield chunk;
+      }
+    } catch (error) {
+      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
+        throw new RateLimitError(this.name, error.message);
+      }
+      if (error instanceof ProviderError) throw error;
+      throw new ProviderError(this.name, 'Image analysis streaming failed', error as Error);
     }
   }
 }

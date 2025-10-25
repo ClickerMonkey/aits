@@ -21,6 +21,8 @@ import type {
   ComponentOutput,
   OptionalParams,
   ComponentCompatible,
+  BaseResponse,
+  BaseChunk,
 } from '@aits/core';
 import type { PromptInput } from '@aits/core';
 import type { ToolInput } from '@aits/core';
@@ -470,6 +472,10 @@ export interface ImageGenerationRequest {
   style?: 'vivid' | 'natural';
   // Response format
   responseFormat?: 'url' | 'b64_json';
+  // Seed for reproducibility
+  seed?: number;
+  // The number of partial images to generate for progress tracking for streaming operations
+  streamCount?: number;
 }
 
 /**
@@ -495,23 +501,19 @@ export interface ImageEditRequest {
 /**
  * Response from image generation/editing operations.
  */
-export interface ImageGenerationResponse {
+export interface ImageGenerationResponse extends BaseResponse {
   // Generated images
   images: Array<{
     url?: string;
     b64_json?: string;
     revisedPrompt?: string;
   }>;
-  // Model used
-  model: string;
-  // Operation cost (if calculated)
-  cost?: number;
 }
 
 /**
  * Streaming chunk for image generation progress.
  */
-export interface ImageGenerationChunk {
+export interface ImageGenerationChunk extends BaseChunk {
   // Partial image data
   imageData?: string;
   // Progress percentage (0-100)
@@ -550,7 +552,7 @@ export interface TranscriptionRequest {
 /**
  * Response from audio transcription.
  */
-export interface TranscriptionResponse {
+export interface TranscriptionResponse extends BaseResponse {
   // Transcribed text
   text: string;
   // Detected language
@@ -563,14 +565,12 @@ export interface TranscriptionResponse {
   segments?: Array<{ text: string; start: number; end: number }>;
   // Model used
   model: string;
-  // Operation cost (if calculated)
-  cost?: number;
 }
 
 /**
  * Streaming chunk for transcription progress.
  */
-export interface TranscriptionChunk {
+export interface TranscriptionChunk extends BaseChunk {
   // Transcribed text chunk
   text?: string;
   // Word with timestamp
@@ -591,6 +591,8 @@ export interface TranscriptionChunk {
 export interface SpeechRequest {
   // Text to convert to speech
   text: string;
+  // Instructions for speech style/tone
+  instructions?: string;
   // Model to use (optional, will be auto-selected)
   model?: string;
   // Voice identifier
@@ -604,29 +606,11 @@ export interface SpeechRequest {
 /**
  * Response from speech synthesis.
  */
-export interface SpeechResponse {
+export interface SpeechResponse extends BaseResponse {
   // Generated audio data
-  audioBuffer: Buffer;
-  // Audio MIME type
-  contentType: string;
-  // Model used
-  model: string;
-  // Operation cost (if calculated)
-  cost?: number;
-}
-
-/**
- * Streaming chunk for speech generation progress.
- */
-export interface SpeechChunk {
-  // Audio data chunk
-  audioData?: Buffer;
-  // Progress indicator
-  progress?: number;
-  // Status message
-  status?: string;
-  // Whether generation is complete
-  done?: boolean;
+  audio: ReadableStream<any>;
+  // Audio format
+  responseFormat?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
 }
 
 /**
@@ -646,16 +630,12 @@ export interface EmbeddingRequest {
 /**
  * Response from embedding generation.
  */
-export interface EmbeddingResponse {
+export interface EmbeddingResponse extends BaseResponse {
   // Generated embeddings
   embeddings: Array<{
     embedding: number[];
     index: number;
   }>;
-  // Model used
-  model: string;
-  // Token usage
-  usage?: Usage;
 }
 
 /**
@@ -721,6 +701,7 @@ export interface ModelHandler<TContext = {}, TProvider extends string = string> 
 
   imageAnalyze?: {
     get?: (request: ImageAnalyzeRequest, ctx: TContext) => Promise<Response>;
+    streem?: (request: ImageAnalyzeRequest, ctx: TContext) => AsyncIterable<Chunk>;
   };
 
   transcribe?: {
@@ -730,7 +711,6 @@ export interface ModelHandler<TContext = {}, TProvider extends string = string> 
 
   speech?: {
     get?: (request: SpeechRequest, ctx: TContext) => Promise<SpeechResponse>;
-    stream?: (request: SpeechRequest, ctx: TContext) => AsyncIterable<SpeechChunk>;
   };
 
   embed?: {
@@ -783,7 +763,6 @@ export interface ModelTransformer<TContext = {}> {
   speech?: {
     convertRequest?: (request: SpeechRequest, ctx: TContext) => unknown;
     parseResponse?: (response: unknown, ctx: TContext) => SpeechResponse;
-    parseChunk?: (chunk: unknown, ctx: TContext) => SpeechChunk;
   };
 
   embed?: {
@@ -917,23 +896,29 @@ export interface Provider<TConfig = any> {
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk>;
 
-  generateSpeech?<TContext>(
+  speech?<TContext>(
     request: SpeechRequest,
     ctx: TContext,
     config?: TConfig
   ): Promise<SpeechResponse>;
-
-  generateSpeechStream?<TContext>(
-    request: SpeechRequest,
-    ctx: TContext,
-    config?: TConfig
-  ): AsyncIterable<SpeechChunk>;
 
   embed?<TContext>(
     request: EmbeddingRequest,
     ctx: TContext,
     config?: TConfig
   ): Promise<EmbeddingResponse>;
+
+  analyzeImage?<TContext>(
+    request: ImageAnalyzeRequest,
+    ctx: TContext,
+    config?: TConfig
+  ): Promise<Response>;
+
+  analyzeImageStream?<TContext>(
+    request: ImageAnalyzeRequest,
+    ctx: TContext,
+    config?: TConfig
+  ): AsyncIterable<Chunk>;
 }
 
 // ============================================================================
@@ -1026,28 +1011,6 @@ export interface AIHooks<T extends AIBaseTypes> {
 }
 
 /**
- * Options for fetching models from OpenRouter.
- */
-export interface OpenRouterFetchOptions {
-  // Whether to enable fetching
-  enabled: boolean;
-  // Optional API key for authentication
-  apiKey?: string;
-}
-
-/**
- * Options for fetching models from Replicate.
- */
-export interface ReplicateFetchOptions {
-  // Whether to enable fetching
-  enabled: boolean;
-  // Optional API key for authentication
-  apiKey?: string;
-  // Optional collection filters
-  collections?: string[];
-}
-
-/**
  * Configuration for creating an AI instance.
  * Defines providers, context, metadata, and model management settings.
  *
@@ -1121,10 +1084,6 @@ export interface AIConfig<
 
   // External model sources
   modelSources?: ModelSource[];
-  // Fetch models from OpenRouter (automatically loads and registers models)
-  fetchOpenRouterModels?: boolean | OpenRouterFetchOptions;
-  // Fetch models from Replicate (automatically loads and registers models when ReplicateModelSource is available)
-  fetchReplicateModels?: boolean | ReplicateFetchOptions;
 
   // Default scoring weights for model selection
   defaultWeights?: ModelSelectionWeights;

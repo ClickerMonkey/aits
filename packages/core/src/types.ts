@@ -355,23 +355,20 @@ export type ResponseFormat =
 export interface Usage
 {
   /** Number of input tokens used (prompt) */
-  inputTokens: number;
+  inputTokens?: number;
   /** Number of output tokens used (completion) */
-  outputTokens: number;
+  outputTokens?: number;
   /** Total number of tokens used (input + output) */
-  totalTokens: number;
+  totalTokens?: number;
   /** Number of cached tokens used, if applicable */
   cachedTokens?: number;
   /** Number of reasoning tokens used, if applicable (for reasoning models) */
   reasoningTokens?: number;
+  /** Duration of output in seconds, if measured */
+  seconds?: number;
   /** Cost of the request in dollars, if calculated by the provider */
   cost?: number;
 }
-
-/**
- * @deprecated Use Usage instead
- */
-export type TokenUsage = Usage;
 
 /**
  * Effort level for reasoning-capable AI models.
@@ -429,10 +426,32 @@ export interface Request
 export type FinishReason = 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'refusal';
 
 /**
+ * Base response from an AI request.
+ */
+export interface BaseResponse
+{
+  /** Usage statistics for this request **/
+  usage?: Usage;
+  /** Model used for this response **/
+  model: string;
+}
+
+/**
+ * Base chunk of a streaming AI response.
+ */
+export interface BaseChunk
+{
+  /** Usage statistics (sent at the end) */
+  usage?: Usage;
+  /** Model used for this chunk **/
+  model?: string;
+}
+
+/**
  * Complete response from an AI request.
  * Contains the generated content, any tool calls, and metadata about the response.
  */
-export interface Response
+export interface Response extends BaseResponse
 {
   /** The main text content of the response */
   content: string;
@@ -444,8 +463,6 @@ export interface Response
   refusal?: string;
   /** Reasoning trace for reasoning-capable models */
   reasoning?: string;
-  /** Usage statistics for this request */
-  usage: Usage;
 }
 
 /**
@@ -457,7 +474,8 @@ export interface Response
  * - `toolCallNamed` is sent when a tool call name is fully received
  * - `toolCall` is sent when a tool call is fully received
  */
-export interface Chunk {
+export interface Chunk extends BaseChunk
+{
   /** Partial text content received */
   content?: string;
   /** Sent when a tool call name is fully received */
@@ -472,8 +490,6 @@ export interface Chunk {
   refusal?: string;
   /** Partial reasoning trace */
   reasoning?: string;
-  /** Usage statistics (sent at the end) */
-  usage?: Usage;
 }
 
 /**

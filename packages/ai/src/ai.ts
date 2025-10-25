@@ -131,53 +131,6 @@ export class AI<T extends AIBaseTypes> {
     // Prepare model sources
     const modelSources = [...(config.modelSources || [])];
 
-    // Add OpenRouter model source if configured
-    if (config.fetchOpenRouterModels) {
-      const openRouterConfig = typeof config.fetchOpenRouterModels === 'boolean'
-        ? {}
-        : config.fetchOpenRouterModels;
-
-      // Dynamically import OpenRouter source
-      import('@aits/openrouter').then(({ OpenRouterModelSource }) => {
-        const source = new OpenRouterModelSource(openRouterConfig);
-        this.registry.addModelSources([source]);
-        // Trigger model fetch
-        source.fetchModels().then((models) => {
-          this.registry.registerModels(models);
-        }).catch((error) => {
-          console.warn('Failed to fetch OpenRouter models:', error);
-        });
-      }).catch((error) => {
-        console.warn('Failed to load OpenRouter model source:', error);
-      });
-    }
-
-    // Add Replicate model source if configured
-    if (config.fetchReplicateModels) {
-      const replicateConfig = typeof config.fetchReplicateModels === 'boolean'
-        ? {}
-        : config.fetchReplicateModels;
-
-      // Dynamically import Replicate source (when implemented)
-      import('@aits/replicate').then((module) => {
-        if ('ReplicateModelSource' in module) {
-          const ReplicateModelSource = module.ReplicateModelSource as any;
-          const source = new ReplicateModelSource(replicateConfig);
-          this.registry.addModelSources([source]);
-          // Trigger model fetch
-          source.fetchModels().then((models: any) => {
-            this.registry.registerModels(models);
-          }).catch((error: any) => {
-            console.warn('Failed to fetch Replicate models:', error);
-          });
-        } else {
-          console.warn('ReplicateModelSource not yet implemented in @aits/replicate');
-        }
-      }).catch((error) => {
-        console.warn('Failed to load Replicate model source:', error);
-      });
-    }
-
     // Initialize registry with model sources
     this.registry = new ModelRegistry<AIProviders<T>>(
       config.providers,

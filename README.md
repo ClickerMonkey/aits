@@ -494,12 +494,6 @@ interface AIConfig<T> {
   // External model sources
   modelSources?: ModelSource[];
 
-  // Fetch models from OpenRouter
-  fetchOpenRouterModels?: boolean | OpenRouterFetchOptions;
-
-  // Fetch models from Replicate
-  fetchReplicateModels?: boolean | ReplicateFetchOptions;
-
   // Lifecycle hooks
   hooks?: AIHooks<T>;
 }

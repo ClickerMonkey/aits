@@ -5,6 +5,7 @@
  * Implements the template method pattern to eliminate code duplication.
  */
 
+import { accumulateUsage } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -174,21 +175,7 @@ export abstract class BaseAPI<
       for await (const chunk of this.streamRequestWithFallback(request, finalSelected, fullCtx, handler)) {
         const usage = this.extractChunkUsage(chunk);
         if (usage) {
-          // Accumulate all usage fields
-          accumulatedUsage.inputTokens = Math.max(accumulatedUsage.inputTokens, usage.inputTokens);
-          accumulatedUsage.outputTokens = Math.max(accumulatedUsage.outputTokens, usage.outputTokens);
-          accumulatedUsage.totalTokens = Math.max(accumulatedUsage.totalTokens, usage.totalTokens);
-
-          // Accumulate optional fields if present
-          if (usage.cachedTokens !== undefined) {
-            accumulatedUsage.cachedTokens = Math.max(accumulatedUsage.cachedTokens || 0, usage.cachedTokens);
-          }
-          if (usage.reasoningTokens !== undefined) {
-            accumulatedUsage.reasoningTokens = Math.max(accumulatedUsage.reasoningTokens || 0, usage.reasoningTokens);
-          }
-          if (usage.cost !== undefined) {
-            accumulatedUsage.cost = Math.max(accumulatedUsage.cost || 0, usage.cost);
-          }
+          accumulateUsage(accumulatedUsage, usage);
         }
         yield chunk;
       }
@@ -272,7 +259,7 @@ export abstract class BaseAPI<
    * Convert accumulated chunks to a response (for streamer-to-executor fallback)
    * @param chunks - Array of chunks to convert
    */
-  protected abstract chunksToResponse(chunks: TChunk[]): TResponse;
+  protected abstract chunksToResponse(chunks: TChunk[], model: string): TResponse;
 
   /**
    * Check if the provider supports non-streaming execution for this operation
@@ -454,7 +441,7 @@ export abstract class BaseAPI<
       for await (const chunk of streamerMethod(request as any, ctx)) {
         chunks.push(chunk);
       }
-      return this.chunksToResponse(chunks);
+      return this.chunksToResponse(chunks, selected.model.id);
     }
 
     // Try provider streamer as fallback
@@ -463,7 +450,7 @@ export abstract class BaseAPI<
       for await (const chunk of this.executeStreamRequest(request, selected, ctx)) {
         chunks.push(chunk);
       }
-      return this.chunksToResponse(chunks);
+      return this.chunksToResponse(chunks, selected.model.id);
     }
 
     throw new Error(

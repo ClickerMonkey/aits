@@ -40,6 +40,8 @@ import type { AI } from '../ai';
 import type {
   AIBaseTypes,
   AIContext,
+  AIContextRequired,
+  AIMetadataRequired,
   Chunk,
   ModelCapability,
   ModelHandlerFor,
@@ -124,10 +126,11 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       refusal: response.refusal,
       reasoning: response.reasoning,
       toolCall: response.toolCalls?.[0], // Send first tool call if any
+      model: response.model,
     };
   }
 
-  protected chunksToResponse(chunks: Chunk[]): Response {
+  protected chunksToResponse(chunks: Chunk[], model: string): Response {
     let content = '';
     let finishReason: FinishReason = 'stop';
     let refusal: string | undefined;
@@ -154,6 +157,9 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       if (chunk.usage) {
         usage = chunk.usage;
       }
+      if (chunk.model) {
+        model = chunk.model;
+      }
     }
 
     return {
@@ -162,7 +168,8 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       finishReason,
       refusal,
       reasoning,
-      usage: usage || { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      model,
+      usage,
     };
   }
 
@@ -217,27 +224,17 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     const chatAPI = this;
     return async function* (
       request: Request,
-      ctx: AIContext<T>,
-      metadata?: any,
+      ctx: AIContextRequired<T>,
+      metadata?: AIMetadataRequired<T>,
       signal?: AbortSignal
     ): AsyncGenerator<Chunk, Response> {
-      // Stream through ChatAPI
-      let lastChunk: Chunk | undefined;
+      const chunks: Chunk[] = [];
       for await (const chunk of chatAPI.stream(request, { ...ctx, metadata, signal } as any)) {
-        lastChunk = chunk;
         yield chunk;
+        chunks.push(chunk);
       }
 
-      // Convert last chunk or accumulated chunks to final response
-      // For now, return a basic response - the prompt will handle accumulation
-      return {
-        content: lastChunk?.content || '',
-        toolCalls: lastChunk?.toolCall ? [lastChunk.toolCall] : undefined,
-        finishReason: lastChunk?.finishReason || 'stop',
-        refusal: lastChunk?.refusal,
-        reasoning: lastChunk?.reasoning,
-        usage: lastChunk?.usage || { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-      };
+      return chatAPI.chunksToResponse(chunks, 'unknown');
     };
   }
 }

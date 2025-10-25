@@ -108,14 +108,14 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected chunksToResponse(chunks: ImageGenerationChunk[]): ImageGenerationResponse {
+  protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
     const images = chunks
       .filter(c => c.image)
       .map(c => c.image!);
 
     return {
       images: images.length > 0 ? images : [],
-      model: 'unknown',
+      model,
     };
   }
 
@@ -224,14 +224,14 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected chunksToResponse(chunks: ImageGenerationChunk[]): ImageGenerationResponse {
+  protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
     const images = chunks
       .filter(c => c.image)
       .map(c => c.image!);
 
     return {
       images: images.length > 0 ? images : [],
-      model: 'unknown',
+      model,
     };
   }
 
@@ -351,7 +351,7 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected chunksToResponse(chunks: Chunk[]): Response {
+  protected chunksToResponse(chunks: Chunk[], model: string): Response {
     let content = '';
     let finishReason: Response['finishReason'] = 'stop';
     let refusal: string | undefined;
@@ -381,7 +381,8 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
       finishReason,
       refusal,
       reasoning,
-      usage: usage || { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      usage,
+      model,
     };
   }
 

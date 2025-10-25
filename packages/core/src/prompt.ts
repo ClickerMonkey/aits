@@ -1,9 +1,9 @@
 import Handlebars from "handlebars";
 import z from 'zod';
 
-import { Fn, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateUsage, Fn, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
-import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, TokenUsage, ToolCall, ToolDefinition, Tuple } from "./types";
+import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 
 /**
  * Input provided to the prompt reconfiguration function.
@@ -149,7 +149,7 @@ export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
   { type: 'textReset', reason?: string } |
   { type: 'requestTokens', tokens: number } |
   { type: 'responseTokens', tokens: number } |
-  { type: 'usage', usage: TokenUsage };
+  { type: 'usage', usage: Usage };
 
 /**
  * A type representing any prompt component.
@@ -443,9 +443,9 @@ export class Prompt<
     let completeText: string = '';
     let maxIterations = request.toolsMax ?? 10;
     let requestTokensSent = false;
-    let usage: TokenUsage | undefined = undefined;
-    let accumulatedUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    let usage: Usage | undefined = undefined;
     let iterations = 0;
+    let accumulatedUsage: Usage = {};
 
     // Track stats for reconfig
     let toolParseErrors = 0;
@@ -483,18 +483,10 @@ export class Prompt<
         if (chunk.usage) {
           usage = chunk.usage;
           if (!requestTokensSent) {
-            yield emit({ type: 'requestTokens', tokens: chunk.usage.inputTokens });
+            yield emit({ type: 'requestTokens', tokens: chunk.usage.inputTokens ?? 0 });
             requestTokensSent = true;
           }
-          accumulatedUsage.inputTokens += usage.inputTokens;
-          accumulatedUsage.outputTokens += usage.outputTokens;
-          accumulatedUsage.totalTokens += usage.totalTokens;
-          if (usage.reasoningTokens) {
-            accumulatedUsage.reasoningTokens = (accumulatedUsage.reasoningTokens || 0) + usage.reasoningTokens;
-          }
-          if (usage.cachedTokens) {
-            accumulatedUsage.cachedTokens = (accumulatedUsage.cachedTokens || 0) + usage.cachedTokens;
-          }
+          accumulateUsage(accumulatedUsage, chunk.usage);
         }
 
         if (chunk.content) {
@@ -921,7 +913,12 @@ export class Prompt<
    * @param usage - The current token usage.
    * @returns The trimmed array of messages.
    */
-  private forget(request: Request, ctx: Context<TContext, TMetadata>, usage: TokenUsage): Message[] {
+  private forget(request: Request, ctx: Context<TContext, TMetadata>, usage: Usage): Message[] {
+    // If we don't have token usage info, we can't forget
+    if (usage.inputTokens === undefined) {
+      return request.messages;
+    }
+
     const completionTokens = request.maxTokens ?? ctx.defaultCompletionTokens ?? 4096; // Default completion buffer
     const availablePromptTokens = usage.inputTokens - completionTokens;
     const contextTokens = ctx.messages?.reduce((sum, msg) => sum + (msg.tokens || 0), 0) || 0;

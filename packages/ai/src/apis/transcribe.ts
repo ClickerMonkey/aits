@@ -100,7 +100,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected chunksToResponse(chunks: TranscriptionChunk[]): TranscriptionResponse {
+  protected chunksToResponse(chunks: TranscriptionChunk[], model: string): TranscriptionResponse {
     const text = chunks.map(c => c.text || '').join('');
     const words = chunks.flatMap(c => c.word ? [c.word] : []);
     const segments = chunks.flatMap(c => c.segment ? [c.segment] : []);
@@ -109,7 +109,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
       text,
       words: words.length > 0 ? words : undefined,
       segments: segments.length > 0 ? segments : undefined,
-      model: 'unknown',
+      model,
     };
   }
 

@@ -94,7 +94,7 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
   // It cannot be detected from provider methods alone
 
   // audio - Text-to-speech synthesis
-  if (provider.generateSpeech !== undefined || provider.generateSpeechStream !== undefined) {
+  if (provider.speech !== undefined) {
     capabilities.add('audio');
   }
 
