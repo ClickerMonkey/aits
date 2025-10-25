@@ -496,6 +496,10 @@ export interface ImageEditRequest {
   size?: string;
   // Response format
   responseFormat?: 'url' | 'b64_json';
+  // Seed for reproducibility
+  seed?: number;
+  // The number of partial images to generate for progress tracking for streaming operations
+  streamCount?: number;
 }
 
 /**

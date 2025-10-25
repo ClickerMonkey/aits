@@ -14,6 +14,7 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
   ImageGenerationChunk,
+  ImageEditRequest,
   ImageAnalyzeRequest,
   TranscriptionRequest,
   TranscriptionResponse,
@@ -1026,6 +1027,147 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Edit images using DALL-E models.
+   *
+   * Supports image editing with text prompts and optional masks.
+   *
+   * @param request Image edit request parameters
+   * @param _ctx Context object (not used)
+   * @param config Optional configuration override
+   * @returns Edited image URLs or base64 data
+   * @throws {ProviderError} If editing fails
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  editImage: Provider['editImage'] = async <TContext>(
+    request: ImageEditRequest,
+    _ctx: TContext,
+    config?: TConfig
+  ): Promise<ImageGenerationResponse> => {
+    const effectiveConfig = config || this.config;
+    const client = this.createClient(effectiveConfig);
+
+    try {
+      const model = request.model || 'dall-e-2';
+      const image = this.toUploadableImage(request.image);
+      const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+
+      let params: OpenAI.Images.ImageEditParamsNonStreaming = {
+        model,
+        image,
+        prompt: request.prompt,
+        mask,
+        n: request.n,
+        size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
+        response_format: request.responseFormat,
+        stream: false,
+      };
+
+      // Apply provider-specific customizations
+      if (this.customizeImageParams) {
+        params = this.customizeImageParams(params, effectiveConfig);
+      }
+
+      const response = await client.images.edit(params);
+
+      return {
+        images: (response.data || []).map((img) => ({
+          url: img.url || undefined,
+          b64_json: img.b64_json || undefined,
+          revisedPrompt: img.revised_prompt || undefined,
+        })),
+        model,
+        usage: {
+          inputTokens: response.usage?.input_tokens || 0,
+          outputTokens: response.usage?.output_tokens || 0,
+          totalTokens: response.usage?.total_tokens || 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
+        throw new RateLimitError(this.name, error.message);
+      }
+      throw new ProviderError(this.name, 'Image editing failed', error as Error);
+    }
+  }
+
+  /**
+   * Edit images with streaming progress updates.
+   *
+   * Note: OpenAI's API doesn't natively support streaming image editing,
+   * so this implementation returns the result with progress indicators.
+   *
+   * @param request Image edit request parameters
+   * @param _ctx Context object (not used)
+   * @param config Optional configuration override
+   * @returns Async generator yielding progress chunks
+   * @throws {ProviderError} If editing fails
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  editImageStream: Provider['editImageStream'] = async function* <TContext>(
+    this: OpenAIProvider<TConfig>,
+    request: ImageEditRequest,
+    _ctx: TContext,
+    config?: TConfig
+  ): AsyncIterable<ImageGenerationChunk> {
+    const effectiveConfig = config || this.config;
+    const client = this.createClient(effectiveConfig);
+
+    try {
+      // Yield initial status
+      yield {
+        status: 'Starting image editing...',
+        progress: 0,
+        done: false,
+      };
+
+      
+      const model = request.model || 'dall-e-2';
+      const image = this.toUploadableImage(request.image);
+      const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+
+      let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
+      let imageCount = 0;
+
+      let params: OpenAI.Images.ImageEditParamsStreaming = {
+        model,
+        image,
+        prompt: request.prompt,
+        mask,
+        n: request.n || 1,
+        size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
+        response_format: request.responseFormat,
+        partial_images: imageStreams,
+        stream: true,
+      };
+
+      if (this.customizeImageParams) {
+        params = this.customizeImageParams(params, effectiveConfig);
+      }
+
+      const response = await client.images.edit(params);
+
+      // Yield completion with results
+      for await (const img of response) {
+        const progress = (imageCount + 1) / (imageStreams + 1);
+        yield {
+          status: `Image generation ${(progress * 100).toFixed(0)}`,
+          progress,
+          done: img.type === 'image_edit.completed',
+          image: {
+            b64_json: img.b64_json || undefined,
+          },
+        };
+        imageCount++;
+      }
+    } catch (error) {
+      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
+        throw new RateLimitError(this.name, error.message);
+      }
+      throw new ProviderError(this.name, 'Image editing streaming failed', error as Error);
+    }
+  }
+
+  /**
    * Generate images with streaming progress updates.
    *
    * Note: OpenAI's API doesn't natively support streaming image generation,
@@ -1055,11 +1197,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         done: false,
       };
 
+      const model = request.model || 'dall-e-3';
+
       let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
       let imageCount = 0;
 
       let params: OpenAI.Images.ImageGenerateParamsStreaming = {
-        model: request.model || 'dall-e-3',
+        model,
         prompt: request.prompt,
         n: 1,
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
@@ -1098,10 +1242,50 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Convert various image input types to Uploadable format.
+   *
+   * @param data Image data in various formats
+   * @returns Uploadable image for OpenAI API
+   */
+  protected toUploadableImage(data: Buffer | Uint8Array | string): Uploadable {
+    if (typeof data === 'string') {
+      // URL
+      if (data.startsWith('http://') || data.startsWith('https://')) {
+        return fs.createReadStream(data);
+      }
+      // Data URL
+      if (data.startsWith('data:')) {
+        const match = data.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) {
+          throw new Error('Invalid data URL');
+        }
+        const base64Data = match[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        return new File([buffer], 'image', { type: match[1] });
+      }
+      // File path
+      if (data.startsWith('/')) {
+        return fs.createReadStream(data);
+      }
+
+      // Raw base64
+      const buffer = Buffer.from(data, 'base64');
+      return new File([buffer], 'image', { type: 'image/png' });
+    } else if (Buffer.isBuffer(data)) {
+      return new File([data], 'image', { type: 'image/png' });
+    } else if (data instanceof Uint8Array) {
+      return new File([data], 'image', { type: 'image/png' });
+    } else {
+      return data;
+    }
+  }
+
+  /**
    * Convert various audio input types to Uploadable format.
-   * 
-   * @param data - 
-   * @returns 
+   *
+   * @param data Audio data in various formats
+   * @returns Uploadable audio for OpenAI API
    */
   protected toUploadableAudio(data: TranscriptionRequest['audio']): Uploadable {
     if (typeof data === 'string') {
