@@ -72,6 +72,10 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
 
+  protected getModel(request: Request): string | undefined {
+    return undefined;
+  }
+
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
     return ['chat', ...provided];
   }

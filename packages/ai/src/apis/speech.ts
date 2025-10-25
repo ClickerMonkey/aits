@@ -30,6 +30,10 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
 
+  protected getModel(request: SpeechRequest): string | undefined {
+    return request.model;
+  }
+
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
     return ['audio', ...provided];
   }

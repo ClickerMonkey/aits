@@ -143,7 +143,6 @@ export class ModelRegistry<TProviders extends Providers> {
 
   constructor(
     providers: TProviders,
-    providerOrder?: (keyof TProviders)[],
     modelOverrides: ModelOverride[] = [],
     defaultCostPerMillionTokens: number = 5.0,
     modelSources: ModelSource[] = []

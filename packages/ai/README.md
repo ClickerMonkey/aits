@@ -1169,7 +1169,6 @@ export const ai = AI.with<AppContext, AppMetadata>()
       priority: 'normal',
       maxCost: 0.10
     },
-    providerOrder: ['openai', 'anthropic'],
     profiles: {
       costPriority: { cost: 0.9, speed: 0.1 },
       balanced: { cost: 0.5, speed: 0.3, accuracy: 0.2 },

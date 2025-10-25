@@ -134,7 +134,6 @@ export class AI<T extends AIBaseTypes> {
     // Initialize registry with model sources
     this.registry = new ModelRegistry<AIProviders<T>>(
       config.providers,
-      config.providerOrder,
       config.modelOverrides || [],
       config.defaultCostPerMillionTokens || 5.0,
       modelSources
@@ -497,19 +496,26 @@ export class AI<T extends AIBaseTypes> {
     usage: Usage
   ): number {
     // Apply overrides if they match
-  let pricing = model.pricing;
-  if (this.config.modelOverrides) {
-    for (const override of this.config.modelOverrides) {
-      if (this.matchesOverride(model, override)) {
-        pricing = { ...pricing, ...override.overrides.pricing };
+    let pricing = model.pricing;
+    if (this.config.modelOverrides) {
+      for (const override of this.config.modelOverrides) {
+        if (this.matchesOverride(model, override)) {
+          pricing = { ...pricing, ...override.overrides.pricing };
+        }
       }
     }
-  }
+    
+    let cost = 0;
 
-    const inputCost = (usage.inputTokens * model.pricing.inputTokensPer1M) / 1_000_000;
-    const outputCost = (usage.outputTokens * model.pricing.outputTokensPer1M)  / 1_000_000;
+    if (usage.inputTokens && model.pricing.inputTokensPer1M) {
+      const inputCost = (usage.inputTokens * model.pricing.inputTokensPer1M) / 1_000_000;
+      cost += inputCost;
+    }
 
-    let cost = inputCost + outputCost;
+    if (usage.outputTokens && model.pricing.outputTokensPer1M) {
+      const outputCost = (usage.outputTokens * model.pricing.outputTokensPer1M) / 1_000_000;
+      cost += outputCost;
+    }
 
     if (usage.cachedTokens && model.pricing.cachedTokensPer1M) {
       const cachedCost = (usage.cachedTokens * model.pricing.cachedTokensPer1M) / 1_000_000;
@@ -519,6 +525,11 @@ export class AI<T extends AIBaseTypes> {
     if (usage.reasoningTokens && model.pricing.reasoningTokensPer1M) {
       const reasoningCost = (usage.reasoningTokens * model.pricing.reasoningTokensPer1M) / 1_000_000;
       cost += reasoningCost;
+    }
+
+    if (usage.seconds && model.pricing.perSeconds) {
+      const timeCost = usage.seconds * model.pricing.perSeconds;
+      cost += timeCost;
     }
 
     if (model.pricing.requestCost) {
@@ -857,9 +868,6 @@ export class AI<T extends AIBaseTypes> {
         ...this.config.tokens,
         ...config?.tokens,
       },
-
-      // Provider order: new options override
-      providerOrder: config?.providerOrder || this.config.providerOrder,
 
       // Profiles: merge
       profiles: {

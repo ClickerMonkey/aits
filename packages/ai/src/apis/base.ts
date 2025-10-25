@@ -5,13 +5,14 @@
  * Implements the template method pattern to eliminate code duplication.
  */
 
-import { accumulateUsage } from '@aits/core';
+import { accumulateUsage, BaseResponse } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
   AIContext,
   AIContextOptional,
   AIContextRequired,
+  AIMetadata,
   AIMetadataRequired,
   AIProviderNames,
   ModelHandler,
@@ -21,6 +22,9 @@ import type {
   Executor,
   Streamer,
   ModelHandlerFor,
+  AIBaseMetadata,
+  AIProviders,
+  AIProvider,
 } from '../types';
 
 /**
@@ -37,7 +41,7 @@ import type {
 export abstract class BaseAPI<
   T extends AIBaseTypes,
   TRequest = unknown,
-  TResponse = unknown,
+  TResponse extends BaseResponse = BaseResponse,
   TChunk = unknown
 > {
   constructor(protected ai: AI<T>) {}
@@ -57,24 +61,46 @@ export abstract class BaseAPI<
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
 
-      // Build metadata with required capabilities
-      const metadataRequired: AIMetadataRequired<T> = {
-        ...fullCtx.metadata,
-        required: this.getRequiredCapabilities(fullCtx.metadata?.required || []),
-      } as AIMetadataRequired<T>;
+      // Check if model is already specified
+      const requestModel = this.getModel(request);
+      const contextModel = fullCtx.metadata?.model;
 
-      const metadata = await this.ai.buildMetadata(metadataRequired);
+      let selected: SelectedModelFor<T>;
 
-      // Run beforeModelSelection hook
-      const enrichedMetadata = hooks.beforeModelSelection
-        ? await hooks.beforeModelSelection(fullCtx, metadata)
-        : metadata;
+      if (requestModel) {
+        // Request model takes highest priority - skip selection
+        selected = this.createSelectedModelFromId(requestModel);
+      } else if (contextModel) {
+        // Context metadata model - skip selection
+        selected = this.createSelectedModelFromId(contextModel);
+      } else {
+        // No model specified - use selection system
+        // Build metadata with required capabilities
+        const metadataRequired: AIMetadataRequired<T> = {
+          ...fullCtx.metadata,
+          required: this.getRequiredCapabilities(fullCtx.metadata?.required || []),
+        } as AIMetadataRequired<T>;
 
-      // Select model
-      const selected = this.ai.selectModel(enrichedMetadata);
-      if (!selected) {
-        throw new Error(this.getNoModelFoundError());
+        const metadata = await this.ai.buildMetadata(metadataRequired);
+
+        // Run beforeModelSelection hook
+        const enrichedMetadata = hooks.beforeModelSelection
+          ? await hooks.beforeModelSelection(fullCtx, metadata)
+          : metadata;
+
+        // Select model
+        const dynamicSelection = this.ai.selectModel(enrichedMetadata);
+        if (!dynamicSelection) {
+          throw new Error(this.getNoModelFoundError());
+        }
+        selected = dynamicSelection;
       }
+
+      // Inject selected model into context for provider access
+      fullCtx.metadata = {
+        ...fullCtx.metadata,
+        model: selected.model.id,
+      } as typeof fullCtx.metadata;
 
       // Run onModelSelected hook
       const finalSelected = (await hooks.onModelSelected?.(fullCtx, selected)) || selected;
@@ -133,24 +159,46 @@ export abstract class BaseAPI<
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
 
-      // Build metadata with required capabilities (including streaming)
-      const metadataRequired: AIMetadataRequired<T> = {
-        ...fullCtx.metadata,
-        required: this.getRequiredCapabilitiesForStreaming(fullCtx.metadata?.required || []),
-      } as AIMetadataRequired<T>;
+      // Check if model is already specified
+      const requestModel = this.getModel(request);
+      const contextModel = fullCtx.metadata?.model;
 
-      const metadata = await this.ai.buildMetadata(metadataRequired);
+      let selected: SelectedModelFor<T>;
 
-      // Run beforeModelSelection hook
-      const enrichedMetadata = hooks.beforeModelSelection
-        ? await hooks.beforeModelSelection(fullCtx, metadata)
-        : metadata;
+      if (requestModel) {
+        // Request model takes highest priority - skip selection
+        selected = this.createSelectedModelFromId(requestModel);
+      } else if (contextModel) {
+        // Context metadata model - skip selection
+        selected = this.createSelectedModelFromId(contextModel);
+      } else {
+        // No model specified - use selection system
+        // Build metadata with required capabilities (including streaming)
+        const metadataRequired: AIMetadataRequired<T> = {
+          ...fullCtx.metadata,
+          required: this.getRequiredCapabilitiesForStreaming(fullCtx.metadata?.required || []),
+        } as AIMetadataRequired<T>;
 
-      // Select model
-      const selected = this.ai.selectModel(enrichedMetadata);
-      if (!selected) {
-        throw new Error(this.getNoModelFoundErrorForStreaming());
+        const metadata = await this.ai.buildMetadata(metadataRequired);
+
+        // Run beforeModelSelection hook
+        const enrichedMetadata = hooks.beforeModelSelection
+          ? await hooks.beforeModelSelection(fullCtx, metadata)
+          : metadata;
+
+        // Select model
+        const dynamicSelection = this.ai.selectModel(enrichedMetadata);
+        if (!dynamicSelection) {
+          throw new Error(this.getNoModelFoundErrorForStreaming());
+        }
+        selected = dynamicSelection;
       }
+
+      // Inject selected model into context for provider access
+      fullCtx.metadata = {
+        ...fullCtx.metadata,
+        model: selected.model.id,
+      } as typeof fullCtx.metadata;
 
       // Run onModelSelected hook
       const finalSelected = hooks.onModelSelected
@@ -170,7 +218,7 @@ export abstract class BaseAPI<
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
 
       // Stream request and accumulate usage
-      let accumulatedUsage: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+      let accumulatedUsage: Usage = {};
 
       for await (const chunk of this.streamRequestWithFallback(request, finalSelected, fullCtx, handler)) {
         const usage = this.extractChunkUsage(chunk);
@@ -199,6 +247,13 @@ export abstract class BaseAPI<
   // ============================================================================
   // ABSTRACT METHODS (must be implemented by subclasses)
   // ============================================================================
+
+  /**
+   * Extract model from request if present.
+   * Each API implementation overrides this to access their specific request type's model field.
+   * @returns model string if present in request, undefined otherwise
+   */
+  protected abstract getModel(request: TRequest): string | undefined;
 
   /**
    * Get required capabilities for model selection
@@ -292,6 +347,55 @@ export abstract class BaseAPI<
   // ============================================================================
   // OPTIONAL OVERRIDES (default implementations provided)
   // ============================================================================
+
+  /**
+   * Create a SelectedModel from a model ID.
+   * Used when bypassing the selection system (explicit model in request or context).
+   */
+  private createSelectedModelFromId(modelId: string): SelectedModelFor<T> {
+    // Find the model in the registry
+    const model = this.ai.models.get(modelId);
+    if (!model) {
+      let providerPrefix = modelId.substring(0, modelId.indexOf('/'));
+      let provider: AIProvider<T> | undefined;
+      for (const providerName in this.ai.providers) {
+        const modelProvider = this.ai.providers[providerName];
+        if (!provider) {
+          provider = modelProvider;
+        }
+        if (providerName === providerPrefix) {
+          provider = modelProvider;
+          break;
+        }
+      }
+      return {
+        model: {
+          id: modelId,
+          provider: (provider?.name || providerPrefix) as any,
+          name: modelId,
+          capabilities: new Set<ModelCapability>(),
+          tier:'flagship',
+          pricing: { inputTokensPer1M: 0, outputTokensPer1M: 0 },
+          contextWindow: 0,
+        },
+        provider: provider! as any,
+        score: 1,
+      };
+    }
+
+    // Find the provider
+    const providerName = model.provider;
+    const provider = this.ai.providers[providerName];
+    if (!provider) {
+      throw new Error(`Provider '${providerName}' not found`);
+    }
+
+    return {
+      model,
+      provider,
+      score: 1.0, // Not scored when explicitly selected
+    } as SelectedModelFor<T>;
+  }
 
   /**
    * Get required capabilities for streaming (default: adds 'streaming')

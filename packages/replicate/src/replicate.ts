@@ -21,6 +21,8 @@ import type {
   SpeechResponse,
   EmbeddingRequest,
   EmbeddingResponse,
+  AIBaseContext,
+  AIBaseTypes,
 } from '@aits/ai';
 import type { Executor, Streamer, Request, Response, Chunk } from '@aits/core';
 import { detectCapabilitiesFromModality } from '@aits/ai';
@@ -347,22 +349,23 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Requires a ModelTransformer for the specific model being used.
    */
-  async generateImage<TContext>(
+  async generateImage(
     request: ImageGenerationRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: ReplicateConfig
   ): Promise<ImageGenerationResponse> {
     const repConfig = config || this.config;
     const client = createClient(repConfig);
 
-    if (!request.model) {
+    const model = request.model || ctx.metadata?.model;
+    if (!model) {
       throw new Error('Model must be specified for Replicate image generation');
     }
 
-    const transformer = this.getTransformer(request.model, repConfig);
+    const transformer = this.getTransformer(model, repConfig);
     if (!transformer?.imageGenerate?.convertRequest || !transformer?.imageGenerate?.parseResponse) {
       throw new Error(
-        `Replicate image generation for model "${request.model}" requires a ModelTransformer with imageGenerate.convertRequest and imageGenerate.parseResponse. ` +
+        `Replicate image generation for model "${model}" requires a ModelTransformer with imageGenerate.convertRequest and imageGenerate.parseResponse. ` +
         'Add a transformer to your ReplicateConfig.transformers.'
       );
     }

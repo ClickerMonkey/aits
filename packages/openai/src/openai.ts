@@ -23,6 +23,8 @@ import type {
   SpeechResponse,
   EmbeddingRequest,
   EmbeddingResponse,
+  AIBaseContext,
+  AIBaseTypes,
 } from '@aits/ai';
 import type { Executor, Streamer, Request, Response, Chunk, MessageContent, ToolCall, FinishReason } from '@aits/core';
 import { ProviderError, RateLimitError } from './types';
@@ -972,9 +974,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  generateImage: Provider['generateImage'] = async <TContext>(
+  generateImage: Provider['generateImage'] = async (
     request: ImageGenerationRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
     const effectiveConfig = config || this.config;
@@ -985,7 +987,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       // of what image generation models can do. And then we narrow it down here.
       // Ideally a party of model/provider selection is finding one that also supports the requested options.
 
-      const model = request.model || 'dall-e-3';
+      const model = request.model || ctx.metadata?.model || 'dall-e-3';
 
       let params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
         model,
@@ -1038,16 +1040,16 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If editing fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  editImage: Provider['editImage'] = async <TContext>(
+  editImage: Provider['editImage'] = async (
     request: ImageEditRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      const model = request.model || 'dall-e-2';
+      const model = request.model || ctx.metadata?.model || 'dall-e-2';
       const image = this.toUploadableImage(request.image);
       const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
 
@@ -1103,10 +1105,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If editing fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  editImageStream: Provider['editImageStream'] = async function* <TContext>(
+  editImageStream: Provider['editImageStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: ImageEditRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk> {
     const effectiveConfig = config || this.config;
@@ -1120,8 +1122,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         done: false,
       };
 
-      
-      const model = request.model || 'dall-e-2';
+
+      const model = request.model || ctx.metadata?.model || 'dall-e-2';
       const image = this.toUploadableImage(request.image);
       const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
 
@@ -1180,10 +1182,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  generateImageStream: Provider['generateImageStream'] = async function* <TContext>(
+  generateImageStream: Provider['generateImageStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: ImageGenerationRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk> {
     const effectiveConfig = config || this.config;
@@ -1197,7 +1199,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         done: false,
       };
 
-      const model = request.model || 'dall-e-3';
+      const model = request.model || ctx.metadata?.model || 'dall-e-3';
 
       let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
       let imageCount = 0;
@@ -1331,9 +1333,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If transcription fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  transcribe: Provider['transcribe'] = async <TContext>(
+  transcribe: Provider['transcribe'] = async (
     request: TranscriptionRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<TranscriptionResponse> => {
     const effectiveConfig = config || this.config;
@@ -1342,7 +1344,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     try {
       // Convert audio to appropriate format
       let file: Uploadable = this.toUploadableAudio(request.audio);
-      const model = request.model || 'whisper-1';
+      const model = request.model || ctx.metadata?.model || 'whisper-1';
       let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
         model,
         file,
@@ -1394,10 +1396,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If transcription fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  transcribeStream: Provider['transcribeStream'] = async function* <TContext>(
+  transcribeStream: Provider['transcribeStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: TranscriptionRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk> {
     const effectiveConfig = config || this.config;
@@ -1413,7 +1415,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
       let file: Uploadable = this.toUploadableAudio(request.audio);
       let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        model: request.model || 'whisper-1',
+        model: request.model || ctx.metadata?.model || 'whisper-1',
         file,
         language: request.language,
         prompt: request.prompt,
@@ -1505,9 +1507,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If speech generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  speech: Provider['speech'] = async <TContext>(
+  speech: Provider['speech'] = async (
     request: SpeechRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<SpeechResponse> => {
     const effectiveConfig = config || this.config;
@@ -1516,7 +1518,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     try {
       const { text: input, instructions, speed, model: requestModel } = request;
 
-      const model = requestModel || 'tts-1';
+      const model = requestModel || ctx.metadata?.model || 'tts-1';
       const voiceDefault = 'alloy' as const;
       const voiceValid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
       const voiceRequest = request.voice || voiceDefault;
@@ -1563,17 +1565,17 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If embedding generation fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  embed: Provider['embed'] = async <TContext>(
+  embed: Provider['embed'] = async (
     request: EmbeddingRequest,
-    _ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<EmbeddingResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      let params: any = {
-        model: request.model || 'text-embedding-3-small',
+      let params: OpenAI.EmbeddingCreateParams = {
+        model: request.model || ctx.metadata?.model || 'text-embedding-3-small',
         input: request.texts,
         dimensions: request.dimensions,
         encoding_format: request.encodingFormat,

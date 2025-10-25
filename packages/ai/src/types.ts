@@ -159,6 +159,8 @@ export interface ModelPricing {
   reasoningTokensPer1M?: number;
   // Cost per 1M image input tokens
   imageInputPer1M?: number;
+  // Cost per second of output
+  perSeconds?: number;
   // Fixed cost per request
   requestCost?: number;
 }
@@ -435,6 +437,11 @@ export type AIMetadataRequired<T extends AIBaseTypes> = Simplify<
 export type AIProviders<T extends AIBaseTypes> = T['Providers'];
 
 /**
+ * Extract provider type union from AI types
+ */
+export type AIProvider<T extends AIBaseTypes> = T['Providers'][keyof T['Providers']];
+
+/**
  * Context passed to components (includes core context fields)
  */
 export type Context<T extends AIBaseTypes> = CoreContext<
@@ -460,7 +467,13 @@ export type ComponentFor<T extends AIBaseTypes> = ComponentCompatible<
 export interface ImageGenerationRequest {
   // Text description of desired image
   prompt: string;
-  // Model to use (optional, will be auto-selected)
+  /**
+   * Optional explicit model override.
+   * If not specified, the model selection system will choose the best model
+   * based on capabilities, cost, and metadata criteria.
+   *
+   * Priority: request.model > ctx.metadata.model > selected model > provider default
+   */
   model?: string;
   // Number of images to generate
   n?: number;
@@ -488,7 +501,13 @@ export interface ImageEditRequest {
   image: Buffer | Uint8Array | string;
   // Optional mask indicating edit region
   mask?: Buffer | Uint8Array | string;
-  // Model to use (optional, will be auto-selected)
+  /**
+   * Optional explicit model override.
+   * If not specified, the model selection system will choose the best model
+   * based on capabilities, cost, and metadata criteria.
+   *
+   * Priority: request.model > ctx.metadata.model > selected model > provider default
+   */
   model?: string;
   // Number of edited images to generate
   n?: number;
@@ -539,7 +558,13 @@ export interface ImageGenerationChunk extends BaseChunk {
 export interface TranscriptionRequest {
   // Audio data to transcribe
   audio: Buffer | ReadStream | string | File;
-  // Model to use (optional, will be auto-selected)
+  /**
+   * Optional explicit model override.
+   * If not specified, the model selection system will choose the best model
+   * based on capabilities, cost, and metadata criteria.
+   *
+   * Priority: request.model > ctx.metadata.model > selected model > provider default
+   */
   model?: string;
   // Source language code (e.g., "en")
   language?: string;
@@ -597,7 +622,13 @@ export interface SpeechRequest {
   text: string;
   // Instructions for speech style/tone
   instructions?: string;
-  // Model to use (optional, will be auto-selected)
+  /**
+   * Optional explicit model override.
+   * If not specified, the model selection system will choose the best model
+   * based on capabilities, cost, and metadata criteria.
+   *
+   * Priority: request.model > ctx.metadata.model > selected model > provider default
+   */
   model?: string;
   // Voice identifier
   voice?: string;
@@ -623,7 +654,13 @@ export interface SpeechResponse extends BaseResponse {
 export interface EmbeddingRequest {
   // Texts to embed
   texts: string[];
-  // Model to use (optional, will be auto-selected)
+  /**
+   * Optional explicit model override.
+   * If not specified, the model selection system will choose the best model
+   * based on capabilities, cost, and metadata criteria.
+   *
+   * Priority: request.model > ctx.metadata.model > selected model > provider default
+   */
   model?: string;
   // Output dimensions (if supported by model)
   dimensions?: number;
@@ -864,63 +901,63 @@ export interface Provider<TConfig = any> {
     config?: TConfig
   ): Streamer<TContext, TMetadata>;
 
-  generateImage?<TContext>(
+  generateImage?(
     request: ImageGenerationRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<ImageGenerationResponse>;
 
-  generateImageStream?<TContext>(
+  generateImageStream?(
     request: ImageGenerationRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk>;
 
-  editImage?<TContext>(
+  editImage?(
     request: ImageEditRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<ImageGenerationResponse>;
 
-  editImageStream?<TContext>(
+  editImageStream?(
     request: ImageEditRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk>;
 
-  transcribe?<TContext>(
+  transcribe?(
     request: TranscriptionRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<TranscriptionResponse>;
 
-  transcribeStream?<TContext>(
+  transcribeStream?(
     request: TranscriptionRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk>;
 
-  speech?<TContext>(
+  speech?(
     request: SpeechRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<SpeechResponse>;
 
-  embed?<TContext>(
+  embed?(
     request: EmbeddingRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<EmbeddingResponse>;
 
-  analyzeImage?<TContext>(
+  analyzeImage?(
     request: ImageAnalyzeRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): Promise<Response>;
 
-  analyzeImageStream?<TContext>(
+  analyzeImageStream?(
     request: ImageAnalyzeRequest,
-    ctx: TContext,
+    ctx: AIBaseContext<AIBaseTypes>,
     config?: TConfig
   ): AsyncIterable<Chunk>;
 }
@@ -1036,7 +1073,6 @@ export interface AIHooks<T extends AIBaseTypes> {
  *
  *   // Providers
  *   providers: { openai, anthropic },
- *   providerOrder: ['openai', 'anthropic'],
  *
  *   // Model configuration
  *   models: customModels,
@@ -1076,8 +1112,6 @@ export interface AIConfig<
 
   // Provider instances
   providers: TProviders;
-  // Provider priority order (first = highest priority)
-  providerOrder?: (keyof TProviders)[];
 
   // Custom model registrations
   models?: ModelInfo[];

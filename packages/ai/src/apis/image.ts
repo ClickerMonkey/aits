@@ -37,6 +37,10 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     super(ai);
   }
 
+  protected getModel(request: ImageGenerationRequest): string | undefined {
+    return request.model;
+  }
+
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
     return ['image', ...provided];
   }
@@ -154,6 +158,10 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     super(ai);
   }
 
+  protected getModel(request: ImageEditRequest): string | undefined {
+    return request.model;
+  }
+
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
     return ['image', ...provided];
   }
@@ -268,6 +276,10 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
 > {
   constructor(ai: AI<T>) {
     super(ai);
+  }
+
+  protected getModel(request: ImageAnalyzeRequest): string | undefined {
+    return request.model;
   }
 
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {

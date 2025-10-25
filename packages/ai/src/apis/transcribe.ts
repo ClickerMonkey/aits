@@ -31,6 +31,10 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
 
+  protected getModel(request: TranscriptionRequest): string | undefined {
+    return request.model;
+  }
+
   protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
     return ['hearing', ...provided];
   }
