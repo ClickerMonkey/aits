@@ -398,6 +398,10 @@ export interface Request
   presencePenalty?: number;
   /** Stop sequences to end the response */
   stop?: string | string[];
+  /** Whether to return log probabilities of the output tokens or not */
+  logProbabilities?: boolean;
+  /** Modify the likelihood of specified tokens appearing in the completion. */
+  logitBias?: Record<string, number>;
   /** Tools available for this request */
   tools?: ToolDefinition[];
   /** Only use tools for this request, don't generate text responses */
@@ -412,6 +416,10 @@ export interface Request
   responseFormat?: ResponseFormat;
   /** Reasoning configuration for reasoning-capable models */
   reason?: { effort?: ReasoningEffort, maxTokens?: number };
+  /** A key that can help optimize cache hit rates */
+  cacheKey?: string;
+  /** Uniquely identifies the user */
+  userKey?: string;
 }
 
 /**

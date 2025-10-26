@@ -225,7 +225,12 @@ export class Tool<
     if (await this.schema(ctx) === undefined) {
       return false;
     }
-    
+
+    // If there are no refs, the tool is self-contained and applicable
+    if (this.refs.length === 0) {
+      return true;
+    }
+
     return await Promise.all(this.refs.map(ref => ref.applicable(ctx))).then(results => results.some(r => r));
   }
 

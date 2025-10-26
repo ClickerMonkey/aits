@@ -1,0 +1,35 @@
+{
+  "name": "@aits/test-integration",
+  "version": "0.1.0",
+  "description": "Integration tests for AITS multi-provider functionality",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "jest",
+    "test:integration": "jest --testPathPattern=__tests__",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@aits/core": "*",
+    "@aits/ai": "*",
+    "@aits/openai": "*",
+    "@aits/openrouter": "*",
+    "@aits/xai": "*",
+    "@aits/replicate": "*",
+    "@aits/google": "*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "dotenv": "^16.0.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "ai",
+    "integration-tests",
+    "multi-provider"
+  ]
+}

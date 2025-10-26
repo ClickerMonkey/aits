@@ -9,8 +9,16 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:unit": "npm run test --workspaces --if-present --ignore @aits/test-integration",
+    "test:integration": "cd packages/test-integration && npm test",
+    "coverage:report": "node scripts/merge-coverage.js",
     "clean": "npm run clean --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "generate:models": "node scripts/generate-static-models.js",
+    "update:openai-pricing": "node scripts/update-openai-pricing.js",
+    "update:provider-pricing": "node scripts/update-provider-pricing.js",
+    "update:openai-models": "node scripts/update-openai-models.js"
   },
   "keywords": [
     "ai",

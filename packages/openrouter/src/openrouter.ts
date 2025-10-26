@@ -4,11 +4,13 @@
  * Provider for OpenRouter API with provider-specific routing and fallback options.
  */
 
-import OpenAI from 'openai';
 import type { ModelInfo, Provider } from '@aits/ai';
-import type { Request, Response, Executor, Streamer, Chunk } from '@aits/core';
-import { detectTier, detectCapabilitiesFromModality } from '@aits/ai';
-import { OpenAIProvider, OpenAIConfig, ProviderError, RateLimitError } from '@aits/openai';
+import { detectCapabilitiesFromModality, detectTier } from '@aits/ai';
+import type { Chunk, Request, Response } from '@aits/core';
+import { OpenAIConfig, OpenAIProvider } from '@aits/openai';
+import OpenAI from 'openai';
+import { fetchModels, fetchZDRModels } from './source';
+import { OpenRouterChatChunk, OpenRouterChatRequest, OpenRouterChatResponse, OpenRouterModel } from './types';
 
 /**
  * OpenRouter provider configuration
@@ -17,174 +19,24 @@ export interface OpenRouterConfig extends OpenAIConfig {
   defaultParams?: {
     siteUrl?: string;
     appName?: string;
-    allowFallbacks?: boolean;
-    requireParameters?: boolean;
-    dataCollection?: 'deny' | 'allow';
-    order?: string[];
     providers?: {
-      allow?: string[];
-      deny?: string[];
-      prefer?: string[];
-      ignore?: string[];
       order?: string[];
-      quantizations?: string[];
+      allowFallbacks?: boolean;
+      requireParameters?: boolean;
       dataCollection?: 'deny' | 'allow';
+      zdr?: boolean;
+      only?: string[];
+      ignore?: string[];
+      quantizations?: ('int4' | 'int8' | 'fp4' | 'fp6' | 'fp8' | 'fp16' | 'bf16' | 'fp32' | 'unknown')[];
+      sort?: 'price' | 'throughput' | 'latency';
+      maxPrice?: {
+        prompt?: number; // dollars per million tokens
+        completion?: number; // dollars per million tokens
+        image?: number; // dollars per image
+      };
     };
     transforms?: string[];
   };
-}
-
-/**
- * OpenRouter chat request with extensions
- */
-type OpenRouterChatRequest = OpenAI.Chat.ChatCompletionCreateParams & {
-  // OpenRouter-specific extensions
-  reasoning?: {
-    enabled: boolean;
-    effort?: 'low' | 'medium' | 'high';
-    max_tokens?: number;
-  };
-  provider?: {
-    allow_fallbacks?: boolean;
-    require_parameters?: boolean;
-    data_collection?: 'deny' | 'allow';
-    order?: string[];
-    allow?: string[];
-    deny?: string[];
-    prefer?: string[];
-    ignore?: string[];
-    quantizations?: string[];
-  };
-  transforms?: string[];
-};
-
-/**
- * OpenRouter's extended usage information
- */
-type OpenRouterUsage = {
-  completion_tokens?: number;
-  completion_tokens_details?: {
-    reasoning_tokens?: number;
-  };
-  cost?: number;
-  cost_details?: {
-    upstream_inference_cost?: number;
-  };
-  prompt_tokens?: number;
-  prompt_tokens_details?: {
-    cached_tokens?: number;
-    audio_tokens?: number;
-  };
-  total_tokens?: number;
-}
-
-/**
- * OpenRouter reasoning information
- */
-type OpenRouterReasoning = {
-  reasoning?: string;
-  reasoning_details?: {
-    id?: string | null;
-    type: 'reasoning.encrypted' | 'reasoning.summary' | 'reasoning.text';
-    format: 'unknown' | 'openai-responses-v1' | 'xai-responses-v1' | 'anthropic-claude-v1';
-    index?: number;
-    summary?: string;
-    text?: string;
-    encrypted?: string;
-    signature?: string;
-    data?: string;
-  }[];
-};
-
-/**
- * OpenRouter chunk with extended usage info
- */
-type OpenRouterChatChunk = OpenAI.Chat.Completions.ChatCompletionChunk & {
-  usage?: (OpenRouterUsage & OpenAI.CompletionUsage) | null;
-} & OpenRouterReasoning;
-
-/**
- * OpenRouter response with extended usage info
- */
-type OpenRouterChatResponse = OpenAI.Chat.ChatCompletion & {
-  choices: Array<OpenAI.ChatCompletion.Choice & {
-    message: OpenAI.Chat.Completions.ChatCompletionMessage & OpenRouterReasoning;
-  }>;
-  usage?: OpenRouterUsage;
-};
-
-/**
- * OpenRouter model response from API
- */
-interface OpenRouterModel {
-  id: string;
-  name: string;
-  context_length: number;
-  architecture: {
-    modality: string;
-    tokenizer: string;
-    instruct_type: string | null;
-  };
-  pricing: {
-    prompt: string;
-    completion: string;
-    image?: string;
-    request?: string;
-  };
-  top_provider: {
-    context_length: number;
-    max_completion_tokens: number | null;
-    is_moderated: boolean;
-  };
-  description?: string;
-}
-
-/**
- * ZDR model info from OpenRouter ZDR endpoint
- */
-interface ZDRModel {
-  name: string;
-  model_name: string;
-  context_length: number;
-  pricing: {
-    prompt: string;
-    completion: string;
-    request: string;
-    image: string;
-  };
-  provider_name: string;
-  tag: string;
-  quantization: string | null;
-  max_completion_tokens: number | null;
-  max_prompt_tokens: number | null;
-  supported_parameters: string[];
-  status: number;
-  uptime_last_30m: number | null;
-  supports_implicit_caching: boolean;
-}
-
-/**
- * Fetch ZDR (Zero Data Retention) compliant models
- */
-async function fetchZDRModels(): Promise<Set<string>> {
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/endpoints/zdr', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.warn('Failed to fetch ZDR models from OpenRouter');
-      return new Set();
-    }
-
-    const data = (await response.json()) as { data: ZDRModel[] };
-    return new Set(data.data.map((model) => model.model_name));
-  } catch (error) {
-    console.warn('Error fetching ZDR models:', error);
-    return new Set();
-  }
 }
 
 /**
@@ -196,6 +48,8 @@ function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>
   if (zdrModelIds.has(model.id) ) {
     capabilities.add('zdr');
   }
+
+  // TODO supportedParameters, capabilities based on input/output modalities, tokenizer
 
   return {
     provider: 'openrouter',
@@ -275,10 +129,10 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
       const dp = config.defaultParams;
 
       params.provider = {
-        allow_fallbacks: dp.allowFallbacks,
-        require_parameters: dp.requireParameters,
-        data_collection: dp.dataCollection,
-        order: dp.order,
+        allow_fallbacks: dp.providers?.allowFallbacks,
+        require_parameters: dp.providers?.requireParameters,
+        data_collection: dp.providers?.dataCollection,
+        max_price: dp.providers?.maxPrice,
         ...dp.providers,
       };
 
@@ -411,22 +265,12 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
   async listModels(config: OpenRouterConfig): Promise<ModelInfo[]> {
     try {
       // Fetch both models and ZDR models in parallel
-      const [modelsResponse, zdrModelIds] = await Promise.all([
-        fetch('https://openrouter.ai/api/v1/models', {
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-          },
-        }),
-        fetchZDRModels(),
+      const [models, zdrModels] = await Promise.all([
+        fetchModels(config.apiKey),
+        fetchZDRModels(config.apiKey),
       ]);
 
-      if (!modelsResponse.ok) {
-        throw new Error(`Failed to fetch models: ${modelsResponse.statusText}`);
-      }
-
-      const data = (await modelsResponse.json()) as { data: OpenRouterModel[] };
-
-      return data.data.map((model) => convertOpenRouterModel(model, zdrModelIds));
+      return models.map((model) => convertOpenRouterModel(model, zdrModels));
     } catch (error) {
       throw new Error(`Failed to list OpenRouter models: ${error}`);
     }

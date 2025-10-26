@@ -127,6 +127,11 @@ export class Agent<
       return this.input.applicable(ctx);
     }
 
+    // If there are no refs, the agent is self-contained and applicable
+    if (this.refs.length === 0) {
+      return true;
+    }
+
     return await Promise.all(this.refs.map(ref => ref.applicable(ctx))).then(results => results.some(r => r));
   }
 

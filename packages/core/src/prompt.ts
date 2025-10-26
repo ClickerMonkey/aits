@@ -982,6 +982,7 @@ export class Prompt<
       const message = request.messages[messageIndex];
       if (message.role === 'system') {
         trimmedMessages.push(message);
+        messageIndex++;
       } else {
         removesRemaining -= messageTokens[messageIndex] || 0;
         messageIndex++;
@@ -1074,7 +1075,7 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
       }
       try {
         execution.status = 'executing';
-        execution.result = await resolve(toolInfo!.tool.run(ctx, execution.args));
+        execution.result = await resolve(toolInfo!.tool.run(execution.args, ctx));
         execution.status = 'success';
         output.ready = true;
       } catch (error: any) {

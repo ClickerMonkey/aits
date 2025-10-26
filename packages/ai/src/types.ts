@@ -150,9 +150,9 @@ export type ModelTier =
  */
 export interface ModelPricing {
   // Cost per 1M input tokens
-  inputTokensPer1M: number;
+  inputTokensPer1M?: number;
   // Cost per 1M output tokens
-  outputTokensPer1M: number;
+  outputTokensPer1M?: number;
   // Cost per 1M cached tokens (if supported)
   cachedTokensPer1M?: number;
   // Cost per 1M reasoning tokens (for models like o1)
@@ -213,9 +213,50 @@ export interface ModelInfo<TProvider extends string = string> {
   maxOutputTokens?: number;
   // Performance metrics
   metrics?: ModelMetrics;
+  // The tokenizer used by the model
+  tokenizer?: ModelTokenizer;
+  // The supported parameters
+  supportedParameters?: Set<ModelParameter>;
   // Additional provider-specific metadata
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Tokenizer type used by the model.
+ */
+export type ModelTokenizer = 'Other' | 'GPT' | 'Mistral' | 'Llama3' | 'Qwen3' | 'Qwen' | 'Gemini' | 'DeepSeek' | 'Claude' | 'Grok' | 'Llama4' | 'Llama2' | 'Cohere' | 'Nova' | 'Router';
+
+/**
+ * Parameter names supported by models.
+ */
+export type ModelParameter = 
+  // Chat Request
+  | 'maxTokens' // max_tokens
+  | 'temperature' // temperature
+  | 'topP' // top_p
+  | 'frequencyPenalty' // frequency_penalty
+  | 'presencePenalty' // presence_penalty
+  | 'stop' // stop
+  | 'seed' // seed
+  | 'responseFormat' // response_format
+  | 'structuredOutput' // structured_outputs
+  | 'tools' // tools
+  | 'toolChoice' // tool_choice
+  | 'logitBias' // logit_bias
+  | 'logProbabilities' // logprobs
+  | 'reason' // reasoning
+  // Image
+  | 'imageBackground' // background
+  | 'imageMultiple' // n
+  | 'imageFormat' // output_format ()
+  | 'imageStream' // stream / partial_images
+  // Embedding
+  | 'embeddingDimensions' // dimensions
+  // Transcription
+  | 'transcribeStream' // stream
+  | 'transcribePrompt' // prompt
+  // Speech
+  | 'speechInstructions' // instructions
 
 /**
  * Override configuration for model properties.
@@ -236,7 +277,7 @@ export interface ModelOverride<TProvider extends string = string> {
 
 // ============================================================================
 // Model Selection
-// ============================================================================
+// ===========================================`=================================
 
 /**
  * Weights for scoring models during selection.
@@ -280,6 +321,8 @@ export interface AIBaseMetadata<TProviders extends Providers> {
   weights?: ModelSelectionWeights;
   // Minimum context window size required
   minContextWindow?: number;
+  // The tier to use to pick the best model
+  tier?: ModelTier;
 }
 
 /**
@@ -362,6 +405,11 @@ export type AITypes<
   ProvidedMetadata: TProvidedMetadata;
   Providers: TProviders;
 };
+
+/**
+ * AIBaseTypes with any types (least type safety)
+ */
+export type AITypesAny = AITypes<any, any, any, any, any, any, Providers>;
 
 /**
  * Infer AIBaseTypes from AIConfig
@@ -467,28 +515,29 @@ export type ComponentFor<T extends AIBaseTypes> = ComponentCompatible<
 export interface ImageGenerationRequest {
   // Text description of desired image
   prompt: string;
-  /**
-   * Optional explicit model override.
-   * If not specified, the model selection system will choose the best model
-   * based on capabilities, cost, and metadata criteria.
-   *
-   * Priority: request.model > ctx.metadata.model > selected model > provider default
-   */
+  // Optional explicit model override
   model?: string;
   // Number of images to generate
   n?: number;
-  // Image size (e.g., "1024x1024")
+  // Image size
+  // gpt-image-1: 1024x1024, 1536x1024, 1024x1536, auto
+  // dall-e-2: 256x256, 512x512, 1024x1024
+  // dall-e-3: 1024x1024, 1792x1024, 1024x1792
   size?: string;
-  // Quality level
-  quality?: 'standard' | 'hd';
-  // Style preference
-  style?: 'vivid' | 'natural';
-  // Response format
+  // Quality level (gpt-image-1, hd,standard=dall-e-3, standard=dall-e-2)
+  quality?: 'low' | 'medium' | 'high';
+  // Style preference (dall-e-3)
+  style?: 'vivid' | 'natural'; 
+  // Response format (dall-e-3, dall-e-2 supports both, gpt-image-1 only b64_json)
   responseFormat?: 'url' | 'b64_json';
+  // Background type (gpt-image-1)
+  background?: 'transparent' | 'opaque' | 'auto';
+  // The number of partial images to generate for progress tracking for streaming operations (gpt-image-1)
+  streamCount?: number;
   // Seed for reproducibility
   seed?: number;
-  // The number of partial images to generate for progress tracking for streaming operations
-  streamCount?: number;
+  // Unique identifier for the user
+  userIdentifier?: string;
 }
 
 /**
@@ -519,6 +568,8 @@ export interface ImageEditRequest {
   seed?: number;
   // The number of partial images to generate for progress tracking for streaming operations
   streamCount?: number;
+  // Unique identifier for the user
+  userIdentifier?: string;
 }
 
 /**
@@ -666,6 +717,8 @@ export interface EmbeddingRequest {
   dimensions?: number;
   // Encoding format
   encodingFormat?: 'float' | 'base64';
+  // The unique identifier for the user
+  userIdentifier?: string;
 }
 
 /**
@@ -943,9 +996,9 @@ export interface Provider<TConfig = any> {
     config?: TConfig
   ): Promise<SpeechResponse>;
 
-  embed?(
+  embed?<TContext extends AIBaseContext<AITypesAny>>(
     request: EmbeddingRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: TContext,
     config?: TConfig
   ): Promise<EmbeddingResponse>;
 

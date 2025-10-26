@@ -287,6 +287,7 @@ export class ModelRegistry<TProviders extends Providers> {
       return {
         model,
         provider,
+        providerConfig: provider.config,
         score: 1.0,
       } as SelectedModel<TProviders, keyof TProviders>;
     }
@@ -306,6 +307,7 @@ export class ModelRegistry<TProviders extends Providers> {
     return {
       model: best.model,
       provider,
+      providerConfig: provider.config,
       score: best.score,
     } as SelectedModel<TProviders, keyof TProviders>;
   }
@@ -404,6 +406,10 @@ export class ModelRegistry<TProviders extends Providers> {
       return result; // score = 0
     }
 
+    if (criteria.tier && model.tier !== criteria.tier) {
+      return result; // score = 0
+    }
+
     // Calculate score based on weights
     const weights = criteria.weights || { cost: 0.5, speed: 0.3, accuracy: 0.2 };
     result.score = this.calculateWeightedScore(model, weights, criteria);
@@ -423,7 +429,7 @@ export class ModelRegistry<TProviders extends Providers> {
 
     // Cost score (lower is better, invert)
     if (weights.cost) {
-      const avgCost = (model.pricing.inputTokensPer1M + model.pricing.outputTokensPer1M) / 2;
+      const avgCost = ((model.pricing.inputTokensPer1M ?? 0) + (model.pricing.outputTokensPer1M ?? 0)) / 2;
       const costScore = 1 / (1 + avgCost / 10); // Normalize
       score += weights.cost * costScore;
     }
@@ -434,15 +440,32 @@ export class ModelRegistry<TProviders extends Providers> {
       score += weights.speed * speedScore;
     }
 
-    // Accuracy score
-    if (weights.accuracy && model.metrics?.accuracyScore) {
-      score += weights.accuracy * model.metrics.accuracyScore;
+    // Accuracy score - use metrics if available, otherwise tier-based
+    if (weights.accuracy) {
+      if (model.metrics?.accuracyScore) {
+        score += weights.accuracy * model.metrics.accuracyScore;
+      } else if (model.tier) {
+        // Fallback to tier-based accuracy when metrics not available
+        const tierScore = model.tier === 'flagship' ? 1.0 : model.tier === 'efficient' ? 0.7 : 0.5;
+        score += weights.accuracy * tierScore;
+      }
     }
 
     // Context window score
     if (weights.contextWindow) {
       const contextScore = Math.min(model.contextWindow / 100000, 1); // Normalize
       score += weights.contextWindow * contextScore;
+    }
+
+    // Optional capabilities multiplier - models matching more optional caps get a score multiplier
+    // This ensures optional capabilities are strongly preferred
+    if (metadata.optional && metadata.optional.length > 0) {
+      const optionalMatches = metadata.optional.filter(cap => model.capabilities.has(cap)).length;
+      const matchRatio = optionalMatches / metadata.optional.length;
+      // Apply 1.0x to 2.0x multiplier based on optional capability match rate
+      // This allows optional caps to overcome significant cost differences
+      const multiplier = 1.0 + matchRatio;
+      score *= multiplier;
     }
 
     return score;
@@ -492,14 +515,12 @@ export class ModelRegistry<TProviders extends Providers> {
     const basePricing = base.pricing;
     const sourcePricing = source.pricing;
     const mergedPricing = {
-      inputTokensPer1M:
-        sourcePricing.inputTokensPer1M > 0 ? sourcePricing.inputTokensPer1M : basePricing.inputTokensPer1M,
-      outputTokensPer1M:
-        sourcePricing.outputTokensPer1M > 0 ? sourcePricing.outputTokensPer1M : basePricing.outputTokensPer1M,
-      cachedTokensPer1M: sourcePricing.cachedTokensPer1M ?? basePricing.cachedTokensPer1M,
-      reasoningTokensPer1M: sourcePricing.reasoningTokensPer1M ?? basePricing.reasoningTokensPer1M,
-      imageInputPer1M: sourcePricing.imageInputPer1M ?? basePricing.imageInputPer1M,
-      requestCost: sourcePricing.requestCost ?? basePricing.requestCost,
+      inputTokensPer1M: sourcePricing.inputTokensPer1M || basePricing.inputTokensPer1M,
+      outputTokensPer1M: sourcePricing.outputTokensPer1M || basePricing.outputTokensPer1M,
+      cachedTokensPer1M: sourcePricing.cachedTokensPer1M || basePricing.cachedTokensPer1M,
+      reasoningTokensPer1M: sourcePricing.reasoningTokensPer1M || basePricing.reasoningTokensPer1M,
+      imageInputPer1M: sourcePricing.imageInputPer1M || basePricing.imageInputPer1M,
+      requestCost: sourcePricing.requestCost || basePricing.requestCost,
     };
 
     // Merge metrics (prefer source if available)

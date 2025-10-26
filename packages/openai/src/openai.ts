@@ -759,6 +759,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           max_tokens: request.maxTokens,
           frequency_penalty: request.frequencyPenalty,
           presence_penalty: request.presencePenalty,
+          logit_bias: request.logitBias,
+          logprobs: request.logProbabilities,
+          parallel_tool_calls: request.toolsOneAtATime ? false : undefined,
+          prompt_cache_key: request.cacheKey,
+          safety_identifier: request.userKey,
+          store: false,
           stop: request.stop,
           tools,
           tool_choice,
@@ -849,6 +855,14 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           temperature: request.temperature,
           top_p: request.topP,
           max_tokens: request.maxTokens,
+          frequency_penalty: request.frequencyPenalty,
+          presence_penalty: request.presencePenalty,
+          logit_bias: request.logitBias,
+          logprobs: request.logProbabilities,
+          parallel_tool_calls: request.toolsOneAtATime ? false : undefined,
+          prompt_cache_key: request.cacheKey,
+          safety_identifier: request.userKey,
+          store: false,
           stop: request.stop,
           tools,
           tool_choice,
@@ -996,7 +1010,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
         quality: request.quality as 'standard' | 'hd' | undefined,
         style: request.style as 'vivid' | 'natural' | undefined,
+        background: request.background,
         response_format: request.responseFormat,
+        user: request.userIdentifier,
         stream: false,
       };
 
@@ -1060,6 +1076,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         mask,
         n: request.n,
         size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
+        user: request.userIdentifier,
         response_format: request.responseFormat,
         stream: false,
       };
@@ -1138,6 +1155,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         n: request.n || 1,
         size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
         response_format: request.responseFormat,
+        user: request.userIdentifier,
         partial_images: imageStreams,
         stream: true,
       };
@@ -1211,6 +1229,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
         quality: request.quality as 'standard' | 'hd' | undefined,
         style: request.style as 'vivid' | 'natural' | undefined,
+        background: request.background,
+        user: request.userIdentifier,
         partial_images: imageStreams,
         response_format: request.responseFormat,
         stream: true,
@@ -1579,6 +1599,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         input: request.texts,
         dimensions: request.dimensions,
         encoding_format: request.encodingFormat,
+        user: request.userIdentifier,
       };
 
       // Apply provider-specific customizations
