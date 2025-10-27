@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDirs": ["./src", "./scripts"]
+  },
+  "include": ["src/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../ai" },
+    { "path": "../openrouter" },
+    { "path": "../core" }
+  ]
+}

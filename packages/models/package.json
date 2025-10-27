@@ -1,0 +1,31 @@
+{
+  "name": "@aits/models",
+  "version": "0.0.1",
+  "description": "Static model information scraped from OpenAI, OpenRouter, and Replicate",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "scrape": "tsx scripts/scrape.ts",
+    "scrape:openrouter": "tsx scripts/scrapers/openrouter.ts",
+    "scrape:openai": "tsx scripts/scrapers/openai.ts",
+    "scrape:replicate": "tsx scripts/scrapers/replicate.ts"
+  },
+  "keywords": ["ai", "models", "openai", "openrouter", "replicate"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aits/ai": "^0.1.0",
+    "@aits/openrouter": "^0.1.0",
+    "axios": "^1.7.2",
+    "replicate": "^0.34.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "puppeteer": "^23.11.1",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.5"
+  }
+}

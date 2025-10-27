@@ -429,7 +429,8 @@ export class ModelRegistry<TProviders extends Providers> {
 
     // Cost score (lower is better, invert)
     if (weights.cost) {
-      const avgCost = ((model.pricing.inputTokensPer1M ?? 0) + (model.pricing.outputTokensPer1M ?? 0)) / 2;
+      // TODO more sophisticated cost modeling
+      const avgCost = ((model.pricing.text?.input ?? 0) + (model.pricing.text?.output ?? 0)) / 2;
       const costScore = 1 / (1 + avgCost / 10); // Normalize
       score += weights.cost * costScore;
     }
@@ -512,16 +513,7 @@ export class ModelRegistry<TProviders extends Providers> {
     const mergedCapabilities = new Set([...base.capabilities, ...source.capabilities]);
 
     // Merge pricing (prefer source if it has non-zero values)
-    const basePricing = base.pricing;
-    const sourcePricing = source.pricing;
-    const mergedPricing = {
-      inputTokensPer1M: sourcePricing.inputTokensPer1M || basePricing.inputTokensPer1M,
-      outputTokensPer1M: sourcePricing.outputTokensPer1M || basePricing.outputTokensPer1M,
-      cachedTokensPer1M: sourcePricing.cachedTokensPer1M || basePricing.cachedTokensPer1M,
-      reasoningTokensPer1M: sourcePricing.reasoningTokensPer1M || basePricing.reasoningTokensPer1M,
-      imageInputPer1M: sourcePricing.imageInputPer1M || basePricing.imageInputPer1M,
-      requestCost: sourcePricing.requestCost || basePricing.requestCost,
-    };
+    const mergedPricing = { ...base.pricing, ...source.pricing };
 
     // Merge metrics (prefer source if available)
     const mergedMetrics = source.metrics ?? base.metrics;

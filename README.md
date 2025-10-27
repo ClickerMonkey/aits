@@ -2,7 +2,7 @@
 
 > **Multi-provider AI library with intelligent model selection, type-safe context management, and comprehensive provider support.**
 
-AITS (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, Anthropic, OpenRouter, xAI, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
+AITS (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
@@ -11,7 +11,7 @@ AITS (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScrip
 
 ### Core Features
 
-- 🎯 **Multi-Provider Support** - Single interface for OpenAI, Anthropic, Google, xAI, OpenRouter, Replicate, and custom providers
+- 🎯 **Multi-Provider Support** - Single interface for OpenAI, OpenRouter, Replicate, and custom providers
 - 🤖 **Intelligent Model Selection** - Automatic model selection based on capabilities, cost, speed, and quality
 - 💰 **Cost Tracking** - Built-in token usage and cost calculation with provider-reported costs
 - 🔄 **Streaming Support** - Full streaming support across all compatible capabilities
@@ -40,7 +40,6 @@ npm install @aits/ai @aits/core zod
 # Install provider packages as needed
 npm install @aits/openai openai       # OpenAI
 npm install @aits/openrouter          # OpenRouter (multi-provider)
-npm install @aits/xai                 # xAI (Grok)
 npm install @aits/replicate replicate # Replicate
 ```
 
@@ -131,7 +130,6 @@ const response = await ai.chat.get([
          │         │             │
          │         │ • OpenAI    │
          │         │ • OpenRouter│
-         │         │ • xAI       │
          │         │ • Replicate │
          └─────────┴─────────────┘
 ```
@@ -187,19 +185,6 @@ npm install @aits/openrouter
 - Built-in cost tracking
 - Zero Data Retention (ZDR) support
 - Provider routing preferences
-
-#### [@aits/xai](./packages/xai)
-xAI provider for Grok models using OpenAI-compatible API.
-
-```bash
-npm install @aits/xai
-```
-
-**Features:**
-- Grok models
-- Chat completions
-- Streaming
-- Function calling
 
 #### [@aits/replicate](./packages/replicate)
 Replicate provider with flexible adapter system for running open-source AI models.
@@ -525,11 +510,6 @@ interface OpenRouterConfig extends OpenAIConfig {
   };
 }
 
-// xAI
-interface XAIConfig extends OpenAIConfig {
-  // Inherits from OpenAIConfig
-}
-
 // Replicate
 interface ReplicateConfig {
   apiKey: string;
@@ -583,8 +563,8 @@ AITS uses a capability system for model selection:
 
 | Capability | Description | Example Providers |
 |------------|-------------|-------------------|
-| `chat` | Basic text completion | OpenAI, OpenRouter, xAI |
-| `streaming` | Real-time response streaming | OpenAI, OpenRouter, xAI |
+| `chat` | Basic text completion | OpenAI, OpenRouter |
+| `streaming` | Real-time response streaming | OpenAI, OpenRouter |
 | `image` | Image generation | OpenAI (DALL-E), Replicate |
 | `vision` | Image understanding | OpenAI (GPT-4V) |
 | `audio` | Text-to-speech | OpenAI (TTS) |
@@ -623,9 +603,7 @@ aits/
 │   ├── ai/            # Main AI library
 │   ├── openai/        # OpenAI provider
 │   ├── openrouter/    # OpenRouter provider
-│   ├── xai/           # xAI provider
 │   ├── replicate/     # Replicate provider
-│   └── google/        # Google AI provider (stub)
 ├── package.json       # Root package configuration
 └── tsconfig.json      # TypeScript configuration
 ```
@@ -656,15 +634,9 @@ aits/
 ## Roadmap
 
 - [ ] Anthropic Claude provider
-- [ ] Google AI provider
-- [ ] Azure OpenAI support
-- [ ] Conversation history management
 - [ ] Built-in retry logic with exponential backoff
 - [ ] Rate limiting utilities
 - [ ] Caching layer
-- [ ] Prompt templates
-- [ ] Agent framework
-- [ ] Tool/function library
 
 ## Contributing
 

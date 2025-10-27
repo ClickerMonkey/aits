@@ -58,10 +58,17 @@ function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>
     capabilities,
     tier,
     pricing: {
-      inputTokensPer1M: parseFloat(model.pricing.prompt) * 1_000_000,
-      outputTokensPer1M: parseFloat(model.pricing.completion) * 1_000_000,
-      imageInputPer1M: model.pricing.image ? parseFloat(model.pricing.image) * 1_000_000 : undefined,
-      requestCost: model.pricing.request ? parseFloat(model.pricing.request) : undefined,
+      text: {
+        input: model.pricing.prompt ? parseFloat(model.pricing.prompt) * 1_000_000 : undefined,
+        output: model.pricing.completion ? parseFloat(model.pricing.completion) * 1_000_000 : undefined,
+      },
+      image: {
+        input: model.pricing.image ? parseFloat(model.pricing.image) * 1_000_000 : undefined,
+      },
+      reasoning: {
+        output: model.pricing.internal_reasoning ? parseFloat(model.pricing.internal_reasoning) * 1_000_000 : undefined,
+      },
+      perRequest: model.pricing.request ? parseFloat(model.pricing.request) : undefined,
     },
     contextWindow: model.context_length,
     maxOutputTokens: model.top_provider.max_completion_tokens ?? undefined,
@@ -97,10 +104,7 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
       name: model.id,
       capabilities: new Set(['chat', 'streaming']),
       tier: detectTier(model.id),
-      pricing: {
-        inputTokensPer1M: 0,
-        outputTokensPer1M: 0,
-      },
+      pricing: {},
       contextWindow: 0,
       maxOutputTokens: undefined,
       metadata: {},

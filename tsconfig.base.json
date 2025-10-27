@@ -18,5 +18,13 @@
     "baseUrl": ".",
     "target": "es2024",
     "types": ["node"],
+    "paths": {
+      "@aits/core": ["./packages/core/src"],
+      "@aits/ai": ["./packages/ai/src"],
+      "@aits/openai": ["./packages/openai/src"],
+      "@aits/openrouter": ["./packages/openrouter/src"],
+      "@aits/replicate": ["./packages/replicate/src"],
+      "@aits/models": ["./packages/models/src"]
+    }
   }
 }

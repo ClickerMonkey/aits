@@ -149,20 +149,37 @@ export type ModelTier =
  * All costs are specified per 1 million tokens unless otherwise noted.
  */
 export interface ModelPricing {
-  // Cost per 1M input tokens
-  inputTokensPer1M?: number;
-  // Cost per 1M output tokens
-  outputTokensPer1M?: number;
-  // Cost per 1M cached tokens (if supported)
-  cachedTokensPer1M?: number;
-  // Cost per 1M reasoning tokens (for models like o1)
-  reasoningTokensPer1M?: number;
-  // Cost per 1M image input tokens
-  imageInputPer1M?: number;
-  // Cost per second of output
-  perSeconds?: number;
+  text?: {
+    input?: number;
+    output?: number;
+    cached?: number;
+  };
+  audio?: {
+    input?: number;
+    output?: number;
+    perSecond?: number; // estimate
+  };
+  image?: {
+    input?: number;
+    output?: {
+      quality: string; // e.g., low, medium, high
+      sizes: {
+        width: number;
+        height: number;
+        cost: number;
+      }[]
+    }[];
+  };
+  reasoning?: {
+    input?: number;
+    output?: number;
+    cached?: number;
+  };
+  embeddings?: {
+    cost?: number;
+  };
   // Fixed cost per request
-  requestCost?: number;
+  perRequest?: number;
 }
 
 /**
@@ -231,7 +248,7 @@ export type ModelTokenizer = 'Other' | 'GPT' | 'Mistral' | 'Llama3' | 'Qwen3' | 
  */
 export type ModelParameter = 
   // Chat Request
-  | 'maxTokens' // max_tokens
+  | 'maxTokens' // max_tokens / max_completion_tokens
   | 'temperature' // temperature
   | 'topP' // top_p
   | 'frequencyPenalty' // frequency_penalty
@@ -250,6 +267,7 @@ export type ModelParameter =
   | 'imageMultiple' // n
   | 'imageFormat' // output_format ()
   | 'imageStream' // stream / partial_images
+  | 'imageStyle'
   // Embedding
   | 'embeddingDimensions' // dimensions
   // Transcription

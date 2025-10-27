@@ -5,8 +5,7 @@
     { "path": "./packages/ai" },
     { "path": "./packages/openai" },
     { "path": "./packages/replicate" },
-    { "path": "./packages/google" },
-    { "path": "./packages/xai" },
-    { "path": "./packages/openrouter" }
+    { "path": "./packages/openrouter" },
+    { "path": "./packages/models" }
   ]
 }

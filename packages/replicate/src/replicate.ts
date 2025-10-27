@@ -6,26 +6,25 @@
  * Users must register ModelAdapters for each model they want to use.
  */
 
-import Replicate from 'replicate';
 import type {
-  Provider,
-  ModelInfo,
-  ModelCapability,
-  ModelTier,
-  ModelTransformer,
-  ImageGenerationRequest,
-  ImageGenerationResponse,
-  TranscriptionRequest,
-  TranscriptionResponse,
-  SpeechRequest,
-  SpeechResponse,
-  EmbeddingRequest,
-  EmbeddingResponse,
   AIBaseContext,
   AIBaseTypes,
+  EmbeddingRequest,
+  EmbeddingResponse,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  ModelCapability,
+  ModelInfo,
+  ModelTier,
+  ModelTransformer,
+  Provider,
+  SpeechRequest,
+  SpeechResponse,
+  TranscriptionRequest,
+  TranscriptionResponse,
 } from '@aits/ai';
-import type { Executor, Streamer, Request, Response, Chunk } from '@aits/core';
-import { detectCapabilitiesFromModality } from '@aits/ai';
+import type { Executor, Request, Streamer } from '@aits/core';
+import Replicate from 'replicate';
 
 // ============================================================================
 // Configuration
@@ -162,11 +161,7 @@ function convertModel(model: ReplicateModel): ModelInfo {
     provider: 'replicate',
     name: model.name,
     capabilities,
-    pricing: {
-      inputTokensPer1M: 0, // Replicate pricing varies by model, set via overrides
-      outputTokensPer1M: 0,
-      requestCost: 0,
-    },
+    pricing: {},
     contextWindow: 0, // Unknown without model-specific info
     maxOutputTokens: undefined,
     tier,
@@ -261,9 +256,9 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
   /**
    * Get transformer for a specific model
    */
-  private getTransformer(modelId: string, config?: ReplicateConfig): ModelTransformer | undefined {
+  private getTransformer<TContext = {}>(modelId: string, config?: ReplicateConfig): ModelTransformer<TContext> | undefined {
     const repConfig = config || this.config;
-    return repConfig.transformers?.[modelId];
+    return repConfig.transformers?.[modelId] as ModelTransformer<TContext> | undefined;
   }
 
   /**
@@ -281,7 +276,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
         throw new Error('Replicate executor requires model ID in metadata');
       }
 
-      const transformer = this.getTransformer(modelId, repConfig);
+      const transformer = this.getTransformer<TContext>(modelId, repConfig);
       if (!transformer?.chat?.convertRequest || !transformer?.chat?.parseResponse) {
         throw new Error(
           `Replicate chat for model "${modelId}" requires a ModelTransformer with chat.convertRequest and chat.parseResponse. ` +
@@ -307,15 +302,16 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    */
   createStreamer<TContext>(config?: ReplicateConfig): Streamer<TContext, any> {
     const repConfig = config || this.config;
+    const provider = this;
 
-    return async function* (request: Request, ctx, metadata, signal) {
+    return async function* (request: Request, ctx: TContext, metadata, signal) {
       // Extract model ID from metadata
       const modelId = (metadata as any)?.model;
       if (!modelId) {
         throw new Error('Replicate streamer requires model ID in metadata');
       }
 
-      const transformer = repConfig.transformers?.[modelId];
+      const transformer = provider.getTransformer<TContext>(modelId, repConfig);
       if (!transformer?.chat?.convertRequest || !transformer?.chat?.parseChunk) {
         throw new Error(
           `Replicate streaming chat for model "${modelId}" requires a ModelTransformer with chat.convertRequest and chat.parseChunk. ` +
@@ -340,7 +336,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
         return transformer.chat.parseResponse(null as any, ctx);
       }
 
-      return { content: '', finishReason: 'stop' as const, usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
+      return { model: modelId, content: '', finishReason: 'stop' as const, usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
     };
   }
 
@@ -407,7 +403,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
       throw new Error('Model must be specified for Replicate transcription');
     }
 
-    const transformer = this.getTransformer(request.model, repConfig);
+    const transformer = this.getTransformer<TContext>(request.model, repConfig);
     if (!transformer?.transcribe?.convertRequest || !transformer?.transcribe?.parseResponse) {
       throw new Error(
         `Replicate transcription for model "${request.model}" requires a ModelTransformer with transcribe.convertRequest and transcribe.parseResponse. ` +
@@ -452,7 +448,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
       throw new Error('Model must be specified for Replicate speech generation');
     }
 
-    const transformer = this.getTransformer(request.model, repConfig);
+    const transformer = this.getTransformer<TContext>(request.model, repConfig);
     if (!transformer?.speech?.convertRequest || !transformer?.speech?.parseResponse) {
       throw new Error(
         `Replicate speech generation for model "${request.model}" requires a ModelTransformer with speech.convertRequest and speech.parseResponse. ` +
@@ -497,7 +493,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
       throw new Error('Model must be specified for Replicate embeddings');
     }
 
-    const transformer = this.getTransformer(request.model, repConfig);
+    const transformer = this.getTransformer<TContext>(request.model, repConfig);
     if (!transformer?.embed?.convertRequest || !transformer?.embed?.parseResponse) {
       throw new Error(
         `Replicate embedding generation for model "${request.model}" requires a ModelTransformer with embed.convertRequest and embed.parseResponse. ` +

@@ -215,10 +215,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       name: model.id,
       capabilities: new Set(['chat', 'streaming']), // Minimal default, enriched by model sources
       tier,
-      pricing: {
-        inputTokensPer1M: 0, // Will be enriched by model sources (e.g., OpenRouter)
-        outputTokensPer1M: 0,
-      },
+      pricing: {},
       contextWindow: 0, // Will be enriched by model sources
       maxOutputTokens: undefined,
       metadata: {
@@ -1011,7 +1008,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         quality: request.quality as 'standard' | 'hd' | undefined,
         style: request.style as 'vivid' | 'natural' | undefined,
         background: request.background,
-        response_format: request.responseFormat,
+        response_format: request.responseFormat || 'b64_json',
         user: request.userIdentifier,
         stream: false,
       };

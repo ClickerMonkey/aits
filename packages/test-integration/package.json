@@ -15,9 +15,7 @@
     "@aits/ai": "*",
     "@aits/openai": "*",
     "@aits/openrouter": "*",
-    "@aits/xai": "*",
-    "@aits/replicate": "*",
-    "@aits/google": "*"
+    "@aits/replicate": "*"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

@@ -8,7 +8,6 @@
 import { AI } from '@aits/ai';
 import { OpenAIProvider } from '@aits/openai';
 import { OpenRouterProvider } from '@aits/openrouter';
-import { XAIProvider } from '@aits/xai';
 import { getAPIKey, requireMinimumProviders, getAvailableProviders } from '../setup';
 
 const describeMultiProvider = requireMinimumProviders(2);
@@ -32,12 +31,6 @@ describeMultiProvider('Multi-Provider Integration', () => {
     if (availableProviders.includes('openrouter')) {
       providers.openrouter = new OpenRouterProvider({
         apiKey: getAPIKey('openrouter')
-      });
-    }
-
-    if (availableProviders.includes('xai')) {
-      providers.xai = new XAIProvider({
-        apiKey: getAPIKey('xai')
       });
     }
 

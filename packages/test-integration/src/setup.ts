@@ -50,7 +50,7 @@ export const skipIfNoAPIKey = (provider: string) => {
  * Get all available providers based on environment variables
  */
 export const getAvailableProviders = (): string[] => {
-  const providers = ['openai', 'openrouter', 'xai', 'replicate', 'google'];
+  const providers = ['openai', 'openrouter', 'replicate'];
   return providers.filter(hasAPIKey);
 };
 

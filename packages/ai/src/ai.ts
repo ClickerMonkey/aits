@@ -507,34 +507,36 @@ export class AI<T extends AIBaseTypes> {
     
     let cost = 0;
 
-    if (usage.inputTokens && model.pricing.inputTokensPer1M) {
-      const inputCost = (usage.inputTokens * model.pricing.inputTokensPer1M) / 1_000_000;
+    if (usage.inputTokens && model.pricing.text?.input) {
+      const inputCost = (usage.inputTokens * model.pricing.text.input) / 1_000_000;
       cost += inputCost;
     }
 
-    if (usage.outputTokens && model.pricing.outputTokensPer1M) {
-      const outputCost = (usage.outputTokens * model.pricing.outputTokensPer1M) / 1_000_000;
+    if (usage.outputTokens && model.pricing.text?.output) {
+      const outputCost = (usage.outputTokens * model.pricing.text.output) / 1_000_000;
       cost += outputCost;
     }
 
-    if (usage.cachedTokens && model.pricing.cachedTokensPer1M) {
-      const cachedCost = (usage.cachedTokens * model.pricing.cachedTokensPer1M) / 1_000_000;
+    if (usage.cachedTokens && model.pricing.text?.cached) {
+      const cachedCost = (usage.cachedTokens * model.pricing.text?.cached) / 1_000_000;
       cost += cachedCost;
     }
 
-    if (usage.reasoningTokens && model.pricing.reasoningTokensPer1M) {
-      const reasoningCost = (usage.reasoningTokens * model.pricing.reasoningTokensPer1M) / 1_000_000;
+    if (usage.reasoningTokens && model.pricing.reasoning?.output) {
+      const reasoningCost = (usage.reasoningTokens * model.pricing.reasoning.output) / 1_000_000;
       cost += reasoningCost;
     }
 
-    if (usage.seconds && model.pricing.perSeconds) {
-      const timeCost = usage.seconds * model.pricing.perSeconds;
+    if (usage.seconds && model.pricing.audio?.perSecond) {
+      const timeCost = usage.seconds * model.pricing.audio.perSecond;
       cost += timeCost;
     }
 
-    if (model.pricing.requestCost) {
-      cost += model.pricing.requestCost;
+    if (model.pricing.perRequest) {
+      cost += model.pricing.perRequest;
     }
+
+    // TODO non text input & output tokens
 
     return cost;
   }

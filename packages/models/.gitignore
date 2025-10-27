@@ -1,0 +1,15 @@
+# Build output
+dist/
+*.tsbuildinfo
+
+# Cache directory (used for transformer generation)
+cache/
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+data/
