@@ -279,7 +279,7 @@ describe('Prompt', () => {
             toolCalls: [{
               id: 'call_1',
               name: 'add',
-              arguments: { a: 5, b: 3 }
+              arguments: '{ "a": 5, "b": 3 }'
             }]
           },
           // Second call: final answer
@@ -341,8 +341,8 @@ describe('Prompt', () => {
             content: '',
             finishReason: 'tool_calls',
             toolCalls: [
-              { id: 'call_1', name: 'multiply', arguments: { a: 5, b: 3 } },
-              { id: 'call_2', name: 'subtract', arguments: { a: 10, b: 4 } }
+              { id: 'call_1', name: 'multiply', arguments: '{ "a": 5, "b": 3 }' },
+              { id: 'call_2', name: 'subtract', arguments: '{ "a": 10, "b": 4 }' }
             ]
           },
           // Second call: final answer
@@ -384,7 +384,7 @@ describe('Prompt', () => {
         description: 'Math',
         content: 'Calculate',
         tools: [tool],
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -396,7 +396,7 @@ describe('Prompt', () => {
             toolCalls: [{
               id: 'call_1',
               name: 'divide',
-              arguments: { a: 10, b: 0 }
+              arguments: JSON.stringify({ a: 10, b: 0 })
             }]
           },
           // Second call: final answer after tool error
@@ -429,9 +429,9 @@ describe('Prompt', () => {
 
       const streamer = createMockStreamer({
         chunks: [
-          { content: 'Hello', finishReason: null },
-          { content: ' ', finishReason: null },
-          { content: 'world', finishReason: null },
+          { content: 'Hello' },
+          { content: ' ' },
+          { content: 'world' },
           { content: '!', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
         ]
       });
@@ -462,8 +462,8 @@ describe('Prompt', () => {
 
       const streamer = createMockStreamer({
         chunks: [
-          { content: '1', finishReason: null },
-          { content: ', 2', finishReason: null },
+          { content: '1' },
+          { content: ', 2' },
           { content: ', 3', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 8, totalTokens: 13 } }
         ]
       });
@@ -613,8 +613,8 @@ describe('Prompt', () => {
         name: 'dynamic',
         description: 'Dynamic',
         content: 'Test',
-        config: (input: { temp: number }) => ({
-          temperature: input.temp
+        config: (input?: { temp: number }) => ({
+          temperature: input?.temp
         })
       });
 

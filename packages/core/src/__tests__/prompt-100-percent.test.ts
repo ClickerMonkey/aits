@@ -5,9 +5,9 @@
  */
 
 import { z } from 'zod';
-import { Prompt } from '../prompt';
-import { Tool } from '../tool';
-import { Context, PromptEvent, Message } from '../types';
+import { Prompt, PromptEvent } from '../prompt';
+import { AnyTool, Tool } from '../tool';
+import { Context, Message } from '../types';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt 100% Coverage', () => {
@@ -31,11 +31,12 @@ describe('Prompt 100% Coverage', () => {
 
       const ctx: Context<{}, {}> = {
         stream: streamer as any,
-        runner: async function* (component, input, ctx, defaultRun) {
+        runner: (component, input, ctx, defaultRun) => {
           runnerCalled = true;
           // Call with event handler
-          yield* await defaultRun(ctx, {
+          return defaultRun(ctx, {
             onPromptEvent: (instance, event) => {
+              // @ts-ignore
               capturedEvents.push(event);
             }
           });
@@ -88,7 +89,7 @@ describe('Prompt 100% Coverage', () => {
         ]
       });
 
-      const capturedEvents: PromptEvent<any, any>[] = [];
+      const capturedEvents: PromptEvent<any, [AnyTool]>[] = [];
 
       const ctx: Context<{}, {}> = {
         execute: executor as any,
@@ -98,6 +99,7 @@ describe('Prompt 100% Coverage', () => {
 
       // Use stream mode with events to trigger event emission
       for await (const event of prompt.get({}, 'stream', ctx)) {
+        // @ts-ignore
         capturedEvents.push(event);
       }
 
@@ -142,7 +144,7 @@ describe('Prompt 100% Coverage', () => {
         ]
       });
 
-      const events: PromptEvent<any, any>[] = [];
+      const events: PromptEvent<any, [AnyTool]>[] = [];
 
       const ctx: Context<{}, {}> = {
         execute: executor as any,
@@ -150,6 +152,7 @@ describe('Prompt 100% Coverage', () => {
       };
 
       for await (const event of prompt.get({}, 'stream', ctx)) {
+        // @ts-ignore
         events.push(event);
       }
 
