@@ -17,6 +17,7 @@ import type {
   AIProviderNames,
   ModelHandler,
   ModelCapability,
+  ModelParameter,
   SelectedModelFor,
   Usage,
   Executor,
@@ -75,10 +76,11 @@ export abstract class BaseAPI<
         selected = this.createSelectedModelFromId(contextModel);
       } else {
         // No model specified - use selection system
-        // Build metadata with required capabilities
+        // Build metadata with required capabilities and parameters
         const metadataRequired: AIMetadataRequired<T> = {
           ...fullCtx.metadata,
-          required: this.getRequiredCapabilities(fullCtx.metadata?.required || []),
+          required: this.getRequiredCapabilities(fullCtx.metadata?.required || [], request, false),
+          requiredParameters: this.getRequiredParameters(fullCtx.metadata?.requiredParameters || [], request, false),
         } as AIMetadataRequired<T>;
 
         const metadata = await this.ai.buildMetadata(metadataRequired);
@@ -173,10 +175,11 @@ export abstract class BaseAPI<
         selected = this.createSelectedModelFromId(contextModel);
       } else {
         // No model specified - use selection system
-        // Build metadata with required capabilities (including streaming)
+        // Build metadata with required capabilities (including streaming) and parameters
         const metadataRequired: AIMetadataRequired<T> = {
           ...fullCtx.metadata,
-          required: this.getRequiredCapabilitiesForStreaming(fullCtx.metadata?.required || []),
+          required: this.getRequiredCapabilitiesForStreaming(fullCtx.metadata?.required || [], request),
+          requiredParameters: this.getRequiredParameters(fullCtx.metadata?.requiredParameters || [], request, true),
         } as AIMetadataRequired<T>;
 
         const metadata = await this.ai.buildMetadata(metadataRequired);
@@ -258,8 +261,16 @@ export abstract class BaseAPI<
   /**
    * Get required capabilities for model selection
    * @param provided - Additional capabilities provided by caller
+   * @param request - Optional request to analyze for additional capability needs
    */
-  protected abstract getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[];
+  protected abstract getRequiredCapabilities(provided: ModelCapability[], request: TRequest, forStreaming: boolean): ModelCapability[];
+
+  /**
+   * Get required parameters for model selection based on the request
+   * @param request - The request to analyze
+   * @returns Set of parameters required by this request
+   */
+  protected abstract getRequiredParameters(provided: ModelParameter[], request: TRequest, forStreaming: boolean): ModelParameter[];
 
   /**
    * Get error message when no compatible model is found
@@ -375,7 +386,7 @@ export abstract class BaseAPI<
           name: modelId,
           capabilities: new Set<ModelCapability>(),
           tier:'flagship',
-          pricing: { inputTokensPer1M: 0, outputTokensPer1M: 0 },
+          pricing: {},
           contextWindow: 0,
         },
         provider: provider! as any,
@@ -400,9 +411,10 @@ export abstract class BaseAPI<
   /**
    * Get required capabilities for streaming (default: adds 'streaming')
    * @param provided - Additional capabilities provided by caller
+   * @param request - Optional request to analyze for additional capability needs
    */
-  protected getRequiredCapabilitiesForStreaming(provided: ModelCapability[]): ModelCapability[] {
-    return [...this.getRequiredCapabilities(provided), 'streaming'];
+  protected getRequiredCapabilitiesForStreaming(provided: ModelCapability[], request: TRequest): ModelCapability[] {
+    return [...this.getRequiredCapabilities(provided, request, true), 'streaming'];
   }
 
   /**

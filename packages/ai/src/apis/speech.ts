@@ -9,6 +9,7 @@ import type {
   AIBaseTypes,
   AIContext,
   ModelCapability,
+  ModelParameter,
   ModelHandlerFor,
   SelectedModelFor,
   SpeechRequest,
@@ -34,8 +35,18 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request: SpeechRequest, forStreaming: boolean): ModelCapability[] {
     return ['audio', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: SpeechRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>(provided);
+
+    if (request.instructions !== undefined) {
+      params.add('speechInstructions');
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {

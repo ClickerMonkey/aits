@@ -9,6 +9,7 @@ import type {
   AIBaseTypes,
   AIContext,
   ModelCapability,
+  ModelParameter,
   ModelHandlerFor,
   SelectedModelFor,
   TranscriptionChunk,
@@ -35,8 +36,21 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request?: TranscriptionRequest, forStreaming: boolean): ModelCapability[] {
     return ['hearing', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: TranscriptionRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>();
+
+    if (request.prompt !== undefined) {
+      params.add('transcribePrompt');
+    }
+    if (forStreaming) {
+      params.add('transcribeStream');
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {

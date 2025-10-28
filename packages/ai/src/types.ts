@@ -325,6 +325,10 @@ export interface AIBaseMetadata<TProviders extends Providers> {
   required?: ModelCapability[];
   // Optional capabilities (preferred but not required)
   optional?: ModelCapability[];
+  // Required parameters (model must support all)
+  requiredParameters?: ModelParameter[];
+  // Optional parameters (preferred but not required)
+  optionalParameters?: ModelParameter[];
   // Provider allowlist/denylist
   providers?: {
     allow?: (keyof TProviders)[];

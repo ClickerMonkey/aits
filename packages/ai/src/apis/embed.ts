@@ -11,6 +11,7 @@ import type {
   EmbeddingRequest,
   EmbeddingResponse,
   ModelCapability,
+  ModelParameter,
   ModelHandlerFor,
   SelectedModelFor
 } from '../types';
@@ -34,8 +35,16 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request: EmbeddingRequest, forStreaming: boolean): ModelCapability[] {
     return ['embedding', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: EmbeddingRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>([...provided]);
+
+    if (request.dimensions !== undefined) params.add('embeddingDimensions');
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {

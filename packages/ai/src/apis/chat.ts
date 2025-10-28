@@ -44,6 +44,7 @@ import type {
   AIMetadataRequired,
   Chunk,
   ModelCapability,
+  ModelParameter,
   ModelHandlerFor,
   Request,
   Response,
@@ -76,8 +77,100 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     return undefined;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
-    return ['chat', ...provided];
+  protected getRequiredCapabilities(provided: ModelCapability[], request: Request, forStreaming: boolean): ModelCapability[] {
+    const capabilities = new Set<ModelCapability>(['chat', ...provided]);
+
+    // Check if request contains images - requires vision capability
+    if (request) {
+      const hasImages = request.messages.some(message => {
+        if (Array.isArray(message.content)) {
+          return message.content.some(part => part.type === 'image');
+        }
+        return false;
+      });
+
+      if (hasImages) {
+        capabilities.add('vision');
+      }
+
+      const hasAudio = request.messages.some(message => {
+        if (Array.isArray(message.content)) {
+          return message.content.some(part => part.type === 'audio');
+        }
+        return false;
+      });
+
+      if (hasAudio) {
+        capabilities.add('hearing');
+      }
+
+      // Check if request uses reasoning
+      if (request.reason !== undefined) {
+        capabilities.add('reasoning');
+      }
+
+      // Check if request expects JSON output
+      if (request.responseFormat) {
+        if (request.responseFormat === 'json') {
+          capabilities.add('json');
+        } else if (typeof request.responseFormat === 'object') {
+          capabilities.add('structured');
+        }
+      }
+
+      // Check if request uses tools
+      if (request.tools && request.tools.length > 0) {
+        capabilities.add('tools');
+      }
+    }
+
+    return Array.from(capabilities);
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: Request, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>([...provided]);
+
+    if (request.maxTokens !== undefined) {
+      params.add('maxTokens');
+    }
+    if (request.temperature !== undefined) {
+      params.add('temperature');
+    }
+    if (request.topP !== undefined) {
+      params.add('topP');
+    }
+    if (request.frequencyPenalty !== undefined) {
+      params.add('frequencyPenalty');
+    }
+    if (request.presencePenalty !== undefined) {
+      params.add('presencePenalty');
+    }
+    if (request.stop !== undefined) {
+      params.add('stop');
+    }
+    if (request.logProbabilities !== undefined) {
+      params.add('logProbabilities');
+    }
+    if (request.logitBias !== undefined) {
+      params.add('logitBias');
+    }
+    if (request.responseFormat !== undefined) {
+      params.add('responseFormat');
+      if (typeof request.responseFormat === 'object') {
+        params.add('structuredOutput');
+      }
+    }
+    if (request.reason !== undefined) {
+      params.add('reason');
+    }
+    if (request.tools !== undefined || request.toolChoice !== undefined || request.toolsOnly) {
+      params.add('tools');
+      if (request.toolChoice !== undefined) {
+        params.add('toolChoice');
+      }
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {

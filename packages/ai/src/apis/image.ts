@@ -15,6 +15,7 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
   ModelCapability,
+  ModelParameter,
   ModelHandlerFor,
   Request,
   Response,
@@ -41,8 +42,30 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request?: ImageGenerationRequest): ModelCapability[] {
     return ['image', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: ImageGenerationRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>(provided);
+
+    if (request.n !== undefined && request.n !== 1) {
+      params.add('imageMultiple');
+    }
+    if (request.background !== undefined) {
+      params.add('imageBackground');
+    }
+    if (request.responseFormat !== undefined) {
+      params.add('imageFormat');
+    }
+    if (request.style !== undefined) {
+      params.add('imageStyle');
+    }
+    if (forStreaming && request.streamCount !== 0) {
+      params.add('imageStream');
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {
@@ -77,7 +100,7 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     // Rough estimate based on prompt length and image size
     const promptTokens = Math.ceil(request.prompt.length / 4);
     const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    const qualityMultiplier = request.quality === 'hd' ? 2 : 1;
+    const qualityMultiplier = request.quality === 'high' ? 2 : 1;
     return promptTokens * sizeMultiplier * qualityMultiplier;
   }
 
@@ -162,8 +185,24 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request: ImageEditRequest, forStreaming: boolean): ModelCapability[] {
     return ['image', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: ImageEditRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>(provided);
+
+    if (request.n !== undefined && request.n !== 1) {
+      params.add('imageMultiple');
+    }
+    if (request.responseFormat !== undefined) {
+      params.add('imageFormat');
+    }
+    if (forStreaming && request.streamCount !== 0) {
+      params.add('imageStream');
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {
@@ -282,8 +321,21 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     return request.model;
   }
 
-  protected getRequiredCapabilities(provided: ModelCapability[]): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request: ImageAnalyzeRequest, forStreaming: boolean): ModelCapability[] {
     return ['chat', 'vision', ...provided];
+  }
+
+  protected getRequiredParameters(provided: ModelParameter[], request: ImageAnalyzeRequest, forStreaming: boolean): ModelParameter[] {
+    const params = new Set<ModelParameter>(provided);
+
+    if (request.maxTokens !== undefined) {
+      params.add('maxTokens');
+    }
+    if (request.temperature !== undefined) {
+      params.add('temperature');
+    }
+
+    return Array.from(params);
   }
 
   protected getNoModelFoundError(): string {

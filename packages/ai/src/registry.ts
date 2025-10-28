@@ -9,6 +9,7 @@ import { detectTier } from './modelDetection';
 import type {
   AIBaseMetadata,
   ModelCapability,
+  ModelParameter,
   ModelHandler,
   ModelInfo,
   ModelOverride,
@@ -284,6 +285,26 @@ export class ModelRegistry<TProviders extends Providers> {
         }
       }
 
+      // Validate that model supports required parameters
+      if (criteria.requiredParameters && criteria.requiredParameters.length > 0) {
+        const optionalParams = criteria.optionalParameters || [];
+
+        for (const param of criteria.requiredParameters) {
+          // If this param is marked as optional, skip the requirement check
+          if (optionalParams.includes(param)) {
+            continue;
+          }
+
+          // Check if model supports this parameter
+          const modelSupportsParam = model.supportedParameters?.has(param) ?? false;
+
+          if (!modelSupportsParam) {
+            // Required parameter not supported by model
+            return undefined;
+          }
+        }
+      }
+
       return {
         model,
         provider,
@@ -401,6 +422,26 @@ export class ModelRegistry<TProviders extends Providers> {
       }
     }
 
+    // Check required parameters
+    if (criteria.requiredParameters && criteria.requiredParameters.length > 0) {
+      const optionalParams = criteria.optionalParameters || [];
+
+      for (const param of criteria.requiredParameters) {
+        // If this param is marked as optional, skip the requirement check
+        if (optionalParams.includes(param)) {
+          continue;
+        }
+
+        // Check if model supports this parameter
+        const modelSupportsParam = model.supportedParameters?.has(param) ?? false;
+
+        if (!modelSupportsParam) {
+          // Required parameter not supported by model
+          return result; // score = 0
+        }
+      }
+    }
+
     // Check minimum context window
     if (criteria.minContextWindow && model.contextWindow < criteria.minContextWindow) {
       return result; // score = 0
@@ -466,6 +507,20 @@ export class ModelRegistry<TProviders extends Providers> {
       // Apply 1.0x to 2.0x multiplier based on optional capability match rate
       // This allows optional caps to overcome significant cost differences
       const multiplier = 1.0 + matchRatio;
+      score *= multiplier;
+    }
+
+    // Optional parameters bonus - models supporting optional parameters get a score boost
+    if (metadata.optionalParameters && metadata.optionalParameters.length > 0) {
+      let supportedOptionalParams = 0;
+      for (const param of metadata.optionalParameters) {
+        if (model.supportedParameters?.has(param)) {
+          supportedOptionalParams++;
+        }
+      }
+      const matchRatio = supportedOptionalParams / metadata.optionalParameters.length;
+      // Apply 1.0x to 1.5x multiplier based on optional parameter match rate
+      const multiplier = 1.0 + (matchRatio * 0.5);
       score *= multiplier;
     }
 
