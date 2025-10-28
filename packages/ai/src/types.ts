@@ -665,8 +665,6 @@ export interface TranscriptionResponse extends BaseResponse {
   words?: Array<{ word: string; start: number; end: number }>;
   // Segment-level timestamps
   segments?: Array<{ text: string; start: number; end: number }>;
-  // Model used
-  model: string;
 }
 
 /**

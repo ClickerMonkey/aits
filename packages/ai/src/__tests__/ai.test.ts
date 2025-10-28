@@ -108,8 +108,7 @@ describe('AI Class', () => {
           capabilities: new Set(['chat']),
           tier: 'flagship',
           pricing: {
-            inputTokensPer1M: 5.0,
-            outputTokensPer1M: 15.0
+            text: { input: 5, output: 15 },
           },
           contextWindow: 8192
         }

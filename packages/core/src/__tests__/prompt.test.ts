@@ -209,7 +209,7 @@ describe('Prompt', () => {
           name: z.string(),
           age: z.number()
         }),
-        config: { maxIterations: 1 } // Prevent retries
+        config: { toolsMax: 1 } // Prevent retries
       });
 
       const executor = createMockExecutor({

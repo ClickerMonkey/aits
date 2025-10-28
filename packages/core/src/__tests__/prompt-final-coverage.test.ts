@@ -67,9 +67,9 @@ describe('Prompt Final Coverage', () => {
 
       const ctx: Context<{}, {}> = {
         stream: streamer as any,
-        runner: async function* (component, input, ctx, defaultRun) {
+        runner: (component, input, ctx, defaultRun) => {
           runnerCalled = true;
-          yield* await defaultRun(ctx);
+          return defaultRun(ctx);
         },
         messages: []
       };

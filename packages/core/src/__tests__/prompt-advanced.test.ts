@@ -156,7 +156,7 @@ describe('Prompt Advanced Features', () => {
         schema: z.object({ value: z.number() }),
         reconfig: (stats, ctx) => {
           // Always stop
-          return false;
+          return { maxIterations: 0 };
         }
       });
 
@@ -447,11 +447,11 @@ describe('Prompt Advanced Features', () => {
         name: 'dynamic-schema',
         description: 'Dynamic schema',
         content: 'Extract',
-        schema: (input: { includeAge: boolean }) => {
-          return input.includeAge
+        schema: (input?: { includeAge: boolean }) => {
+          return input?.includeAge
             ? z.object({ name: z.string(), age: z.number() })
             : z.object({ name: z.string() });
-        }
+        },
       });
 
       const executor = createMockExecutor({

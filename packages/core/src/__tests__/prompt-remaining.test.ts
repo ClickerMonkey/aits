@@ -18,7 +18,7 @@ describe('Prompt Remaining Coverage', () => {
       content: 'Test'
     });
 
-    expect(prompt.type).toBe('prompt');
+    expect(prompt.kind).toBe('prompt');
   });
 
   it('should handle abort signal during streaming', async () => {
@@ -32,7 +32,7 @@ describe('Prompt Remaining Coverage', () => {
 
     const streamer = createMockStreamer({
       chunks: [
-        { content: 'chunk1', finishReason: null },
+        { content: 'chunk1' },
         { content: 'chunk2', finishReason: 'stop' }
       ]
     });
@@ -76,7 +76,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Invalid JSON',
       content: 'Test',
       tools: [tool],
-      config: { maxIterations: 2 }
+      config: { toolsMax: 2 }
     });
 
     const executor = createMockExecutor({
@@ -163,7 +163,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Mixed tools',
       content: 'Test',
       tools: [tool1, tool2],
-      config: { maxIterations: 2 }
+      config: { toolsMax: 2 }
     });
 
     const executor = createMockExecutor({
@@ -294,7 +294,7 @@ describe('Prompt Remaining Coverage', () => {
       tools: [tool],
       reconfig: (stats) => {
         reconfigStats = stats;
-        return false; // Stop after first
+        return { maxIterations: 0 }; // Stop after first
       }
     });
 
@@ -385,7 +385,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Parse error',
       content: 'Extract data',
       schema: z.object({ value: z.number() }),
-      config: { maxIterations: 2 }
+      config: { toolsMax: 2 }
     });
 
     const executor = createMockExecutor({

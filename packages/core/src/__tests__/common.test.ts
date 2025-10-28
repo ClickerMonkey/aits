@@ -14,6 +14,7 @@ import {
   consumeAll,
   accumulateUsage,
 } from '../common';
+import { Usage } from '../types';
 
 describe('Common Utilities', () => {
   describe('resolveFn', () => {
@@ -406,8 +407,8 @@ describe('Common Utilities', () => {
     });
 
     it('should handle empty target', () => {
-      const target = {};
-      const add = {
+      const target: Usage = {};
+      const add: Usage = {
         inputTokens: 15,
         outputTokens: 25,
       };
@@ -419,13 +420,13 @@ describe('Common Utilities', () => {
     });
 
     it('should handle partial add object', () => {
-      const target = {
+      const target: Usage = {
         inputTokens: 10,
         outputTokens: 20,
         totalTokens: 30,
       };
 
-      const add = {
+      const add: Usage = {
         inputTokens: 5,
         // Missing outputTokens
         cost: 0.001,
@@ -440,11 +441,11 @@ describe('Common Utilities', () => {
     });
 
     it('should handle zero values', () => {
-      const target = {
+      const target: Usage = {
         inputTokens: 10,
       };
 
-      const add = {
+      const add: Usage = {
         inputTokens: 0,
         outputTokens: 0,
       };
@@ -456,8 +457,8 @@ describe('Common Utilities', () => {
     });
 
     it('should initialize fields if target is empty', () => {
-      const target = {};
-      const add = {
+      const target: Usage = {};
+      const add: Usage = {
         inputTokens: 100,
         cost: 0.05,
       };

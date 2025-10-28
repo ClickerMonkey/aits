@@ -197,8 +197,8 @@ describe('ModelRegistry', () => {
 
         // Should be sorted by cost (ascending)
         for (let i = 1; i < results.length; i++) {
-          const prevCost = results[i - 1].model.pricing.inputTokensPer1M;
-          const currCost = results[i].model.pricing.inputTokensPer1M;
+          const prevCost = results[i - 1].model.pricing.text?.input!;
+          const currCost = results[i].model.pricing.text?.input!;
           expect(currCost).toBeGreaterThanOrEqual(prevCost);
         }
       });
@@ -378,7 +378,7 @@ describe('ModelRegistry', () => {
             name: 'No Chat Model',
             capabilities: new Set(['embedding']),
             tier: 'efficient',
-            pricing: { inputTokensPer1M: 0.1, outputTokensPer1M: 0 },
+            pricing: { text: { input: 0.1, output: 0 } },
             contextWindow: 4096
           }
         ]

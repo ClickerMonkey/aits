@@ -4,6 +4,7 @@
  * Common test data used across multiple test files.
  */
 
+import z from 'zod';
 import type { Message, Request, Response, Chunk, ToolCall } from '../../types';
 
 // ============================================================================
@@ -60,15 +61,11 @@ export const mockRequestWithTools: Request = {
     {
       name: 'calculator',
       description: 'Performs calculations',
-      parameters: {
-        type: 'object',
-        properties: {
-          operation: { type: 'string', enum: ['add', 'subtract', 'multiply', 'divide'] },
-          a: { type: 'number' },
-          b: { type: 'number' }
-        },
-        required: ['operation', 'a', 'b']
-      }
+      parameters: z.object({
+        operation: z.enum(['add', 'subtract', 'multiply', 'divide']),
+        a: z.number(),
+        b: z.number()
+      }),
     }
   ]
 };
@@ -84,7 +81,8 @@ export const mockResponse: Response = {
     inputTokens: 10,
     outputTokens: 20,
     totalTokens: 30
-  }
+  },
+  model: 'mock-model',
 };
 
 export const mockResponseWithToolCalls: Response = {
@@ -93,16 +91,16 @@ export const mockResponseWithToolCalls: Response = {
   toolCalls: [
     {
       id: 'call_123',
-      type: 'function',
       name: 'calculator',
-      arguments: { operation: 'add', a: 5, b: 3 }
+      arguments: '{ "operation": "add", "a": 5, "b": 3 }',
     }
   ],
   usage: {
     inputTokens: 15,
     outputTokens: 5,
     totalTokens: 20
-  }
+  },
+  model: 'mock-model',
 };
 
 export const mockResponseWithRefusal: Response = {
@@ -113,7 +111,8 @@ export const mockResponseWithRefusal: Response = {
     inputTokens: 8,
     outputTokens: 12,
     totalTokens: 20
-  }
+  },
+  model: 'mock-model',
 };
 
 // ============================================================================
@@ -121,24 +120,21 @@ export const mockResponseWithRefusal: Response = {
 // ============================================================================
 
 export const mockChunks: Chunk[] = [
-  { content: 'Hello', finishReason: null },
-  { content: ' there', finishReason: null },
+  { content: 'Hello' },
+  { content: ' there' },
   { content: '!', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
 ];
 
 export const mockChunksWithToolCalls: Chunk[] = [
-  { content: '', finishReason: null },
+  { content: '' },
   {
     content: '',
     finishReason: 'tool_calls',
-    toolCalls: [
-      {
-        id: 'call_456',
-        type: 'function',
-        name: 'get_weather',
-        arguments: { location: 'San Francisco' }
-      }
-    ],
+    toolCall: {
+      id: 'call_456',
+      name: 'get_weather',
+      arguments: '{ "location": "San Francisco" }'
+    },
     usage: { inputTokens: 12, outputTokens: 8, totalTokens: 20 }
   }
 ];
@@ -149,23 +145,20 @@ export const mockChunksWithToolCalls: Chunk[] = [
 
 export const mockToolCall: ToolCall = {
   id: 'call_789',
-  type: 'function',
   name: 'search',
-  arguments: { query: 'typescript testing' }
+  arguments: '{ "query": "typescript testing" }'
 };
 
 export const mockToolCalls: ToolCall[] = [
   {
     id: 'call_001',
-    type: 'function',
     name: 'calculator',
-    arguments: { operation: 'multiply', a: 6, b: 7 }
+    arguments: '{ "operation": "multiply", "a": 6, "b": 7 }'
   },
   {
     id: 'call_002',
-    type: 'function',
     name: 'get_time',
-    arguments: {}
+    arguments: '{}'
   }
 ];
 

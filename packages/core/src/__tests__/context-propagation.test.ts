@@ -25,7 +25,8 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx) => {
           receivedContext = ctx;
           return 'success';
-        }
+        },
+        types: { context: {userId: 'string'} }
       });
 
       const ctx: Context<{ userId: string }, {}> = {
@@ -51,7 +52,8 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx: Context<{ counter: number }, {}>) => {
           executionLog.push(`inner:${ctx.counter}`);
           return ctx.counter;
-        }
+        },
+        types: { context: {counter: 0} }
       });
 
       const outerTool = new Tool({
@@ -70,7 +72,8 @@ describe('Context Propagation', () => {
           const result = inner.run({}, modifiedCtx);
 
           return result;
-        }
+        },
+        types: { context: {counter: 0} }
       });
 
       const ctx: Context<{ counter: number }, {}> = {
@@ -96,7 +99,8 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx) => {
           receivedContext = ctx;
           return 'success';
-        }
+        },
+        types: { context: {sessionId: ''} }
       });
 
       const ctx: Context<{ sessionId: string }, {}> = {
@@ -121,7 +125,8 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx: Context<{ level: number }, {}>) => {
           executionLog.push(`inner:${ctx.level}`);
           return `Level ${ctx.level}`;
-        }
+        },
+        types: { context: {level: 0} }
       });
 
       const outerAgent = new Agent({
@@ -138,7 +143,8 @@ describe('Context Propagation', () => {
           const result = inner.run({}, modifiedCtx);
 
           return result;
-        }
+        },
+        types: { context: {level: 0} }
       });
 
       const ctx: Context<{ level: number }, {}> = {
@@ -164,7 +170,8 @@ describe('Context Propagation', () => {
           const newPath = `${ctx.path}/tool`;
           executionLog.push(`tool:depth=${ctx.depth},path=${newPath}`);
           return newPath;
-        }
+        },
+        types: { context: {depth: 0, path: ''} }
       });
 
       const innerAgent = new Agent({
@@ -178,7 +185,8 @@ describe('Context Propagation', () => {
           // Modify context and pass to tool
           const modifiedCtx = { ...ctx, depth: ctx.depth + 1, path: newPath };
           return t.run({}, modifiedCtx);
-        }
+        },
+        types: { context: {depth: 0, path: ''} }
       });
 
       const outerAgent = new Agent({
@@ -192,7 +200,8 @@ describe('Context Propagation', () => {
           // Modify context and pass to inner agent
           const modifiedCtx = { ...ctx, depth: ctx.depth + 1, path: newPath };
           return inner.run({}, modifiedCtx);
-        }
+        },
+        types: { context: {depth: 0, path: ''} }
       });
 
       const ctx: Context<{ depth: number; path: string }, {}> = {
@@ -253,14 +262,16 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx: Context<{ value: number }, {}>) => {
           executionLog.push(`tool:${ctx.value}`);
           return ctx.value * 2;
-        }
+        },
+        types: { context: {value: 0} }
       });
 
       const prompt = new Prompt({
         name: 'multiplier',
         description: 'Multiplier',
         content: 'Multiply',
-        tools: [tool]
+        tools: [tool],
+        types: { context: {value: 0} }
       });
 
       const executor = createMockExecutor({
@@ -305,14 +316,16 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx: Context<{ count: number }, {}>) => {
           executionLog.push(`tool:count=${ctx.count}`);
           return `Count: ${ctx.count}`;
-        }
+        },
+        types: { context: {count: 0} }
       });
 
       const prompt = new Prompt({
         name: 'counter',
         description: 'Counter',
         content: 'Count',
-        tools: [tool]
+        tools: [tool],
+        types: { context: {count: 0} }
       });
 
       const agent = new Agent({
@@ -327,7 +340,8 @@ describe('Context Propagation', () => {
 
           // The prompt will call the tool with the modified context
           return await p.get({}, 'result', modifiedCtx);
-        }
+        },
+        types: { context: {count: 0} }
       });
 
       const executor = createMockExecutor({
@@ -383,7 +397,8 @@ describe('Context Propagation', () => {
         call: (input, refs, ctx: Context<{ value: string }, {}>) => {
           executionLog.push(`tool2:${ctx.value}`);
           return ctx.value;
-        }
+        },
+        types: { context: {value: ''} }
       });
 
       const agent = new Agent({
@@ -402,7 +417,8 @@ describe('Context Propagation', () => {
           const result2 = t2.run({}, ctx2);
 
           return `${result1} & ${result2}`;
-        }
+        },
+        types: { context: {value: ''} }
       });
 
       const ctx: Context<{ value: string }, {}> = {
@@ -433,7 +449,8 @@ describe('Context Propagation', () => {
           // Try to mutate (shouldn't affect parent)
           (ctx as any).value = 999;
           return 'modified';
-        }
+        },
+        types: { context: {value: 0} }
       });
 
       const outerAgent = new Agent({
@@ -448,7 +465,8 @@ describe('Context Propagation', () => {
 
           contextSnapshots.push({ after: ctx.value });
           return ctx.value;
-        }
+        },
+        types: { context: {value: 0} }
       });
 
       const ctx: Context<{ value: number }, {}> = {
@@ -476,7 +494,8 @@ describe('Context Propagation', () => {
           // Mutate the passed context
           (ctx as any).value = 999;
           return 'modified';
-        }
+        },
+        types: { context: {value: 0} }
       });
 
       const outerAgent = new Agent({
@@ -492,7 +511,8 @@ describe('Context Propagation', () => {
 
           contextSnapshots.push({ after: ctx.value });
           return ctx.value;
-        }
+        },
+        types: { context: {value: 0} }
       });
 
       const ctx: Context<{ value: number }, {}> = {

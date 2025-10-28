@@ -342,7 +342,7 @@ describe('Prompt Forget Function Coverage', () => {
     // The last user message should be kept
     if (callCount >= 2 && lastRequest) {
       const hasKeepMessage = lastRequest.messages.some((m: Message) =>
-        m.content === 'keep' || m.content.includes('Test')
+        m.content === 'keep' || String(m.content).includes('Test')
       );
       expect(hasKeepMessage).toBe(true);
     }

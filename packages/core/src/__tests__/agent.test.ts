@@ -35,6 +35,7 @@ describe('Agent', () => {
       const tool = new Tool({
         name: 'helper',
         description: 'Helper tool',
+        instructions: 'Helps with tasks',
         schema: z.object({ input: z.string() }),
         call: (input) => input.input.toUpperCase()
       });
@@ -54,6 +55,7 @@ describe('Agent', () => {
       const tool = new Tool({
         name: 'tool1',
         description: 'Tool',
+        instructions: 'Tool instructions',
         schema: z.object({ x: z.number() }),
         call: (input) => input.x * 2
       });
@@ -128,8 +130,9 @@ describe('Agent', () => {
       const tool = new Tool({
         name: 'calculator',
         description: 'Calculate',
+        instructions: 'Performs calculations',
         schema: z.object({ a: z.number(), b: z.number() }),
-        call: (input) => input.a + input.b
+        call: (input): number => input.a + input.b
       });
 
       const agent = new Agent({
@@ -166,6 +169,7 @@ describe('Agent', () => {
       const fetchTool = new Tool({
         name: 'fetch',
         description: 'Fetch data',
+        instructions: 'Fetches data from a URL',
         schema: z.object({ url: z.string() }),
         call: async (input) => {
           return { data: `Data from ${input.url}` };
@@ -175,6 +179,7 @@ describe('Agent', () => {
       const processTool = new Tool({
         name: 'process',
         description: 'Process data',
+        instructions: 'Processes fetched data',
         schema: z.object({ data: z.string() }),
         call: (input) => {
           return input.data.toUpperCase();
@@ -311,9 +316,9 @@ describe('Agent', () => {
 
       const ctx: Context<{}, {}> = {
         messages: [],
-        runner: async (component, input, ctx, defaultCall) => {
+        runner: (component, input, ctx, defaultCall) => {
           logs.push('Before execution');
-          const result = await defaultCall(ctx);
+          const result = defaultCall(ctx);
           logs.push('After execution');
           return result;
         }
@@ -348,6 +353,7 @@ describe('Agent', () => {
       const tool = new Tool({
         name: 'tool1',
         description: 'Tool',
+        instructions: 'Tool instructions',
         schema: z.object({ x: z.number() }),
         call: (input) => input.x
       });
@@ -372,6 +378,7 @@ describe('Agent', () => {
       const tool = new Tool({
         name: 'tool1',
         description: 'Tool',
+        instructions: 'Tool instructions',
         schema: z.object({ x: z.number() }),
         call: (input) => input.x,
         applicable: () => false
@@ -397,6 +404,7 @@ describe('Agent', () => {
       const tool1 = new Tool({
         name: 'tool1',
         description: 'Tool 1',
+        instructions: 'Tool 1 instructions',
         schema: z.object({ x: z.number() }),
         call: (input) => input.x,
         applicable: () => false
@@ -405,6 +413,7 @@ describe('Agent', () => {
       const tool2 = new Tool({
         name: 'tool2',
         description: 'Tool 2',
+        instructions: 'Tool 2 instructions',
         schema: z.object({ x: z.number() }),
         call: (input) => input.x,
         applicable: () => true
@@ -485,6 +494,7 @@ describe('Agent', () => {
       const fetchTool = new Tool({
         name: 'fetch',
         description: 'Fetch data',
+        instructions: 'Fetches data about a given topic',
         schema: z.object({ topic: z.string() }),
         call: async (input) => {
           return {
@@ -500,6 +510,7 @@ describe('Agent', () => {
       const summarizeTool = new Tool({
         name: 'summarize',
         description: 'Summarize',
+        instructions: 'Summarizes text to key points',
         schema: z.object({ text: z.string() }),
         call: (input) => {
           return input.text.substring(0, 20) + '...';
@@ -538,6 +549,7 @@ describe('Agent', () => {
       const errorTool = new Tool({
         name: 'error',
         description: 'Throws error',
+        instructions: 'Always fails when called',
         schema: z.object({}),
         call: () => {
           throw new Error('Tool failed');

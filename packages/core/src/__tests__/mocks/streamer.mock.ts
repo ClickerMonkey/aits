@@ -47,6 +47,12 @@ export const createMockStreamer = (options?: MockStreamerOptions): Streamer<any,
     if (options?.error && options?.throwAfterChunk === undefined) {
       throw options.error;
     }
+
+    return {
+      content: chunks.map(c => c.content).join(''),
+      finishReason: 'stop',
+      model: '',
+    }
   };
 };
 
@@ -58,7 +64,7 @@ export const createMockStreamerWithTools = (
 ): Streamer<any, any> => {
   return async function* (request, ctx, metadata, signal) {
     // Yield initial chunk
-    yield { content: '', finishReason: null };
+    yield { content: '' };
 
     // Yield tool calls chunk
     yield {
@@ -68,8 +74,15 @@ export const createMockStreamerWithTools = (
         ...tc,
         type: 'function' as const
       })),
-      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      model: 'mock-model',
     };
+
+    return {
+      content: '',
+      finishReason: 'stop',
+      model: 'mock-model',
+    }
   };
 };
 
@@ -93,7 +106,7 @@ export const createSpyStreamer = (
   };
 
   (streamer as any).chunks = chunks;
-  return streamer as Streamer<any, any> & { chunks: Chunk[] };
+  return streamer as any as Streamer<any, any> & { chunks: Chunk[] };
 };
 
 /**

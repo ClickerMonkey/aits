@@ -207,8 +207,7 @@ export function createMockModels(providerName: string): ModelInfo[] {
       capabilities: new Set(['chat', 'streaming', 'vision']),
       tier: 'flagship',
       pricing: {
-        inputTokensPer1M: 10.0,
-        outputTokensPer1M: 30.0
+        text: { input: 10, output: 30 },
       },
       contextWindow: 128000,
       maxOutputTokens: 4096
@@ -220,8 +219,7 @@ export function createMockModels(providerName: string): ModelInfo[] {
       capabilities: new Set(['chat', 'streaming']),
       tier: 'efficient',
       pricing: {
-        inputTokensPer1M: 0.5,
-        outputTokensPer1M: 1.5
+        text: { input: 0.5, output: 1.5 },
       },
       contextWindow: 32000,
       maxOutputTokens: 4096
@@ -233,8 +231,7 @@ export function createMockModels(providerName: string): ModelInfo[] {
       capabilities: new Set(['image']),
       tier: 'flagship',
       pricing: {
-        inputTokensPer1M: 20.0,
-        outputTokensPer1M: 20.0
+        text: { input: 20, output: 20 },
       },
       contextWindow: 4096
     },
@@ -245,8 +242,7 @@ export function createMockModels(providerName: string): ModelInfo[] {
       capabilities: new Set(['embedding']),
       tier: 'efficient',
       pricing: {
-        inputTokensPer1M: 0.02,
-        outputTokensPer1M: 0
+        text: { input: 0.2, output: 0 },
       },
       contextWindow: 8192
     }

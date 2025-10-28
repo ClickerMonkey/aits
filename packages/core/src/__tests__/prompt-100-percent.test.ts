@@ -24,7 +24,7 @@ describe('Prompt 100% Coverage', () => {
 
       const streamer = createMockStreamer({
         chunks: [
-          { content: 'Hello', finishReason: null },
+          { content: 'Hello' },
           { content: ' world', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
         ]
       });
@@ -287,7 +287,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Parse errors',
         content: 'Test',
         tools: [tool],
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -333,7 +333,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Execution errors',
         content: 'Test',
         tools: [tool],
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -498,7 +498,7 @@ describe('Prompt 100% Coverage', () => {
             return { maxIterations: 5 };
           }
           // Stop after second call
-          return false;
+          return { maxIterations: 0 };
         }
       });
 
@@ -530,7 +530,7 @@ describe('Prompt 100% Coverage', () => {
           name: z.string(),
           age: z.number().positive()
         }),
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -561,7 +561,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Non JSON',
         content: 'Extract',
         schema: z.object({ value: z.string() }),
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -807,7 +807,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Parse rejection',
         content: 'Test',
         tools: [tool],
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -853,7 +853,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Runtime error',
         content: 'Test',
         tools: [tool],
-        config: { maxIterations: 2 }
+        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({

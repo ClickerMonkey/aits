@@ -33,7 +33,8 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
           inputTokens: 10,
           outputTokens: 20,
           totalTokens: 30
-        }
+        },
+        model: 'mock-model',
       };
 
       return {
@@ -70,7 +71,8 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
         inputTokens: 10,
         outputTokens: 20,
         totalTokens: 30
-      }
+      },
+      model: 'mock-model',
     };
 
     return {
