@@ -54,6 +54,8 @@ export interface OpenAIConfig {
   baseURL?: string;
   // OpenAI organization ID for multi-org accounts
   organization?: string;
+  // Optional project ID
+  project?: string;
 }
 
 // ============================================================================
@@ -1761,7 +1763,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       )) {
         yield chunk;
       }
-      
+
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
         throw new RateLimitError(this.name, error.message);

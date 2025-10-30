@@ -208,6 +208,8 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
     return new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseURL || 'https://openrouter.ai/api/v1',
+      project: config.project,
+      organization: config.organization,
       defaultHeaders: {
         'HTTP-Referer': config.defaultParams?.siteUrl,
         'X-Title': config.defaultParams?.appName,
