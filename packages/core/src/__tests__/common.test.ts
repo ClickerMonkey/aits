@@ -13,8 +13,12 @@ import {
   resolve,
   consumeAll,
   accumulateUsage,
+  getModel,
+  getResponseFromChunks,
+  getChunksFromResponse,
+  withEvents,
 } from '../common';
-import { Usage } from '../types';
+import { Usage, Chunk, Response, Component, Context, Events } from '../types';
 
 describe('Common Utilities', () => {
   describe('resolveFn', () => {
@@ -467,6 +471,542 @@ describe('Common Utilities', () => {
 
       expect(target.inputTokens).toBe(100);
       expect(target.cost).toBe(0.05);
+    });
+  });
+
+  describe('getModel', () => {
+    it('should convert string to Model object', () => {
+      const result = getModel('gpt-4');
+      expect(result).toEqual({ id: 'gpt-4' });
+    });
+
+    it('should return Model object as-is', () => {
+      const model = { id: 'gpt-4', contextWindow: 8192 };
+      const result = getModel(model);
+      expect(result).toBe(model);
+    });
+
+    it('should handle undefined input', () => {
+      const result = getModel(undefined);
+      expect(result).toBeUndefined();
+    });
+
+    it('should preserve all Model properties', () => {
+      const model = {
+        id: 'claude-3',
+        contextWindow: 200000,
+        maxOutput: 4096,
+        inputCost: 0.003,
+        outputCost: 0.015
+      };
+      const result = getModel(model);
+      expect(result).toEqual(model);
+    });
+  });
+
+  describe('getResponseFromChunks', () => {
+    it('should aggregate content from chunks', () => {
+      const chunks: Chunk[] = [
+        { content: 'Hello' },
+        { content: ' world' },
+        { content: '!' },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.content).toBe('Hello world!');
+    });
+
+    it('should aggregate reasoning from chunks', () => {
+      const chunks: Chunk[] = [
+        { reasoning: 'First thought' },
+        { reasoning: ', second thought' },
+        { content: 'Answer' },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.reasoning).toBe('First thought, second thought');
+    });
+
+    it('should handle finishReason', () => {
+      const chunks: Chunk[] = [
+        { content: 'Response' },
+        { finishReason: 'stop' },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.finishReason).toBe('stop');
+    });
+
+    it('should handle model', () => {
+      const chunks: Chunk[] = [
+        { content: 'Response', model: 'gpt-4' },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.model).toBe('gpt-4');
+    });
+
+    it('should handle refusal', () => {
+      const chunks: Chunk[] = [
+        { refusal: 'Cannot answer that' },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.refusal).toBe('Cannot answer that');
+    });
+
+    it('should aggregate tool calls', () => {
+      const chunks: Chunk[] = [
+        {
+          toolCall: {
+            id: 'call_1',
+            name: 'tool1',
+            arguments: '{"arg":"value1"}'
+          }
+        },
+        {
+          toolCall: {
+            id: 'call_2',
+            name: 'tool2',
+            arguments: '{"arg":"value2"}'
+          }
+        },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.toolCalls).toHaveLength(2);
+      expect(response.toolCalls![0].name).toBe('tool1');
+      expect(response.toolCalls![1].name).toBe('tool2');
+    });
+
+    it('should accumulate usage', () => {
+      const chunks: Chunk[] = [
+        {
+          usage: {
+            inputTokens: 10,
+            outputTokens: 20,
+            totalTokens: 30
+          }
+        },
+        {
+          usage: {
+            inputTokens: 5,
+            outputTokens: 10,
+            totalTokens: 15
+          }
+        },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.usage).toEqual({
+        inputTokens: 15,
+        outputTokens: 30,
+        totalTokens: 45
+      });
+    });
+
+    it('should handle empty chunks array', () => {
+      const chunks: Chunk[] = [];
+      const response = getResponseFromChunks(chunks);
+      expect(response.content).toBe('');
+      expect(response.finishReason).toBe('stop');
+      expect(response.model).toBe('unknown');
+    });
+
+    it('should handle all fields together', () => {
+      const chunks: Chunk[] = [
+        {
+          content: 'Hello',
+          reasoning: 'Thinking...',
+          model: 'gpt-4',
+          usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+        },
+        {
+          content: ' world',
+          finishReason: 'stop',
+          usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 }
+        },
+      ];
+
+      const response = getResponseFromChunks(chunks);
+      expect(response.content).toBe('Hello world');
+      expect(response.reasoning).toBe('Thinking...');
+      expect(response.finishReason).toBe('stop');
+      expect(response.model).toBe('gpt-4');
+      expect(response.usage).toEqual({
+        inputTokens: 15,
+        outputTokens: 15,
+        totalTokens: 30
+      });
+    });
+  });
+
+  describe('getChunksFromResponse', () => {
+    it('should convert basic response to chunks', () => {
+      const response: Response = {
+        content: 'Hello world',
+        finishReason: 'stop',
+        model: 'gpt-4',
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].content).toBe('Hello world');
+      expect(chunks[0].finishReason).toBe('stop');
+      expect(chunks[0].model).toBe('gpt-4');
+    });
+
+    it('should create chunk for reasoning', () => {
+      const response: Response = {
+        content: 'Answer',
+        reasoning: 'My reasoning',
+        finishReason: 'stop',
+        model: 'gpt-4',
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].reasoning).toBe('My reasoning');
+      expect(chunks[1].content).toBe('Answer');
+    });
+
+    it('should create chunk for refusal', () => {
+      const response: Response = {
+        content: '',
+        refusal: 'Cannot answer',
+        finishReason: 'refusal',
+        model: 'gpt-4',
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].refusal).toBe('Cannot answer');
+      expect(chunks[1].finishReason).toBe('refusal');
+    });
+
+    it('should create chunk for both reasoning and refusal', () => {
+      const response: Response = {
+        content: '',
+        reasoning: 'Thinking',
+        refusal: 'Cannot answer',
+        finishReason: 'refusal',
+        model: 'gpt-4',
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0].reasoning).toBe('Thinking');
+      expect(chunks[0].refusal).toBe('Cannot answer');
+    });
+
+    it('should create chunks for tool calls', () => {
+      const response: Response = {
+        content: '',
+        finishReason: 'tool_calls',
+        model: 'gpt-4',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'tool1',
+            arguments: '{"arg":"value1"}'
+          },
+          {
+            id: 'call_2',
+            name: 'tool2',
+            arguments: '{"arg":"value2"}'
+          },
+        ],
+      };
+
+      const chunks = getChunksFromResponse(response);
+      // 1 chunk for each tool call + 1 final chunk = 3 total
+      expect(chunks).toHaveLength(3);
+      expect(chunks[0].toolCall).toBeDefined();
+      expect(chunks[0].toolCallNamed).toBeDefined();
+      expect(chunks[0].toolCallArguments).toBeDefined();
+      expect(chunks[0].toolCall!.name).toBe('tool1');
+      expect(chunks[1].toolCall!.name).toBe('tool2');
+      expect(chunks[2].finishReason).toBe('tool_calls');
+    });
+
+    it('should handle response with no tool calls', () => {
+      const response: Response = {
+        content: 'Simple response',
+        finishReason: 'stop',
+        model: 'gpt-4',
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].content).toBe('Simple response');
+    });
+
+    it('should include usage in final chunk', () => {
+      const response: Response = {
+        content: 'Response',
+        finishReason: 'stop',
+        model: 'gpt-4',
+        usage: {
+          inputTokens: 10,
+          outputTokens: 20,
+          totalTokens: 30
+        },
+      };
+
+      const chunks = getChunksFromResponse(response);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].usage).toEqual({
+        inputTokens: 10,
+        outputTokens: 20,
+        totalTokens: 30
+      });
+    });
+
+    it('should handle complex response with all fields', () => {
+      const response: Response = {
+        content: 'Final answer',
+        reasoning: 'Let me think',
+        finishReason: 'stop',
+        model: 'gpt-4',
+        usage: {
+          inputTokens: 50,
+          outputTokens: 100,
+          totalTokens: 150
+        },
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'calculator',
+            arguments: '{"op":"add","a":1,"b":2}'
+          },
+        ],
+      };
+
+      const chunks = getChunksFromResponse(response);
+      // 1 for reasoning + 1 for tool call + 1 final = 3
+      expect(chunks).toHaveLength(3);
+      expect(chunks[0].reasoning).toBe('Let me think');
+      expect(chunks[1].toolCall!.name).toBe('calculator');
+      expect(chunks[2].content).toBe('Final answer');
+      expect(chunks[2].usage).toBeDefined();
+    });
+  });
+
+  describe('withEvents', () => {
+    // Create a mock component for testing
+    const createMockComponent = (output: any = 'test-output'): Component<any, any, string, any, any, any> => ({
+      kind: 'prompt' as const,
+      name: 'test-component',
+      description: 'Test component',
+      refs: [],
+      run: jest.fn(() => output),
+      applicable: jest.fn(() => Promise.resolve(true)),
+    });
+
+    it('should call onChild when component has parent (line 348)', async () => {
+      const onChild = jest.fn();
+      const events: Events<any> = {
+        onChild,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = { test: 'input' };
+
+      // Create a parent instance
+      const parentInstance = {
+        id: 'parent:test:0',
+        component: createMockComponent(),
+        context: {},
+        input: {},
+        status: 'running' as const,
+      };
+
+      const context: Context<any, any> = {
+        instance: parentInstance,
+      };
+
+      const getOutput = jest.fn(() => Promise.resolve('result'));
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(onChild).toHaveBeenCalled();
+      const childInstance = onChild.mock.calls[0][1];
+      expect(childInstance.parent).toBe(parentInstance);
+    });
+
+    it('should handle error with interrupted status when signal is aborted (lines 368-370)', async () => {
+      const onStatus = jest.fn();
+      const events: Events<any> = {
+        onStatus,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+
+      const abortController = new AbortController();
+      const context: Context<any, any> = {
+        signal: abortController.signal,
+      };
+
+      const error = new Error('Execution error');
+      const getOutput = jest.fn(() => {
+        abortController.abort(); // Abort before rejection
+        return Promise.reject(error);
+      });
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Find the call where status is 'interrupted'
+      const interruptedCall = onStatus.mock.calls.find(
+        call => call[0].status === 'interrupted'
+      );
+
+      expect(interruptedCall).toBeDefined();
+      expect(interruptedCall[0].error).toBe(error);
+      expect(interruptedCall[0].completed).toBeDefined();
+    });
+
+    it('should handle error with failed status when not aborted (lines 371-372)', async () => {
+      const onStatus = jest.fn();
+      const events: Events<any> = {
+        onStatus,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+      const context: Context<any, any> = {};
+
+      const error = new Error('Regular error');
+      const getOutput = jest.fn(() => Promise.reject(error));
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Find the call where status is 'failed'
+      const failedCall = onStatus.mock.calls.find(
+        call => call[0].status === 'failed'
+      );
+
+      expect(failedCall).toBeDefined();
+      expect(failedCall[0].status).toBe('failed');
+    });
+
+    it('should set completed timestamp and error on failure (lines 373-374)', async () => {
+      const onStatus = jest.fn();
+      const events: Events<any> = {
+        onStatus,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+      const context: Context<any, any> = {};
+
+      const error = new Error('Test error');
+      const getOutput = jest.fn(() => Promise.reject(error));
+
+      const startTime = Date.now();
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Find the failed status call
+      const failedCall = onStatus.mock.calls.find(
+        call => call[0].status === 'failed'
+      );
+
+      expect(failedCall).toBeDefined();
+      expect(failedCall[0].completed).toBeGreaterThanOrEqual(startTime);
+      expect(failedCall[0].error).toBe(error);
+    });
+
+    it('should call onStatus on error (line 377)', async () => {
+      const onStatus = jest.fn();
+      const events: Events<any> = {
+        onStatus,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+      const context: Context<any, any> = {};
+
+      const error = new Error('Error test');
+      const getOutput = jest.fn(() => Promise.reject(error));
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // onStatus should be called at least twice: once for 'pending', once for 'failed'
+      expect(onStatus.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+      // Check that onStatus was called with failed status
+      const statusCalls = onStatus.mock.calls.map(call => call[0].status);
+      expect(statusCalls).toContain('failed');
+    });
+
+    it('should handle successful completion', async () => {
+      const onStatus = jest.fn();
+      const events: Events<any> = {
+        onStatus,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+      const context: Context<any, any> = {};
+
+      const result = 'success-result';
+      const getOutput = jest.fn(() => Promise.resolve(result));
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Find the completed status call
+      const completedCall = onStatus.mock.calls.find(
+        call => call[0].status === 'completed'
+      );
+
+      expect(completedCall).toBeDefined();
+      expect(completedCall[0].output).toBe(result);
+      expect(completedCall[0].completed).toBeDefined();
+    });
+
+    it('should not call onChild when no parent exists', async () => {
+      const onChild = jest.fn();
+      const events: Events<any> = {
+        onChild,
+      };
+
+      const runner = withEvents(events);
+      const component = createMockComponent();
+      const input = {};
+      const context: Context<any, any> = {}; // No parent instance
+
+      const getOutput = jest.fn(() => Promise.resolve('result'));
+
+      runner(component, input, context, getOutput);
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(onChild).not.toHaveBeenCalled();
     });
   });
 });

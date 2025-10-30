@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { Prompt } from '../prompt';
 import { Tool } from '../tool';
-import { Context } from '../types';
+import { Context, ToolCall } from '../types';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt Final Coverage', () => {
@@ -94,7 +94,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -124,7 +124,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -148,17 +148,19 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: {} // No inputTokens
-          };
+            usage: {}, // No inputTokens
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'success',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -180,17 +182,19 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 1000 }
-          };
+            usage: { inputTokens: 1000 },
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'success',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         // No messages
       };
 
@@ -212,17 +216,19 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 100 } // Very few tokens
-          };
+            usage: { inputTokens: 100 }, // Very few tokens
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'success',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'test', tokens: 50 }
         ],
@@ -249,17 +255,19 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 1000, totalTokens: 1000 }
-          };
+            usage: { inputTokens: 1000, totalTokens: 1000 },
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'success',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'test message without tokens' }
         ],
@@ -293,7 +301,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any, // Using execute instead of stream triggers streamify
+        execute: executor, // Using execute instead of stream triggers streamify
         messages: []
       };
 
@@ -321,7 +329,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'previous message' },
           { role: 'assistant', content: 'previous response' }
@@ -348,7 +356,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'previous message' }
         ]
@@ -397,7 +405,7 @@ describe('Prompt Final Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -452,31 +460,31 @@ describe('Prompt Final Coverage', () => {
         if (request.messages.length === 1) {
           return {
             content: '',
-            finishReason: 'tool_calls' as const,
+            finishReason: 'tool_calls',
             toolCalls: [
               {
                 id: 'call_1',
                 name: 'par-tool-1',
-                type: 'function' as const,
                 arguments: '{"value": 10}'
               },
               {
                 id: 'call_2',
                 name: 'par-tool-2',
-                type: 'function' as const,
                 arguments: '{"value": 20}'
               }
-            ]
-          };
+            ] as ToolCall[],
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'All parallel tools executed',
-          finishReason: 'stop' as const
-        };
+          finishReason: 'stop' as const,
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -521,26 +529,26 @@ describe('Prompt Final Coverage', () => {
               {
                 id: 'call_1',
                 name: 'seq-tool-1',
-                type: 'function' as const,
                 arguments: '{"value": 1}'
               },
               {
                 id: 'call_2',
                 name: 'seq-tool-2',
-                type: 'function' as const,
                 arguments: '{"value": 2}'
               }
-            ]
-          };
+            ] as ToolCall[],
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'All tools executed',
-          finishReason: 'stop' as const
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -577,19 +585,20 @@ describe('Prompt Final Coverage', () => {
             toolCalls: [{
               id: 'call_1',
               name: 'error-tool',
-              type: 'function' as const,
               arguments: '{}'
-            }]
-          };
+            }] as ToolCall[],
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'Handled tool error',
-          finishReason: 'stop' as const
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 

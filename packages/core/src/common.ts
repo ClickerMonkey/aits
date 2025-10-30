@@ -1,4 +1,4 @@
-import { Chunk, Model, ModelInput, Usage, Response } from "./types";
+import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -298,13 +298,15 @@ export function getResponseFromChunks(chunks: Chunk[]): Response {
 export function getChunksFromResponse(response: Response): Chunk[] {
   const chunks: Chunk[] = [];
 
-  chunks.push({
-    refusal: response.refusal,
-    reasoning: response.reasoning,
-  });
+  if (response.reasoning || response.refusal) {
+    chunks.push({
+      refusal: response.refusal,
+      reasoning: response.reasoning,
+    });
+  }
 
   for (const toolCall of response.toolCalls || []) {
-    chunks.push({ toolCall });
+    chunks.push({ toolCall, toolCallNamed: toolCall, toolCallArguments: toolCall });
   }
 
   chunks.push({
@@ -315,4 +317,68 @@ export function getChunksFromResponse(response: Response): Chunk[] {
   });
 
   return chunks;
+}
+
+/**
+ * Creates a runner that emits events during component execution.
+ * 
+ * @param events 
+ * @returns 
+ */ // @ts-ignore
+export function withEvents<TRoot extends AnyComponent>(events: Events<TRoot>): Runner {
+  let instanceIndex = 0;
+  const runner: Runner = (component, input, context, getOutput) => {
+    type C = typeof component;
+
+    const instanceContext = { ...context };
+
+    const instance: Instance<C> = {
+      id: `${component.kind}:${component.name}:${instanceIndex++}`,
+      parent: context.instance,
+      component,
+      context: instanceContext,
+      input,
+      status: 'pending',
+    };
+
+    instanceContext.instance = instance;
+
+    if (instance.parent) {
+      // @ts-ignore
+      events.onChild?.(instance.parent, instance);
+    }
+
+    // @ts-ignore
+    events.onStatus?.(instance);
+
+    instance.status = 'running';
+    instance.started = Date.now();
+
+    const output = getOutput(instanceContext, events);
+    const resolved = resolve(output);
+
+    resolved.then((result) => {
+      instance.status = 'completed';
+      instance.completed = Date.now();
+      instance.output = result;
+
+      // @ts-ignore
+      events.onStatus?.(instance);
+    }, (error) => {
+      if (instanceContext.signal?.aborted) {
+        instance.status = 'interrupted';
+      } else {
+        instance.status = 'failed';
+      }
+      instance.completed = Date.now();
+      instance.error = error;
+
+      // @ts-ignore
+      events.onStatus?.(instance);
+    });
+
+    return output;
+  };
+
+  return runner;
 }

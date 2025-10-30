@@ -1,10 +1,10 @@
 import z from "zod";
 
 import { Agent } from "./agent";
-import { consumeAll } from "./common";
+import { consumeAll, withEvents } from "./common";
 import { Prompt } from "./prompt";
 import { Tool } from "./tool";
-import { ComponentsAll, Context, withEvents } from "./types";
+import { ComponentsAll, Context } from "./types";
 
 interface MyMetadata { 
   requirements?: Array<'text' | 'vision' | 'images' | 'hearing' | 'voice'>;

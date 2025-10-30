@@ -51,7 +51,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -98,7 +98,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -138,7 +138,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -165,7 +165,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -227,7 +227,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -293,7 +293,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -343,7 +343,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -365,7 +365,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -386,7 +386,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'Previous message 1' },
           { role: 'assistant', content: 'Previous response 1' }
@@ -413,7 +413,7 @@ describe('Prompt Advanced Features', () => {
         description: 'Tools only',
         content: 'Fetch',
         tools: [tool],
-        config: { toolsOnly: true }
+        toolsOnly: true,
       });
 
       const executor = createMockExecutor({
@@ -431,7 +431,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -462,7 +462,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -488,7 +488,7 @@ describe('Prompt Advanced Features', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 

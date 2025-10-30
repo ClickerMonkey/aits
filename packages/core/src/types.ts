@@ -223,6 +223,21 @@ export type Context<TContext, TMetadata> = TContext &
    */
   contextWindow?: number;
 
+  /** 
+   * Number of attempts to get the output in the right format and to pass validation. Defaults to 2. 
+   */
+  outputRetries?: number;
+
+  /** 
+   * Number of attempts that will be made to forget context messages of the past in order to complete the request. Defaults to 1.
+   */
+  forgetRetries?: number;
+
+  /**
+   * Number of attempts to retry tool calls upon failure. Defaults to 2.
+   */
+  toolRetries?: number;
+
   /**
    * The current instance of the component being executed, if any.
    */
@@ -409,10 +424,6 @@ export interface Request extends BaseRequest
   logitBias?: Record<string, number>;
   /** Tools available for this request */
   tools?: ToolDefinition[];
-  /** Only use tools for this request, don't generate text responses */
-  toolsOnly?: boolean;
-  /** Maximum number of tool calls allowed */
-  toolsMax?: number;
   /** Use tools one at a time instead of parallel execution */
   toolsOneAtATime?: boolean;
   /** Tool choice strategy for this request */
@@ -589,68 +600,4 @@ export interface Events<
   onChild?: <N extends TNodes>(node: Instance<N>, child: Instance<ComponentRefs<N>>) => void;
   // An event when a prompt node generates a new prompt event
   onPromptEvent?: <N extends Extract<TNodes, AnyPrompt>>(instance: Instance<N>, event: PromptEvent<ComponentOutput<N>, ComponentRefs<N>>) => void;
-}
-
-/**
- * Creates a runner that emits events during component execution.
- * 
- * @param events 
- * @returns 
- */ // @ts-ignore
-export function withEvents<TRoot extends AnyComponent>(events: Events<TRoot>): Runner {
-  let instanceIndex = 0;
-  const runner: Runner = (component, input, context, getOutput) => {
-    type C = typeof component;
-
-    const instanceContext = { ...context };
-
-    const instance: Instance<C> = {
-      id: `${component.kind}:${component.name}:${instanceIndex++}`,
-      parent: context.instance,
-      component,
-      context: instanceContext,
-      input,
-      status: 'pending',
-    };
-
-    instanceContext.instance = instance;
-
-    if (instance.parent) {
-      // @ts-ignore
-      events.onChild?.(instance.parent, instance);
-    }
-
-    // @ts-ignore
-    events.onStatus?.(instance);
-
-    instance.status = 'running';
-    instance.started = Date.now();
-
-    const output = getOutput(instanceContext, events);
-    const resolved = resolve(output);
-
-    resolved.then((result) => {
-      instance.status = 'completed';
-      instance.completed = Date.now();
-      instance.output = result;
-
-      // @ts-ignore
-      events.onStatus?.(instance);
-    }, (error) => {
-      if (instanceContext.signal?.aborted) {
-        instance.status = 'interrupted';
-      } else {
-        instance.status = 'failed';
-      }
-      instance.completed = Date.now();
-      instance.error = error;
-
-      // @ts-ignore
-      events.onStatus?.(instance);
-    });
-
-    return output;
-  };
-
-  return runner;
 }

@@ -76,7 +76,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Invalid JSON',
       content: 'Test',
       tools: [tool],
-      config: { toolsMax: 2 }
+      toolsMax: 2,
     });
 
     const executor = createMockExecutor({
@@ -98,7 +98,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -120,17 +120,19 @@ describe('Prompt Remaining Coverage', () => {
         return {
           content: 'partial',
           finishReason: 'length',
-          usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 }
-        };
+          usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'complete',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -163,7 +165,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Mixed tools',
       content: 'Test',
       tools: [tool1, tool2],
-      config: { toolsMax: 2 }
+      toolsMax: 2,
     });
 
     const executor = createMockExecutor({
@@ -184,7 +186,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -228,7 +230,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -254,17 +256,19 @@ describe('Prompt Remaining Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 }
-        };
+          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'user', content: 'test', tokens: 100 },
         { role: 'assistant', content: 'response', tokens: 100 }
@@ -317,7 +321,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -347,7 +351,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -371,7 +375,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 
@@ -385,7 +389,7 @@ describe('Prompt Remaining Coverage', () => {
       description: 'Parse error',
       content: 'Extract data',
       schema: z.object({ value: z.number() }),
-      config: { toolsMax: 2 }
+      outputRetries: 2,
     });
 
     const executor = createMockExecutor({
@@ -402,7 +406,7 @@ describe('Prompt Remaining Coverage', () => {
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: []
     };
 

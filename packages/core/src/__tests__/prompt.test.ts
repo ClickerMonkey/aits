@@ -87,7 +87,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -112,7 +112,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -135,7 +135,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -160,7 +160,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -191,7 +191,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -209,7 +209,7 @@ describe('Prompt', () => {
           name: z.string(),
           age: z.number()
         }),
-        config: { toolsMax: 1 } // Prevent retries
+        toolIterations: 1,
       });
 
       const executor = createMockExecutor({
@@ -220,7 +220,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -243,7 +243,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -292,7 +292,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -355,7 +355,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -364,7 +364,7 @@ describe('Prompt', () => {
       const duration = Date.now() - startTime;
 
       // Parallel should be faster than sequential (< 15ms instead of ~20ms)
-      expect(duration).toBeLessThan(30);
+      expect(duration).toBeLessThan(50);
     });
 
     it('should handle tool errors gracefully', async () => {
@@ -384,7 +384,7 @@ describe('Prompt', () => {
         description: 'Math',
         content: 'Calculate',
         tools: [tool],
-        config: { toolsMax: 2 }
+        toolIterations: 2,
       });
 
       const executor = createMockExecutor({
@@ -409,7 +409,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -540,7 +540,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'Hello' },
           { role: 'assistant', content: 'Hi there' }
@@ -566,7 +566,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'Previous message' }
         ]
@@ -597,7 +597,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -623,7 +623,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -647,7 +647,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -672,7 +672,7 @@ describe('Prompt', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 

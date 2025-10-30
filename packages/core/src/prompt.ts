@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
 import z from 'zod';
 
-import { accumulateUsage, Fn, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateUsage, Fn, getChunksFromResponse, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
 import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 
@@ -11,19 +11,40 @@ import { Component, Context, Events, Executor, FinishReason, Message, Names, Opt
  * This allows the prompt to adjust its configuration based on runtime statistics.
  */
 export interface PromptReconfigInput {
+  // The current iteration in the prompt execution loop
   iteration: number;
+  // The number of iterations that will be attempted before stopping taking into account all retry types
+  maxIterations: number;
+  // Total argument parsing & validation errors on tools so far
   toolParseErrors: number;
+  // Total tool call errors so far
   toolCallErrors: number;
+  // Names of tools called so far
   tools: string[];
+  // Total successful tool calls so far
   toolSuccesses: number;
+  // Remaining retries for tool calls
+  toolRetries: number;
+  // Remaining retries for valid structured output generation
+  outputRetries: number;
+  // Remaining retries for forgetting context
+  forgetRetries: number;
 }
 
 /**
  * Reconfiguration options for a prompt during execution.
  */
 export interface PromptReconfig {
+  // The config to use for the next iteration
   config?: Partial<Request>;
+  // Overrides the iterations left
   maxIterations?: number;
+  // Overrides the number of tool call retries
+  toolRetries?: number;
+  // Overrides the number of output retries
+  outputRetries?: number;
+  // Overrides the number of forget retries
+  forgetRetries?: number;
 }
 
 /**
@@ -65,6 +86,18 @@ export interface PromptInput<
   // - parallel: start all tools at once and wait for all to finish
   // - immediate: start tools as soon as they are available
   toolExecution?: 'sequential' | 'parallel' | 'immediate';
+  // Number of attempts to retry tool calls upon failure. Defaults to 2. */
+  toolRetries?: number;
+  // Number of attempts to get the output in the right format and to pass validation. Defaults to what's on the context, which defaults to 2.
+  outputRetries?: number;
+  // Number of attempts that will be made to forget context messages of the past in order to complete the request. Defaults to what's on the context, which defaults to 1.
+  forgetRetries?: number;
+  // Only use tools for this request, don't generate text responses
+  toolsOnly?: boolean;
+  // Maximum number of tool call iterations allowed. Defaults to 3.
+  toolIterations?: number;
+  // Maximum tool calls allowed. We can't enforce this exact number unless toolsOneAtATime=true, but we will stop sending tools if we have tool successes >= this number
+  toolsMax?: number;
   // A function/promise that returns an array of tool names to use, or false to indicate the prompt is not compatible with the context.
   retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
@@ -442,10 +475,15 @@ export class Prompt<
       request.messages = this.forget(request, ctx);
     }
 
+    let outputRetries = this.input.outputRetries ?? ctx.outputRetries ?? 2;
+    let forgetRetries = this.input.forgetRetries ?? ctx.forgetRetries ?? 1;
+    let toolIterations = this.input.toolIterations ?? 3;
+    let toolRetries = this.input.toolRetries ?? ctx.toolRetries ?? 2;
+
     let result: TOutput | undefined = undefined;
     let lastError: string | undefined = undefined;
     let completeText: string = '';
-    let maxIterations = request.toolsMax ?? 10;
+    let maxIterations = outputRetries + forgetRetries + toolIterations + toolRetries + 1;
     let requestTokensSent = false;
     let usage: Usage | undefined = undefined;
     let iterations = 0;
@@ -467,23 +505,29 @@ export class Prompt<
       : (ev: PromptEvent<TOutput, TTools>) => ev;
 
     // Main execution loop!
-    while (iterations <= maxIterations) {
+    while (iterations < maxIterations) {
       const toolCalls: ToolExecution<PromptTools<TTools>>[] = [];
       const toolCallMap = new Map<string, ToolExecution<PromptTools<TTools>>>();
+      const toolErrorsPrevious = (toolCallErrors + toolParseErrors);
 
       let finishReason: FinishReason | undefined = undefined;
       let refusal = '';
       let reasoning = '';
       let content = '';
+      let disableTools = false;
 
-      const streamSignal = new AbortController();
-      ctx.signal?.addEventListener('abort', () => {
-        streamSignal.abort();
-      });
+      const streamController = new AbortController();
+      const streamAbort = () => streamController.abort();
 
-      const stream = streamer(request, ctx, this.input.metadata, streamSignal.signal);
+      ctx.signal?.addEventListener('abort', streamAbort);
+
+      const stream = streamer(request, ctx, this.input.metadata, streamController.signal);
 
       for await (const chunk of stream) {
+        if (streamController.signal.aborted) {
+          break;
+        }
+
         if (chunk.usage) {
           usage = chunk.usage;
           if (!requestTokensSent) {
@@ -517,7 +561,7 @@ export class Prompt<
           if (toolCall.tool) {
             yield emit({ type: 'toolParseName', tool: toolCall.tool });
           } else {
-            streamSignal.abort(toolCall.error);
+            streamController.abort(toolCall.error);
             break;
           }
         }
@@ -562,6 +606,8 @@ export class Prompt<
         }
       }
 
+      ctx.signal?.removeEventListener('abort', streamAbort);
+
       // If the model reasoned, yield it
       if (reasoning) {
         yield emit({ type: 'reason', content: reasoning });
@@ -583,8 +629,9 @@ export class Prompt<
 
       // If we sent too much, forget the past homie 
       if (finishReason === 'length') {
-        if (usage) {
+        if (usage && forgetRetries > 0) {
           request.messages = this.forget(request, ctx, usage)
+          forgetRetries--;
 
           yield emit({ type: 'textReset', reason: 'length' });
 
@@ -597,8 +644,9 @@ export class Prompt<
         }
       }
 
-      // If we need to make some tool calls, lets do it!
-      if (finishReason === 'tool_calls' && toolCalls.length) {
+      // If we need to make some tool calls, lets do it! 
+      // We might not have a finish_reason if we got a bad tool name.
+      if (finishReason === 'tool_calls' || toolCalls.length) {
         // Add the assistant's response with tool calls to the conversation
         request.messages.push({
           role: 'assistant',
@@ -677,17 +725,31 @@ export class Prompt<
             toolSuccesses++;
           }
         }
+
+        if ((toolCallErrors + toolParseErrors) > toolErrorsPrevious) {
+          if (toolRetries > 0) {
+            toolRetries--;
+          } else {
+            disableTools = true;
+          }
+        }
       }
 
       // The only want tool calls, no further response.
-      if (request.toolsOnly && toolSuccesses > 0) {
+      if (this.input.toolsOnly && toolSuccesses > 0) {
         // got what we needed!
         lastError = undefined;
         break;
       }
 
+      // If we met our max tool calls, remove the tools from the request
+      if (this.input.toolsMax && toolSuccesses >= this.input.toolsMax) {
+        // No more tools for you!
+        disableTools = true;
+      }
+
       // If we are finished, parse the output
-      if (finishReason === 'stop' || (!toolCalls.length && content)) {
+      if (finishReason === 'stop') {
         completeText = content;
         
         if (!schema || (schema instanceof z.ZodString)) {
@@ -729,12 +791,19 @@ export class Prompt<
           }
 
           if (errorMessage) {
-            yield emit({ type: 'textReset', reason: resetReason });
+            if (outputRetries > 0) {
+              outputRetries--;
 
-            request.messages.push({
-              role: 'user',
-              content: errorMessage,
-            });
+              yield emit({ type: 'textReset', reason: resetReason });
+
+              request.messages.push({
+                role: 'user',
+                content: errorMessage,
+              });
+            } else {
+              lastError = errorMessage;
+              break; // No more retries left
+            }
           } else {
             // A result was successfully parsed and validated!
             lastError = undefined;
@@ -747,9 +816,13 @@ export class Prompt<
       if (this.input.reconfig) {
         const stats: PromptReconfigInput = {
           iteration: iterations,
+          maxIterations,
           toolParseErrors,
           toolCallErrors,
           toolSuccesses,
+          toolRetries,
+          outputRetries,
+          forgetRetries,
           tools: Array.from(toolsCalled),
         };
         const reconfigResult = await this.input.reconfig(stats, ctx);
@@ -769,21 +842,31 @@ export class Prompt<
             } else if (reconfigResult.maxIterations > 0) {
               maxIterations = iterations + reconfigResult.maxIterations;
             }
-            // If undefined, keep the default maxIterations
+          }
+          if (reconfigResult.outputRetries !== undefined) {
+            outputRetries = reconfigResult.outputRetries;
+          }
+          if (reconfigResult.forgetRetries !== undefined) {
+            forgetRetries = reconfigResult.forgetRetries;
+          }
+          if (reconfigResult.toolRetries !== undefined) {
+            toolRetries = reconfigResult.toolRetries;
+            if (toolRetries === 0) {
+              disableTools = true;
+            }
           }
         }
       }
 
-      // If we met our max tool calls, remove the tools from the request
-      if (request.toolsMax && toolSuccesses >= request.toolsMax) {
+      // If we disabled tools because of hitting retry limits or max tool calls desired, remove them!
+      if (disableTools) {
         delete request.tools;
-        // If tool_choice was required, remove it now that we're done with tools
-        if (request.toolChoice === 'required') {
-          delete request.toolChoice;
-        }
+        delete request.toolChoice;
+        delete request.toolsOneAtATime;
       }
 
       // Lets go again!
+      // We are hungry for valid tool calls and output!
       iterations++;
     }
 
@@ -797,7 +880,7 @@ export class Prompt<
     yield emit({ type: 'usage', usage: accumulatedUsage });
 
     // We don't emit complete without a valid result unless toolsOnly is set
-    if (result === undefined && !request.toolsOnly) {
+    if (result === undefined && !this.input.toolsOnly) {
       if (!lastError && iterations === maxIterations) {
         lastError = `Maximum iterations (${maxIterations}) reached without a valid response.`;
       }
@@ -890,23 +973,9 @@ export class Prompt<
   private streamify(execute: Executor<TContext, TMetadata>): Streamer<TContext, TMetadata> {
     return async function* (request, ctx, metadata, signal) {
       const response = await execute(request, ctx, metadata, signal);
-
-      yield {
-        reasoning: response.reasoning,
-        refusal: response.refusal,
-      };
-
-      for (const toolCall of response.toolCalls || []) {
-        yield { toolCallNamed: toolCall, toolCallArguments: toolCall, toolCall };
+      for (const chunk of getChunksFromResponse(response)) {
+        yield chunk;
       }
-
-      yield { 
-        content: response.content,
-        finishReason: response.finishReason,
-        usage: response.usage,
-        model: response.model,
-      };
-
       return response;
     };
   }
@@ -924,9 +993,6 @@ export class Prompt<
    * 2. A token estimation function is provided in the context (we can estimate token counts)
    * 3. Messages already have token counts assigned (we can use these directly)
    * 
-   * 
-   * 
-   *
    * @param request - The original request with messages.
    * @param ctx - The context containing message history and token estimation.
    * @param usage - The current token usage.
@@ -1076,6 +1142,10 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
   const output = emitter();
   const error = emitter();
 
+  if (!toolInfo) {
+    error.ready = true;
+  }
+
   const execution: ToolExecution<T> = {
     toolCall: toolCall,
     tool: toolInfo?.tool,
@@ -1094,9 +1164,9 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
         execution.args = await toolInfo!.tool.parse(ctx, toolCall.arguments, toolInfo!.definition.parameters);
         execution.status = 'parsed';
         start.ready = true;
-      } catch (error: any) {
+      } catch (e: any) {
         execution.status = 'invalid';
-        execution.error = `Error parsing tool arguments: ${error.message}`;
+        execution.error = `Error parsing tool arguments: ${e.message}`;
         error.ready = true;
       }
 
@@ -1112,9 +1182,9 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
         execution.result = await resolve(toolInfo!.tool.run(execution.args, ctx));
         execution.status = 'success';
         output.ready = true;
-      } catch (error: any) {
+      } catch (e: any) {
         execution.status = 'error';
-        execution.error = `Error executing tool: ${error.message}`;
+        execution.error = `Error executing tool: ${e.message}`;
         error.ready = true;
       }
 

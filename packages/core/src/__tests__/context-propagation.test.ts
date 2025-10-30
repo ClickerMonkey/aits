@@ -241,7 +241,7 @@ describe('Context Propagation', () => {
 
       const ctx: Context<{ tenantId: string }, {}> = {
         tenantId: 'tenant-789',
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -294,7 +294,7 @@ describe('Context Propagation', () => {
 
       const ctx: Context<{ value: number }, {}> = {
         value: 10,
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -364,7 +364,7 @@ describe('Context Propagation', () => {
 
       const ctx: Context<{ count: number }, {}> = {
         count: 10,
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 

@@ -778,7 +778,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       try {
         const messages = this.convertMessages(request);
         const tools = this.convertTools(request);
-        const tool_choice = this.convertToolChoice(request);
+        const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
+        const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
         const response_format = this.convertResponseFormat(request);
 
         let params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
@@ -791,13 +792,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           presence_penalty: request.presencePenalty,
           logit_bias: request.logitBias,
           logprobs: request.logProbabilities,
-          parallel_tool_calls: request.toolsOneAtATime ? false : undefined,
           prompt_cache_key: request.cacheKey,
           safety_identifier: request.userKey,
           store: false,
           stop: request.stop,
           tools,
           tool_choice,
+          parallel_tool_calls,
           response_format,
           reasoning_effort: request.reason?.effort,
           ...request.extra,
@@ -878,7 +879,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         const signal = requestSignal || ctx.signal;
         const messages = this.convertMessages(request);
         const tools = this.convertTools(request);
-        const tool_choice = this.convertToolChoice(request);
+        const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
+        const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
         const response_format = this.convertResponseFormat(request);
 
         let params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
@@ -891,13 +893,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           presence_penalty: request.presencePenalty,
           logit_bias: request.logitBias,
           logprobs: request.logProbabilities,
-          parallel_tool_calls: request.toolsOneAtATime ? false : undefined,
           prompt_cache_key: request.cacheKey,
           safety_identifier: request.userKey,
           store: false,
           stop: request.stop,
           tools,
           tool_choice,
+          parallel_tool_calls,
           response_format,
           ...request.extra,
           stream: true,

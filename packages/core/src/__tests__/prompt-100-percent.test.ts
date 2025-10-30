@@ -7,11 +7,12 @@
 import { z } from 'zod';
 import { Prompt, PromptEvent } from '../prompt';
 import { AnyTool, Tool } from '../tool';
-import { Context, Message, withEvents } from '../types';
+import { Context, Message } from '../types';
+import { withEvents } from '../common';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt 100% Coverage', () => {
-  describe('Custom Runner with Events (lines 349-355)', () => {
+  describe('Custom Runner with Events', () => {
     it('should use custom runner with event tracking in get method', async () => {
       const prompt = new Prompt({
         name: 'runner-events',
@@ -20,7 +21,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       let runnerCalled = false;
-      const innerEvents: PromptEvent<any, any>[] = [];
+      const innerEvents: PromptEvent<any, [AnyTool]>[] = [];
 
       const streamer = createMockStreamer({
         chunks: [
@@ -30,8 +31,9 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        stream: streamer as any,
+        stream: streamer,
         runner: withEvents<typeof prompt>({
+          // @ts-ignore
           onPromptEvent: (instance, event) => {
             runnerCalled = true;
             // @ts-ignore
@@ -90,7 +92,7 @@ describe('Prompt 100% Coverage', () => {
       const capturedEvents: PromptEvent<any, [AnyTool]>[] = [];
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         instance: { id: 'test-instance' } as any,
         messages: []
       };
@@ -145,7 +147,7 @@ describe('Prompt 100% Coverage', () => {
       const events: PromptEvent<any, [AnyTool]>[] = [];
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -207,7 +209,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -264,7 +266,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -288,7 +290,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Parse errors',
         content: 'Test',
         tools: [tool],
-        config: { toolsMax: 2 }
+        toolsMax: 2,
       });
 
       const executor = createMockExecutor({
@@ -310,7 +312,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -334,7 +336,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Execution errors',
         content: 'Test',
         tools: [tool],
-        config: { toolsMax: 2 }
+        toolsMax: 2,
       });
 
       const executor = createMockExecutor({
@@ -356,7 +358,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -399,7 +401,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -444,7 +446,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -476,7 +478,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -511,7 +513,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -531,7 +533,6 @@ describe('Prompt 100% Coverage', () => {
           name: z.string(),
           age: z.number().positive()
         }),
-        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -548,7 +549,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -562,7 +563,6 @@ describe('Prompt 100% Coverage', () => {
         description: 'Non JSON',
         content: 'Extract',
         schema: z.object({ value: z.string() }),
-        config: { toolsMax: 2 }
       });
 
       const executor = createMockExecutor({
@@ -579,7 +579,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -605,17 +605,19 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 3000, outputTokens: 0, totalTokens: 3000 }
-          };
+            usage: { inputTokens: 3000, outputTokens: 0, totalTokens: 3000 },
+            model: 'model-xyz',
+          } as const;
         }
         return {
           content: 'Success after forget',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-xyz',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'user', content: 'Message without tokens' },
           { role: 'assistant', content: 'Response without tokens' }
@@ -646,17 +648,19 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
-          };
-        }
+            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            model: 'model-abc',
+          } as const;
+        } 
         return {
           content: 'Trimmed successfully',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'system', content: 'System message', tokens: 50 },
           { role: 'user', content: 'Message 1', tokens: 200 },
@@ -690,17 +694,19 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
-          };
+            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'Done',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'system', content: 'Important system message', tokens: 100 },
           { role: 'user', content: 'Old message', tokens: 500 },
@@ -732,17 +738,19 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
-          };
+            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'Done',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'system', content: 'System only', tokens: 100 }
         ],
@@ -768,17 +776,19 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
-          };
+            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            model: 'model-abc',
+          } as const;
         }
         return {
           content: 'Done',
-          finishReason: 'stop'
-        };
+          finishReason: 'stop',
+          model: 'model-abc',
+        } as const;
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: [
           { role: 'system', content: 'Initial system', tokens: 100 },
           { role: 'user', content: 'User 1', tokens: 300 },
@@ -808,7 +818,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Parse rejection',
         content: 'Test',
         tools: [tool],
-        config: { toolsMax: 2 }
+        toolsMax: 2,
       });
 
       const executor = createMockExecutor({
@@ -830,7 +840,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 
@@ -854,7 +864,7 @@ describe('Prompt 100% Coverage', () => {
         description: 'Runtime error',
         content: 'Test',
         tools: [tool],
-        config: { toolsMax: 2 }
+        toolsMax: 2,
       });
 
       const executor = createMockExecutor({
@@ -876,7 +886,7 @@ describe('Prompt 100% Coverage', () => {
       });
 
       const ctx: Context<{}, {}> = {
-        execute: executor as any,
+        execute: executor,
         messages: []
       };
 

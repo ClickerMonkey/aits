@@ -26,6 +26,8 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
         throw new Error('Request aborted');
       }
 
+      await new Promise(resolve => setTimeout(resolve, 5));
+
       const response = options.responses[callIndex++] || options.responses[options.responses.length - 1];
       const defaultResponse: Response = {
         content: 'Mock response',
@@ -50,9 +52,7 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
     const opts = options as MockExecutorOptions | undefined;
 
     // Simulate delay if specified
-    if (opts?.delay) {
-      await new Promise(resolve => setTimeout(resolve, opts.delay));
-    }
+    await new Promise(resolve => setTimeout(resolve, opts?.delay ?? 5));
 
     // Check for abort signal
     if (signal?.aborted) {

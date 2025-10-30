@@ -29,17 +29,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 700, outputTokens: 0, totalTokens: 700 }
-        };
+          usage: { inputTokens: 700, outputTokens: 0, totalTokens: 700 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'sys' },
         { role: 'user', content: 'msg1' }, // No tokens - will need estimation
@@ -75,17 +77,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 2500, outputTokens: 0, totalTokens: 2500 }
-        };
+          usage: { inputTokens: 2500, outputTokens: 0, totalTokens: 2500 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'sys', tokens: 100 },
         { role: 'user', content: 'u1', tokens: 500 },
@@ -116,17 +120,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 500, outputTokens: 0, totalTokens: 500 }
-        };
+          usage: { inputTokens: 500, outputTokens: 0, totalTokens: 500 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'user', content: 'single' } // Single message, no tokens field
       ],
@@ -152,17 +158,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 }
-        };
+          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'sys', tokens: 100 },
         { role: 'user', content: 'u1' }, // No tokens
@@ -191,17 +199,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 800, outputTokens: 0, totalTokens: 800 }
-        };
+          usage: { inputTokens: 800, outputTokens: 0, totalTokens: 800 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'only system messages', tokens: 100 }
         // No user messages
@@ -230,17 +240,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 }
-        };
+          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'initial system', tokens: 100 },
         { role: 'user', content: 'old message 1', tokens: 300 },
@@ -276,17 +288,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
-        };
+          usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'sys', tokens: 100 },
         { role: 'user', content: 'm1', tokens: 400 },
@@ -320,17 +334,19 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 }
-        };
+          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 },
+          model: 'model-abc',
+        } as const;
       }
       return {
         content: 'success',
-        finishReason: 'stop'
-      };
+        finishReason: 'stop',
+        model: 'model-abc',
+      } as const;
     });
 
     const ctx: Context<{}, {}> = {
-      execute: executor as any,
+      execute: executor,
       messages: [
         { role: 'system', content: 'sys', tokens: 100 },
         { role: 'user', content: 'trim1', tokens: 400 },
