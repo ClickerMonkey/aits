@@ -39,10 +39,6 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     super(ai);
   }
 
-  protected getModel(request: ImageGenerationRequest): string | undefined {
-    return request.model;
-  }
-
   protected getRequiredCapabilities(provided: ModelCapability[], request?: ImageGenerationRequest): ModelCapability[] {
     return ['image', ...provided];
   }
@@ -143,7 +139,7 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
 
     return {
       images: images.length > 0 ? images : [],
-      model,
+      model: model || chunks.find(c => c.model)?.model || 'unknown-model',
     };
   }
 

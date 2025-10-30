@@ -10,8 +10,8 @@ import type {
   AIBaseTypes,
   AIContext,
   ModelCapability,
-  ModelParameter,
   ModelHandlerFor,
+  ModelParameter,
   SelectedModelFor,
   TranscriptionChunk,
   TranscriptionRequest,
@@ -119,7 +119,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
 
   protected chunksToResponse(chunks: TranscriptionChunk[], givenModel: string): TranscriptionResponse {
     let text = '';
-    let model = givenModel;
+    let model: ModelInput = givenModel;
     let usage: Usage | undefined;
 
     for (const chunk of chunks) {

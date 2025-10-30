@@ -4,14 +4,13 @@
  * Provides text-to-speech functionality.
  */
 
-import { ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
   AIContext,
   ModelCapability,
-  ModelParameter,
   ModelHandlerFor,
+  ModelParameter,
   SelectedModelFor,
   SpeechRequest,
   SpeechResponse
