@@ -101,8 +101,8 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     return Math.ceil(request.text.length / 4);
   }
 
-  protected responseToChunk(response: SpeechResponse): SpeechResponse {
-    return response;
+  protected responseToChunks(response: SpeechResponse): SpeechResponse[] {
+    return [response];
   }
 
   protected chunksToResponse(chunks: SpeechResponse[], model: string): SpeechResponse {

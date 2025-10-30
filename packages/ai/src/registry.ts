@@ -10,7 +10,6 @@ import { detectTier } from './modelDetection';
 import type {
   AIBaseMetadata,
   ModelCapability,
-  ModelParameter,
   ModelHandler,
   ModelInfo,
   ModelOverride,
@@ -19,7 +18,7 @@ import type {
   Provider,
   Providers,
   ScoredModel,
-  SelectedModel,
+  SelectedModel
 } from './types';
 
 // ============================================================================

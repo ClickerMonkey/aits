@@ -4,7 +4,7 @@
  * Provides image generation, editing, and analysis functionality.
  */
 
-import { ModelInput } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -125,11 +125,14 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     );
   }
 
-  protected responseToChunk(response: ImageGenerationResponse): ImageGenerationChunk {
-    return {
+  protected responseToChunks(response: ImageGenerationResponse): ImageGenerationChunk[] {
+    return response.images.map((img) => ({
+      progress: 1,
       done: true,
-      image: response.images[0],
-    };
+      image: img,
+      model: response.model,
+      usage: response.usage,
+    }));
   }
 
   protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
@@ -138,8 +141,9 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
       .map(c => c.image!);
 
     return {
-      images: images.length > 0 ? images : [],
-      model: model || chunks.find(c => c.model)?.model || 'unknown-model',
+      images: images,
+      model: chunks.find(c => c.model)?.model || model,
+      usage: chunks.find(c => c.usage)?.usage,
     };
   }
 
@@ -261,11 +265,14 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     );
   }
 
-  protected responseToChunk(response: ImageGenerationResponse): ImageGenerationChunk {
-    return {
+  protected responseToChunks(response: ImageGenerationResponse): ImageGenerationChunk[] {
+    return response.images.map((img) => ({
+      progress: 1,
       done: true,
-      image: response.images[0],
-    };
+      image: img,
+      model: response.model,
+      usage: response.usage,
+    }));
   }
 
   protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
@@ -274,8 +281,9 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
       .map(c => c.image!);
 
     return {
-      images: images.length > 0 ? images : [],
-      model,
+      images: images,
+      model: chunks.find(c => c.model)?.model || model,
+      usage: chunks.find(c => c.usage)?.usage,
     };
   }
 
@@ -398,49 +406,12 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     yield* streamer(chatRequest, ctx, ctx.metadata);
   }
 
-  protected responseToChunk(response: Response): Chunk {
-    return {
-      content: response.content,
-      finishReason: response.finishReason,
-      usage: response.usage,
-      refusal: response.refusal,
-      reasoning: response.reasoning,
-    };
+  protected responseToChunks(response: Response): Chunk[] {
+    return getChunksFromResponse(response);
   }
 
   protected chunksToResponse(chunks: Chunk[], model: string): Response {
-    let content = '';
-    let finishReason: Response['finishReason'] = 'stop';
-    let refusal: string | undefined;
-    let reasoning: string | undefined;
-    let usage: Usage | undefined;
-
-    for (const chunk of chunks) {
-      if (chunk.content) {
-        content += chunk.content;
-      }
-      if (chunk.finishReason) {
-        finishReason = chunk.finishReason;
-      }
-      if (chunk.refusal) {
-        refusal = (refusal || '') + chunk.refusal;
-      }
-      if (chunk.reasoning) {
-        reasoning = (reasoning || '') + chunk.reasoning;
-      }
-      if (chunk.usage) {
-        usage = chunk.usage;
-      }
-    }
-
-    return {
-      content,
-      finishReason,
-      refusal,
-      reasoning,
-      usage,
-      model,
-    };
+    return getResponseFromChunks(chunks);
   }
 
   protected getHandlerGetMethod(

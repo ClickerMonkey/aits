@@ -35,7 +35,7 @@
  * ```
  */
 
-import type { Executor, FinishReason, Streamer, ToolCall } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, type Executor, type FinishReason, type Streamer, type ToolCall } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -211,59 +211,12 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     yield* streamer(request, ctx, ctx.metadata);
   }
 
-  protected responseToChunk(response: Response): Chunk {
-    return {
-      content: response.content,
-      finishReason: response.finishReason,
-      usage: response.usage,
-      refusal: response.refusal,
-      reasoning: response.reasoning,
-      toolCall: response.toolCalls?.[0], // Send first tool call if any
-      model: response.model,
-    };
+  protected responseToChunks(response: Response): Chunk[] {
+    return getChunksFromResponse(response);
   }
 
   protected chunksToResponse(chunks: Chunk[], model: string): Response {
-    let content = '';
-    let finishReason: FinishReason = 'stop';
-    let refusal: string | undefined;
-    let reasoning: string | undefined;
-    const toolCalls: ToolCall[] = [];
-    let usage: Usage | undefined;
-
-    for (const chunk of chunks) {
-      if (chunk.content) {
-        content += chunk.content;
-      }
-      if (chunk.toolCall) {
-        toolCalls.push(chunk.toolCall);
-      }
-      if (chunk.finishReason) {
-        finishReason = chunk.finishReason;
-      }
-      if (chunk.refusal) {
-        refusal = (refusal || '') + chunk.refusal;
-      }
-      if (chunk.reasoning) {
-        reasoning = (reasoning || '') + chunk.reasoning;
-      }
-      if (chunk.usage) {
-        usage = chunk.usage;
-      }
-      if (chunk.model) {
-        model = chunk.model;
-      }
-    }
-
-    return {
-      content,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      finishReason,
-      refusal,
-      reasoning,
-      model,
-      usage,
-    };
+    return getResponseFromChunks(chunks);
   }
 
   protected getHandlerGetMethod(

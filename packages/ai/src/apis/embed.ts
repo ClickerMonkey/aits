@@ -90,7 +90,7 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
     return Math.ceil(totalTextLength / 4);
   }
 
-  protected responseToChunk(response: EmbeddingResponse): never {
+  protected responseToChunks(response: EmbeddingResponse): never {
     throw new Error('Embeddings do not support chunking');
   }
 

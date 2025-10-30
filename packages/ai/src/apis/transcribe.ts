@@ -109,12 +109,12 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
     );
   }
 
-  protected responseToChunk(response: TranscriptionResponse): TranscriptionChunk {
-    return {
+  protected responseToChunks(response: TranscriptionResponse): TranscriptionChunk[] {
+    return [{
       text: response.text,
       model: response.model,
       usage: response.usage,
-    };
+    }];
   }
 
   protected chunksToResponse(chunks: TranscriptionChunk[], givenModel: string): TranscriptionResponse {

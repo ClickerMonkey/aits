@@ -5,7 +5,7 @@
  * Implements the template method pattern to eliminate code duplication.
  */
 
-import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, ModelInput } from '@aits/core';
+import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, getModel, ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -27,6 +27,7 @@ import type {
   AIProviders,
   AIProvider,
 } from '../types';
+import { isModelInfo } from '../common';
 
 /**
  * Abstract base class for all API implementations
@@ -47,44 +48,55 @@ export abstract class BaseAPI<
 > {
   constructor(protected ai: AI<T>) {}
 
-  async getModelFor(request: TRequest, ctx: AIContext<T>): Promise<SelectedModelFor<T> | null> {
-    let selected: SelectedModelFor<T> | null = null;
+  /**
+   * Gets the selected model for a given request and context.
+   * 
+   * @param request - The request to get the model for
+   * @param ctx - The AI context
+   * @returns 
+   */
+  async getModelFor(request: TRequest, ctx: AIContext<T>, forStreaming: boolean): Promise<SelectedModelFor<T> | null> {
+    const { hooks, registry } = this.ai;
 
     // Check if model is already specified
-    const givenModel: ModelInput | undefined = request.model || ctx.metadata?.model;
-    if (givenModel) {
-      const modelId = typeof givenModel === 'string' ? givenModel : givenModel.id;
-      const model = this.ai.registry.getModel(modelId);
-      if (model) {
-        const provider = this.ai.providers[model.provider as AIProviderNames<T>] 
-          ?? this.ai.registry.getProviderFor(modelId);
+    const model = getModel(request.model || ctx.metadata?.model);
+    if (model) {
+      const modelInfo = isModelInfo(model)
+        ? model
+        : registry.getModel(model.id);
+
+      if (modelInfo) {
+        const provider = registry.getProvider(modelInfo.provider) as AIProvider<T>
+          ?? registry.getProviderFor(model.id);
+          
         if (!provider) {
           return null;
         }
 
         return {
-          model,
+          model: modelInfo,
           provider: provider,
           score: 1.0,
         };
       } else {
-        const { contextWindow = 0, maxOutputTokens = 0 } = typeof givenModel === 'object' ? givenModel : {};
-        const [providerKey, provider] = this.ai.registry.getProviderFor(modelId);
+        const { contextWindow = 0, maxOutputTokens = 0 } = model;
+        const [providerKey, provider] = this.ai.registry.getProviderFor(model.id);
         if (!provider || !providerKey) {
           return null;
         }
+
         return {
           model: {
-            id: modelId,
+            id: model.id,
             provider: providerKey,
-            name: modelId,
+            name: model.id,
             capabilities: new Set<ModelCapability>(),
             tier:'flagship',
             pricing: {},
-            contextWindow: contextWindow,
+            contextWindow,
             maxOutputTokens,
           },
-          provider: provider,
+          provider,
           score: 1.0,
         };
       }
@@ -93,26 +105,26 @@ export abstract class BaseAPI<
       // Build metadata with required capabilities and parameters
       const metadataRequired: AIMetadataRequired<T> = {
         ...ctx.metadata,
-        required: this.getRequiredCapabilities(ctx.metadata?.required || [], request, false),
-        requiredParameters: this.getRequiredParameters(ctx.metadata?.requiredParameters || [], request, false),
+        required: this.getRequiredCapabilities(ctx.metadata?.required || [], request, forStreaming),
+        requiredParameters: this.getRequiredParameters(ctx.metadata?.requiredParameters || [], request, forStreaming),
       } as AIMetadataRequired<T>;
 
+      // Build metadata from what used passed in context
       const metadata = await this.ai.buildMetadata(metadataRequired);
 
-      // Run beforeModelSelection hook
+      // Run beforeModelSelection hook to affect which model might be selected
       const enrichedMetadata = hooks.beforeModelSelection
-        ? await hooks.beforeModelSelection(fullCtx, metadata)
+        ? await hooks.beforeModelSelection(ctx, metadata)
         : metadata;
 
       // Select model
-      const dynamicSelection = this.ai.selectModel(enrichedMetadata);
+      const dynamicSelection = registry.selectModel(enrichedMetadata);
       if (!dynamicSelection) {
         throw new Error(this.getNoModelFoundError());
       }
-      selected = dynamicSelection;
-    }
 
-    return selected
+      return dynamicSelection;
+    }
   }
 
   /**
@@ -381,7 +393,7 @@ export abstract class BaseAPI<
    * Convert a response to a single chunk (for executor-to-streamer fallback)
    * @param response - The response to convert
    */
-  protected abstract responseToChunk(response: TResponse): TChunk;
+  protected abstract responseToChunks(response: TResponse): TChunk[];
 
   /**
    * Convert accumulated chunks to a response (for streamer-to-executor fallback)
@@ -666,14 +678,18 @@ export abstract class BaseAPI<
     const getMethod = this.getHandlerGetMethod(handler);
     if (getMethod) {
       const response = await getMethod(request as any, ctx);
-      yield this.responseToChunk(response);
+      for (const chunk of this.responseToChunks(response)) {
+        yield chunk;
+      }
       return;
     }
 
     // Try provider executor as fallback
     if (this.hasProviderExecutor(selected)) {
       const response = await this.executeRequest(request, selected, ctx);
-      yield this.responseToChunk(response);
+      for (const chunk of this.responseToChunks(response)) {
+        yield chunk;
+      }
       return;
     }
 

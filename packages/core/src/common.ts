@@ -1,4 +1,4 @@
-import { Model, ModelInput, Usage } from "./types";
+import { Chunk, Model, ModelInput, Usage, Response } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -246,4 +246,73 @@ export function getModel(input: ModelInput): Model;
 export function getModel(input: ModelInput | undefined): Model | undefined;
 export function getModel(input: ModelInput | undefined): Model | undefined {
   return typeof input === 'string' ? { id: input } : input;
+}
+
+/**
+ * Converts a series of chunks into a Response object.
+ * 
+ * @param chunks - The array of Chunk objects to convert.
+ * @returns The aggregated Response object.
+ */
+export function getResponseFromChunks(chunks: Chunk[]): Response {
+  const resp: Response = { 
+    content: '',
+    finishReason: 'stop', 
+    model: 'unknown',
+  };
+  for (const chunk of chunks) {
+    if (chunk.content) {
+      resp.content += chunk.content;
+    }
+    if (chunk.finishReason) {
+      resp.finishReason = chunk.finishReason;
+    }
+    if (chunk.reasoning) {
+      resp.reasoning = (resp.reasoning || '') + chunk.reasoning;
+    }
+    if (chunk.model) {
+      resp.model = chunk.model;
+    }
+    if (chunk.refusal) {
+      resp.refusal = chunk.refusal;
+    }
+    if (chunk.toolCall) {
+      resp.toolCalls = resp.toolCalls || [];
+      resp.toolCalls.push(chunk.toolCall);
+    }
+    if (chunk.usage) {
+      resp.usage = resp.usage || {};
+      accumulateUsage(resp.usage, chunk.usage);
+    }
+  }
+
+  return resp;
+}
+
+/**
+ * Converts a Response object into an array of Chunk objects.
+ * 
+ * @param response - The response to convert.
+ * @returns The built chunks from the response.
+ */
+export function getChunksFromResponse(response: Response): Chunk[] {
+  const chunks: Chunk[] = [];
+
+  chunks.push({
+    refusal: response.refusal,
+    reasoning: response.reasoning,
+  });
+
+  for (const toolCall of response.toolCalls || []) {
+    chunks.push({ toolCall });
+  }
+
+  chunks.push({
+    content: response.content,
+    finishReason: response.finishReason,
+    usage: response.usage,
+    model: response.model,
+  });
+
+  return chunks;
 }

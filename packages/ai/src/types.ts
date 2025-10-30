@@ -616,7 +616,7 @@ export interface ImageGenerationResponse extends BaseResponse {
 export interface ImageGenerationChunk extends BaseChunk {
   // Partial image data
   imageData?: string;
-  // Progress percentage (0-100)
+  // Progress percentage (0-1)
   progress?: number;
   // Whether generation is complete
   done?: boolean;
