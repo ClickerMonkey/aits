@@ -23,12 +23,14 @@ import type {
   SpeechResponse,
   EmbeddingRequest,
   EmbeddingResponse,
-  AIBaseContext,
   AIBaseTypes,
+  AIContextAny,
+  AIMetadataAny,
 } from '@aits/ai';
-import type { Executor, Streamer, Request, Response, Chunk, MessageContent, ToolCall, FinishReason } from '@aits/core';
+import { type Executor, type Streamer, type Request, type Response, type Chunk, type MessageContent, type ToolCall, type FinishReason, getModel } from '@aits/core';
 import { ProviderError, RateLimitError } from './types';
 import { detectTier } from '@aits/ai';
+import { get } from 'http';
 
 // ============================================================================
 // OpenAI Provider Configuration
@@ -146,7 +148,6 @@ export interface OpenAIConfig {
  * - `modelFilter(model)`: Filter which models to include
  * - `createClient(config)`: Customize client creation
  * - `convertModel(model)`: Customize model conversion
- * - `customizeChatParams(params, config, request)`: Modify chat params
  * - `customizeImageParams(params, config)`: Modify image params
  * - `customizeTranscriptionParams(params, config)`: Modify transcription params
  * - `customizeSpeechParams(params, config)`: Modify speech params
@@ -268,7 +269,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param config Provider configuration
    * @returns Modified parameters
    */
-  protected customizeTranscriptionParams?(params: any, config: TConfig): any;
+  protected augmentTranscriptionRequest?<TExpected extends OpenAI.Audio.TranscriptionCreateParams>(
+    params: TExpected, 
+    request: TranscriptionRequest,
+    config: TConfig
+  ) {
+    // No-op by default
+  }
 
   /**
    * Customize speech generation params before sending to API.
@@ -340,6 +347,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // Message & Request Conversion (Protected - Reusable)
   // ============================================================================
 
+  /**
+   * Convert AITS MessageContent to OpenAI content string format.
+   * @param x 
+   * @param from 
+   * @returns 
+   */
   protected convertContentString(x: MessageContent['content'], from: string): string {
     if (typeof x === 'string') {
       return x;
@@ -353,6 +366,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     return '';
   }
 
+  /**
+   * Convert AITS MessageContent to OpenAI text content format.
+   * @param x 
+   * @param name 
+   * @returns 
+   */
   protected convertContentText(
     x: string | MessageContent[],
     name: string
@@ -360,6 +379,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     if (typeof x === 'string') {
       return x;
     }
+
     return x.map((part): OpenAI.Chat.Completions.ChatCompletionContentPartText => {
       if (part.type === 'text') {
         return { type: 'text', text: String(part.content) };
@@ -374,6 +394,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     });
   }
 
+  /**
+   * Convert AITS MessageContent to OpenAI format.
+   * @param x 
+   * @param name 
+   * @returns 
+   */
   protected convertContent(
     x: string | MessageContent[],
     name: string
@@ -543,6 +569,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     });
   }
 
+  /**
+   * Convert AITS ToolCall to OpenAI format.
+   * @param x ToolCall object
+   * @returns 
+   */
   protected convertToolCall(x: ToolCall): OpenAI.Chat.ChatCompletionMessageToolCall {
     return {
       id: x.id,
@@ -732,12 +763,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If request fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  createExecutor<TContext, TMetadata>(config?: TConfig): Executor<TContext, TMetadata> {
+  createExecutor(config?: TConfig): Executor<AIContextAny, AIMetadataAny> {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
-    return async (request: Request, _ctx: TContext, metadata?: TMetadata, signal?: AbortSignal): Promise<Response> => {
-      const model = (metadata as any)?.model;
+    return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, signal?: AbortSignal): Promise<Response> => {
+      const model = getModel(metadata?.model || ctx.metadata?.model);
       if (!model) {
         throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
       }
@@ -749,7 +780,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         const response_format = this.convertResponseFormat(request);
 
         let params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-          model,
+          model: model.id,
           messages,
           temperature: request.temperature,
           top_p: request.topP,
@@ -767,6 +798,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           tool_choice,
           response_format,
           reasoning_effort: request.reason?.effort,
+          ...request.extra,
           stream: false,
         };
 
@@ -824,30 +856,31 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {ProviderError} If request fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  createStreamer<TContext, TMetadata>(config?: TConfig): Streamer<TContext, TMetadata> {
+  createStreamer(config?: TConfig): Streamer<AIContextAny, AIMetadataAny> {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     return async function* (
       this: OpenAIProvider<TConfig>,
       request: Request,
-      _ctx: TContext,
-      metadata?: TMetadata,
-      signal?: AbortSignal
+      ctx: AIContextAny,
+      metadata?: AIMetadataAny,
+      requestSignal?: AbortSignal
     ): AsyncGenerator<Chunk> {
-      const model = (metadata as any)?.model;
+      const model = getModel(request?.model || metadata?.model || ctx.metadata?.model);
       if (!model) {
         throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
       }
 
       try {
+        const signal = requestSignal || ctx.signal;
         const messages = this.convertMessages(request);
         const tools = this.convertTools(request);
         const tool_choice = this.convertToolChoice(request);
         const response_format = this.convertResponseFormat(request);
 
         let params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-          model,
+          model: model.id,
           messages,
           temperature: request.temperature,
           top_p: request.topP,
@@ -864,6 +897,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           tools,
           tool_choice,
           response_format,
+          ...request.extra,
           stream: true,
           stream_options: { include_usage: true },
         };
@@ -963,7 +997,18 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             yield { toolCall };
           }
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.code === 'context_length_exceeded') {
+          const match = error.message.match(/maximum context length is (\d+)/i);
+          const contextWindow = match ? parseInt(match[1]) : undefined;
+          yield {
+            finishReason: 'length',
+            usage: { inputTokens: contextWindow },
+          };
+
+          return;
+        }
+
         if (error instanceof Error && 'status' in error && (error as any).status === 429) {
           throw new RateLimitError(this.name, error.message);
         }
@@ -979,7 +1024,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Supports DALL-E 2 and DALL-E 3 with various sizes and quality settings.
    *
    * @param request Image generation request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Generated image URLs or base64 data
    * @throws {ProviderError} If generation fails
@@ -987,7 +1032,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   generateImage: Provider['generateImage'] = async (
     request: ImageGenerationRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
     const effectiveConfig = config || this.config;
@@ -998,10 +1043,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       // of what image generation models can do. And then we narrow it down here.
       // Ideally a party of model/provider selection is finding one that also supports the requested options.
 
-      const model = request.model || ctx.metadata?.model || 'dall-e-3';
+      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-3');
 
       let params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
-        model,
+        model: model.id,
         prompt: request.prompt,
         n: request.n,
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
@@ -1010,6 +1055,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         background: request.background,
         response_format: request.responseFormat || 'b64_json',
         user: request.userIdentifier,
+        ...request.extra,
         stream: false,
       };
 
@@ -1047,7 +1093,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Supports image editing with text prompts and optional masks.
    *
    * @param request Image edit request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Edited image URLs or base64 data
    * @throws {ProviderError} If editing fails
@@ -1055,19 +1101,19 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   editImage: Provider['editImage'] = async (
     request: ImageEditRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      const model = request.model || ctx.metadata?.model || 'dall-e-2';
+      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-2');
       const image = this.toUploadableImage(request.image);
       const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
 
       let params: OpenAI.Images.ImageEditParamsNonStreaming = {
-        model,
+        model: model.id,
         image,
         prompt: request.prompt,
         mask,
@@ -1075,6 +1121,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
         user: request.userIdentifier,
         response_format: request.responseFormat,
+        ...request.extra,
         stream: false,
       };
 
@@ -1113,7 +1160,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * so this implementation returns the result with progress indicators.
    *
    * @param request Image edit request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Async generator yielding progress chunks
    * @throws {ProviderError} If editing fails
@@ -1122,22 +1169,15 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   editImageStream: Provider['editImageStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: ImageEditRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk> {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      // Yield initial status
-      yield {
-        status: 'Starting image editing...',
-        progress: 0,
-        done: false,
-      };
-
-
-      const model = request.model || ctx.metadata?.model || 'dall-e-2';
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-2');
       const image = this.toUploadableImage(request.image);
       const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
 
@@ -1145,7 +1185,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       let imageCount = 0;
 
       let params: OpenAI.Images.ImageEditParamsStreaming = {
-        model,
+        model: model.id,
         image,
         prompt: request.prompt,
         mask,
@@ -1154,6 +1194,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         response_format: request.responseFormat,
         user: request.userIdentifier,
         partial_images: imageStreams,
+        ...request.extra,
         stream: true,
       };
 
@@ -1161,18 +1202,23 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         params = this.customizeImageParams(params, effectiveConfig);
       }
 
-      const response = await client.images.edit(params);
+      const response = await client.images.edit(params, { signal });
 
       // Yield completion with results
       for await (const img of response) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+
         const progress = (imageCount + 1) / (imageStreams + 1);
+
         yield {
-          status: `Image generation ${(progress * 100).toFixed(0)}`,
           progress,
           done: img.type === 'image_edit.completed',
           image: {
             b64_json: img.b64_json || undefined,
           },
+          model,
         };
         imageCount++;
       }
@@ -1191,7 +1237,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * so this implementation polls for progress or returns the result immediately.
    *
    * @param request Image generation request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Async generator yielding progress chunks
    * @throws {ProviderError} If generation fails
@@ -1200,27 +1246,21 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   generateImageStream: Provider['generateImageStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: ImageGenerationRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk> {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      // Yield initial status
-      yield {
-        status: 'Starting image generation...',
-        progress: 0,
-        done: false,
-      };
-
-      const model = request.model || ctx.metadata?.model || 'dall-e-3';
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-3');
 
       let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
       let imageCount = 0;
 
       let params: OpenAI.Images.ImageGenerateParamsStreaming = {
-        model,
+        model: model.id,
         prompt: request.prompt,
         n: 1,
         size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
@@ -1230,6 +1270,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         user: request.userIdentifier,
         partial_images: imageStreams,
         response_format: request.responseFormat,
+        ...request.extra,
         stream: true,
       };
 
@@ -1237,19 +1278,23 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         params = this.customizeImageParams(params, effectiveConfig);
       }
 
-      const response = await client.images.generate(params);
+      const response = await client.images.generate(params, { signal });
 
       // Yield completion with results
       for await (const img of response) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+
         const progress = (imageCount + 1) / (imageStreams + 1);
         yield {
-          status: `Image generation ${(progress * 100).toFixed(0)}`,
           progress,
           done: img.type === 'image_generation.completed',
           image: {
             b64_json: img.b64_json || undefined,
           },
         };
+
         imageCount++;
       }
     } catch (error) {
@@ -1344,7 +1389,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Supports multiple audio formats and optional timestamps.
    *
    * @param request Transcription request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Transcription text and optional metadata
    * @throws {ProviderError} If transcription fails
@@ -1352,7 +1397,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   transcribe: Provider['transcribe'] = async (
     request: TranscriptionRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<TranscriptionResponse> => {
     const effectiveConfig = config || this.config;
@@ -1361,23 +1406,24 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     try {
       // Convert audio to appropriate format
       let file: Uploadable = this.toUploadableAudio(request.audio);
-      const model = request.model || ctx.metadata?.model || 'whisper-1';
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'whisper-1');
       let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        model,
+        model: model.id,
         file,
         language: request.language,
         prompt: request.prompt,
         temperature: request.temperature,
         response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
         timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
+        ...request.extra,
+        stream: false,
       };
 
       // Apply provider-specific customizations
-      if (this.customizeTranscriptionParams) {
-        params = this.customizeTranscriptionParams(params, effectiveConfig);
-      }
+      this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
 
-      const response = await client.audio.transcriptions.create(params);
+      const response = await client.audio.transcriptions.create(params, { signal });
 
       return {
         text: response.text,
@@ -1407,7 +1453,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * so this implementation returns the result with progress indicators.
    *
    * @param request Transcription request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Async generator yielding transcription chunks
    * @throws {ProviderError} If transcription fails
@@ -1416,94 +1462,68 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   transcribeStream: Provider['transcribeStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: TranscriptionRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk> {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      // Yield initial status
-      yield {
-        status: 'Starting transcription...',
-        progress: 0,
-        done: false,
-      };
-
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'whisper-1');
       let file: Uploadable = this.toUploadableAudio(request.audio);
-      let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        model: request.model || ctx.metadata?.model || 'whisper-1',
+      let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsStreaming = {
+        model: model.id,
         file,
         language: request.language,
         prompt: request.prompt,
         temperature: request.temperature,
         response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
         timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
+        ...request.extra,
+        stream: true,
       };
 
-      if (this.customizeTranscriptionParams) {
-        params = this.customizeTranscriptionParams(params, effectiveConfig);
-      }
+      this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
 
-      // Yield processing status
-      yield {
-        status: 'Transcribing audio...',
-        progress: 50,
-        done: false,
-      };
+      const response = await client.audio.transcriptions.create(params, { signal });
 
-      const response = await client.audio.transcriptions.create(params);
+      for await (const chunk of response) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
 
-      // Handle different response formats
-      if (typeof response === 'string') {
-        yield {
-          text: response,
-          progress: 100,
-          status: 'Transcription complete',
-          done: true,
-        };
-        return;
-      }
-
-      interface VerboseResponse {
-        text: string;
-        language?: string;
-        duration?: number;
-        words?: Array<{ word: string; start: number; end: number }>;
-        segments?: Array<{ text: string; start: number; end: number }>;
-      }
-
-      const verboseResponse = response as VerboseResponse;
-
-      // Yield words if available
-      if (verboseResponse.words) {
-        for (const word of verboseResponse.words) {
-          yield {
-            word,
-            progress: 90,
-            done: false,
-          };
+        switch (chunk.type) {
+          case 'transcript.text.delta':
+            yield {
+              delta: chunk.delta,
+            };
+            break
+          case 'transcript.text.segment':
+            yield {
+              segment: {
+                start: chunk.start,
+                end: chunk.end,
+                speaker: chunk.speaker,
+                text: chunk.text,
+                id: chunk.id,
+              },
+            };
+            break;
+          case 'transcript.text.done':
+            yield {
+              text: chunk.text,
+              usage: !chunk.usage ? undefined : {
+                inputTokens: chunk.usage.input_tokens,
+                outputTokens: chunk.usage.output_tokens,
+                totalTokens: chunk.usage.total_tokens,
+              },
+              model,
+            };
+            break;
         }
       }
 
-      // Yield segments if available
-      if (verboseResponse.segments) {
-        for (const segment of verboseResponse.segments) {
-          yield {
-            segment,
-            progress: 95,
-            done: false,
-          };
-        }
-      }
-
-      // Yield final complete text
-      yield {
-        text: verboseResponse.text,
-        progress: 100,
-        status: 'Transcription complete',
-        done: true,
-      };
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
         throw new RateLimitError(this.name, error.message);
@@ -1518,7 +1538,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Supports multiple voices and audio formats.
    *
    * @param request Speech synthesis request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Audio buffer and content type
    * @throws {ProviderError} If speech generation fails
@@ -1526,16 +1546,17 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   speech: Provider['speech'] = async (
     request: SpeechRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<SpeechResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
-      const { text: input, instructions, speed, model: requestModel } = request;
+      const { text: input, instructions, speed } = request;
 
-      const model = requestModel || ctx.metadata?.model || 'tts-1';
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'tts-1');
       const voiceDefault = 'alloy' as const;
       const voiceValid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
       const voiceRequest = request.voice || voiceDefault;
@@ -1543,19 +1564,20 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       const responseFormat = request.responseFormat || 'opus';
 
       let params: OpenAI.Audio.Speech.SpeechCreateParams = {
-        model,
+        model: model.id,
         input,
         instructions,
         voice,
         speed,
         response_format: responseFormat,
+        ...request.extra,
       };
 
       if (this.customizeSpeechParams) {
         params = this.customizeSpeechParams(params, effectiveConfig);
       }
 
-      const response = await client.audio.speech.create(params);
+      const response = await client.audio.speech.create(params, { signal });
 
       return {
         model,
@@ -1576,7 +1598,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Supports text-embedding-3-small, text-embedding-3-large, and ada-002 models.
    *
    * @param request Embedding request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Array of embeddings with usage information
    * @throws {ProviderError} If embedding generation fails
@@ -1584,19 +1606,22 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   embed: Provider['embed'] = async (
     request: EmbeddingRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<EmbeddingResponse> => {
     const effectiveConfig = config || this.config;
     const client = this.createClient(effectiveConfig);
 
     try {
+      const signal = ctx.signal;
+      const model = getModel(request.model || ctx.metadata?.model || 'text-embedding-3-small');
       let params: OpenAI.EmbeddingCreateParams = {
-        model: request.model || ctx.metadata?.model || 'text-embedding-3-small',
+        model: model.id,
         input: request.texts,
         dimensions: request.dimensions,
         encoding_format: request.encodingFormat,
         user: request.userIdentifier,
+        ...request.extra,
       };
 
       // Apply provider-specific customizations
@@ -1604,14 +1629,14 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         params = this.customizeEmbeddingParams(params, effectiveConfig);
       }
 
-      const response = await client.embeddings.create(params);
+      const response = await client.embeddings.create(params, { signal });
 
       return {
         embeddings: response.data.map((item) => ({
           embedding: item.embedding,
           index: item.index,
         })),
-        model: response.model,
+        model,
         usage: response.usage
           ? {
               inputTokens: response.usage.prompt_tokens,
@@ -1635,15 +1660,15 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * with image content and calls the chat API internally.
    *
    * @param request Image analysis request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Analysis response with text content
    * @throws {ProviderError} If analysis fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  analyzeImage: Provider['analyzeImage'] = async <TContext>(
+  analyzeImage: Provider['analyzeImage'] = async (
     request: ImageAnalyzeRequest,
-    _ctx: TContext,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<Response> => {
     const effectiveConfig = config || this.config;
@@ -1671,8 +1696,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       // Use the chat executor to analyze the images
       const response = await executor(
         chatRequest,
-        _ctx,
-        { model: request.model } as any,
+        ctx,
+        {},
         undefined
       );
 
@@ -1693,16 +1718,16 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * with image content and calls the streaming chat API internally.
    *
    * @param request Image analysis request parameters
-   * @param _ctx Context object (not used)
+   * @param ctx Context object (not used)
    * @param config Optional configuration override
    * @returns Async generator yielding response chunks
    * @throws {ProviderError} If analysis fails
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  analyzeImageStream: Provider['analyzeImageStream'] = async function* <TContext>(
+  analyzeImageStream: Provider['analyzeImageStream'] = async function* (
     this: OpenAIProvider<TConfig>,
     request: ImageAnalyzeRequest,
-    _ctx: TContext,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<Chunk> {
     const effectiveConfig = config || this.config;
@@ -1730,12 +1755,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       // Use the chat streamer to analyze the images
       for await (const chunk of streamer(
         chatRequest,
-        _ctx,
+        ctx,
         { model: request.model } as any,
         undefined
       )) {
         yield chunk;
       }
+      
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as any).status === 429) {
         throw new RateLimitError(this.name, error.message);

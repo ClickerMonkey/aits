@@ -1,4 +1,4 @@
-import { Usage } from "./types";
+import { Model, ModelInput, Usage } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -234,4 +234,16 @@ export function accumulateUsage(target: Usage, add?: Usage) {
   target.seconds = add.seconds
     ? (target.seconds || 0) + add.seconds
     : target.seconds;
+}
+
+/**
+ * Gets a Model object from either a string ID or a ModelInput object.
+ * 
+ * @param input - The model identifier or ModelInput object.
+ * @returns 
+ */
+export function getModel(input: ModelInput): Model;
+export function getModel(input: ModelInput | undefined): Model | undefined;
+export function getModel(input: ModelInput | undefined): Model | undefined {
+  return typeof input === 'string' ? { id: input } : input;
 }

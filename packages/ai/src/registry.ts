@@ -5,6 +5,7 @@
  * Provider order ensures deterministic model resolution: first provider to return a model ID wins.
  */
 
+import { getModel } from '@aits/core';
 import { detectTier } from './modelDetection';
 import type {
   AIBaseMetadata,
@@ -132,12 +133,16 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
 // Model Registry
 // ============================================================================
 
-export class ModelRegistry<TProviders extends Providers> {
+export class ModelRegistry<
+  TProviders extends Providers, 
+  TProviderKey extends keyof TProviders & string = keyof TProviders & string,
+  TProvider extends TProviders[TProviderKey] = TProviders[TProviderKey]
+> {
 
-  private models: Map<string, ModelInfo> = new Map(); // key: "provider/model"
+  private models: Map<string, ModelInfo<TProviderKey>> = new Map(); // key: "provider/model"
   private modelHandlers: Map<string, ModelHandler> = new Map();
-  private providers: Map<keyof TProviders & string, TProviders[keyof TProviders]> = new Map();
-  private providerCapabilities: Map<keyof TProviders & string, Set<ModelCapability>> = new Map();
+  private providers: Map<TProviderKey, TProvider> = new Map();
+  private providerCapabilities: Map<TProviderKey, Set<ModelCapability>> = new Map();
   private modelSources: ModelSource[] = [];
   private modelOverrides: ModelOverride[];
   private defaultCostPerMillionTokens: number;
@@ -149,7 +154,7 @@ export class ModelRegistry<TProviders extends Providers> {
     modelSources: ModelSource[] = []
   ) {
     // Store providers
-    this.providers = new Map(Object.entries(providers)) as Map<keyof TProviders & string, TProviders[keyof TProviders]>;
+    this.providers = new Map(Object.entries(providers)) as Map<TProviderKey, TProvider>;
 
     // Pre-compute provider capabilities for efficient lookup during selection
     for (const [providerName, provider] of this.providers.entries()) {
@@ -174,7 +179,7 @@ export class ModelRegistry<TProviders extends Providers> {
    * Register a model in the registry
    * Provider order matters: first to register wins
    */
-  registerModel(model: ModelInfo): void {
+  registerModel(model: ModelInfo<TProviderKey>): void {
     const key = `${model.provider}/${model.id}`;
 
     // If model already exists, only override if new provider has higher priority
@@ -195,7 +200,7 @@ export class ModelRegistry<TProviders extends Providers> {
   /**
    * Register multiple models
    */
-  registerModels(models: ModelInfo[]): void {
+  registerModels(models: ModelInfo<TProviderKey>[]): void {
     for (const model of models) {
       this.registerModel(model);
     }
@@ -204,14 +209,14 @@ export class ModelRegistry<TProviders extends Providers> {
   /**
    * Get a model by ID (checks all providers in order)
    */
-  getModel(id: string): ModelInfo | undefined {
+  getModel(id: string): ModelInfo<TProviderKey> | undefined {
     // Try with provider prefix first
     if (id.includes('/')) {
       return this.models.get(id);
     }
 
     let priorityProvider = 10;
-    let priorityModel: ModelInfo | undefined = undefined;
+    let priorityModel: ModelInfo<TProviderKey> | undefined = undefined;
 
     // Try each provider in order
     for (const [providerName, provider] of this.providers.entries()) {
@@ -228,18 +233,43 @@ export class ModelRegistry<TProviders extends Providers> {
   }
 
   /**
+   * Gets the provider to use for a given model ID
+   * 
+   * @param id 
+   * @returns 
+   */
+  getProviderFor(id: string): [TProviderKey, TProvider] | [] {
+    let priorityProvider: TProvider | undefined = undefined;
+    let priorityKey: TProviderKey | undefined = undefined;
+
+    for (const [providerKey, provider] of this.providers.entries()) {
+      const providerName = provider.name;
+      if (id.startsWith(`${providerName}/`) || id.startsWith(`${providerKey}/`)) {
+        return [providerKey, provider];
+      }
+      const priority = provider.priority ?? 10;
+      if (!priorityProvider || priority < (priorityProvider.priority ?? 10)) {
+        priorityProvider = provider;
+        priorityKey = providerKey;
+      }
+    }
+
+    return priorityKey && priorityProvider ? [priorityKey, priorityProvider] : [];
+  }
+
+  /**
    * List all models
    */
-  listModels(): ModelInfo[] {
+  listModels(): ModelInfo<TProviderKey>[] {
     return Array.from(this.models.values());
   }
 
   /**
    * Search and score models based on criteria
    */
-  searchModels(metadata: AIBaseMetadata<TProviders>): ScoredModel[] {
+  searchModels(metadata: AIBaseMetadata<TProviders>): ScoredModel<TProviderKey>[] {
     const allModels = this.listModels();
-    const scored: ScoredModel[] = [];
+    const scored: ScoredModel<TProviderKey>[] = [];
 
     for (const model of allModels) {
       const score = this.scoreModel(model, metadata);
@@ -257,10 +287,13 @@ export class ModelRegistry<TProviders extends Providers> {
   /**
    * Select best model based on criteria
    */
-  selectModel(criteria: AIBaseMetadata<TProviders>): SelectedModel<TProviders, keyof TProviders> | undefined {
+  selectModel(criteria: AIBaseMetadata<TProviders>): SelectedModel<TProviders, TProviderKey> | undefined {
     // If model explicitly specified, use it
-    if (criteria.model) {
-      const model = this.getModel(criteria.model);
+    const model = getModel(criteria.model);
+    const modelId = model?.id;
+
+    if (modelId) {
+      const model = this.getModel(modelId);
       if (!model) {
         return undefined;
       }
@@ -310,7 +343,7 @@ export class ModelRegistry<TProviders extends Providers> {
         provider,
         providerConfig: provider.config,
         score: 1.0,
-      } as SelectedModel<TProviders, keyof TProviders>;
+      };
     }
 
     // Search and score all compatible models
@@ -330,7 +363,7 @@ export class ModelRegistry<TProviders extends Providers> {
       provider,
       providerConfig: provider.config,
       score: best.score,
-    } as SelectedModel<TProviders, keyof TProviders>;
+    };
   }
 
   /**
@@ -352,7 +385,7 @@ export class ModelRegistry<TProviders extends Providers> {
   /**
    * Get provider info
    */
-  getProvider(name: keyof TProviders & string): TProviders[keyof TProviders] | undefined {
+  getProvider(name: TProviderKey): TProvider | undefined {
     return this.providers.get(name);
   }
 
@@ -361,15 +394,15 @@ export class ModelRegistry<TProviders extends Providers> {
    * @param name - Provider name
    * @returns Set of capabilities the provider supports, or undefined if provider not found
    */
-  getProviderCapabilities(name: keyof TProviders & string): Set<ModelCapability> | undefined {
+  getProviderCapabilities(name: TProviderKey): Set<ModelCapability> | undefined {
     return this.providerCapabilities.get(name);
   }
 
   /**
    * Score a model against criteria
    */
-  private scoreModel(model: ModelInfo, criteria: AIBaseMetadata<TProviders>): ScoredModel {
-    const result: ScoredModel = {
+  private scoreModel(model: ModelInfo<TProviderKey>, criteria: AIBaseMetadata<TProviders>): ScoredModel<TProviderKey> {
+    const result: ScoredModel<TProviderKey> = {
       model,
       score: 0,
       matchedRequired: [],
@@ -530,7 +563,7 @@ export class ModelRegistry<TProviders extends Providers> {
   /**
    * Apply overrides to a model
    */
-  private applyOverrides(model: ModelInfo): ModelInfo {
+  private applyOverrides(model: ModelInfo<TProviderKey>): ModelInfo<TProviderKey> {
     let result = { ...model };
 
     for (const override of this.modelOverrides) {
@@ -563,7 +596,7 @@ export class ModelRegistry<TProviders extends Providers> {
    * Merge two ModelInfo objects intelligently
    * Prefers non-default values and combines capabilities
    */
-  private mergeModelInfo(base: ModelInfo, source: ModelInfo): ModelInfo {
+  private mergeModelInfo(base: ModelInfo<TProviderKey>, source: ModelInfo<TProviderKey>): ModelInfo<TProviderKey> {
     // Merge capabilities
     const mergedCapabilities = new Set([...base.capabilities, ...source.capabilities]);
 
@@ -600,10 +633,10 @@ export class ModelRegistry<TProviders extends Providers> {
     this.models.clear();
 
     // Step 1: Fetch from model sources (e.g., OpenRouter)
-    const sourceModels = new Map<string, ModelInfo>();
+    const sourceModels = new Map<string, ModelInfo<TProviderKey>>();
     for (const source of this.modelSources) {
       try {
-        const models = await source.fetchModels();
+        const models = await source.fetchModels() as ModelInfo<TProviderKey>[];
         for (const model of models) {
           const key = `${model.provider}/${model.id}`;
           sourceModels.set(key, model);
@@ -637,7 +670,7 @@ export class ModelRegistry<TProviders extends Providers> {
           const key = `${providerName as string}/${modelInfo.id}`;
 
           // Create base model with defaults
-          let fullModel: ModelInfo<keyof TProviders & string> = {
+          let fullModel: ModelInfo<TProviderKey> = {
             id: modelInfo.id,
             provider: providerName,
             name: modelInfo.name || modelInfo.id,

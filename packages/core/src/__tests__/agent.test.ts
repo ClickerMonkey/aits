@@ -11,10 +11,9 @@
 
 import { z } from 'zod';
 import { Agent } from '../agent';
-import { Tool } from '../tool';
 import { Prompt } from '../prompt';
+import { Tool } from '../tool';
 import { Context } from '../types';
-import { createMockExecutor } from './mocks/executor.mock';
 
 describe('Agent', () => {
   describe('Construction', () => {

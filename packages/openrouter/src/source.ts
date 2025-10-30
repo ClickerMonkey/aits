@@ -6,10 +6,7 @@
  */
 
 import type { ModelInfo, ModelSource } from '@aits/ai';
-import {
-  detectCapabilitiesFromModality,
-  detectTier,
-} from '@aits/ai';
+import { convertOpenRouterModel } from './openrouter';
 import { OpenRouterModel, ZDRModel } from './types';
 
 /**
@@ -64,43 +61,6 @@ export async function fetchModels(apiKey?: string): Promise<OpenRouterModel[]> {
   }
   const data = (await response.json()) as { data: OpenRouterModel[] };
   return data.data;
-}
-
-/**
- * Convert OpenRouter model to ModelInfo
- */
-function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>): ModelInfo {
-  const capabilities = detectCapabilitiesFromModality(model.architecture.modality, model.id);
-  const tier = detectTier(model.name);
-  
-  // Update ZDR support from ZDR endpoint (more reliable)
-  if (zdrModelIds.has(model.id)) {
-    capabilities.add('zdr');
-  }
-
-  // Extract provider from model ID (format: provider/model-name)
-  const provider = model.id.includes('/') ? model.id.split('/')[0] : 'unknown';
-
-  return {
-    provider,
-    id: model.id,
-    name: model.name,
-    capabilities,
-    tier,
-    pricing: {
-      inputTokensPer1M: parseFloat(model.pricing.prompt) * 1_000_000,
-      outputTokensPer1M: parseFloat(model.pricing.completion) * 1_000_000,
-      imageInputPer1M: model.pricing.image ? parseFloat(model.pricing.image) * 1_000_000 : undefined,
-      requestCost: model.pricing.request ? parseFloat(model.pricing.request) : undefined,
-    },
-    contextWindow: model.context_length,
-    maxOutputTokens: model.top_provider.max_completion_tokens ?? undefined,
-    metadata: {
-      description: model.description,
-      architecture: model.architecture,
-      source: 'openrouter',
-    },
-  };
 }
 
 /**

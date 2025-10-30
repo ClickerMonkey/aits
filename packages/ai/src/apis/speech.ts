@@ -4,6 +4,7 @@
  * Provides text-to-speech functionality.
  */
 
+import { ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -30,10 +31,6 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   // ============================================================================
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
-
-  protected getModel(request: SpeechRequest): string | undefined {
-    return request.model;
-  }
 
   protected getRequiredCapabilities(provided: ModelCapability[], request: SpeechRequest, forStreaming: boolean): ModelCapability[] {
     return ['audio', ...provided];

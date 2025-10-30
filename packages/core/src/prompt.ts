@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
 import z from 'zod';
 
-import { accumulateUsage, Fn, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateUsage, Fn, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
 import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 
@@ -427,6 +427,7 @@ export class Prompt<
     const request: Request = {
       name: this.name,
       ...config,
+      maxTokens: config?.maxTokens ?? ctx.maxOutputTokens,
       messages: [
         { role: 'system', content },
       ],
@@ -436,6 +437,9 @@ export class Prompt<
 
     if (!this.input.excludeMessages && ctx.messages) {
       request.messages = request.messages.concat(ctx.messages);
+
+      // Pre-emptively trim context messages if we have a context window limit
+      request.messages = this.forget(request, ctx);
     }
 
     let result: TOutput | undefined = undefined;
@@ -688,6 +692,8 @@ export class Prompt<
         
         if (!schema || (schema instanceof z.ZodString)) {
           result = content as unknown as TOutput;
+
+          break; // All good!
         } else {
           // Grab the JSON part from the content just in case...
           const potentialJSON = content.substring(
@@ -898,6 +904,7 @@ export class Prompt<
         content: response.content,
         finishReason: response.finishReason,
         usage: response.usage,
+        model: response.model,
       };
 
       return response;
@@ -906,67 +913,94 @@ export class Prompt<
 
   /**
    * Trims messages from the request to fit within token limits.
-   * This is called automatically when the model returns a 'length' finish reason.
+   * 
+   * This is called:
+   * - Before a request is made to ensure the prompt fits within the model's context window if it's specified
+   * - After a response with a 'length' finish reason to allow retrying with trimmed context
+   * - After a provider catches an early context window error and emits amn artificial length event.
+   * 
+   * Scenarios that support trimming:
+   * 1. Token usage is provided from a previous request (we can use this to infer token counts)
+   * 2. A token estimation function is provided in the context (we can estimate token counts)
+   * 3. Messages already have token counts assigned (we can use these directly)
+   * 
+   * 
+   * 
    *
    * @param request - The original request with messages.
    * @param ctx - The context containing message history and token estimation.
    * @param usage - The current token usage.
    * @returns The trimmed array of messages.
    */
-  private forget(request: Request, ctx: Context<TContext, TMetadata>, usage: Usage): Message[] {
-    // If we don't have token usage info, we can't forget
-    if (usage.inputTokens === undefined) {
+  private forget(request: Request, ctx: Context<TContext, TMetadata>, usage?: Usage): Message[] {
+    const model = getModel(request.model);
+    const contextWindow = model?.contextWindow ?? ctx.contextWindow ?? usage?.totalTokens;
+
+    // We can't forget our past if we don't know the context window
+    if (contextWindow === undefined) {
       return request.messages;
     }
 
-    const completionTokens = request.maxTokens ?? ctx.defaultCompletionTokens ?? 4096; // Default completion buffer
-    const availablePromptTokens = usage.inputTokens - completionTokens;
-    const contextTokens = ctx.messages?.reduce((sum, msg) => sum + (msg.tokens || 0), 0) || 0;
-    const removeTokens = contextTokens - availablePromptTokens;
+    // Calculate max input tokens allowed
+    const maxOutput = request.maxTokens ?? ctx.maxOutputTokens ?? 4096; // Default completion buffer
+    const maxInput = contextWindow - maxOutput;
 
-    // ctx.messages structure: system -> (user -> assistant)[] -> user -> tool[]
+    // ctx.messages structure: system -> (user -> assistant)[] -> user? -> assistant.tool_calls ->  tool[]
+    
+    // If we have any tokens defined, spread them out
+    // If we have no tokens defined & estimateTokens, estimate them
+    // If we have no tokens defined & no estimateTokens but we have usage.inputTokens, spread them out
+    // If we have no tokens defined & no estimateTokens & no usage.inputTokens, we can't trim
 
-    if (!ctx.messages || availablePromptTokens <= 0 || removeTokens <= 0) {
-      return request.messages;
-    }
+    let messageTokens: number[] = [];
+    const totalMessageTokens = request.messages.reduce((sum, t) => sum + (t.tokens || 0), 0);
+    if (totalMessageTokens > 0) {
+      const chunks: Message[][] = [];
+      const chunkTokens: number[] = [];
+      let currentChunk: Message[] = [];
 
-    // If we have a token estimator, use it to fill in missing token counts
-    if (ctx.estimateTokens) {
-      for (const msg of ctx.messages) {
-        if (msg.tokens === undefined) {
-          msg.tokens = ctx.estimateTokens(msg);
+      for (let i = request.messages.length - 1; i >= 0; i--) {
+        const msg = request.messages[i];
+        currentChunk.push(msg);
+        if (msg.tokens) {
+          chunks.unshift(currentChunk);
+          chunkTokens.unshift(msg.tokens);
+          currentChunk = [];
         }
       }
-    }
-    
-    // Chunk messages based on token boundaries in context
-    let contextIndex = ctx.messages.length - 1;
-    const chunks: Message[][] = [];
-    const chunkTokens: number[] = [];
-    let currentChunk: Message[] = [];
-
-    for (let i = request.messages.length - 1; i >= 0; i--) {
-      const msg = request.messages[i];
-      currentChunk.push(msg);
-      const ctxMsg = ctx.messages[contextIndex];
-      if (ctxMsg.tokens && contextIndex > 0) {
-        contextIndex--;
-        chunks.unshift(currentChunk);
-        chunkTokens.unshift(ctxMsg.tokens);
-        currentChunk = [];
-      }
-    }
-    if (currentChunk.length) {
-      if (chunks.length === 0) {
-        chunks.push(currentChunk);
-        chunkTokens.push(availablePromptTokens);
-      } else {
+      if (currentChunk.length) {
         chunks[0].unshift(...currentChunk);
       }
+      // Distribute tokens across messages in each chunk
+      // If we have usage.inputTokens, we add them to the last chunk (usage.inputTokens - totalMessageTokens)
+      if (usage?.inputTokens) {
+        const overage = totalMessageTokens - usage.inputTokens;
+        if (overage > 0) {
+          chunkTokens[chunkTokens.length - 1] += overage;
+        }
+      }
+      messageTokens = chunks.map((c, i) => c.map(() => chunkTokens[i] / c.length)).flat();
+    } else if (ctx.estimateTokens) {
+      for (const msg of request.messages) {
+        msg.tokens = ctx.estimateTokens(msg);
+      }
+      messageTokens = request.messages.map(m => m.tokens!);
+    } else if (usage?.inputTokens) {
+      const spreadTokens = usage.inputTokens;
+      const perMessage = Math.floor(spreadTokens / request.messages.length);
+      messageTokens = request.messages.map(() => perMessage);
+    } else {
+      // we have no way to know token counts, so we can't trim
+      return request.messages;
     }
 
-    // Distribute tokens across messages in each chunk
-    const messageTokens = chunks.map((c, i) => c.map(() => chunkTokens[i] / c.length)).flat();
+    const totalMessageTokensFinal = messageTokens.reduce((sum, t) => sum + t, 0);
+    if (totalMessageTokensFinal <= maxInput) {
+      // No trimming needed
+      return request.messages;
+    }
+    
+    const removeTokens = totalMessageTokensFinal - maxInput;
 
     // Calculate where to start trimming and where to stop
     const messageMinIndex = request.messages.findIndex(m => m.role === 'system') + 1; // inclusive

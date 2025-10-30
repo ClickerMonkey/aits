@@ -23,6 +23,8 @@ import type {
   ComponentCompatible,
   BaseResponse,
   BaseChunk,
+  BaseRequest,
+  ModelInput,
 } from '@aits/core';
 import type { PromptInput } from '@aits/core';
 import type { ToolInput } from '@aits/core';
@@ -313,41 +315,6 @@ export interface ModelSelectionWeights {
 }
 
 /**
- * Base metadata that all AI operations need.
- * Provides model selection criteria and constraints.
- *
- * @template TProviders - Provider types for type-safe provider filtering
- */
-export interface AIBaseMetadata<TProviders extends Providers> {
-  // Specific model to use (bypasses selection)
-  model?: string;
-  // Required capabilities (model must have all)
-  required?: ModelCapability[];
-  // Optional capabilities (preferred but not required)
-  optional?: ModelCapability[];
-  // Required parameters (model must support all)
-  requiredParameters?: ModelParameter[];
-  // Optional parameters (preferred but not required)
-  optionalParameters?: ModelParameter[];
-  // Provider allowlist/denylist
-  providers?: {
-    allow?: (keyof TProviders)[];
-    deny?: (keyof TProviders)[];
-  };
-  // Cost constraints
-  budget?: {
-    maxCostPerRequest?: number;
-    maxCostPerMillionTokens?: number;
-  };
-  // Scoring weights for model selection
-  weights?: ModelSelectionWeights;
-  // Minimum context window size required
-  minContextWindow?: number;
-  // The tier to use to pick the best model
-  tier?: ModelTier;
-}
-
-/**
  * Model evaluation result from search/scoring.
  * Includes score and details about capability matching.
  *
@@ -397,24 +364,16 @@ export type SelectedModelFor<T extends AIBaseTypes> = SelectedModel<AIProviders<
  * Container for all type information about an AI instance
  * This is the single type parameter used throughout
  */
-export interface AIBaseTypes {
-  Context: object;
-  DefaultContext: object;
-  ProvidedContext: object;
-  Metadata: object;
-  DefaultMetadata: object;
-  ProvidedMetadata: object;
-  Providers: Providers;
-}
+export type AIBaseTypes = AITypes<any, any, any, any, any, any, Providers>;
 
 /**
  * Concrete instance of AIBaseTypes with specific types
  */
 export type AITypes<
-  TContext extends object,
+  TContext extends AIContextUser,
   TDefaultContext extends StrictPartial<TContext>,
   TProvidedContext extends StrictPartial<TContext>,
-  TMetadata extends object,
+  TMetadata extends AIMetadataUser,
   TDefaultMetadata extends StrictPartial<TMetadata>,
   TProvidedMetadata extends StrictPartial<TMetadata>,
   TProviders extends Providers
@@ -461,6 +420,51 @@ export type AITypesInfer<
 export type AIProviderNames<T extends AIBaseTypes> = keyof AIProviders<T> & string;
 
 /**
+ * Base metadata that all AI operations need.
+ * Provides model selection criteria and constraints.
+ *
+ * @template TProviders - Provider types for type-safe provider filtering
+ */
+export interface AIBaseMetadata<TProviders extends Providers> {
+  // Specific model to use (bypasses selection)
+  model?: ModelInput;
+  // Required capabilities (model must have all)
+  required?: ModelCapability[];
+  // Optional capabilities (preferred but not required)
+  optional?: ModelCapability[];
+  // Required parameters (model must support all)
+  requiredParameters?: ModelParameter[];
+  // Optional parameters (preferred but not required)
+  optionalParameters?: ModelParameter[];
+  // Provider allowlist/denylist
+  providers?: {
+    allow?: (keyof TProviders)[];
+    deny?: (keyof TProviders)[];
+  };
+  // Cost constraints
+  budget?: {
+    maxCostPerRequest?: number;
+    maxCostPerMillionTokens?: number;
+  };
+  // Scoring weights for model selection
+  weights?: ModelSelectionWeights;
+  // Minimum context window size required
+  minContextWindow?: number;
+  // The tier to use to pick the best model
+  tier?: ModelTier;
+}
+
+/**
+ * Base metadata with any types - for providers & handlers.
+ */
+export type AIMetadataAny = AIBaseMetadata<Providers>;
+
+/**
+ * The type of user context that can be provided by the caller.
+ */
+export type AIMetadataUser = { [P in PropertyKey]: P extends keyof AIMetadataAny ? never : any };
+
+/**
  * Base context that all AI operations get
  */
 export type AIBaseContext<T extends AIBaseTypes> = {
@@ -470,9 +474,19 @@ export type AIBaseContext<T extends AIBaseTypes> = {
 };
 
 /**
+ * Base context with any types - for providers & handlers.
+ */
+export type AIContextAny = AIBaseContext<AITypesAny>// & { [custom: string | number | symbol]: any };
+
+/**
+ * The type of user context that can be provided by the caller.
+ */
+export type AIContextUser = { [P in PropertyKey]?: P extends keyof AIContextAny ? never : any };
+
+/**
  * Full context = base context + user context
  */
-export type AIContext<T extends AIBaseTypes> = Simplify<AIBaseContext<T> & T['Context']>;
+export type AIContext<T extends AIBaseTypes> = Simplify<AIBaseContext<T> & Omit<T['Context'], keyof AIContextAny>>;
 
 /**
  * Required context that must be provided by caller
@@ -480,7 +494,7 @@ export type AIContext<T extends AIBaseTypes> = Simplify<AIBaseContext<T> & T['Co
  */
 export type AIContextRequired<T extends AIBaseTypes> = Simplify<
   Partial<AIBaseContext<T>> &
-  Relax<T['Context'], T['DefaultContext'] & T['ProvidedContext']>
+  Omit<Relax<T['Context'], T['DefaultContext'] & T['ProvidedContext']>, keyof AIContextAny>
 >;
 
 /**
@@ -491,14 +505,14 @@ export type AIContextOptional<T extends AIBaseTypes> = OptionalParams<[AIContext
 /**
  * Full metadata = base metadata + user metadata
  */
-export type AIMetadata<T extends AIBaseTypes> = Simplify<AIBaseMetadata<AIProviders<T>> & T['Metadata']>;
+export type AIMetadata<T extends AIBaseTypes> = Simplify<AIBaseMetadata<AIProviders<T>> & Omit<T['Metadata'], keyof AIMetadataAny>>;
 
 /**
  * Required metadata that must be provided by caller
  */
 export type AIMetadataRequired<T extends AIBaseTypes> = Simplify<
   AIBaseMetadata<AIProviders<T>> &
-  Relax<T['Metadata'], T['DefaultMetadata'] & T['ProvidedMetadata']>
+  Omit<Relax<T['Metadata'], T['DefaultMetadata'] & T['ProvidedMetadata']>, keyof AIMetadataAny>
 >;
 
 /**
@@ -534,11 +548,9 @@ export type ComponentFor<T extends AIBaseTypes> = ComponentCompatible<
 /**
  * Request for generating images from text prompts.
  */
-export interface ImageGenerationRequest {
+export interface ImageGenerationRequest extends BaseRequest {
   // Text description of desired image
   prompt: string;
-  // Optional explicit model override
-  model?: string;
   // Number of images to generate
   n?: number;
   // Image size
@@ -565,21 +577,13 @@ export interface ImageGenerationRequest {
 /**
  * Request for editing existing images with text prompts.
  */
-export interface ImageEditRequest {
+export interface ImageEditRequest extends BaseRequest{
   // Text description of desired edits
   prompt: string;
   // Source image to edit
   image: Buffer | Uint8Array | string;
   // Optional mask indicating edit region
   mask?: Buffer | Uint8Array | string;
-  /**
-   * Optional explicit model override.
-   * If not specified, the model selection system will choose the best model
-   * based on capabilities, cost, and metadata criteria.
-   *
-   * Priority: request.model > ctx.metadata.model > selected model > provider default
-   */
-  model?: string;
   // Number of edited images to generate
   n?: number;
   // Output size
@@ -614,8 +618,6 @@ export interface ImageGenerationChunk extends BaseChunk {
   imageData?: string;
   // Progress percentage (0-100)
   progress?: number;
-  // Status message
-  status?: string;
   // Whether generation is complete
   done?: boolean;
   // Final image (when done)
@@ -628,17 +630,9 @@ export interface ImageGenerationChunk extends BaseChunk {
 /**
  * Request for transcribing audio to text.
  */
-export interface TranscriptionRequest {
+export interface TranscriptionRequest extends BaseRequest {
   // Audio data to transcribe
   audio: Buffer | ReadStream | string | File;
-  /**
-   * Optional explicit model override.
-   * If not specified, the model selection system will choose the best model
-   * based on capabilities, cost, and metadata criteria.
-   *
-   * Priority: request.model > ctx.metadata.model > selected model > provider default
-   */
-  model?: string;
   // Source language code (e.g., "en")
   language?: string;
   // Optional prompt to guide transcription
@@ -657,50 +651,30 @@ export interface TranscriptionRequest {
 export interface TranscriptionResponse extends BaseResponse {
   // Transcribed text
   text: string;
-  // Detected language
-  language?: string;
-  // Audio duration in seconds
-  duration?: number;
-  // Word-level timestamps
-  words?: Array<{ word: string; start: number; end: number }>;
-  // Segment-level timestamps
-  segments?: Array<{ text: string; start: number; end: number }>;
 }
 
 /**
  * Streaming chunk for transcription progress.
  */
 export interface TranscriptionChunk extends BaseChunk {
-  // Transcribed text chunk
+  // Transcribed text chunk delta
+  delta?: string;
+  // The full text transcribed
   text?: string;
-  // Word with timestamp
-  word?: { word: string; start: number; end: number };
-  // Segment with timestamp
-  segment?: { text: string; start: number; end: number };
-  // Progress indicator
-  progress?: number;
+  // Segment information (after segment complete
+  segment?: { start: number; end: number; speaker: string, text: string, id: string };
   // Status message
   status?: string;
-  // Whether transcription is complete
-  done?: boolean;
 }
 
 /**
  * Request for generating speech from text.
  */
-export interface SpeechRequest {
+export interface SpeechRequest extends BaseRequest{
   // Text to convert to speech
   text: string;
   // Instructions for speech style/tone
   instructions?: string;
-  /**
-   * Optional explicit model override.
-   * If not specified, the model selection system will choose the best model
-   * based on capabilities, cost, and metadata criteria.
-   *
-   * Priority: request.model > ctx.metadata.model > selected model > provider default
-   */
-  model?: string;
   // Voice identifier
   voice?: string;
   // Speech speed multiplier (0.25 - 4.0)
@@ -722,17 +696,9 @@ export interface SpeechResponse extends BaseResponse {
 /**
  * Request for generating text embeddings.
  */
-export interface EmbeddingRequest {
+export interface EmbeddingRequest extends BaseRequest {
   // Texts to embed
   texts: string[];
-  /**
-   * Optional explicit model override.
-   * If not specified, the model selection system will choose the best model
-   * based on capabilities, cost, and metadata criteria.
-   *
-   * Priority: request.model > ctx.metadata.model > selected model > provider default
-   */
-  model?: string;
   // Output dimensions (if supported by model)
   dimensions?: number;
   // Encoding format
@@ -755,13 +721,11 @@ export interface EmbeddingResponse extends BaseResponse {
 /**
  * Request for analyzing images with vision models.
  */
-export interface ImageAnalyzeRequest {
+export interface ImageAnalyzeRequest extends BaseRequest{
   // Analysis prompt/question
   prompt: string;
   // Image URLs or base64 data
   images: string[];
-  // Model to use (optional, will be auto-selected)
-  model?: string;
   // Maximum tokens in response
   maxTokens?: number;
   // Sampling temperature
@@ -844,44 +808,45 @@ export type ModelHandlerFor<T extends AIBaseTypes> = ModelHandler<AIContext<T>, 
  *
  * @template TContext - Context type passed to transformer methods
  */
-export interface ModelTransformer<TContext = {}> {
+export interface ModelTransformer {
   chat?: {
-    convertRequest?: (request: Request, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => Response;
-    parseChunk?: (chunk: unknown, ctx: TContext) => Chunk;
+    convertRequest?: (request: Request, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => Response;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Chunk;
   };
 
   imageGenerate?: {
-    convertRequest?: (request: ImageGenerationRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => ImageGenerationResponse;
-    parseChunk?: (chunk: unknown, ctx: TContext) => ImageGenerationChunk;
+    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => ImageGenerationResponse;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => ImageGenerationChunk;
   };
 
   imageEdit?: {
-    convertRequest?: (request: ImageEditRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => ImageGenerationResponse;
-    parseChunk?: (chunk: unknown, ctx: TContext) => ImageGenerationChunk;
+    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => ImageGenerationResponse;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => ImageGenerationChunk;
   };
 
   imageAnalyze?: {
-    convertRequest?: (request: ImageAnalyzeRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => Response;
+    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => Response;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Chunk;
   };
 
   transcribe?: {
-    convertRequest?: (request: TranscriptionRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => TranscriptionResponse;
-    parseChunk?: (chunk: unknown, ctx: TContext) => TranscriptionChunk;
+    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => TranscriptionResponse;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => TranscriptionChunk;
   };
 
   speech?: {
-    convertRequest?: (request: SpeechRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => SpeechResponse;
+    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => SpeechResponse;
   };
 
   embed?: {
-    convertRequest?: (request: EmbeddingRequest, ctx: TContext) => unknown;
-    parseResponse?: (response: unknown, ctx: TContext) => EmbeddingResponse;
+    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => object;
+    parseResponse?: (response: object, ctx: AIContextAny) => EmbeddingResponse;
   };
 }
 
@@ -966,71 +931,71 @@ export interface Provider<TConfig = any> {
   // Health check for provider availability
   checkHealth(config?: TConfig): Promise<boolean>;
 
-  createExecutor?<TContext, TMetadata>(
+  createExecutor?(
     config?: TConfig
-  ): Executor<TContext, TMetadata>;
+  ): Executor<AIContextAny, AIMetadataAny>;
 
-  createStreamer?<TContext, TMetadata>(
+  createStreamer?(
     config?: TConfig
-  ): Streamer<TContext, TMetadata>;
+  ): Streamer<AIContextAny, AIMetadataAny>;
 
   generateImage?(
     request: ImageGenerationRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse>;
 
   generateImageStream?(
     request: ImageGenerationRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk>;
 
   editImage?(
     request: ImageEditRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse>;
 
   editImageStream?(
     request: ImageEditRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk>;
 
   transcribe?(
     request: TranscriptionRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<TranscriptionResponse>;
 
   transcribeStream?(
     request: TranscriptionRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk>;
 
   speech?(
     request: SpeechRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<SpeechResponse>;
 
-  embed?<TContext extends AIBaseContext<AITypesAny>>(
+  embed?(
     request: EmbeddingRequest,
-    ctx: TContext,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<EmbeddingResponse>;
 
   analyzeImage?(
     request: ImageAnalyzeRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): Promise<Response>;
 
   analyzeImageStream?(
     request: ImageAnalyzeRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<Chunk>;
 }
@@ -1169,8 +1134,8 @@ export interface AIHooks<T extends AIBaseTypes> {
  * ```
  */
 export interface AIConfig<
-  TContext extends object,
-  TMetadata extends object,
+  TContext extends AIContextUser,
+  TMetadata extends AIMetadataUser,
   TProviders extends Providers
 > {
   // Default context values (always available)
@@ -1179,9 +1144,9 @@ export interface AIConfig<
   providedContext?: (ctx: StrictPartial<TContext>) => Promise<StrictPartial<TContext>>;
 
   // Default metadata values
-  defaultMetadata?: StrictPartial<TMetadata & AIBaseMetadata<TProviders>>;
+  defaultMetadata?: StrictPartial<Omit<TMetadata, keyof AIMetadataAny> & AIBaseMetadata<TProviders>>;
   // Async metadata provider
-  providedMetadata?: (metadata: StrictPartial<TMetadata & AIBaseMetadata<TProviders>>) => Promise<StrictPartial<TMetadata> & AIBaseMetadata<TProviders>>;
+  providedMetadata?: (metadata: StrictPartial<Omit<TMetadata, keyof AIMetadataAny> & AIBaseMetadata<TProviders>>) => Promise<StrictPartial<TMetadata> & AIBaseMetadata<TProviders>>;
 
   // Provider instances
   providers: TProviders;

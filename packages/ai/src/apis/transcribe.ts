@@ -4,6 +4,7 @@
  * Provides speech-to-text functionality.
  */
 
+import { ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -14,7 +15,8 @@ import type {
   SelectedModelFor,
   TranscriptionChunk,
   TranscriptionRequest,
-  TranscriptionResponse
+  TranscriptionResponse,
+  Usage
 } from '../types';
 import { BaseAPI } from './base';
 
@@ -32,11 +34,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
 
-  protected getModel(request: TranscriptionRequest): string | undefined {
-    return request.model;
-  }
-
-  protected getRequiredCapabilities(provided: ModelCapability[], request?: TranscriptionRequest, forStreaming: boolean): ModelCapability[] {
+  protected getRequiredCapabilities(provided: ModelCapability[], request: TranscriptionRequest, forStreaming: boolean): ModelCapability[] {
     return ['hearing', ...provided];
   }
 
@@ -70,7 +68,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
     selected: SelectedModelFor<T>,
     ctx: AIContext<T>
   ): Promise<TranscriptionResponse> {
-    return await selected.provider.transcribe!<AIContext<T>>(
+    return await selected.provider.transcribe!(
       request,
       ctx,
       selected.providerConfig
@@ -104,7 +102,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
       throw new Error(`Provider ${selected.model.provider} does not support streaming transcription`);
     }
 
-    yield* selected.provider.transcribeStream<AIContext<T>>(
+    yield* selected.provider.transcribeStream(
       request,
       ctx,
       selected.providerConfig
@@ -114,21 +112,32 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   protected responseToChunk(response: TranscriptionResponse): TranscriptionChunk {
     return {
       text: response.text,
-      done: true,
+      model: response.model,
+      usage: response.usage,
     };
   }
 
-  protected chunksToResponse(chunks: TranscriptionChunk[], model: string): TranscriptionResponse {
-    const text = chunks.map(c => c.text || '').join('');
-    const words = chunks.flatMap(c => c.word ? [c.word] : []);
-    const segments = chunks.flatMap(c => c.segment ? [c.segment] : []);
+  protected chunksToResponse(chunks: TranscriptionChunk[], givenModel: string): TranscriptionResponse {
+    let text = '';
+    let model = givenModel;
+    let usage: Usage | undefined;
 
-    return {
-      text,
-      words: words.length > 0 ? words : undefined,
-      segments: segments.length > 0 ? segments : undefined,
-      model,
-    };
+    for (const chunk of chunks) {
+      if (chunk.model) {
+        model = chunk.model;
+      }
+      if (chunk.usage) {
+        usage = chunk.usage;
+      }
+      if (chunk.delta) {
+        text += chunk.delta;
+      }
+      if (chunk.text) {
+        text = chunk.text;
+      }
+    }
+
+    return { text, model, usage };
   }
 
   protected getHandlerGetMethod(

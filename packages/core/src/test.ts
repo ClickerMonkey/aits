@@ -7,7 +7,6 @@ import { Tool } from "./tool";
 import { ComponentsAll, Context, withEvents } from "./types";
 
 interface MyMetadata { 
-  model?: string;
   requirements?: Array<'text' | 'vision' | 'images' | 'hearing' | 'voice'>;
 }
 

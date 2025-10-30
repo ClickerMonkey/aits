@@ -4,7 +4,8 @@
  * Provides mock executor implementations for testing without real API calls.
  */
 
-import type { Executor, Response } from '../../types';
+import { accumulateUsage } from '../../common';
+import type { Chunk, Executor, Request, Response, Streamer, Usage } from '../../types';
 
 export interface MockExecutorOptions {
   response?: Partial<Response>;
@@ -125,20 +126,24 @@ export const createSpyExecutor = (
 /**
  * Creates a mock streamer for testing
  */
-export const createMockStreamer = (options: {
-  chunks: Array<Partial<Response>>;
-}) => {
-  const fn = async function* (request: any, ctx: any, metadata?: any, signal?: AbortSignal) {
+export const createMockStreamer = <TContext extends object = {}, TMetadata extends object = {}>(options: {
+  chunks: Chunk[];
+}): Streamer<TContext, TMetadata> => {
+  const fn: Streamer<TContext, TMetadata> = async function* (request: Request, ctx: TContext, metadata?: TMetadata, signal?: AbortSignal): AsyncGenerator<Chunk, Response, void> {
     for (const chunk of options.chunks) {
       if (signal?.aborted) {
         throw new Error('Request aborted');
       }
-      yield {
-        content: '',
-        finishReason: null,
-        ...chunk
-      } as Response;
+      yield chunk;
     }
+    return {
+      content: options.chunks.map(c => c.content).join(''),
+      finishReason: options.chunks.find(c => c.finishReason)?.finishReason || 'stop',
+      usage: options.chunks.reduce((acc, chunk) => (accumulateUsage(acc, chunk.usage), acc), {} as Usage),
+      reasoning: options.chunks.map(c => c.reasoning).filter(Boolean).join(''),
+      refusal: options.chunks.map(c => c.refusal).filter(Boolean).join(''),
+      model: options.chunks.find(c => c.model)?.model || 'mock-model',
+    };
   };
 
   return jest.fn(fn);

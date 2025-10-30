@@ -7,12 +7,12 @@
 import { z } from 'zod';
 import { Prompt, PromptEvent } from '../prompt';
 import { AnyTool, Tool } from '../tool';
-import { Context, Message } from '../types';
+import { Context, Message, withEvents } from '../types';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt 100% Coverage', () => {
   describe('Custom Runner with Events (lines 349-355)', () => {
-    it.skip('should use custom runner with event tracking in get method', async () => {
+    it('should use custom runner with event tracking in get method', async () => {
       const prompt = new Prompt({
         name: 'runner-events',
         description: 'Runner with events',
@@ -20,37 +20,35 @@ describe('Prompt 100% Coverage', () => {
       });
 
       let runnerCalled = false;
-      const capturedEvents: PromptEvent<any, any>[] = [];
+      const innerEvents: PromptEvent<any, any>[] = [];
 
       const streamer = createMockStreamer({
         chunks: [
           { content: 'Hello' },
           { content: ' world', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
-        ]
+        ],
       });
 
       const ctx: Context<{}, {}> = {
         stream: streamer as any,
-        runner: (component, input, ctx, defaultRun) => {
-          runnerCalled = true;
-          // Call with event handler
-          return defaultRun(ctx, {
-            onPromptEvent: (instance, event) => {
-              // @ts-ignore
-              capturedEvents.push(event);
-            }
-          });
-        },
+        runner: withEvents<typeof prompt>({
+          onPromptEvent: (instance, event) => {
+            runnerCalled = true;
+            // @ts-ignore
+            innerEvents.push(event);
+          },
+        }),
         messages: []
       };
 
-      const chunks: string[] = [];
-      for await (const chunk of prompt.get({}, 'streamContent', ctx)) {
-        chunks.push(chunk);
+      const outerEvents: PromptEvent<any, any>[] = [];
+      for await (const chunk of prompt.run({}, ctx)) {
+        outerEvents.push(chunk);
       }
 
       expect(runnerCalled).toBe(true);
-      expect(chunks.length).toBeGreaterThan(0);
+      expect(outerEvents.length).toBeGreaterThan(0);
+      expect(innerEvents.length).toBeGreaterThan(0);
     });
   });
 
@@ -591,7 +589,7 @@ describe('Prompt 100% Coverage', () => {
   });
 
   describe('Forget Function (lines 934-993)', () => {
-    it.skip('should use estimateTokens for messages without token counts', async () => {
+    it('should use estimateTokens for messages without token counts', async () => {
       const prompt = new Prompt({
         name: 'estimate-in-forget',
         description: 'Estimate in forget',
@@ -626,14 +624,14 @@ describe('Prompt 100% Coverage', () => {
           estimateCalls++;
           return msg.content.length * 0.25;
         },
-        defaultCompletionTokens: 1000
+        maxOutputTokens: 1000
       };
 
       await prompt.get({}, 'result', ctx);
       expect(estimateCalls).toBeGreaterThan(0);
     });
 
-    it.skip('should handle message chunking with token boundaries', async () => {
+    it('should handle message chunking with token boundaries', async () => {
       const prompt = new Prompt({
         name: 'chunking',
         description: 'Chunking',
@@ -667,7 +665,7 @@ describe('Prompt 100% Coverage', () => {
           { role: 'assistant', content: 'Response 2', tokens: 200 },
           { role: 'user', content: 'Message 3', tokens: 200 }
         ],
-        defaultCompletionTokens: 500
+        maxOutputTokens: 500
       };
 
       const result = await prompt.get({}, 'result', ctx);
@@ -709,7 +707,7 @@ describe('Prompt 100% Coverage', () => {
           { role: 'assistant', content: 'Old response', tokens: 500 },
           { role: 'user', content: 'Recent message', tokens: 100 }
         ],
-        defaultCompletionTokens: 500
+        maxOutputTokens: 500
       };
 
       await prompt.get({}, 'result', ctx);
@@ -748,7 +746,7 @@ describe('Prompt 100% Coverage', () => {
         messages: [
           { role: 'system', content: 'System only', tokens: 100 }
         ],
-        defaultCompletionTokens: 500
+        maxOutputTokens: 500
       };
 
       const result = await prompt.get({}, 'result', ctx);
@@ -787,7 +785,7 @@ describe('Prompt 100% Coverage', () => {
           { role: 'system', content: 'Mid system', tokens: 100 },
           { role: 'user', content: 'User 2', tokens: 300 }
         ],
-        defaultCompletionTokens: 500
+        maxOutputTokens: 500
       };
 
       const result = await prompt.get({}, 'result', ctx);

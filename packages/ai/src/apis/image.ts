@@ -4,6 +4,7 @@
  * Provides image generation, editing, and analysis functionality.
  */
 
+import { ModelInput } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -181,7 +182,7 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     super(ai);
   }
 
-  protected getModel(request: ImageEditRequest): string | undefined {
+  protected getModel(request: ImageEditRequest): ModelInput | undefined {
     return request.model;
   }
 
@@ -317,10 +318,6 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     super(ai);
   }
 
-  protected getModel(request: ImageAnalyzeRequest): string | undefined {
-    return request.model;
-  }
-
   protected getRequiredCapabilities(provided: ModelCapability[], request: ImageAnalyzeRequest, forStreaming: boolean): ModelCapability[] {
     return ['chat', 'vision', ...provided];
   }
@@ -391,7 +388,7 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     ctx: AIContext<T>
   ): Promise<Response> {
     const chatRequest = this.convertToChatRequest(request);
-    const executor = selected.provider.createExecutor!<AIContext<T>, any>(selected.providerConfig);
+    const executor = selected.provider.createExecutor!(selected.providerConfig);
     return await executor(chatRequest, ctx, ctx.metadata);
   }
 
@@ -401,7 +398,7 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     ctx: AIContext<T>
   ): AsyncIterable<Chunk> {
     const chatRequest = this.convertToChatRequest(request);
-    const streamer = selected.provider.createStreamer!<AIContext<T>, any>(selected.providerConfig);
+    const streamer = selected.provider.createStreamer!(selected.providerConfig);
     yield* streamer(chatRequest, ctx, ctx.metadata);
   }
 

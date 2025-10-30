@@ -65,7 +65,7 @@ describe('Tool', () => {
         }
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const args = JSON.stringify({ operation: 'add', a: 5, b: 3 });
 
       const parsed = await tool.parse(ctx, args);
@@ -82,7 +82,7 @@ describe('Tool', () => {
         call: (input) => input.value
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const invalidArgs = JSON.stringify({ value: -5 });
 
       await expect(tool.parse(ctx, invalidArgs)).rejects.toThrow();
@@ -97,7 +97,7 @@ describe('Tool', () => {
         call: (input) => input.data
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const malformedArgs = '{ invalid json }';
 
       await expect(tool.parse(ctx, malformedArgs)).rejects.toThrow();
@@ -117,7 +117,7 @@ describe('Tool', () => {
         call: (input) => `Validated: ${input.email}`
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
 
       // Should pass Zod validation but fail custom validation
       const blockedArgs = JSON.stringify({ email: 'user@blocked.com' });
@@ -140,7 +140,7 @@ describe('Tool', () => {
         call: (input) => input.a * input.b
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const result = await tool.run({ a: 6, b: 7 }, ctx);
 
       expect(result).toBe(42);
@@ -157,7 +157,7 @@ describe('Tool', () => {
         }
       });
 
-      const ctx = { userId: 'user-123' } as Context<any, any>;
+      const ctx = { userId: 'user-123' } as Context<{}, {}>;
       const result = await tool.run({ key: 'id' }, ctx);
 
       expect(result).toBe('id: user-123');
@@ -184,7 +184,7 @@ describe('Tool', () => {
         }
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const result = await mainTool.run({}, ctx);
 
       expect(result).toBe('Main used: helper-result');
@@ -202,7 +202,7 @@ describe('Tool', () => {
         }
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const result = await tool.run({ delay: 10 }, ctx);
 
       expect(result).toBe('Waited 10ms');
@@ -221,7 +221,7 @@ describe('Tool', () => {
         }
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
 
       expect(() => tool.run({}, ctx)).toThrow('Execution failed');
     });
@@ -235,7 +235,7 @@ describe('Tool', () => {
         call: (input) => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
 
       await expect(tool.parse(ctx, '{}')).rejects.toThrow('Not able to build a schema');
     });
@@ -254,7 +254,7 @@ describe('Tool', () => {
         call: (input) => `Weather for ${input.location}`
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const compiled = await tool.compile(ctx);
 
       expect(compiled).toBeDefined();
@@ -276,7 +276,7 @@ describe('Tool', () => {
         call: (input) => input.a + input.b
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const compiled = await tool.compile(ctx);
 
       expect(compiled).toBeDefined();
@@ -293,7 +293,7 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const compiled = await tool.compile(ctx);
 
       expect(compiled).toBeUndefined();
@@ -310,7 +310,7 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const applicable = await tool.applicable(ctx);
 
       // With no refs and schema available, should be applicable (self-contained tool)
@@ -327,7 +327,7 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const applicable = await tool.applicable(ctx);
 
       expect(applicable).toBe(true);
@@ -343,8 +343,8 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const allowedCtx = { hasPermission: true } as Context<any, any>;
-      const deniedCtx = { hasPermission: false } as Context<any, any>;
+      const allowedCtx = { hasPermission: true } as Context<{}, {}>;
+      const deniedCtx = { hasPermission: false } as Context<{}, {}>;
 
       expect(await tool.applicable(allowedCtx)).toBe(true);
       expect(await tool.applicable(deniedCtx)).toBe(false);
@@ -364,8 +364,8 @@ describe('Tool', () => {
         call: () => 'admin-only-result'
       });
 
-      const adminCtx = { userId: 'admin' } as Context<any, any>;
-      const userCtx = { userId: 'user' } as Context<any, any>;
+      const adminCtx = { userId: 'admin' } as Context<{}, {}>;
+      const userCtx = { userId: 'user' } as Context<{}, {}>;
 
       expect(await tool.applicable(adminCtx)).toBe(true);
       expect(await tool.applicable(userCtx)).toBe(false);
@@ -380,7 +380,7 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const applicable = await tool.applicable(ctx);
 
       expect(applicable).toBe(false);
@@ -413,7 +413,7 @@ describe('Tool', () => {
         call: (input, [available, notAvailable]) => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const applicable = await tool.applicable(ctx);
 
       // Should be true because at least one ref is applicable
@@ -446,7 +446,7 @@ describe('Tool', () => {
         call: (input, refs) => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const applicable = await tool.applicable(ctx);
 
       // Should be false because no refs are applicable
@@ -464,7 +464,7 @@ describe('Tool', () => {
         call: () => 'result'
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const compiled = await tool.compile(ctx);
 
       expect(compiled).toBeUndefined();
@@ -479,7 +479,7 @@ describe('Tool', () => {
         call: (input) => input.value * 2
       });
 
-      const ctx = {} as Context<any, any>;
+      const ctx = {} as Context<{}, {}>;
       const compiled = await tool.compile(ctx);
 
       expect(compiled).toBeDefined();
@@ -500,7 +500,7 @@ describe('Tool', () => {
       });
 
       let runnerCalled = false;
-      const ctx: Context<any, any> = {
+      const ctx: Context<{}, {}> = {
         runner: (component, input, ctx, defaultRun) => {
           runnerCalled = true;
           expect(component).toBe(tool);
@@ -528,7 +528,7 @@ describe('Tool', () => {
 
       const executionLog: string[] = [];
 
-      const ctx: Context<any, any> = {
+      const ctx: Context<{}, {}> = {
         runner: (component, input, ctx, defaultRun) => {
           executionLog.push(`Before: ${input.value}`);
           const result = defaultRun(ctx);

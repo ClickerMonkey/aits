@@ -4,8 +4,8 @@
  * Provider for OpenRouter API with provider-specific routing and fallback options.
  */
 
-import type { ModelInfo, Provider } from '@aits/ai';
-import { detectCapabilitiesFromModality, detectTier } from '@aits/ai';
+import type { ModelCapability, ModelInfo, ModelParameter, ModelTokenizer, Provider } from '@aits/ai';
+import { detectTier } from '@aits/ai';
 import type { Chunk, Request, Response } from '@aits/core';
 import { OpenAIConfig, OpenAIProvider } from '@aits/openai';
 import OpenAI from 'openai';
@@ -39,42 +39,161 @@ export interface OpenRouterConfig extends OpenAIConfig {
   };
 }
 
+
 /**
- * Convert OpenRouter model to ModelInfo
+ * Convert OpenRouter parameter names to our ModelParameter format
  */
-function convertOpenRouterModel(model: OpenRouterModel, zdrModelIds: Set<string>): ModelInfo {
-  const capabilities = detectCapabilitiesFromModality(model.architecture.modality, model.id);
-  const tier = detectTier(model.name);
-  if (zdrModelIds.has(model.id) ) {
-    capabilities.add('zdr');
+function convertSupportedParameters(openRouterParams: string[]): ModelParameter[] {
+  const paramMap: Record<string, ModelParameter> = {
+    'max_tokens': 'maxTokens',
+    'temperature': 'temperature',
+    'top_p': 'topP',
+    'frequency_penalty': 'frequencyPenalty',
+    'presence_penalty': 'presencePenalty',
+    'stop': 'stop',
+    'seed': 'seed',
+    'response_format': 'responseFormat',
+    'structured_outputs': 'structuredOutput',
+    'tools': 'tools',
+    'tool_choice': 'toolChoice',
+    'logit_bias': 'logitBias',
+    'logprobs': 'logProbabilities',
+    'top_logprobs': 'logProbabilities',
+    'reasoning': 'reason',
+    'include_reasoning': 'reason',
+  };
+
+  const converted = new Set<ModelParameter>();
+  for (const param of openRouterParams) {
+    const mapped = paramMap[param];
+    if (mapped) {
+      converted.add(mapped);
+    }
   }
 
-  // TODO supportedParameters, capabilities based on input/output modalities, tokenizer
+  return Array.from(converted);
+}
+
+/**
+ * Detect capabilities from input/output modalities
+ */
+function detectCapabilities(model: OpenRouterModel): ModelCapability[] {
+  const capabilities = new Set<ModelCapability>();
+
+  // Chat capability - if model outputs text
+  if (model.architecture.output_modalities.includes('text')) {
+    capabilities.add('chat');
+  }
+
+  // Image generation - if model outputs images
+  if (model.architecture.output_modalities.includes('image')) {
+    capabilities.add('image');
+  }
+
+  // Vision capability - if model accepts images as input
+  if (model.architecture.input_modalities.includes('image')) {
+    capabilities.add('vision');
+  }
+
+  // Audio/hearing capability - if model accepts audio as input
+  if (model.architecture.input_modalities.includes('audio')) {
+    capabilities.add('hearing');
+  }
+
+  // File handling capability
+  if (model.architecture.input_modalities.includes('file')) {
+    capabilities.add('vision'); // Files often imply document/vision capabilities
+  }
+
+  // Tools/function calling
+  if (model.supported_parameters.includes('tools') || model.supported_parameters.includes('tool_choice')) {
+    capabilities.add('tools');
+  }
+
+  // Reasoning capability
+  if (model.supported_parameters.includes('reasoning') || model.supported_parameters.includes('include_reasoning')) {
+    capabilities.add('reasoning');
+  }
+
+  // JSON output capability
+  if (model.supported_parameters.includes('response_format')) {
+    capabilities.add('json');
+  }
+
+  // Structured output capability
+  if (model.supported_parameters.includes('structured_outputs')) {
+    capabilities.add('structured');
+  }
+
+  // Streaming capability (most models support this)
+  capabilities.add('streaming');
+
+  return Array.from(capabilities);
+}
+
+
+/**
+ * Convert OpenRouter model to ModelInfo with full details
+ */
+export function convertOpenRouterModel(
+  model: OpenRouterModel,
+  zdrModelIds: Set<string>,
+  metrics?: { latency?: number; throughput?: number; uptime?: number } | null
+): ModelInfo {
+  const capabilities = detectCapabilities(model);
+  const supportedParameters = convertSupportedParameters(model.supported_parameters);
+  const tier = detectTier(model.name);
+
+  // Update ZDR support from ZDR endpoint
+  if (zdrModelIds.has(model.id)) {
+    capabilities.push('zdr');
+  }
+
+  // Extract provider from model ID (format: provider/model-name)
+  const provider = model.id.includes('/') ? model.id.split('/')[0] : 'openrouter';
+
+  const hasValue = (x: string | undefined): x is string => {
+    return x !== undefined && x !== null && x !== '' && x !== '0';
+  }
 
   return {
-    provider: 'openrouter',
+    provider,
     id: model.id,
     name: model.name,
-    capabilities,
+    capabilities: new Set(capabilities), // Will be serialized as array
     tier,
     pricing: {
-      text: {
-        input: model.pricing.prompt ? parseFloat(model.pricing.prompt) * 1_000_000 : undefined,
-        output: model.pricing.completion ? parseFloat(model.pricing.completion) * 1_000_000 : undefined,
-      },
-      image: {
-        input: model.pricing.image ? parseFloat(model.pricing.image) * 1_000_000 : undefined,
-      },
-      reasoning: {
-        output: model.pricing.internal_reasoning ? parseFloat(model.pricing.internal_reasoning) * 1_000_000 : undefined,
-      },
-      perRequest: model.pricing.request ? parseFloat(model.pricing.request) : undefined,
+      text: hasValue(model.pricing.prompt) || hasValue(model.pricing.completion) ? {
+        input: hasValue(model.pricing.prompt) ? parseFloat(model.pricing.prompt) * 1_000_000 : undefined,
+        output: hasValue(model.pricing.completion) ? parseFloat(model.pricing.completion) * 1_000_000 : undefined,
+      } : undefined,
+      image: hasValue(model.pricing.image) ? {
+        input: parseFloat(model.pricing.image) * 1_000_000,
+      } : undefined,
+      reasoning: hasValue(model.pricing.internal_reasoning) ? {
+        output: parseFloat(model.pricing.internal_reasoning) * 1_000_000,
+      } : undefined,
+      perRequest: hasValue(model.pricing.request) 
+        ? parseFloat(model.pricing.request) 
+        : undefined,
     },
     contextWindow: model.context_length,
     maxOutputTokens: model.top_provider.max_completion_tokens ?? undefined,
+    tokenizer: model.architecture.tokenizer as ModelTokenizer,
+    supportedParameters: new Set(supportedParameters), // Will be serialized as array
+    metrics: metrics ? {
+      timeToFirstToken: metrics.latency,
+      tokensPerSecond: metrics.throughput,
+      // Store uptime in metadata since it's not a standard metric
+    } : undefined,
     metadata: {
       description: model.description,
-      architecture: model.architecture,
+      defaultParameters: model.default_parameters,
+      source: 'openrouter',
+      canonicalSlug: model.canonical_slug,
+      huggingFaceId: model.hugging_face_id,
+      created: model.created,
+      uptime: metrics?.uptime,
     },
   };
 }

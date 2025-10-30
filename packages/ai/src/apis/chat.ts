@@ -35,7 +35,7 @@
  * ```
  */
 
-import type { FinishReason, ToolCall } from '@aits/core';
+import type { Executor, FinishReason, Streamer, ToolCall } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -72,10 +72,6 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
   // ============================================================================
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
-
-  protected getModel(request: Request): string | undefined {
-    return undefined;
-  }
 
   protected getRequiredCapabilities(provided: ModelCapability[], request: Request, forStreaming: boolean): ModelCapability[] {
     const capabilities = new Set<ModelCapability>(['chat', ...provided]);
@@ -198,7 +194,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       throw new Error(`Provider ${selected.provider.name} does not support chat requests`);
     }
 
-    const executor = selected.provider.createExecutor<AIContext<T>, any>(selected.providerConfig);
+    const executor = selected.provider.createExecutor(selected.providerConfig);
     return await executor(request, ctx, ctx.metadata);
   }
 
@@ -211,7 +207,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       throw new Error(`Provider ${selected.provider.name} does not support chat streaming`);
     }
 
-    const streamer = selected.provider.createStreamer<AIContext<T>, any>(selected.providerConfig);
+    const streamer = selected.provider.createStreamer(selected.providerConfig);
     yield* streamer(request, ctx, ctx.metadata);
   }
 
@@ -298,14 +294,14 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
    * @returns Executor function
    * @internal
    */
-  createExecutor() {
+  createExecutor(): Executor<AIContextRequired<T>, AIMetadataRequired<T>> {
     return async (
       request: Request,
-      ctx: AIContext<T>,
-      metadata?: any,
+      ctx: AIContextRequired<T>,
+      metadata?: AIMetadataRequired<T>,
       signal?: AbortSignal
     ): Promise<Response> => {
-      return await this.get(request, { ...ctx, metadata, signal } as any);
+      return await this.get(request, { ...ctx, metadata, signal });
     };
   }
 
@@ -317,7 +313,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
    * @returns Streamer function
    * @internal
    */
-  createStreamer() {
+  createStreamer(): Streamer<AIContextRequired<T>, AIMetadataRequired<T>> {
     const chatAPI = this;
     return async function* (
       request: Request,
@@ -326,7 +322,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
       signal?: AbortSignal
     ): AsyncGenerator<Chunk, Response> {
       const chunks: Chunk[] = [];
-      for await (const chunk of chatAPI.stream(request, { ...ctx, metadata, signal } as any)) {
+      for await (const chunk of chatAPI.stream(request, { ...ctx, metadata, signal })) {
         yield chunk;
         chunks.push(chunk);
       }

@@ -97,7 +97,7 @@ describe('AI Class', () => {
   });
 
   describe('Configuration', () => {
-    it.skip('should register base models', async () => {
+    it('should register base models', async () => {
       const provider1 = createMockProvider({ name: 'provider1' });
 
       const customModels: ModelInfo[] = [
@@ -128,7 +128,7 @@ describe('AI Class', () => {
       expect(customModel?.name).toBe('Custom Model 1');
     });
 
-    it.skip('should apply model overrides', async () => {
+    it('should apply model overrides', async () => {
       const provider1 = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()

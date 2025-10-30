@@ -9,11 +9,14 @@ import { Prompt } from '../prompt';
 import { Context, Message } from '../types';
 
 describe('Prompt Forget Function Coverage', () => {
-  it.skip('should use estimateTokens to fill in missing token counts (line 934-940)', async () => {
+  it('should use estimateTokens to fill in missing token counts (line 934-940)', async () => {
     const prompt = new Prompt({
       name: 'estimate-test',
       description: 'Estimate test',
-      content: 'Test'
+      content: 'Test',
+      config: {
+        model: { id: 'gpt', contextWindow: 3000 }
+      }
     });
 
     let estimateCallCount = 0;
@@ -26,7 +29,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 }
+          usage: { inputTokens: 700, outputTokens: 0, totalTokens: 700 }
         };
       }
       return {
@@ -38,17 +41,17 @@ describe('Prompt Forget Function Coverage', () => {
     const ctx: Context<{}, {}> = {
       execute: executor as any,
       messages: [
-        { role: 'system', content: 'sys', tokens: 50 },
+        { role: 'system', content: 'sys' },
         { role: 'user', content: 'msg1' }, // No tokens - will need estimation
         { role: 'assistant', content: 'resp1' }, // No tokens - will need estimation
         { role: 'user', content: 'msg2' }, // No tokens - will need estimation
-        { role: 'user', content: 'msg3', tokens: 800 } // Force high token count
+        { role: 'user', content: 'msg3' } // Force high token count
       ],
       estimateTokens: (msg: Message) => {
         estimateCallCount++;
         return 200; // Higher estimate to trigger trimming
       },
-      defaultCompletionTokens: 500
+      maxOutputTokens: 500
     };
 
     await prompt.get({}, 'result', ctx);
@@ -57,7 +60,7 @@ describe('Prompt Forget Function Coverage', () => {
     expect(estimateCallCount).toBeGreaterThan(0);
   });
 
-  it.skip('should chunk messages with token boundaries (lines 942-958)', async () => {
+  it('should chunk messages with token boundaries (lines 942-958)', async () => {
     const prompt = new Prompt({
       name: 'chunking-test',
       description: 'Chunking test',
@@ -90,7 +93,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'user', content: 'u2', tokens: 500 },
         { role: 'assistant', content: 'a2', tokens: 500 }
       ],
-      defaultCompletionTokens: 500
+      maxOutputTokens: 500
     };
 
     const result = await prompt.get({}, 'result', ctx);
@@ -127,7 +130,7 @@ describe('Prompt Forget Function Coverage', () => {
       messages: [
         { role: 'user', content: 'single' } // Single message, no tokens field
       ],
-      defaultCompletionTokens: 400
+      maxOutputTokens: 400
     };
 
     const result = await prompt.get({}, 'result', ctx);
@@ -166,7 +169,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'assistant', content: 'a1', tokens: 200 },
         { role: 'user', content: 'u2', tokens: 200 }
       ],
-      defaultCompletionTokens: 600
+      maxOutputTokens: 600
     };
 
     const result = await prompt.get({}, 'result', ctx);
@@ -203,7 +206,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'system', content: 'only system messages', tokens: 100 }
         // No user messages
       ],
-      defaultCompletionTokens: 500
+      maxOutputTokens: 500
     };
 
     const result = await prompt.get({}, 'result', ctx);
@@ -246,7 +249,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'assistant', content: 'old response', tokens: 300 },
         { role: 'user', content: 'recent', tokens: 100 }
       ],
-      defaultCompletionTokens: 1000
+      maxOutputTokens: 1000
     };
 
     await prompt.get({}, 'result', ctx);
@@ -258,7 +261,7 @@ describe('Prompt Forget Function Coverage', () => {
     }
   });
 
-  it.skip('should handle removal loop with messageTokens (lines 980-989)', async () => {
+  it('should handle removal loop with messageTokens (lines 980-989)', async () => {
     const prompt = new Prompt({
       name: 'removal-loop',
       description: 'Removal loop',
@@ -292,7 +295,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'assistant', content: 'r2', tokens: 400 },
         { role: 'user', content: 'm3', tokens: 300 }
       ],
-      defaultCompletionTokens: 500
+      maxOutputTokens: 500
     };
 
     const result = await prompt.get({}, 'result', ctx);
@@ -334,7 +337,7 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'assistant', content: 'trim-resp', tokens: 400 },
         { role: 'user', content: 'keep', tokens: 100 }
       ],
-      defaultCompletionTokens: 1200
+      maxOutputTokens: 1200
     };
 
     await prompt.get({}, 'result', ctx);

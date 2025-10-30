@@ -31,10 +31,6 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
   // REQUIRED ABSTRACT METHOD IMPLEMENTATIONS
   // ============================================================================
 
-  protected getModel(request: EmbeddingRequest): string | undefined {
-    return request.model;
-  }
-
   protected getRequiredCapabilities(provided: ModelCapability[], request: EmbeddingRequest, forStreaming: boolean): ModelCapability[] {
     return ['embedding', ...provided];
   }

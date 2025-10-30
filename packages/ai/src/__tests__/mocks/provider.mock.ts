@@ -6,24 +6,14 @@
  */
 
 import type {
-  Provider,
-  ModelInfo,
-  ImageGenerationRequest,
-  ImageGenerationResponse,
-  ImageGenerationChunk,
-  ImageEditRequest,
-  TranscriptionRequest,
-  TranscriptionResponse,
-  TranscriptionChunk,
-  SpeechRequest,
-  SpeechResponse,
-  EmbeddingRequest,
-  EmbeddingResponse,
+  AIMetadataAny,
+  AIContextAny,
+  Chunk,
   Executor,
-  Streamer,
-  Request,
+  ModelInfo,
+  Provider,
   Response,
-  Chunk
+  Streamer
 } from '../../types';
 
 export interface MockProviderOptions {
@@ -53,7 +43,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
       return options?.healthCheck ?? true;
     },
 
-    createExecutor<TContext, TMetadata>(): Executor<TContext, TMetadata> {
+    createExecutor(): Executor<AIContextAny, AIMetadataAny> {
       return async (request, ctx, metadata, signal) => {
         if (signal?.aborted) {
           throw new Error('Request aborted');
@@ -71,7 +61,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
       };
     },
 
-    createStreamer<TContext, TMetadata>(): Streamer<TContext, TMetadata> {
+    createStreamer(): Streamer<AIContextAny, AIMetadataAny> {
       return async function* (request, ctx, metadata, signal) {
         const chunks = [
           { content: 'Hello', finishReason: null },

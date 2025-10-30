@@ -6,7 +6,7 @@
  */
 
 import { OpenAIProvider } from '../openai';
-import type { Request, ImageGenerationRequest, TranscriptionRequest, SpeechRequest, EmbeddingRequest } from '@aits/ai';
+import { type Request, type ImageGenerationRequest, type TranscriptionRequest, type SpeechRequest, type EmbeddingRequest, type AIContextAny, AI } from '@aits/ai';
 import { z } from 'zod';
 
 // Mock the OpenAI SDK
@@ -14,6 +14,8 @@ let mockOpenAI: any;
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => mockOpenAI);
 });
+
+const ctxDefault: AIContextAny = { ai: AI.with().providers({}).create({}), metadata: {} };
 
 describe('OpenAIProvider', () => {
   let provider: OpenAIProvider;
@@ -144,7 +146,7 @@ describe('OpenAIProvider', () => {
           maxTokens: 100
         };
 
-        const response = await executor(request, {}, { model: 'gpt-4' });
+        const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
         expect(response).toBeDefined();
         expect(response.content).toBe('Hello, world!');
@@ -154,7 +156,7 @@ describe('OpenAIProvider', () => {
         expect(mockOpenAI.chat.completions.create).toHaveBeenCalled();
       });
 
-      it.skip('should handle tool calls', async () => {
+      it('should handle tool calls', async () => {
         mockOpenAI.chat.completions.create.mockResolvedValue({
           id: 'chatcmpl-456',
           choices: [{
@@ -191,7 +193,7 @@ describe('OpenAIProvider', () => {
           }]
         };
 
-        const response = await executor(request, {}, { model: 'gpt-4' });
+        const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
         expect(response.finishReason).toBe('tool_calls');
         expect(response.toolCalls).toBeDefined();
@@ -208,7 +210,7 @@ describe('OpenAIProvider', () => {
           messages: [{ role: 'user', content: 'Hello' }]
         };
 
-        await expect(executor(request, {}, { model: 'gpt-4' })).rejects.toThrow();
+        await expect(executor(request, ctxDefault, { model: 'gpt-4' })).rejects.toThrow();
       });
 
       it('should handle rate limit errors', async () => {
@@ -221,7 +223,7 @@ describe('OpenAIProvider', () => {
           messages: [{ role: 'user', content: 'Hello' }]
         };
 
-        await expect(executor(request, {}, { model: 'gpt-4' })).rejects.toThrow();
+        await expect(executor(request, ctxDefault, { model: 'gpt-4' })).rejects.toThrow();
       });
     });
 
@@ -274,7 +276,7 @@ describe('OpenAIProvider', () => {
         };
 
         const chunks = [];
-        for await (const chunk of streamer(request, {}, { model: 'gpt-4' })) {
+        for await (const chunk of streamer(request, ctxDefault, { model: 'gpt-4' })) {
           chunks.push(chunk);
         }
 
@@ -297,7 +299,7 @@ describe('OpenAIProvider', () => {
         prompt: 'A beautiful sunset'
       };
 
-      const response = await provider.generateImage!(request, {});
+      const response = await provider.generateImage!(request, ctxDefault);
 
       expect(response).toBeDefined();
       expect(response.images).toHaveLength(1);
@@ -347,10 +349,10 @@ describe('OpenAIProvider', () => {
         prompt: 'Test'
       };
 
-      await expect(provider.generateImage!(request, {})).rejects.toThrow();
+      await expect(provider.generateImage!(request, ctxDefault)).rejects.toThrow();
     });
 
-    it.skip('should stream image generation with progress', async () => {
+    it('should stream image generation with progress', async () => {
       mockOpenAI.images.generate.mockResolvedValue({
         data: [{ url: 'https://example.com/image.png' }]
       });
@@ -360,7 +362,7 @@ describe('OpenAIProvider', () => {
       };
 
       const chunks = [];
-      for await (const chunk of provider.generateImageStream!(request, {}, provider.config)) {
+      for await (const chunk of provider.generateImageStream!(request, ctxDefault, provider.config)) {
         chunks.push(chunk);
       }
 
@@ -382,7 +384,7 @@ describe('OpenAIProvider', () => {
         image: Buffer.from('fake-image')
       };
 
-      const response = await provider.editImage!(request, {});
+      const response = await provider.editImage!(request, ctxDefault);
 
       expect(response).toBeDefined();
       expect(response.images).toHaveLength(1);
@@ -418,7 +420,7 @@ describe('OpenAIProvider', () => {
         audio: Buffer.from('fake-audio')
       };
 
-      const response = await provider.transcribe!(request, {});
+      const response = await provider.transcribe!(request, ctxDefault);
 
       expect(response).toBeDefined();
       expect(response.text).toBe('Hello, this is a test transcription');
@@ -454,7 +456,7 @@ describe('OpenAIProvider', () => {
         text: 'Hello, world!'
       };
 
-      const response = await provider.speech!(request, {});
+      const response = await provider.speech!(request, ctxDefault);
 
       expect(response).toBeDefined();
       expect(response.audio).toBe(mockStream);
@@ -496,7 +498,7 @@ describe('OpenAIProvider', () => {
         texts: ['Hello', 'World']
       };
 
-      const response = await provider.embed!(request, {});
+      const response = await provider.embed!(request, ctxDefault);
 
       expect(response).toBeDefined();
       expect(response.embeddings).toHaveLength(2);
@@ -524,24 +526,27 @@ describe('OpenAIProvider', () => {
   });
 
   describe('Provider Customization', () => {
-    it.skip('should support custom image params', async () => {
+    it('should support custom image params', async () => {
       mockOpenAI.images.generate.mockResolvedValue({
         data: [{ url: 'https://example.com/image.png' }]
       });
 
-      const customProvider = new OpenAIProvider({
-        apiKey: 'test-key',
-        customizeImageParams: (params) => ({
-          ...params,
-          user: 'test-user'
-        })
-      });
+      class CustomProvider extends OpenAIProvider {
+        override customizeImageParams(params: any): any {
+          return {
+            ...params,
+            user: 'test-user',  
+          };
+        }
+      }
+
+      const customProvider = new CustomProvider({ apiKey: 'test-key' });
 
       const request: ImageGenerationRequest = {
         prompt: 'Test'
       };
 
-      await customProvider.generateImage!(request, {});
+      await customProvider.generateImage!(request, ctxDefault);
 
       // Check that customization was applied
       const callArgs = mockOpenAI.images.generate.mock.calls;
@@ -573,7 +578,7 @@ describe('OpenAIProvider', () => {
         ]
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       expect(mockOpenAI.chat.completions.create).toHaveBeenCalled();
@@ -597,7 +602,7 @@ describe('OpenAIProvider', () => {
         ]
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
     });
@@ -625,7 +630,7 @@ describe('OpenAIProvider', () => {
         ]
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4-vision-preview' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4-vision-preview' });
 
       expect(response).toBeDefined();
     });
@@ -653,7 +658,7 @@ describe('OpenAIProvider', () => {
         ]
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
     });
@@ -683,7 +688,7 @@ describe('OpenAIProvider', () => {
         }]
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;
@@ -713,7 +718,7 @@ describe('OpenAIProvider', () => {
         toolChoice: 'required'
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;
@@ -739,10 +744,10 @@ describe('OpenAIProvider', () => {
           description: 'Get weather',
           parameters: z.object({ location: z.string() })
         }],
-        toolChoice: { name: 'get_weather' }
+        toolChoice: { tool: 'get_weather' }
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
     });
@@ -765,7 +770,7 @@ describe('OpenAIProvider', () => {
         responseFormat: z.object({ result: z.string() })
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;
@@ -789,7 +794,7 @@ describe('OpenAIProvider', () => {
         responseFormat: 'text'
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
     });
@@ -881,7 +886,7 @@ describe('OpenAIProvider', () => {
         temperature: 0.7
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;
@@ -905,7 +910,7 @@ describe('OpenAIProvider', () => {
         maxTokens: 100
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;
@@ -929,7 +934,7 @@ describe('OpenAIProvider', () => {
         topP: 0.9
       };
 
-      const response = await executor(request, {}, { model: 'gpt-4' });
+      const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       expect(response).toBeDefined();
       const callArgs = mockOpenAI.chat.completions.create.mock.calls;

@@ -216,7 +216,12 @@ export type Context<TContext, TMetadata> = TContext &
   /**
    * The default number of completion tokens to reserve when calculating available prompt tokens.
    */
-  defaultCompletionTokens?: number;
+  maxOutputTokens?: number;
+
+  /**
+   * The context window size restriction to impose, if any.
+   */
+  contextWindow?: number;
 
   /**
    * The current instance of the component being executed, if any.
@@ -380,7 +385,7 @@ export type ReasoningEffort = 'low' | 'medium' | 'high';
  * Parameters for an AI request.
  * Configures the model's behavior, available tools, and output format.
  */
-export interface Request
+export interface Request extends BaseRequest
 {
   /** Optional name to identify the request. Could be the component name. */
   name?: string;
@@ -434,6 +439,35 @@ export interface Request
 export type FinishReason = 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'refusal';
 
 /**
+ * Information about an AI model.
+ */
+export interface Model 
+{
+  // Model unique identifier
+  id: string;
+  // Maximum context window size in tokens
+  contextWindow?: number;
+  // Maximum output tokens (if different from context window)
+  maxOutputTokens?: number;
+}
+
+/**
+ * Input type for specifying a model, either by ID or full Model object.
+ */
+export type ModelInput = string | Model;
+
+/**
+ * Base request for an AI operation.
+ */
+export interface BaseRequest
+{
+  // Optional model to use for this request
+  model?: ModelInput;
+  // Optional provider-specific configuration
+  extra?: Record<string, any>;
+}
+
+/**
  * Base response from an AI request.
  */
 export interface BaseResponse
@@ -441,7 +475,7 @@ export interface BaseResponse
   /** Usage statistics for this request **/
   usage?: Usage;
   /** Model used for this response **/
-  model: string;
+  model: ModelInput;
 }
 
 /**
@@ -452,7 +486,7 @@ export interface BaseChunk
   /** Usage statistics (sent at the end) */
   usage?: Usage;
   /** Model used for this chunk **/
-  model?: string;
+  model?: ModelInput;
 }
 
 /**

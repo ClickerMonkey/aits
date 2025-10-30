@@ -7,10 +7,13 @@
  */
 
 import type {
-  AIBaseContext,
-  AIBaseTypes,
+  AIContextAny,
+  AIMetadataAny,
+  Chunk,
   EmbeddingRequest,
   EmbeddingResponse,
+  ImageAnalyzeRequest,
+  ImageEditRequest,
   ImageGenerationRequest,
   ImageGenerationResponse,
   ModelCapability,
@@ -23,7 +26,7 @@ import type {
   TranscriptionRequest,
   TranscriptionResponse,
 } from '@aits/ai';
-import type { Executor, Request, Streamer } from '@aits/core';
+import { BaseChunk, BaseRequest, BaseResponse, getModel, type Executor, type Request, type Streamer, type Response } from '@aits/core';
 import Replicate from 'replicate';
 
 // ============================================================================
@@ -256,9 +259,138 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
   /**
    * Get transformer for a specific model
    */
-  private getTransformer<TContext = {}>(modelId: string, config?: ReplicateConfig): ModelTransformer<TContext> | undefined {
+  private getTransformer(modelId: string, config?: ReplicateConfig): ModelTransformer | undefined {
     const repConfig = config || this.config;
-    return repConfig.transformers?.[modelId] as ModelTransformer<TContext> | undefined;
+    return repConfig.transformers?.[modelId] as ModelTransformer | undefined;
+  }
+
+  /**
+   * Does a simple request
+   * 
+   * @param config 
+   * @param request 
+   * @param ctx 
+   * @param metadata 
+   */
+  private async doRequest<
+    TRequest extends BaseRequest,
+    TResponse extends BaseResponse
+  >(
+    config: ReplicateConfig | undefined,
+    request: TRequest, 
+    ctx: AIContextAny, 
+    metadata: AIMetadataAny | undefined,
+    requestSignal: AbortSignal | undefined,
+    getConverters: (transformer: ModelTransformer) => {
+      convertRequest?: (request: TRequest, ctx: AIContextAny) => object;
+      parseResponse?: (response: object, ctx: AIContextAny) => TResponse;
+    }
+  ) {
+    const repConfig = config || this.config;
+
+    // Extract model ID from metadata
+    const model = getModel(request.model || metadata?.model || ctx.metadata?.model);
+    if (!model) {
+      throw new Error('Replicate executor requires model ID in metadata');
+    }
+
+    // Get transformer for model
+    const transformer = this.getTransformer(model.id, repConfig);
+    if (!transformer) {
+      throw new Error(
+        `Replicate model "${model.id}" requires a ModelTransformer. ` +
+        'Add a transformer to your ReplicateConfig.transformers.'
+      );
+    }
+
+    // Ensure transformer has necessary methods
+    const { convertRequest, parseResponse } = getConverters(transformer);
+    if (!convertRequest || !parseResponse) {
+      throw new Error(
+        `Replicate model "${model.id}" requires a ModelTransformer with convertRequest and parseResponse.` +
+        `Ensure the transformer for model "${model.id}" has the necessary methods.`
+      );
+    }
+
+    const signal = requestSignal || ctx.signal;
+    const modelId = model.id as `${string}/${string}`;
+    const client = createClient(repConfig);
+
+    // Convert request using transformer
+    const input = convertRequest(request, ctx);
+
+    // Run prediction
+    const output = await client.run(modelId, { input, signal });
+
+    // Parse response using transformer
+    return parseResponse(output, ctx);
+  }
+
+  /**
+   * Does a simple request
+   * 
+   * @param config 
+   * @param request 
+   * @param ctx 
+   * @param metadata 
+   */
+  private async* doStream<
+    TRequest extends BaseRequest,
+    TChunk extends BaseChunk
+  >(
+    config: ReplicateConfig | undefined,
+    request: TRequest, 
+    ctx: AIContextAny, 
+    metadata: AIMetadataAny | undefined,
+    requestSignal: AbortSignal | undefined,
+    getConverters: (transformer: ModelTransformer) => {
+      convertRequest?: (request: TRequest, ctx: AIContextAny) => object;
+      parseChunk?: (chunk: object, ctx: AIContextAny) => TChunk;
+    }
+  ) {
+    const repConfig = config || this.config;
+
+    // Extract model ID from metadata
+    const model = getModel(request.model || metadata?.model || ctx.metadata?.model);
+    if (!model) {
+      throw new Error('Replicate executor requires model ID in metadata');
+    }
+
+    // Get transformer for model
+    const transformer = this.getTransformer(model.id, repConfig);
+    if (!transformer) {
+      throw new Error(
+        `Replicate model "${model.id}" requires a ModelTransformer. ` +
+        'Add a transformer to your ReplicateConfig.transformers.'
+      );
+    }
+
+    // Ensure transformer has necessary methods
+    const { convertRequest, parseChunk } = getConverters(transformer);
+    if (!convertRequest || !parseChunk) {
+      throw new Error(
+        `Replicate model "${model.id}" requires a ModelTransformer with convertRequest and parseChunk.` +
+        `Ensure the transformer for model "${model.id}" has the necessary methods.`
+      );
+    }
+
+    const signal = requestSignal || ctx.signal;
+    const modelId = model.id as `${string}/${string}`;
+    const client = createClient(repConfig);
+
+    // Convert request using transformer
+    const input = convertRequest(request, ctx);
+
+    // Stream prediction
+    for await (const event of client.stream(modelId, { input, signal })) {
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+      
+      // Parse chunk using transformer
+      const chunk = parseChunk(event, ctx);
+      yield chunk;
+    }
   }
 
   /**
@@ -266,77 +398,37 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Note: Chat requires a model transformer in config for request/response conversion
    */
-  createExecutor<TContext>(config?: ReplicateConfig): Executor<TContext, any> {
+  createExecutor(config?: ReplicateConfig): Executor<AIContextAny, AIMetadataAny> {
     const repConfig = config || this.config;
 
     return async (request: Request, ctx, metadata, signal) => {
-      // Extract model ID from metadata
-      const modelId = (metadata as any)?.model;
-      if (!modelId) {
-        throw new Error('Replicate executor requires model ID in metadata');
-      }
-
-      const transformer = this.getTransformer<TContext>(modelId, repConfig);
-      if (!transformer?.chat?.convertRequest || !transformer?.chat?.parseResponse) {
-        throw new Error(
-          `Replicate chat for model "${modelId}" requires a ModelTransformer with chat.convertRequest and chat.parseResponse. ` +
-          'Add a transformer to your ReplicateConfig.transformers.'
-        );
-      }
-
-      const client = createClient(repConfig);
-
-      // Convert request using transformer
-      const replicateInput = transformer.chat.convertRequest(request, ctx);
-
-      // Run prediction
-      const output = await client.run(modelId as any, { input: replicateInput as any });
-
-      // Parse response using transformer
-      return transformer.chat.parseResponse(output, ctx);
+      return this.doRequest(repConfig, request, ctx, metadata, signal, (transformer) => transformer.chat || {});
     };
   }
 
   /**
    * Create streamer for chat/completion
    */
-  createStreamer<TContext>(config?: ReplicateConfig): Streamer<TContext, any> {
-    const repConfig = config || this.config;
+  createStreamer(config?: ReplicateConfig): Streamer<AIContextAny, AIMetadataAny> {
     const provider = this;
 
-    return async function* (request: Request, ctx: TContext, metadata, signal) {
-      // Extract model ID from metadata
-      const modelId = (metadata as any)?.model;
-      if (!modelId) {
-        throw new Error('Replicate streamer requires model ID in metadata');
-      }
-
-      const transformer = provider.getTransformer<TContext>(modelId, repConfig);
-      if (!transformer?.chat?.convertRequest || !transformer?.chat?.parseChunk) {
-        throw new Error(
-          `Replicate streaming chat for model "${modelId}" requires a ModelTransformer with chat.convertRequest and chat.parseChunk. ` +
-          'Add a transformer to your ReplicateConfig.transformers.'
-        );
-      }
-
-      const client = createClient(repConfig);
-
-      // Convert request using transformer
-      const replicateInput = transformer.chat.convertRequest(request, ctx);
-
-      // Stream prediction
-      for await (const event of client.stream(modelId as any, { input: replicateInput as any })) {
-        // Parse chunk using transformer
-        const chunk = transformer.chat.parseChunk!(event, ctx);
+    return async function* (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, signal?: AbortSignal) {
+      const stream = provider.doStream(config, request, ctx, metadata, signal, (transformer) => transformer.chat || {});
+      const chunks: Chunk[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
         yield chunk;
       }
 
-      // Return final response if parseResponse is available
-      if (transformer.chat.parseResponse) {
-        return transformer.chat.parseResponse(null as any, ctx);
-      }
-
-      return { model: modelId, content: '', finishReason: 'stop' as const, usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
+      return { 
+        model: request.model || chunks.find(c => c.model)?.model!,
+        content: chunks.map(c => c.content).join(''),
+        finishReason: chunks.find(c => c.finishReason)?.finishReason || 'stop',
+        usage: chunks.find(c => c.usage)?.usage,
+        reasoning: chunks.map(c => c.reasoning).filter(Boolean).join(''),
+        refusal: chunks.map(c => c.refusal).filter(Boolean).join(''),
+        toolCalls: chunks.map(c => c.toolCall).filter(tc => !!tc),
+      };
     };
   }
 
@@ -347,43 +439,75 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    */
   async generateImage(
     request: ImageGenerationRequest,
-    ctx: AIBaseContext<AIBaseTypes>,
+    ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<ImageGenerationResponse> {
-    const repConfig = config || this.config;
-    const client = createClient(repConfig);
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {});
+  }
 
-    const model = request.model || ctx.metadata?.model;
-    if (!model) {
-      throw new Error('Model must be specified for Replicate image generation');
-    }
+  /**
+   * Generate image using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async* generateImageStream(
+    request: ImageGenerationRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ) {
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {});
+  }
 
-    const transformer = this.getTransformer(model, repConfig);
-    if (!transformer?.imageGenerate?.convertRequest || !transformer?.imageGenerate?.parseResponse) {
-      throw new Error(
-        `Replicate image generation for model "${model}" requires a ModelTransformer with imageGenerate.convertRequest and imageGenerate.parseResponse. ` +
-        'Add a transformer to your ReplicateConfig.transformers.'
-      );
-    }
+  /**
+   * Edit image using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async editImage(
+    request: ImageEditRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ): Promise<ImageGenerationResponse> {
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {});
+  }
 
-    try {
-      // Convert request using transformer
-      const modelInput = transformer.imageGenerate.convertRequest(request, ctx);
+  /**
+   * Edit image using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async* editImageStream(
+    request: ImageEditRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ) {
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {});
+  }
 
-      // Run the model
-      const output = await client.run(
-        request.model as `${string}/${string}`,
-        { input: modelInput as Record<string, unknown> },
-      );
+  /**
+   * Analyze image using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async analyzeImage(
+    request: ImageAnalyzeRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ): Promise<Response> {
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {});
+  }
 
-      // Parse response using transformer
-      return transformer.imageGenerate.parseResponse(output, ctx);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Replicate image generation failed: ${error.message}`);
-      }
-      throw error;
-    }
+  /**
+   * Analyze image using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async* analyzeImageStream(
+    request: ImageAnalyzeRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ) {
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {});
   }
 
   /**
@@ -391,44 +515,25 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Requires a ModelTransformer for the specific model being used.
    */
-  async transcribe<TContext>(
+  async transcribe(
     request: TranscriptionRequest,
-    ctx: TContext,
+    ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<TranscriptionResponse> {
-    const repConfig = config || this.config;
-    const client = createClient(repConfig);
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {});
+  }
 
-    if (!request.model) {
-      throw new Error('Model must be specified for Replicate transcription');
-    }
-
-    const transformer = this.getTransformer<TContext>(request.model, repConfig);
-    if (!transformer?.transcribe?.convertRequest || !transformer?.transcribe?.parseResponse) {
-      throw new Error(
-        `Replicate transcription for model "${request.model}" requires a ModelTransformer with transcribe.convertRequest and transcribe.parseResponse. ` +
-        'Add a transformer to your ReplicateConfig.transformers.'
-      );
-    }
-
-    try {
-      // Convert request using transformer
-      const modelInput = transformer.transcribe.convertRequest(request, ctx);
-
-      // Run the model
-      const output = await client.run(
-        request.model as `${string}/${string}`,
-        { input: modelInput as Record<string, unknown> },
-      );
-
-      // Parse response using transformer
-      return transformer.transcribe.parseResponse(output, ctx);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Replicate transcription failed: ${error.message}`);
-      }
-      throw error;
-    }
+  /**
+   * Transcribe audio using Replicate
+   *
+   * Requires a ModelTransformer for the specific model being used.
+   */
+  async* transcribeStream(
+    request: TranscriptionRequest,
+    ctx: AIContextAny,
+    config?: ReplicateConfig
+  ) {
+    return this.doStream(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {});
   }
 
   /**
@@ -436,44 +541,12 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Requires a ModelTransformer for the specific model being used.
    */
-  async speech<TContext>(
+  async speech(
     request: SpeechRequest,
-    ctx: TContext,
+    ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<SpeechResponse> {
-    const repConfig = config || this.config;
-    const client = createClient(repConfig);
-
-    if (!request.model) {
-      throw new Error('Model must be specified for Replicate speech generation');
-    }
-
-    const transformer = this.getTransformer<TContext>(request.model, repConfig);
-    if (!transformer?.speech?.convertRequest || !transformer?.speech?.parseResponse) {
-      throw new Error(
-        `Replicate speech generation for model "${request.model}" requires a ModelTransformer with speech.convertRequest and speech.parseResponse. ` +
-        'Add a transformer to your ReplicateConfig.transformers.'
-      );
-    }
-
-    try {
-      // Convert request using transformer
-      const modelInput = transformer.speech.convertRequest(request, ctx);
-
-      // Run the model
-      const output = await client.run(
-        request.model as `${string}/${string}`,
-        { input: modelInput as Record<string, unknown> },
-      );
-
-      // Parse response using transformer
-      return transformer.speech.parseResponse(output, ctx);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Replicate speech generation failed: ${error.message}`);
-      }
-      throw error;
-    }
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.speech || {});
   }
 
   /**
@@ -481,43 +554,11 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
    *
    * Requires a ModelTransformer for the specific model being used.
    */
-  async embed<TContext>(
+  async embed(
     request: EmbeddingRequest,
-    ctx: TContext,
+    ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<EmbeddingResponse> {
-    const repConfig = config || this.config;
-    const client = createClient(repConfig);
-
-    if (!request.model) {
-      throw new Error('Model must be specified for Replicate embeddings');
-    }
-
-    const transformer = this.getTransformer<TContext>(request.model, repConfig);
-    if (!transformer?.embed?.convertRequest || !transformer?.embed?.parseResponse) {
-      throw new Error(
-        `Replicate embedding generation for model "${request.model}" requires a ModelTransformer with embed.convertRequest and embed.parseResponse. ` +
-        'Add a transformer to your ReplicateConfig.transformers.'
-      );
-    }
-
-    try {
-      // Convert request using transformer
-      const modelInput = transformer.embed.convertRequest(request, ctx);
-
-      // Run the model
-      const output = await client.run(
-        request.model as `${string}/${string}`,
-        { input: modelInput as Record<string, unknown> },
-      );
-
-      // Parse response using transformer
-      return transformer.embed.parseResponse(output, ctx);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Replicate embedding generation failed: ${error.message}`);
-      }
-      throw error;
-    }
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.embed || {});
   }
 }

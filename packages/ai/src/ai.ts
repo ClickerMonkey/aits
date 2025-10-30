@@ -44,7 +44,10 @@ import type {
   SelectedModelFor,
   StrictPartial,
   Usage,
-  ToolInput
+  ToolInput,
+  AIContextUser,
+  AIMetadataUser,
+  AIContextAny
 } from './types';
 
 /**
@@ -107,7 +110,7 @@ export class AI<T extends AIBaseTypes> {
   /**
    * Static builder for creating AI instances with type inference
    */
-  public static with<TContext extends object = {}, TMetadata extends object = {}>() {
+  public static with<TContext extends AIContextUser = {}, TMetadata extends AIMetadataUser = {}>() {
     return {
       providers: <TProviders extends Providers>(providers: TProviders) => {
         return {
@@ -659,6 +662,7 @@ export class AI<T extends AIBaseTypes> {
 
     // Wrap the prompt's stream method to inject executor/streamer via buildCoreContext
     const ai = this;
+    // @ts-ignore
     const originalStream = prompt.stream.bind(prompt);
     prompt.stream = async function* (
       input: TInput, 

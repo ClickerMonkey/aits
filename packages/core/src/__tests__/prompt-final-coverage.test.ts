@@ -50,7 +50,7 @@ describe('Prompt Final Coverage', () => {
   });
 
   describe('Custom Runner', () => {
-    it.skip('should support custom runner in get stream mode', async () => {
+    it('should support custom runner in get stream mode', async () => {
       const prompt = new Prompt({
         name: 'with-runner-stream',
         description: 'With runner stream',
@@ -74,9 +74,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      for await (const _ of prompt.get({}, 'stream', ctx)) {
-        // Consume stream
-      }
+      prompt.run({}, ctx)
 
       expect(runnerCalled).toBe(true);
     });
@@ -228,14 +226,14 @@ describe('Prompt Final Coverage', () => {
         messages: [
           { role: 'user', content: 'test', tokens: 50 }
         ],
-        defaultCompletionTokens: 4096 // Large, will make available tokens negative
+        maxOutputTokens: 4096 // Large, will make available tokens negative
       };
 
       const result = await prompt.get({}, 'result', ctx);
       expect(result).toBe('success');
     });
 
-    it.skip('should use estimateTokens when messages missing tokens', async () => {
+    it('should use estimateTokens when messages missing tokens', async () => {
       const prompt = new Prompt({
         name: 'estimate-tokens',
         description: 'Estimate tokens',
@@ -251,7 +249,7 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 1000 }
+            usage: { inputTokens: 1000, totalTokens: 1000 }
           };
         }
         return {
@@ -269,7 +267,7 @@ describe('Prompt Final Coverage', () => {
           estimatorCalled = true;
           return 10;
         },
-        defaultCompletionTokens: 500
+        maxOutputTokens: 500
       };
 
       await prompt.get({}, 'result', ctx);

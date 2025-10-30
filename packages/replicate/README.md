@@ -112,6 +112,8 @@ const provider = new ReplicateProvider({
 
 ### Creating Custom Adapters
 
+TODO-FIX example
+
 ```typescript
 import { ModelTransformer } from '@aits/ai';
 import type { Request, Response } from '@aits/core';

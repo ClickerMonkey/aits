@@ -11,7 +11,7 @@ import { Context } from '../types';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt Remaining Coverage', () => {
-  it.skip('should return component type as prompt', () => {
+  it('should return component type as prompt', () => {
     const prompt = new Prompt({
       name: 'test',
       description: 'Test',
@@ -106,7 +106,7 @@ describe('Prompt Remaining Coverage', () => {
     expect(result).toBe('Recovered');
   });
 
-  it.skip('should handle finishReason length with retry', async () => {
+  it('should handle finishReason length with retry', async () => {
     const prompt = new Prompt({
       name: 'length-retry',
       description: 'Length retry',
@@ -269,7 +269,7 @@ describe('Prompt Remaining Coverage', () => {
         { role: 'user', content: 'test', tokens: 100 },
         { role: 'assistant', content: 'response', tokens: 100 }
       ],
-      defaultCompletionTokens: 500
+      maxOutputTokens: 500
     };
 
     const result = await prompt.get({}, 'result', ctx);
