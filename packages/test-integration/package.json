@@ -1,7 +1,7 @@
 {
   "name": "@aits/test-integration",
   "version": "0.1.0",
-  "description": "Integration tests for AITS multi-provider functionality",
+  "description": "Integration tests for @aits multi-provider functionality",
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

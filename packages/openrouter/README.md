@@ -1,6 +1,6 @@
 # @aits/openrouter
 
-OpenRouter provider for the AITS (AI TypeScript) framework. OpenRouter provides unified access to multiple AI providers through a single API, with automatic fallbacks, routing optimization, and competitive pricing.
+OpenRouter provider for the @aits (AI TypeScript) framework. OpenRouter provides unified access to multiple AI providers through a single API, with automatic fallbacks, routing optimization, and competitive pricing.
 
 ## Features
 
@@ -527,7 +527,7 @@ For image generation, speech, transcription, and embeddings, use provider-specif
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core AITS framework types and interfaces
+- **[@aits/core](../core)**: Core @aits framework types and interfaces
 - **[@aits/ai](../ai)**: AI abstractions and utilities
 - **[@aits/openai](../openai)**: OpenAI provider (base class)
 - **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
@@ -546,7 +546,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please see the main [AITS repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
 
 ## Support
 

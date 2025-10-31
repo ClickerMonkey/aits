@@ -63,7 +63,7 @@ export interface OpenAIConfig {
 // ============================================================================
 
 /**
- * OpenAI provider implementation for the AITS framework.
+ * OpenAI provider implementation for the @aits framework.
  *
  * Supports the full range of OpenAI capabilities including:
  * - Chat completions with GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
@@ -201,7 +201,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert OpenAI's model format to AITS ModelInfo format.
+   * Convert OpenAI's model format to @aits ModelInfo format.
    *
    * Subclasses can override this to enrich model metadata with
    * provider-specific information.
@@ -305,7 +305,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    *
    * @param params OpenAI chat completion parameters
    * @param config Provider configuration
-   * @param request Original AITS request
+   * @param request Original @aits request
    * @returns Modified parameters
    */
   protected augmentChatRequest<TExpected extends OpenAI.Chat.ChatCompletionCreateParams>(
@@ -334,7 +334,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Augment chat response with provider-specific data.
    * 
    * @param openai OpenAI chat completion response
-   * @param response AITS response object to augment
+   * @param response @aits response object to augment
    * @returns 
    */
   protected augmentChatResponse<TExpected extends OpenAI.Chat.Completions.ChatCompletion>(
@@ -350,7 +350,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // ============================================================================
 
   /**
-   * Convert AITS MessageContent to OpenAI content string format.
+   * Convert @aits MessageContent to OpenAI content string format.
    * @param x 
    * @param from 
    * @returns 
@@ -369,7 +369,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS MessageContent to OpenAI text content format.
+   * Convert @aits MessageContent to OpenAI text content format.
    * @param x 
    * @param name 
    * @returns 
@@ -397,7 +397,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS MessageContent to OpenAI format.
+   * Convert @aits MessageContent to OpenAI format.
    * @param x 
    * @param name 
    * @returns 
@@ -572,7 +572,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS ToolCall to OpenAI format.
+   * Convert @aits ToolCall to OpenAI format.
    * @param x ToolCall object
    * @returns 
    */
@@ -588,12 +588,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS Request messages to OpenAI format.
+   * Convert @aits Request messages to OpenAI format.
    *
    * Handles conversion of all message types (system, user, assistant, tool)
    * and content types (text, image, audio, file).
    *
-   * @param request AITS request object
+   * @param request @aits request object
    * @returns Array of OpenAI-formatted messages
    */
   protected convertMessages(request: Request): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -629,11 +629,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS tool definitions to OpenAI format.
+   * Convert @aits tool definitions to OpenAI format.
    *
    * Transforms Zod schemas into JSON Schema format required by OpenAI.
    *
-   * @param request AITS request object
+   * @param request @aits request object
    * @returns Array of OpenAI-formatted tools or undefined
    */
   protected convertTools(request: Request): OpenAI.Chat.ChatCompletionTool[] | undefined {
@@ -650,11 +650,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS tool choice to OpenAI format.
+   * Convert @aits tool choice to OpenAI format.
    *
    * Supports auto, required, none, and specific tool selection.
    *
-   * @param request AITS request object
+   * @param request @aits request object
    * @returns OpenAI-formatted tool choice option or undefined
    */
   protected convertToolChoice(
@@ -676,11 +676,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert AITS response format to OpenAI format.
+   * Convert @aits response format to OpenAI format.
    *
    * Supports text, JSON object mode, and structured output with Zod schemas.
    *
-   * @param request AITS request object
+   * @param request @aits request object
    * @returns OpenAI-formatted response format or undefined
    */
   protected convertResponseFormat(

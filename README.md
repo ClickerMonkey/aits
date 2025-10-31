@@ -1,8 +1,8 @@
-# AITS - AI TypeScript Library
+# @aits - AI TypeScript Library
 
 > **Multi-provider AI library with intelligent model selection, type-safe context management, and comprehensive provider support.**
 
-AITS (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
+@aits (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
@@ -139,7 +139,7 @@ const response = await ai.chat.get([
 ### Core Packages
 
 #### [@aits/core](./packages/core)
-Core types and interfaces for the AITS framework. Defines the foundational types for requests, responses, providers, and streaming.
+Core types and interfaces for the @aits framework. Defines the foundational types for requests, responses, providers, and streaming.
 
 ```bash
 npm install @aits/core
@@ -520,7 +520,7 @@ interface ReplicateConfig {
 
 ## Cost Tracking
 
-AITS provides comprehensive cost tracking:
+@aits provides comprehensive cost tracking:
 
 ```typescript
 const response = await ai.chat.get(messages);
@@ -559,7 +559,7 @@ try {
 
 ## Model Capabilities
 
-AITS uses a capability system for model selection:
+@aits uses a capability system for model selection:
 
 | Capability | Description | Example Providers |
 |------------|-------------|-------------------|
@@ -648,7 +648,7 @@ Contributions are welcome! Areas where we'd especially appreciate help:
 - **Testing** - Unit tests, integration tests
 - **Bug Fixes** - Issue reports and fixes
 
-Please see the main [AITS repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
 
 ## Related Projects
 

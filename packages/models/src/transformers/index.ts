@@ -2,7 +2,7 @@
  * Model Transformers
  *
  * Maps model IDs to their transformer implementations.
- * Transformers handle conversion between AITS request/response format
+ * Transformers handle conversion between @aits request/response format
  * and provider-specific formats for models with non-standard APIs.
  */
 

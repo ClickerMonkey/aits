@@ -1,7 +1,7 @@
 {
   "name": "@aits/ai",
   "version": "0.1.0",
-  "description": "AITS AI - AI TypeScript library main functionality",
+  "description": "@aits AI - AI TypeScript library main functionality",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

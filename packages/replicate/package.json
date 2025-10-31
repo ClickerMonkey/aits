@@ -1,7 +1,7 @@
 {
   "name": "@aits/replicate",
   "version": "0.1.0",
-  "description": "AITS Replicate - Replicate integration for AITS",
+  "description": "@aits Replicate - Replicate integration for @aits",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

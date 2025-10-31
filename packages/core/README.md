@@ -1,6 +1,6 @@
 # @aits/core
 
-Core primitives for building composable AI systems with TypeScript. AITS (AI TypeScript) provides a type-safe, modular framework for creating agents, tools, and prompts that work together seamlessly.
+Core primitives for building composable AI systems with TypeScript. @aits (AI TypeScript) provides a type-safe, modular framework for creating agents, tools, and prompts that work together seamlessly.
 
 ## Overview
 
@@ -62,7 +62,7 @@ Components execute within a `Context` that provides:
 
 ### Type System
 
-AITS uses advanced TypeScript features to provide:
+@aits uses advanced TypeScript features to provide:
 - Type inference across component hierarchies
 - Compile-time validation of component composition
 - Type-safe tool parameters and outputs
@@ -441,7 +441,7 @@ Yields promises as they settle, maintaining indices.
 
 ## TypeScript Support
 
-AITS is built with TypeScript and provides excellent type inference:
+@aits is built with TypeScript and provides excellent type inference:
 
 ```typescript
 // Types are inferred automatically

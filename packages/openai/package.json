@@ -1,7 +1,7 @@
 {
   "name": "@aits/openai",
   "version": "0.1.0",
-  "description": "AITS OpenAI - OpenAI integration for AITS",
+  "description": "@aits OpenAI - OpenAI integration for @aits",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

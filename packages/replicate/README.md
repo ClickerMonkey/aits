@@ -1,6 +1,6 @@
 # @aits/replicate
 
-Replicate provider for the AITS (AI TypeScript) framework. This package provides integration with Replicate's platform for running AI models in the cloud.
+Replicate provider for the @aits (AI TypeScript) framework. This package provides integration with Replicate's platform for running AI models in the cloud.
 
 ## Features
 
@@ -19,7 +19,7 @@ npm install @aits/replicate @aits/ai @aits/core replicate zod
 
 ## Important Note
 
-**Replicate has no consistent API** - each model has its own input/output schema. This means you need to register model adapters for each model you want to use. The AITS framework provides a flexible adapter system to handle this.
+**Replicate has no consistent API** - each model has its own input/output schema. This means you need to register model adapters for each model you want to use. The @aits framework provides a flexible adapter system to handle this.
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ const provider = new ReplicateProvider({
 
 ## Model Adapters
 
-Model adapters translate between the AITS standard interface and each model's specific input/output format.
+Model adapters translate between the @aits standard interface and each model's specific input/output format.
 
 ### Using Built-in Adapters
 
@@ -119,7 +119,7 @@ import { ModelTransformer } from '@aits/ai';
 import type { Request, Response } from '@aits/core';
 
 const myCustomAdapter: ModelTransformer = {
-  // Convert AITS request to model-specific input
+  // Convert @aits request to model-specific input
   transformRequest: (request: Request) => {
     return {
       prompt: request.messages[request.messages.length - 1].content,
@@ -129,7 +129,7 @@ const myCustomAdapter: ModelTransformer = {
     };
   },
 
-  // Convert model output to AITS response
+  // Convert model output to @aits response
   transformResponse: (output: unknown): Response => {
     const result = output as { text: string; tokens_used?: number };
 
@@ -334,10 +334,10 @@ for await (const model of results) {
 
 ```typescript
 interface ModelTransformer {
-  // Convert AITS request to model input
+  // Convert @aits request to model input
   transformRequest: (request: Request) => Record<string, unknown>;
 
-  // Convert model output to AITS response
+  // Convert model output to @aits response
   transformResponse: (output: unknown) => Response;
 
   // Optional: convert stream chunks
@@ -570,7 +570,7 @@ Popular model categories:
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core AITS framework types and interfaces
+- **[@aits/core](../core)**: Core @aits framework types and interfaces
 - **[@aits/ai](../ai)**: AI abstractions and utilities
 - **[@aits/openai](../openai)**: OpenAI provider
 - **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
@@ -590,7 +590,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome, especially new model adapters! Please see the main [AITS repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome, especially new model adapters! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
 
 ### Contributing Adapters
 

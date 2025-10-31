@@ -1,6 +1,6 @@
 # @aits/test-integration
 
-Integration tests for AITS multi-provider functionality. These tests make **real API calls** to verify that multiple providers work together correctly.
+Integration tests for @aits multi-provider functionality. These tests make **real API calls** to verify that multiple providers work together correctly.
 
 ## Setup
 

@@ -61,13 +61,13 @@ export abstract class BaseAPI<
     // Check if model is already specified
     const model = getModel(request.model || ctx.metadata?.model);
     if (model) {
-      const modelInfo = isModelInfo(model)
+      const modelInfo = isModelInfo<AIProviderNames<T>>(model)
         ? model
         : registry.getModel(model.id);
 
       if (modelInfo) {
-        const provider = registry.getProvider(modelInfo.provider) as AIProvider<T>
-          ?? registry.getProviderFor(model.id);
+        const provider = registry.getProvider(modelInfo.provider)
+          ?? registry.getProviderFor(model.id)[1];
           
         if (!provider) {
           return null;
@@ -120,7 +120,7 @@ export abstract class BaseAPI<
       // Select model
       const dynamicSelection = registry.selectModel(enrichedMetadata);
       if (!dynamicSelection) {
-        throw new Error(this.getNoModelFoundError());
+        return null;
       }
 
       return dynamicSelection;
@@ -142,48 +142,17 @@ export abstract class BaseAPI<
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
 
-      // Check if model is already specified
-      const requestModel = request.model;
-      const contextModel = fullCtx.metadata?.model;
-
-      let selected: SelectedModelFor<T>;
-
-      if (requestModel) {
-        // Request model takes highest priority - skip selection
-        selected = this.createSelectedModelFromId(requestModel);
-      } else if (contextModel) {
-        // Context metadata model - skip selection
-        selected = this.createSelectedModelFromId(contextModel);
-      } else {
-        // No model specified - use selection system
-        // Build metadata with required capabilities and parameters
-        const metadataRequired: AIMetadataRequired<T> = {
-          ...fullCtx.metadata,
-          required: this.getRequiredCapabilities(fullCtx.metadata?.required || [], request, false),
-          requiredParameters: this.getRequiredParameters(fullCtx.metadata?.requiredParameters || [], request, false),
-        } as AIMetadataRequired<T>;
-
-        const metadata = await this.ai.buildMetadata(metadataRequired);
-
-        // Run beforeModelSelection hook
-        const enrichedMetadata = hooks.beforeModelSelection
-          ? await hooks.beforeModelSelection(fullCtx, metadata)
-          : metadata;
-
-        // Select model
-        const dynamicSelection = this.ai.selectModel(enrichedMetadata);
-        if (!dynamicSelection) {
-          throw new Error(this.getNoModelFoundError());
-        }
-        selected = dynamicSelection;
+      // Get model for request
+      const selected = await this.getModelFor(request, fullCtx, false);
+      if (!selected) {
+        throw new Error(this.getNoModelFoundError());
       }
-
+    
       // Inject selected model into context for provider access
       fullCtx.metadata = {
         ...fullCtx.metadata,
-        model: selected.model.id,
+        model: selected.model,
       } as typeof fullCtx.metadata;
-      fullCtx.metadata!.model = selected.model.id;
 
       // Run onModelSelected hook
       const finalSelected = (await hooks.onModelSelected?.(fullCtx, selected)) || selected;
@@ -242,40 +211,10 @@ export abstract class BaseAPI<
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
 
-      // Check if model is already specified
-      const requestModel: ModelInput | undefined = request.model;
-      const contextModel: ModelInput | undefined = fullCtx.metadata?.model;
-
-      let selected: SelectedModelFor<T>;
-
-      if (requestModel) {
-        // Request model takes highest priority - skip selection
-        selected = this.createSelectedModelFromId(requestModel);
-      } else if (contextModel) {
-        // Context metadata model - skip selection
-        selected = this.createSelectedModelFromId(contextModel);
-      } else {
-        // No model specified - use selection system
-        // Build metadata with required capabilities (including streaming) and parameters
-        const metadataRequired: AIMetadataRequired<T> = {
-          ...fullCtx.metadata,
-          required: this.getRequiredCapabilitiesForStreaming(fullCtx.metadata?.required || [], request),
-          requiredParameters: this.getRequiredParameters(fullCtx.metadata?.requiredParameters || [], request, true),
-        } as AIMetadataRequired<T>;
-
-        const metadata = await this.ai.buildMetadata(metadataRequired);
-
-        // Run beforeModelSelection hook
-        const enrichedMetadata = hooks.beforeModelSelection
-          ? await hooks.beforeModelSelection(fullCtx, metadata)
-          : metadata;
-
-        // Select model
-        const dynamicSelection = this.ai.selectModel(enrichedMetadata);
-        if (!dynamicSelection) {
-          throw new Error(this.getNoModelFoundErrorForStreaming());
-        }
-        selected = dynamicSelection;
+      // Get model for request
+      const selected = await this.getModelFor(request, fullCtx, true);
+      if (!selected) {
+        throw new Error(this.getNoModelFoundErrorForStreaming());
       }
 
       // Inject selected model into context for provider access
@@ -432,55 +371,6 @@ export abstract class BaseAPI<
   // ============================================================================
   // OPTIONAL OVERRIDES (default implementations provided)
   // ============================================================================
-
-  /**
-   * Create a SelectedModel from a model ID.
-   * Used when bypassing the selection system (explicit model in request or context).
-   */
-  private createSelectedModelFromId(id: string): SelectedModelFor<T> {
-    // Find the model in the registry
-    const model = this.ai.models.get(id);
-    if (!model) {
-      let providerPrefix = id.substring(0, id.indexOf('/'));
-      let provider: AIProvider<T> | undefined;
-      for (const providerName in this.ai.providers) {
-        const modelProvider = this.ai.providers[providerName];
-        if (!provider) {
-          provider = modelProvider;
-        }
-        if (providerName === providerPrefix) {
-          provider = modelProvider;
-          break;
-        }
-      }
-      return {
-        model: {
-          id: id,
-          provider: (provider?.name || providerPrefix) as any,
-          name: id,
-          capabilities: new Set<ModelCapability>(),
-          tier:'flagship',
-          pricing: {},
-          contextWindow: 0,
-        },
-        provider: provider! as any,
-        score: 1,
-      };
-    }
-
-    // Find the provider
-    const providerName = model.provider;
-    const provider = this.ai.providers[providerName];
-    if (!provider) {
-      throw new Error(`Provider '${providerName}' not found`);
-    }
-
-    return {
-      model,
-      provider,
-      score: 1.0, // Not scored when explicitly selected
-    } as SelectedModelFor<T>;
-  }
 
   /**
    * Get required capabilities for streaming (default: adds 'streaming')

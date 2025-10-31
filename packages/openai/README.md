@@ -1,6 +1,6 @@
 # @aits/openai
 
-OpenAI provider for the AITS (AI TypeScript) framework. This package provides a comprehensive integration with OpenAI's API, supporting the full range of capabilities including chat completions, image generation, speech synthesis, transcription, and embeddings.
+OpenAI provider for the @aits (AI TypeScript) framework. This package provides a comprehensive integration with OpenAI's API, supporting the full range of capabilities including chat completions, image generation, speech synthesis, transcription, and embeddings.
 
 ## Features
 
@@ -827,7 +827,7 @@ try {
 
 ### OpenAIProvider
 
-Main provider class implementing the AITS Provider interface.
+Main provider class implementing the @aits Provider interface.
 
 **Constructor**: `new OpenAIProvider(config: OpenAIConfig)`
 
@@ -903,7 +903,7 @@ Main provider class implementing the AITS Provider interface.
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core AITS framework types and interfaces
+- **[@aits/core](../core)**: Core @aits framework types and interfaces
 - **[@aits/ai](../ai)**: AI abstractions and utilities
 - **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
 - **[@aits/openrouter](../openrouter)**: OpenRouter multi-provider gateway
@@ -914,7 +914,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please see the main [AITS repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
 
 ## Support
 

@@ -1,7 +1,7 @@
 {
   "name": "@aits/openrouter",
   "version": "0.1.0",
-  "description": "AITS OpenRouter - OpenRouter integration for AITS",
+  "description": "@aits OpenRouter - OpenRouter integration for @aits",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

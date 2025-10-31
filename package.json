@@ -2,7 +2,7 @@
   "name": "aits-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "AITS - AI TypeScript library collection",
+  "description": "@aits - AI TypeScript library collection",
   "workspaces": [
     "packages/*"
   ],

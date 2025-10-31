@@ -25,6 +25,7 @@ import type {
   BaseChunk,
   BaseRequest,
   ModelInput,
+  Model,
 } from '@aits/core';
 import type { PromptInput } from '@aits/core';
 import type { ToolInput } from '@aits/core';
@@ -213,7 +214,7 @@ export interface ModelMetrics {
  *
  * @template TProvider - Provider name type (string union)
  */
-export interface ModelInfo<TProvider extends string = string> {
+export interface ModelInfo<TProvider extends string = string> extends Model {
   // Model identifier (e.g., "gpt-4", "claude-3-opus")
   id: string;
   // Provider name (e.g., "openai", "anthropic")
