@@ -1,0 +1,57 @@
+{
+  "name": "@aits/cletus",
+  "version": "0.1.0",
+  "description": "Interactive CLI demo showcasing AITS capabilities",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cletus": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "demo",
+    "interactive"
+  ],
+  "author": "ClickerMonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClickerMonkey/aits.git",
+    "directory": "packages/cletus"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@aits/ai": "^0.1.0",
+    "@aits/core": "^0.1.0",
+    "@aits/openai": "^0.1.0",
+    "@clack/prompts": "^0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "bugs": {
+    "url": "https://github.com/ClickerMonkey/aits/issues"
+  }
+}

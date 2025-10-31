@@ -5,8 +5,10 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/__tests__", "src/**/*.test.ts", "src/**/__integration__"],
+  "exclude": ["src/**/__tests__", "src/**/*.test.ts"],
   "references": [
-    { "path": "../ai" }
+    { "path": "../core" },
+    { "path": "../ai" },
+    { "path": "../openai" }
   ]
 }
