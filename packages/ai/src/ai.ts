@@ -240,6 +240,10 @@ export class AI<T extends AIBaseTypes> {
   async buildCoreContext(requiredCtx: AIContextRequired<T>): Promise<Context<T>> {
     const ctx = await this.buildContext(requiredCtx);
 
+    if (ctx.executor && ctx.streamer && ctx.estimateTokens) {
+      return ctx;
+    }
+
     // Get executor and streamer from ChatAPI
     const execute = this.chat.createExecutor();
     const stream = this.chat.createStreamer();

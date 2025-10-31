@@ -5,32 +5,32 @@
  * Also serves as base class for OpenAI-compatible providers.
  */
 
-import fs from 'fs';
-import OpenAI, { Uploadable } from 'openai';
-import z from 'zod';
 import type {
-  Provider,
-  ModelInfo,
-  ImageGenerationRequest,
-  ImageGenerationResponse,
-  ImageGenerationChunk,
-  ImageEditRequest,
-  ImageAnalyzeRequest,
-  TranscriptionRequest,
-  TranscriptionResponse,
-  TranscriptionChunk,
-  SpeechRequest,
-  SpeechResponse,
-  EmbeddingRequest,
-  EmbeddingResponse,
-  AIBaseTypes,
   AIContextAny,
   AIMetadataAny,
+  EmbeddingRequest,
+  EmbeddingResponse,
+  ImageAnalyzeRequest,
+  ImageEditRequest,
+  ImageGenerationChunk,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  ModelInfo,
+  Provider,
+  SpeechRequest,
+  SpeechResponse,
+  TranscriptionChunk,
+  TranscriptionRequest,
+  TranscriptionResponse
 } from '@aits/ai';
-import { type Executor, type Streamer, type Request, type Response, type Chunk, type MessageContent, type ToolCall, type FinishReason, getModel } from '@aits/core';
-import { ProviderError, RateLimitError } from './types';
 import { detectTier } from '@aits/ai';
-import { get } from 'http';
+import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall } from '@aits/core';
+import fs from 'fs';
+import OpenAI, { Uploadable } from 'openai';
+import { Stream } from 'openai/core/streaming';
+import z from 'zod';
+import { isContextWindowError, parseContextWindowError, type RetryConfig, RetryContext, type RetryEvents, withRetry } from './retry';
+import { ContextWindowError, ProviderError, RateLimitError } from './types';
 
 // ============================================================================
 // OpenAI Provider Configuration
@@ -44,6 +44,16 @@ import { get } from 'http';
  * const config: OpenAIConfig = {
  *   apiKey: process.env.OPENAI_API_KEY!,
  *   organization: 'org-123456', // Optional
+ *   retry: {
+ *     maxRetries: 3,
+ *     initialDelay: 1000,
+ *     retryableStatuses: [0, 429, 500, 503],
+ *   },
+ *   retryEvents: {
+ *     onRetry: (attempt, error, delay, context) => {
+ *       console.log(`Retry attempt ${attempt} for ${context.operation} after ${delay}ms`);
+ *     },
+ *   },
  * };
  * ```
  */
@@ -56,6 +66,20 @@ export interface OpenAIConfig {
   organization?: string;
   // Optional project ID
   project?: string;
+  // Global retry configuration for all operations
+  retry?: RetryConfig;
+  // Global event handlers for retry lifecycle events
+  retryEvents?: RetryEvents;
+  // Default models
+  defaultModels?: {
+    chat?: ModelInput;
+    imageGenerate?: ModelInput;
+    imageEdit?: ModelInput;
+    imageAnalyze?: ModelInput;
+    transcription?: ModelInput;
+    speech?: ModelInput;
+    embedding?: ModelInput;
+  }
 }
 
 // ============================================================================
@@ -197,6 +221,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       organization: config.organization,
+      project: config.project,
     });
   }
 
@@ -254,7 +279,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // Optional Override Methods for Request Customization
   // ============================================================================
 
-
   /**
    * Customize image generation params before sending to API.
    *
@@ -262,7 +286,28 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param config Provider configuration
    * @returns Modified parameters
    */
-  protected customizeImageParams?(params: any, config: TConfig): any;
+  protected augmentImageGenerateRequest?<TParams extends OpenAI.ImageGenerateParams>(
+    params: TParams, 
+    request: ImageGenerationRequest,
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
+
+  /**
+   * Customize image edit params before sending to API.
+   *
+   * @param params Image generation parameters
+   * @param config Provider configuration
+   * @returns Modified parameters
+   */
+  protected augmentImageEditRequest?<TParams extends OpenAI.ImageEditParams>(
+    params: TParams, 
+    request: ImageEditRequest,
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
 
   /**
    * Customize transcription params before sending to API.
@@ -271,8 +316,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param config Provider configuration
    * @returns Modified parameters
    */
-  protected augmentTranscriptionRequest?<TExpected extends OpenAI.Audio.TranscriptionCreateParams>(
-    params: TExpected, 
+  protected augmentTranscriptionRequest?<TParams extends OpenAI.Audio.TranscriptionCreateParams>(
+    params: TParams, 
     request: TranscriptionRequest,
     config: TConfig
   ) {
@@ -286,7 +331,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param config Provider configuration
    * @returns Modified parameters
    */
-  protected customizeSpeechParams?(params: any, config: TConfig): any;
+  protected augmentSpeechRequest?<TParams extends OpenAI.Audio.SpeechCreateParams>(
+    params: TParams, 
+    request: SpeechRequest,
+    config: TConfig
+  ) {
+    // No-op by default
+  }
 
   /**
    * Customize embedding params before sending to API.
@@ -295,7 +346,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param config Provider configuration
    * @returns Modified parameters
    */
-  protected customizeEmbeddingParams?(params: any, config: TConfig): any;
+  protected augmentEmbeddingRequest?<TParams extends OpenAI.EmbeddingCreateParams>(
+    params: TParams, 
+    request: EmbeddingRequest, 
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
 
   /**
    * Customize chat completion params before sending to API.
@@ -308,8 +365,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param request Original @aits request
    * @returns Modified parameters
    */
-  protected augmentChatRequest<TExpected extends OpenAI.Chat.ChatCompletionCreateParams>(
-    params: TExpected,
+  protected augmentChatRequest<TParams extends OpenAI.Chat.ChatCompletionCreateParams>(
+    params: TParams,
     request: Request,
     config: TConfig,
   ) {
@@ -322,8 +379,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param expected 
    * @param chunk 
    */
-  protected augmentChatChunk<TExpected extends OpenAI.Chat.Completions.ChatCompletionChunk>(
-    expected: TExpected, 
+  protected augmentChatChunk<TParams extends OpenAI.Chat.Completions.ChatCompletionChunk>(
+    expected: TParams, 
     chunk: Chunk,
     config: TConfig,
   ) {
@@ -337,8 +394,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param response @aits response object to augment
    * @returns 
    */
-  protected augmentChatResponse<TExpected extends OpenAI.Chat.Completions.ChatCompletion>(
-    expected: TExpected, 
+  protected augmentChatResponse<TParams extends OpenAI.Chat.Completions.ChatCompletion>(
+    expected: TParams, 
     response: Response,
     config: TConfig,
   ) {
@@ -751,6 +808,46 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Get request data common to all request types.
+   * 
+   * @param request - The request
+   * @param ctx - The context
+   * @param effectiveConfig - The effective configuration
+   * @param defaultModel - Optional default model
+   * @returns 
+   */
+  getRequestData<R>(
+    request: BaseRequest, 
+    requestSignal: AbortSignal | undefined,
+    ctx: AIContextAny, 
+    effectiveConfig: TConfig, 
+    operation: string, 
+    defaultModel?: ModelInput
+  ) {
+    const model = getModel(request.model || ctx.metadata?.model || defaultModel);
+    if (!model) {
+      throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
+    }
+
+    const retryConfig: RetryConfig = { ...effectiveConfig.retry, ...(request.extra?.retry) };
+    const retryEvents: RetryEvents = request.extra?.retryEvents || effectiveConfig.retryEvents || {};
+    const retryContext: RetryContext = {
+      operation,
+      model: model.id,
+      provider: this.name,
+      startTime: Date.now(),
+    };
+
+    const signal = requestSignal || ctx.signal;
+
+    const retry = (fn: (signal?: AbortSignal) => Promise<R>): Promise<R> => {
+      return withRetry(() => fn(signal), retryContext, retryConfig, retryEvents, signal);
+    };
+
+    return { model, retry, signal };
+  }
+
+  /**
    * Create an executor for chat completion requests.
    *
    * The executor handles non-streaming chat completions with support for:
@@ -766,85 +863,96 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {RateLimitError} If rate limit is exceeded
    */
   createExecutor(config?: TConfig): Executor<AIContextAny, AIMetadataAny> {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
     const client = this.createClient(effectiveConfig);
 
-    return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, signal?: AbortSignal): Promise<Response> => {
-      const model = getModel(metadata?.model || ctx.metadata?.model);
-      if (!model) {
-        throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
-      }
+    return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, requestSignal?: AbortSignal): Promise<Response> => {
+      const { model, retry } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(request, requestSignal, ctx, effectiveConfig, 'chat', metadata?.model || effectiveConfig.defaultModels?.chat);
 
+      const messages = this.convertMessages(request);
+      const tools = this.convertTools(request);
+      const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
+      const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
+      const response_format = this.convertResponseFormat(request);
+      const params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
+        model: model.id,
+        messages,
+        temperature: request.temperature,
+        top_p: request.topP,
+        max_tokens: request.maxTokens,
+        frequency_penalty: request.frequencyPenalty,
+        presence_penalty: request.presencePenalty,
+        logit_bias: request.logitBias,
+        logprobs: request.logProbabilities,
+        prompt_cache_key: request.cacheKey,
+        safety_identifier: request.userKey,
+        store: false,
+        stop: request.stop,
+        tools,
+        tool_choice,
+        parallel_tool_calls,
+        response_format,
+        reasoning_effort: request.reason?.effort,
+        ...request.extra,
+        stream: false,
+      };
+
+      this.augmentChatRequest(params, request, effectiveConfig);
+
+      let completion: OpenAI.Chat.Completions.ChatCompletion;
       try {
-        const messages = this.convertMessages(request);
-        const tools = this.convertTools(request);
-        const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
-        const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
-        const response_format = this.convertResponseFormat(request);
+        completion = await retry(async (signal) => {
+          const inner = await client.chat.completions.create(params, { signal });
 
-        let params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-          model: model.id,
-          messages,
-          temperature: request.temperature,
-          top_p: request.topP,
-          max_tokens: request.maxTokens,
-          frequency_penalty: request.frequencyPenalty,
-          presence_penalty: request.presencePenalty,
-          logit_bias: request.logitBias,
-          logprobs: request.logProbabilities,
-          prompt_cache_key: request.cacheKey,
-          safety_identifier: request.userKey,
-          store: false,
-          stop: request.stop,
-          tools,
-          tool_choice,
-          parallel_tool_calls,
-          response_format,
-          reasoning_effort: request.reason?.effort,
-          ...request.extra,
-          stream: false,
-        };
+          const choice = completion.choices[0];
+          if (!choice) {
+            throw new ProviderError(this.name, 'No choices in response');
+          }
 
-        this.augmentChatRequest(params, request, effectiveConfig);
+          return inner;
+        });
 
-        const completion = await client.chat.completions.create(params, { signal });
-
-        const choice = completion.choices[0];
-        if (!choice) {
-          throw new ProviderError(this.name, 'No choices in response');
+      } catch (e: any) {
+        if (isContextWindowError(e)) {
+          const details = parseContextWindowError(e);
+          return {
+            content: '',
+            toolCalls: [],
+            finishReason: 'length',
+            model,
+            usage: { inputTokens: details?.contextWindow, totalTokens: details?.contextWindow },
+          };
         }
 
-        const toolCalls = choice.message.tool_calls
-          ?.filter((tc) => tc.type === 'function')
-          .map((tc) => ({
-            id: tc.id,
-            name: tc.function.name,
-            arguments: tc.function.arguments,
-          }));
-
-        const response: Response = {
-          content: choice.message.content || '',
-          toolCalls,
-          finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : choice.finish_reason,
-          refusal: choice.finish_reason === 'content_filter' ? choice.message.content || undefined : undefined,
-          model,
-          usage: {
-            inputTokens: completion.usage?.prompt_tokens ?? -1,
-            outputTokens: completion.usage?.completion_tokens ?? -1,
-            totalTokens: completion.usage?.total_tokens ?? -1,
-          },
-        };
-
-        this.augmentChatResponse(completion, response, effectiveConfig);
-
-        return response;
-      } catch (error) {
-        if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-          throw new RateLimitError(this.name, error.message);
-        }
-        if (error instanceof ProviderError) throw error;
-        throw new ProviderError(this.name, 'Request failed', error as Error);
+        throw e;
       }
+
+      const choice = completion.choices[0];
+      
+      const toolCalls = choice.message.tool_calls
+        ?.filter((tc) => tc.type === 'function')
+        .map((tc) => ({
+          id: tc.id,
+          name: tc.function.name,
+          arguments: tc.function.arguments,
+        }));
+
+      const response: Response = {
+        content: choice.message.content || '',
+        toolCalls,
+        finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : choice.finish_reason,
+        refusal: choice.finish_reason === 'content_filter' ? choice.message.content || undefined : undefined,
+        model,
+        usage: {
+          inputTokens: completion.usage?.prompt_tokens ?? -1,
+          outputTokens: completion.usage?.completion_tokens ?? -1,
+          totalTokens: completion.usage?.total_tokens ?? -1,
+        },
+      };
+
+      this.augmentChatResponse(completion, response, effectiveConfig);
+
+      return response;
     };
   }
 
@@ -860,7 +968,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @throws {RateLimitError} If rate limit is exceeded
    */
   createStreamer(config?: TConfig): Streamer<AIContextAny, AIMetadataAny> {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
     const client = this.createClient(effectiveConfig);
 
     return async function* (
@@ -870,162 +978,156 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       metadata?: AIMetadataAny,
       requestSignal?: AbortSignal
     ): AsyncGenerator<Chunk> {
-      const model = getModel(request?.model || metadata?.model || ctx.metadata?.model);
-      if (!model) {
-        throw new ProviderError(this.name, `Model is required for ${this.name} requests`);
+      const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>>(request, requestSignal, ctx, effectiveConfig, 'streaming chat', metadata?.model || effectiveConfig.defaultModels?.chat);
+
+      const messages = this.convertMessages(request);
+      const tools = this.convertTools(request);
+      const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
+      const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
+      const response_format = this.convertResponseFormat(request);
+
+      const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+        model: model.id,
+        messages,
+        temperature: request.temperature,
+        top_p: request.topP,
+        max_tokens: request.maxTokens,
+        frequency_penalty: request.frequencyPenalty,
+        presence_penalty: request.presencePenalty,
+        logit_bias: request.logitBias,
+        logprobs: request.logProbabilities,
+        prompt_cache_key: request.cacheKey,
+        safety_identifier: request.userKey,
+        store: false,
+        stop: request.stop,
+        tools,
+        tool_choice,
+        parallel_tool_calls,
+        response_format,
+        ...request.extra,
+        stream: true,
+        stream_options: { include_usage: true },
+      };
+
+      this.augmentChatRequest(params, request, effectiveConfig);
+
+      let stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
+      try {
+        stream = await retry(async (signal) => {
+          return await client.chat.completions.create(params, { signal });
+        });
+
+      } catch (e: any) {
+        if (isContextWindowError(e)) {
+          const details = parseContextWindowError(e);
+          return {
+            content: '',
+            toolCalls: [],
+            finishReason: 'length',
+            model,
+            usage: { inputTokens: details?.contextWindow, totalTokens: details?.contextWindow },
+          };
+        }
+
+        throw e;
       }
 
-      try {
-        const signal = requestSignal || ctx.signal;
-        const messages = this.convertMessages(request);
-        const tools = this.convertTools(request);
-        const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
-        const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
-        const response_format = this.convertResponseFormat(request);
+      // Track accumulated tool calls
+      type ToolCallItem = { id: string; name: string; arguments: string, named: boolean, finished: boolean, updated: boolean };
+      const toolCallsMap = new Map<number, ToolCallItem>();
+      const toolCalls: ToolCallItem[] = [];
+      
+      for await (const chunk of stream) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
 
-        let params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-          model: model.id,
-          messages,
-          temperature: request.temperature,
-          top_p: request.topP,
-          max_tokens: request.maxTokens,
-          frequency_penalty: request.frequencyPenalty,
-          presence_penalty: request.presencePenalty,
-          logit_bias: request.logitBias,
-          logprobs: request.logProbabilities,
-          prompt_cache_key: request.cacheKey,
-          safety_identifier: request.userKey,
-          store: false,
-          stop: request.stop,
-          tools,
-          tool_choice,
-          parallel_tool_calls,
-          response_format,
-          ...request.extra,
-          stream: true,
-          stream_options: { include_usage: true },
+        const choice = chunk?.choices[0];
+        const delta = choice?.delta;
+        
+        const yieldChunk: Chunk = {
+          content: delta.content || undefined,
+          finishReason: choice?.finish_reason as FinishReason | undefined,
+          refusal: delta?.refusal ?? undefined,
+          usage: !chunk.usage ? undefined : {
+            inputTokens: chunk.usage.prompt_tokens || 0,
+            outputTokens: chunk.usage.completion_tokens || 0,
+            totalTokens: chunk.usage.total_tokens || 0,
+          },
         };
 
-        this.augmentChatRequest(params, request, effectiveConfig);
+        // Handle tool calls
+        for (const toolCall of toolCalls) {
+          toolCall.updated = false;
+        }
 
-        const stream = await client.chat.completions.create(params, { signal });
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const existing = toolCallsMap.get(tc.index);
+            const toolCall = existing || { id: '', name: '', arguments: '', named: false, finished: false, updated: true };
 
-        // Track accumulated tool calls
-        type ToolCallItem = { id: string; name: string; arguments: string, named: boolean, finished: boolean, updated: boolean };
-        const toolCallsMap = new Map<number, ToolCallItem>();
-        const toolCalls: ToolCallItem[] = [];
-        
-        for await (const chunk of stream) {
-          if (signal?.aborted) {
-            throw new Error('Request aborted');
-          }
+            if (tc.id) {
+              toolCall.id = tc.id;
+              toolCall.updated = true;
+            }
+            if (tc.function?.name) {
+              toolCall.name = tc.function.name;
+              toolCall.updated = true;
+            }
+            if (tc.function?.arguments) {
+              toolCall.arguments += tc.function.arguments;
+              toolCall.updated = true;
+            }
+            if (!existing) {
+              toolCallsMap.set(tc.index, toolCall);
+              toolCalls.push(toolCall);
+            }
 
-          const choice = chunk?.choices[0];
-          const delta = choice?.delta;
-          
-          const yieldChunk: Chunk = {
-            content: delta.content || undefined,
-            finishReason: choice?.finish_reason as FinishReason | undefined,
-            refusal: delta?.refusal ?? undefined,
-            usage: !chunk.usage ? undefined : {
-              inputTokens: chunk.usage.prompt_tokens || 0,
-              outputTokens: chunk.usage.completion_tokens || 0,
-              totalTokens: chunk.usage.total_tokens || 0,
-            },
-          };
-
-          // Handle tool calls
-          for (const toolCall of toolCalls) {
-            toolCall.updated = false;
-          }
-
-          if (delta?.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              const existing = toolCallsMap.get(tc.index);
-              const toolCall = existing || { id: '', name: '', arguments: '', named: false, finished: false, updated: true };
-
-              if (tc.id) {
-                toolCall.id = tc.id;
-                toolCall.updated = true;
-              }
-              if (tc.function?.name) {
-                toolCall.name = tc.function.name;
-                toolCall.updated = true;
-              }
-              if (tc.function?.arguments) {
-                toolCall.arguments += tc.function.arguments;
-                toolCall.updated = true;
-              }
-              if (!existing) {
-                toolCallsMap.set(tc.index, toolCall);
-                toolCalls.push(toolCall);
-              }
-
-              if (toolCall.arguments) {
-                if (!toolCall.named) {
-                  yieldChunk.toolCallNamed = existing;
-                  toolCall.named = true;
-                } else {
-                  yieldChunk.toolCallArguments = existing;
-                }
+            if (toolCall.arguments) {
+              if (!toolCall.named) {
+                yieldChunk.toolCallNamed = existing;
+                toolCall.named = true;
+              } else {
+                yieldChunk.toolCallArguments = existing;
               }
             }
           }
+        }
 
-          for (const toolCall of toolCalls) {
-            if (!toolCall.updated && !toolCall.finished) {
-              toolCall.finished = true;
-              yieldChunk.toolCall = toolCall;
-            }
+        for (const toolCall of toolCalls) {
+          if (!toolCall.updated && !toolCall.finished) {
+            toolCall.finished = true;
+            yieldChunk.toolCall = toolCall;
           }
+        }
 
-          // Augment chunk with provider-specific data
+        // Augment chunk with provider-specific data
+        this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
+
+        // Send it!
+        yield yieldChunk;
+      }
+
+      // All tool calls should've been emitted, but just in case
+      for (const toolCall of toolCalls) {
+        if (!toolCall.finished) {
+          toolCall.finished = true;
+
+          const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = { choices: [], created: 0, id: '', model: '', object: 'chat.completion.chunk' };
+          const yieldChunk: Chunk = { toolCall };
+
+          // Augment chunk with provider-specific data  
           this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
 
           // Send it!
-          yield yieldChunk;
+          yield { toolCall };
         }
-
-        // All tool calls should've been emitted, but just in case
-        for (const toolCall of toolCalls) {
-          if (!toolCall.finished) {
-            toolCall.finished = true;
-
-            const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = { choices: [], created: 0, id: '', model: '', object: 'chat.completion.chunk' };
-            const yieldChunk: Chunk = { toolCall };
-
-            // Augment chunk with provider-specific data  
-            this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
-
-            // Send it!
-            yield { toolCall };
-          }
-        }
-      } catch (error: any) {
-        if (error.code === 'context_length_exceeded') {
-          const match = error.message.match(/maximum context length is (\d+)/i);
-          const contextWindow = match ? parseInt(match[1]) : undefined;
-          yield {
-            finishReason: 'length',
-            usage: { inputTokens: contextWindow },
-          };
-
-          return;
-        }
-
-        if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-          throw new RateLimitError(this.name, error.message);
-        }
-        if (error instanceof ProviderError) throw error;
-        throw new ProviderError(this.name, 'Streaming failed', error as Error);
       }
     }.bind(this);
   }
 
   /**
-   * Generate images using DALL-E models.
-   *
-   * Supports DALL-E 2 and DALL-E 3 with various sizes and quality settings.
+   * Generate images.
    *
    * @param request Image generation request parameters
    * @param ctx Context object (not used)
@@ -1039,55 +1141,133 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry } = this.getRequestData<OpenAI.Images.ImagesResponse>(request, undefined, ctx, effectiveConfig, 'generate image', effectiveConfig.defaultModels?.imageGenerate || 'gpt-image-1');
+    
+    const params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
+      model: model.id,
+      prompt: request.prompt,
+      n: request.n,
+      size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
+      quality: request.quality as 'standard' | 'hd' | undefined,
+      style: request.style as 'vivid' | 'natural' | undefined,
+      background: request.background,
+      response_format: request.responseFormat || 'b64_json',
+      user: request.userIdentifier,
+      ...request.extra,
+      stream: false,
+    };
+
+    // Apply provider-specific customizations
+    this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
+    
     const client = this.createClient(effectiveConfig);
 
+    let response: OpenAI.Images.ImagesResponse;
     try {
-      // TODO more flexible options on ImageGenerationRequest that is more in line with all the features
-      // of what image generation models can do. And then we narrow it down here.
-      // Ideally a party of model/provider selection is finding one that also supports the requested options.
+      response = await retry(async (signal) => {
+        return await client.images.generate(params, { signal });
+      });
 
-      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-3');
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during image generation', details?.contextWindow, e);
+      }
+      throw e;
+    }
+  
+    return {
+      images: (response.data || []).map((img) => ({
+        url: img.url || undefined,
+        b64_json: img.b64_json || undefined,
+        revisedPrompt: img.revised_prompt || undefined,
+      })),
+      model,
+      usage: {
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
+      },
+    };
+  }
+  
+  /**
+   * Generate images with streaming progress updates.
+   *
+   * Note: OpenAI's API doesn't natively support streaming image generation,
+   * so this implementation polls for progress or returns the result immediately.
+   *
+   * @param request Image generation request parameters
+   * @param ctx Context object (not used)
+   * @param config Optional configuration override
+   * @returns Async generator yielding progress chunks
+   * @throws {ProviderError} If generation fails
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  generateImageStream: Provider['generateImageStream'] = async function* (
+    this: OpenAIProvider<TConfig>,
+    request: ImageGenerationRequest,
+    ctx: AIContextAny,
+    config?: TConfig
+  ): AsyncIterable<ImageGenerationChunk> {
+    const effectiveConfig = { ...this.config, ...config };
 
-      let params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
-        model: model.id,
-        prompt: request.prompt,
-        n: request.n,
-        size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
-        quality: request.quality as 'standard' | 'hd' | undefined,
-        style: request.style as 'vivid' | 'natural' | undefined,
-        background: request.background,
-        response_format: request.responseFormat || 'b64_json',
-        user: request.userIdentifier,
-        ...request.extra,
-        stream: false,
-      };
+    const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Images.ImageGenStreamEvent>>(request, undefined, ctx, effectiveConfig, 'generate image stream', effectiveConfig.defaultModels?.imageGenerate || 'gpt-image-1');
+    
+    const imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
 
-      // Apply provider-specific customizations
-      if (this.customizeImageParams) {
-        params = this.customizeImageParams(params, effectiveConfig);
+    const params: OpenAI.Images.ImageGenerateParamsStreaming = {
+      model: model.id,
+      prompt: request.prompt,
+      n: 1,
+      size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
+      quality: request.quality as 'standard' | 'hd' | undefined,
+      style: request.style as 'vivid' | 'natural' | undefined,
+      background: request.background,
+      user: request.userIdentifier,
+      partial_images: imageStreams,
+      response_format: request.responseFormat,
+      ...request.extra,
+      stream: true,
+    };
+
+    this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
+    
+    const client = this.createClient(effectiveConfig);
+
+    let response: Stream<OpenAI.Images.ImageGenStreamEvent>;
+    try {
+      response = await retry(async (signal) => {
+        return await client.images.generate(params, { signal });
+      });
+
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during image generation', details?.contextWindow, e);
+      }
+      throw e;
+    }
+
+    // Yield completion with results
+    let imageCount = 0;
+    for await (const img of response) {
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
       }
 
-      const response = await client.images.generate(params);
-
-      return {
-        images: (response.data || []).map((img) => ({
-          url: img.url || undefined,
+      const progress = (imageCount + 1) / (imageStreams + 1);
+      yield {
+        progress,
+        done: img.type === 'image_generation.completed',
+        image: {
           b64_json: img.b64_json || undefined,
-          revisedPrompt: img.revised_prompt || undefined,
-        })),
-        model,
-        usage: {
-          inputTokens: response.usage?.input_tokens || 0,
-          outputTokens: response.usage?.output_tokens || 0,
-          totalTokens: response.usage?.total_tokens || 0,
         },
       };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Image generation failed', error as Error);
+
+      imageCount++;
     }
   }
 
@@ -1108,53 +1288,58 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<ImageGenerationResponse> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry } = this.getRequestData<OpenAI.Images.ImagesResponse>(request, undefined, ctx, effectiveConfig, 'edit image', effectiveConfig.defaultModels?.imageEdit || 'gpt-image-1');
+    
+    const image = this.toUploadableImage(request.image);
+    const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+    
+    const params: OpenAI.Images.ImageEditParamsNonStreaming = {
+      model: model.id,
+      image,
+      prompt: request.prompt,
+      mask,
+      n: request.n,
+      size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
+      user: request.userIdentifier,
+      response_format: request.responseFormat,
+      ...request.extra,
+      stream: false,
+    };
+
+    // Apply provider-specific customizations
+    this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
+
     const client = this.createClient(effectiveConfig);
 
+    let response: OpenAI.Images.ImagesResponse;
     try {
-      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-2');
-      const image = this.toUploadableImage(request.image);
-      const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+      response = await retry(async (signal) => {
+        return await client.images.edit(params, { signal });
+      });
 
-      let params: OpenAI.Images.ImageEditParamsNonStreaming = {
-        model: model.id,
-        image,
-        prompt: request.prompt,
-        mask,
-        n: request.n,
-        size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
-        user: request.userIdentifier,
-        response_format: request.responseFormat,
-        ...request.extra,
-        stream: false,
-      };
-
-      // Apply provider-specific customizations
-      if (this.customizeImageParams) {
-        params = this.customizeImageParams(params, effectiveConfig);
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
       }
-
-      const response = await client.images.edit(params);
-
-      return {
-        images: (response.data || []).map((img) => ({
-          url: img.url || undefined,
-          b64_json: img.b64_json || undefined,
-          revisedPrompt: img.revised_prompt || undefined,
-        })),
-        model,
-        usage: {
-          inputTokens: response.usage?.input_tokens || 0,
-          outputTokens: response.usage?.output_tokens || 0,
-          totalTokens: response.usage?.total_tokens || 0,
-        },
-      };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Image editing failed', error as Error);
+      throw e;
     }
+
+    return {
+      images: (response.data || []).map((img) => ({
+        url: img.url || undefined,
+        b64_json: img.b64_json || undefined,
+        revisedPrompt: img.revised_prompt || undefined,
+      })),
+      model,
+      usage: {
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
+      },
+    };
   }
 
   /**
@@ -1176,138 +1361,67 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<ImageGenerationChunk> {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry, signal } = this.getRequestData<Stream<OpenAI.ImageEditStreamEvent>>(request, undefined, ctx, effectiveConfig, 'edit image stream', effectiveConfig.defaultModels?.imageEdit || 'gpt-image-1');
+    
+    const image = this.toUploadableImage(request.image);
+    const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+    const imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
+
+    const params: OpenAI.Images.ImageEditParamsStreaming = {
+      model: model.id,
+      image,
+      prompt: request.prompt,
+      mask,
+      n: request.n || 1,
+      size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
+      response_format: request.responseFormat,
+      user: request.userIdentifier,
+      partial_images: imageStreams,
+      ...request.extra,
+      stream: true,
+    };
+
+    this.augmentImageEditRequest?.(params, request, effectiveConfig);
+
     const client = this.createClient(effectiveConfig);
 
+    let response: Stream<OpenAI.Images.ImageEditStreamEvent>;
     try {
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-2');
-      const image = this.toUploadableImage(request.image);
-      const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+      response = await retry(async (signal) => {
+        return await client.images.edit(params, { signal });
+      });
 
-      let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
-      let imageCount = 0;
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
+      }
+      throw e;
+    }
 
-      let params: OpenAI.Images.ImageEditParamsStreaming = {
-        model: model.id,
-        image,
-        prompt: request.prompt,
-        mask,
-        n: request.n || 1,
-        size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
-        response_format: request.responseFormat,
-        user: request.userIdentifier,
-        partial_images: imageStreams,
-        ...request.extra,
-        stream: true,
+    // Yield completion with results
+    let imageCount = 0;
+    for await (const img of response) {
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      const progress = (imageCount + 1) / (imageStreams + 1);
+
+      yield {
+        progress,
+        done: img.type === 'image_edit.completed',
+        image: {
+          b64_json: img.b64_json || undefined,
+        },
+        model,
       };
-
-      if (this.customizeImageParams) {
-        params = this.customizeImageParams(params, effectiveConfig);
-      }
-
-      const response = await client.images.edit(params, { signal });
-
-      // Yield completion with results
-      for await (const img of response) {
-        if (signal?.aborted) {
-          throw new Error('Request aborted');
-        }
-
-        const progress = (imageCount + 1) / (imageStreams + 1);
-
-        yield {
-          progress,
-          done: img.type === 'image_edit.completed',
-          image: {
-            b64_json: img.b64_json || undefined,
-          },
-          model,
-        };
-        imageCount++;
-      }
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Image editing streaming failed', error as Error);
+      imageCount++;
     }
   }
 
-  /**
-   * Generate images with streaming progress updates.
-   *
-   * Note: OpenAI's API doesn't natively support streaming image generation,
-   * so this implementation polls for progress or returns the result immediately.
-   *
-   * @param request Image generation request parameters
-   * @param ctx Context object (not used)
-   * @param config Optional configuration override
-   * @returns Async generator yielding progress chunks
-   * @throws {ProviderError} If generation fails
-   * @throws {RateLimitError} If rate limit is exceeded
-   */
-  generateImageStream: Provider['generateImageStream'] = async function* (
-    this: OpenAIProvider<TConfig>,
-    request: ImageGenerationRequest,
-    ctx: AIContextAny,
-    config?: TConfig
-  ): AsyncIterable<ImageGenerationChunk> {
-    const effectiveConfig = config || this.config;
-    const client = this.createClient(effectiveConfig);
-
-    try {
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'dall-e-3');
-
-      let imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
-      let imageCount = 0;
-
-      let params: OpenAI.Images.ImageGenerateParamsStreaming = {
-        model: model.id,
-        prompt: request.prompt,
-        n: 1,
-        size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
-        quality: request.quality as 'standard' | 'hd' | undefined,
-        style: request.style as 'vivid' | 'natural' | undefined,
-        background: request.background,
-        user: request.userIdentifier,
-        partial_images: imageStreams,
-        response_format: request.responseFormat,
-        ...request.extra,
-        stream: true,
-      };
-
-      if (this.customizeImageParams) {
-        params = this.customizeImageParams(params, effectiveConfig);
-      }
-
-      const response = await client.images.generate(params, { signal });
-
-      // Yield completion with results
-      for await (const img of response) {
-        if (signal?.aborted) {
-          throw new Error('Request aborted');
-        }
-
-        const progress = (imageCount + 1) / (imageStreams + 1);
-        yield {
-          progress,
-          done: img.type === 'image_generation.completed',
-          image: {
-            b64_json: img.b64_json || undefined,
-          },
-        };
-
-        imageCount++;
-      }
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Image generation streaming failed', error as Error);
-    }
-  }
 
   /**
    * Convert various image input types to Uploadable format.
@@ -1404,50 +1518,55 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<TranscriptionResponse> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry, signal } = this.getRequestData<OpenAI.Audio.Transcriptions.Transcription>(request, undefined, ctx, effectiveConfig, 'transcribe', effectiveConfig.defaultModels?.transcription || 'whisper-1');
+    
+    const file: Uploadable = this.toUploadableAudio(request.audio);
+    const params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
+      model: model.id,
+      file,
+      language: request.language,
+      prompt: request.prompt,
+      temperature: request.temperature,
+      response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
+      timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
+      ...request.extra,
+      stream: false,
+    };
+
+    // Apply provider-specific customizations
+    this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
+    
     const client = this.createClient(effectiveConfig);
 
+    let response: OpenAI.Audio.Transcriptions.Transcription;
     try {
-      // Convert audio to appropriate format
-      let file: Uploadable = this.toUploadableAudio(request.audio);
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'whisper-1');
-      let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
-        model: model.id,
-        file,
-        language: request.language,
-        prompt: request.prompt,
-        temperature: request.temperature,
-        response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
-        timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
-        ...request.extra,
-        stream: false,
-      };
+      response = await retry(async (signal) => {
+        return await client.audio.transcriptions.create(params, { signal });
+      });
 
-      // Apply provider-specific customizations
-      this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
-
-      const response = await client.audio.transcriptions.create(params, { signal });
-
-      return {
-        text: response.text,
-        model,
-        usage: {
-          ...(response.usage?.type === 'tokens' ? {
-            outputTokens: response.usage.output_tokens ?? 0,
-            inputTokens: response.usage.input_tokens ?? 0,
-            totalTokens: response.usage.total_tokens ?? 0,
-          }: {
-            seconds: response.usage?.seconds ?? 0,
-          }),
-        },
-      };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
       }
-      throw new ProviderError(this.name, 'Transcription failed', error as Error);
+      throw e;
     }
+
+    return {
+      text: response.text,
+      model,
+      usage: {
+        ...(response.usage?.type === 'tokens' ? {
+          outputTokens: response.usage.output_tokens ?? 0,
+          inputTokens: response.usage.input_tokens ?? 0,
+          totalTokens: response.usage.total_tokens ?? 0,
+        }: {
+          seconds: response.usage?.seconds ?? 0,
+        }),
+      },
+    };
   }
 
   /**
@@ -1469,70 +1588,75 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<TranscriptionChunk> {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Audio.Transcriptions.TranscriptionStreamEvent>>(request, undefined, ctx, effectiveConfig, 'transcribe stream', effectiveConfig.defaultModels?.transcription || 'whisper-1');
+    
+    const file: Uploadable = this.toUploadableAudio(request.audio);
+    const params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsStreaming = {
+      model: model.id,
+      file,
+      language: request.language,
+      prompt: request.prompt,
+      temperature: request.temperature,
+      response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
+      timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
+      ...request.extra,
+      stream: true,
+    };
+
+    this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
+
     const client = this.createClient(effectiveConfig);
 
+    let response: Stream<OpenAI.Audio.Transcriptions.TranscriptionStreamEvent>;
     try {
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'whisper-1');
-      let file: Uploadable = this.toUploadableAudio(request.audio);
-      let params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsStreaming = {
-        model: model.id,
-        file,
-        language: request.language,
-        prompt: request.prompt,
-        temperature: request.temperature,
-        response_format: request.responseFormat as 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json' | undefined,
-        timestamp_granularities: request.timestampGranularities as ('word' | 'segment')[] | undefined,
-        ...request.extra,
-        stream: true,
-      };
+      response = await retry(async (signal) => {
+        return await client.audio.transcriptions.create(params, { signal });
+      });
 
-      this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during transcription', details?.contextWindow, e);
+      }
+      throw e;
+    }
 
-      const response = await client.audio.transcriptions.create(params, { signal });
+    for await (const chunk of response) {
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
 
-      for await (const chunk of response) {
-        if (signal?.aborted) {
-          throw new Error('Request aborted');
-        }
-
-        switch (chunk.type) {
-          case 'transcript.text.delta':
-            yield {
-              delta: chunk.delta,
-            };
-            break
-          case 'transcript.text.segment':
-            yield {
-              segment: {
-                start: chunk.start,
-                end: chunk.end,
-                speaker: chunk.speaker,
-                text: chunk.text,
-                id: chunk.id,
-              },
-            };
-            break;
-          case 'transcript.text.done':
-            yield {
+      switch (chunk.type) {
+        case 'transcript.text.delta':
+          yield {
+            delta: chunk.delta,
+          };
+          break
+        case 'transcript.text.segment':
+          yield {
+            segment: {
+              start: chunk.start,
+              end: chunk.end,
+              speaker: chunk.speaker,
               text: chunk.text,
-              usage: !chunk.usage ? undefined : {
-                inputTokens: chunk.usage.input_tokens,
-                outputTokens: chunk.usage.output_tokens,
-                totalTokens: chunk.usage.total_tokens,
-              },
-              model,
-            };
-            break;
-        }
+              id: chunk.id,
+            },
+          };
+          break;
+        case 'transcript.text.done':
+          yield {
+            text: chunk.text,
+            usage: !chunk.usage ? undefined : {
+              inputTokens: chunk.usage.input_tokens,
+              outputTokens: chunk.usage.output_tokens,
+              totalTokens: chunk.usage.total_tokens,
+            },
+            model,
+          };
+          break;
       }
-
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Transcription streaming failed', error as Error);
     }
   }
 
@@ -1553,47 +1677,50 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<SpeechResponse> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry, signal } = this.getRequestData<globalThis.Response>(request, undefined, ctx, effectiveConfig, 'speech', effectiveConfig.defaultModels?.speech || 'tts-1');
+    
+    const { text: input, instructions, speed } = request;
+    const voiceDefault = 'alloy' as const;
+    const voiceValid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
+    const voiceRequest = request.voice || voiceDefault;
+    const voice = (voiceValid as readonly string[]).includes(voiceRequest) ? voiceRequest : voiceDefault;
+    const responseFormat = request.responseFormat || 'opus';
+
+    const params: OpenAI.Audio.Speech.SpeechCreateParams = {
+      model: model.id,
+      input,
+      instructions,
+      voice,
+      speed,
+      response_format: responseFormat,
+      ...request.extra,
+    };
+
+    // Apply provider-specific customizations
+    this.augmentSpeechRequest?.(params, request, effectiveConfig);
+
     const client = this.createClient(effectiveConfig);
 
+    let response: globalThis.Response;
     try {
-      const { text: input, instructions, speed } = request;
-
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'tts-1');
-      const voiceDefault = 'alloy' as const;
-      const voiceValid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'] as const;
-      const voiceRequest = request.voice || voiceDefault;
-      const voice = (voiceValid as readonly string[]).includes(voiceRequest) ? voiceRequest : voiceDefault;
-      const responseFormat = request.responseFormat || 'opus';
-
-      let params: OpenAI.Audio.Speech.SpeechCreateParams = {
-        model: model.id,
-        input,
-        instructions,
-        voice,
-        speed,
-        response_format: responseFormat,
-        ...request.extra,
-      };
-
-      if (this.customizeSpeechParams) {
-        params = this.customizeSpeechParams(params, effectiveConfig);
+      response = await retry(async (signal) => {
+        return await client.audio.speech.create(params, { signal });
+      });
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during speech generation', details?.contextWindow, e);
       }
+      throw e;
+    }
 
-      const response = await client.audio.speech.create(params, { signal });
-
-      return {
-        model,
-        audio: response.body as ReadableStream<any>,
-        responseFormat,
-      };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Speech generation failed', error as Error);
-  }
+    return {
+      model,
+      audio: response.body as ReadableStream<any>,
+      responseFormat,
+    };
   }
 
   /**
@@ -1613,48 +1740,52 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<EmbeddingResponse> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
+
+    const { model, retry } = this.getRequestData<OpenAI.CreateEmbeddingResponse>(request, undefined, ctx, effectiveConfig, 'embed', effectiveConfig.defaultModels?.embedding || 'text-embedding-3-small');
+    
+    const params: OpenAI.EmbeddingCreateParams = {
+      model: model.id,
+      input: request.texts,
+      dimensions: request.dimensions,
+      encoding_format: request.encodingFormat,
+      user: request.userIdentifier,
+      ...request.extra,
+    };
+
+    // Apply provider-specific customizations
+    this.augmentEmbeddingRequest?.(params, request, effectiveConfig);
+
     const client = this.createClient(effectiveConfig);
 
+    let response: OpenAI.CreateEmbeddingResponse;
     try {
-      const signal = ctx.signal;
-      const model = getModel(request.model || ctx.metadata?.model || 'text-embedding-3-small');
-      let params: OpenAI.EmbeddingCreateParams = {
-        model: model.id,
-        input: request.texts,
-        dimensions: request.dimensions,
-        encoding_format: request.encodingFormat,
-        user: request.userIdentifier,
-        ...request.extra,
-      };
+      response = await retry(async (signal) => {
+        return await client.embeddings.create(params, { signal });
+      });
 
-      // Apply provider-specific customizations
-      if (this.customizeEmbeddingParams) {
-        params = this.customizeEmbeddingParams(params, effectiveConfig);
+    } catch (e: any) {
+      if (isContextWindowError(e)) {
+        const details = parseContextWindowError(e);
+        throw new ContextWindowError(this.name, 'Context window exceeded during embedding generation', details?.contextWindow, e);
       }
-
-      const response = await client.embeddings.create(params, { signal });
-
-      return {
-        embeddings: response.data.map((item) => ({
-          embedding: item.embedding,
-          index: item.index,
-        })),
-        model,
-        usage: response.usage
-          ? {
-              inputTokens: response.usage.prompt_tokens,
-              outputTokens: 0,
-              totalTokens: response.usage.total_tokens,
-            }
-          : undefined,
-      };
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      throw new ProviderError(this.name, 'Embedding generation failed', error as Error);
+      throw e;
     }
+
+    return {
+      embeddings: response.data.map((item) => ({
+        embedding: item.embedding,
+        index: item.index,
+      })),
+      model,
+      usage: response.usage
+        ? {
+            inputTokens: response.usage.prompt_tokens,
+            outputTokens: 0,
+            totalTokens: response.usage.total_tokens,
+          }
+        : undefined,
+    };
   }
 
   /**
@@ -1675,44 +1806,36 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): Promise<Response> => {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
     const executor = this.createExecutor(effectiveConfig);
 
-    try {
-      // Convert ImageAnalyzeRequest to chat Request
-      const chatRequest: Request = {
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', content: request.prompt },
-              ...request.images.map((image): MessageContent => ({
-                type: 'image',
-                content: image,
-              })),
-            ],
-          },
-        ],
-        temperature: request.temperature,
-        maxTokens: request.maxTokens,
-      };
+    // Convert ImageAnalyzeRequest to chat Request
+    const chatRequest: Request = {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', content: request.prompt },
+            ...request.images.map((image): MessageContent => ({
+              type: 'image',
+              content: image,
+            })),
+          ],
+        },
+      ],
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+    };
 
-      // Use the chat executor to analyze the images
-      const response = await executor(
-        chatRequest,
-        ctx,
-        {},
-        undefined
-      );
+    // Use the chat executor to analyze the images
+    const response = await executor(
+      chatRequest,
+      ctx,
+      {},
+      undefined
+    );
 
-      return response;
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      if (error instanceof ProviderError) throw error;
-      throw new ProviderError(this.name, 'Image analysis failed', error as Error);
-    }
+    return response;
   }
 
   /**
@@ -1734,44 +1857,35 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ctx: AIContextAny,
     config?: TConfig
   ): AsyncIterable<Chunk> {
-    const effectiveConfig = config || this.config;
+    const effectiveConfig = { ...this.config, ...config };
     const streamer = this.createStreamer(effectiveConfig);
 
-    try {
-      // Convert ImageAnalyzeRequest to chat Request
-      const chatRequest: Request = {
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', content: request.prompt },
-              ...request.images.map((image): MessageContent => ({
-                type: 'image',
-                content: image,
-              })),
-            ],
-          },
-        ],
-        temperature: request.temperature,
-        maxTokens: request.maxTokens,
-      };
+    // Convert ImageAnalyzeRequest to chat Request
+    const chatRequest: Request = {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', content: request.prompt },
+            ...request.images.map((image): MessageContent => ({
+              type: 'image',
+              content: image,
+            })),
+          ],
+        },
+      ],
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+    };
 
-      // Use the chat streamer to analyze the images
-      for await (const chunk of streamer(
-        chatRequest,
-        ctx,
-        { model: request.model } as any,
-        undefined
-      )) {
-        yield chunk;
-      }
-
-    } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as any).status === 429) {
-        throw new RateLimitError(this.name, error.message);
-      }
-      if (error instanceof ProviderError) throw error;
-      throw new ProviderError(this.name, 'Image analysis streaming failed', error as Error);
+    // Use the chat streamer to analyze the images
+    for await (const chunk of streamer(
+      chatRequest,
+      ctx,
+      { model: request.model } as any,
+      undefined
+    )) {
+      yield chunk;
     }
   }
 }

@@ -112,3 +112,27 @@ export class ProviderQuotaError extends ProviderError {
     this.name = 'ProviderQuotaError';
   }
 }
+
+/**
+ * Error thrown when the request exceeds the model's context window.
+ *
+ * This typically occurs with status 413 when the input is too long
+ * for the model's maximum context length.
+ *
+ * @example
+ * ```typescript
+ * throw new ContextWindowError('openai', 'Input too long', 128000, originalError);
+ * ```
+ */
+export class ContextWindowError extends ProviderError {
+  constructor(
+    provider: string,
+    message: string,
+    // The context window size in tokens (if known)
+    public contextWindow?: number,
+    cause?: Error
+  ) {
+    super(provider, message, cause);
+    this.name = 'ContextWindowError';
+  }
+}
