@@ -1,9 +1,8 @@
 /**
  * Final Coverage Tests for Prompt.ts
  *
- * Targeting specific uncovered lines:
- * 481, 553, 556, 559, 579-581, 595-596, 613, 619, 622, 642, 658, 722-723,
- * 759-761, 779-782, 802, 833, 977, 1074
+ * Tests for edge cases and specific functionality paths in prompt execution,
+ * including abort signals, tool execution modes, error handling, and retry logic.
  */
 
 import { z } from 'zod';
@@ -13,7 +12,7 @@ import { Context } from '../types';
 import { createMockExecutor, createMockStreamer } from './mocks/executor.mock';
 
 describe('Prompt Final Coverage Lines', () => {
-  describe('Line 481: ctx.signal abort listener', () => {
+  describe('Abort Signal Handling', () => {
     it('should handle abort signal during streaming', async () => {
       const prompt = new Prompt({
         name: 'abort-test',
@@ -51,8 +50,8 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 553, 556, 559: Tool event emission in immediate mode', () => {
-    it('should emit tool start events in immediate mode (line 553)', async () => {
+  describe('Tool Event Emission in Immediate Mode', () => {
+    it('should emit tool start events in immediate mode', async () => {
       const tool = new Tool({
         name: 'immediate-tool',
         description: 'Immediate tool',
@@ -98,7 +97,7 @@ describe('Prompt Final Coverage Lines', () => {
       expect(startEvents.length).toBeGreaterThan(0);
     });
 
-    it('should emit tool output events in immediate mode (line 556)', async () => {
+    it('should emit tool output events in immediate mode', async () => {
       const tool = new Tool({
         name: 'fast-tool',
         description: 'Fast tool',
@@ -144,7 +143,7 @@ describe('Prompt Final Coverage Lines', () => {
       expect(outputEvents.length).toBeGreaterThan(0);
     });
 
-    it('should emit tool error events in immediate mode (line 559)', async () => {
+    it('should emit tool error events in immediate mode', async () => {
       const tool = new Tool({
         name: 'error-tool',
         description: 'Error tool',
@@ -193,7 +192,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 579-581: Content filter handling', () => {
+  describe('Content Filter Handling', () => {
     it('should handle content_filter finish reason', async () => {
       const prompt = new Prompt({
         name: 'content-filter',
@@ -217,7 +216,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 595-596: Length finish reason without usage', () => {
+  describe('Length Finish Reason Without Usage Info', () => {
     it('should error when length finish reason has no usage info', async () => {
       const prompt = new Prompt({
         name: 'length-no-usage',
@@ -242,8 +241,8 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 613, 619, 622: Skip mode when tool has error', () => {
-    it('should skip tool execution and emit events when tool has error (lines 613, 619, 622)', async () => {
+  describe('Skip Mode When Tool Has Error', () => {
+    it('should skip tool execution and emit events when tool has error', async () => {
       const validTool = new Tool({
         name: 'valid-tool',
         description: 'Valid',
@@ -293,8 +292,8 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 642, 658: Tool emit error in sequential and parallel modes', () => {
-    it('should emit tool error in sequential mode (line 642)', async () => {
+  describe('Tool Error Emission in Different Execution Modes', () => {
+    it('should emit tool error in sequential mode', async () => {
       const errorTool = new Tool({
         name: 'seq-error',
         description: 'Sequential error',
@@ -342,7 +341,7 @@ describe('Prompt Final Coverage Lines', () => {
       expect(errorEvents.length).toBeGreaterThan(0);
     });
 
-    it('should emit tool error in parallel mode (line 658)', async () => {
+    it('should emit tool error in parallel mode', async () => {
       const errorTool = new Tool({
         name: 'par-error',
         description: 'Parallel error',
@@ -392,7 +391,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 722-723: Validation error handling', () => {
+  describe('Custom Validation Error Handling', () => {
     it('should handle validation error with custom validate function', async () => {
       const prompt = new Prompt({
         name: 'custom-validation',
@@ -429,7 +428,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 759-761: Reconfig config assignment', () => {
+  describe('Reconfig Config Assignment', () => {
     it('should apply reconfig custom config and delete messages', async () => {
       let reconfigCalled = false;
 
@@ -469,7 +468,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Lines 779-782: toolsMax logic', () => {
+  describe('Tools Max Limit Logic', () => {
     it('should remove tools and required toolChoice after reaching toolsMax', async () => {
       const tool = new Tool({
         name: 'limited-tool',
@@ -515,7 +514,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Line 802: Error when iterations == maxIterations', () => {
+  describe('Maximum Iterations Error', () => {
     it('should error when maximum iterations reached without valid response', async () => {
       const prompt = new Prompt({
         name: 'max-iterations',
@@ -545,7 +544,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Line 833: Schema returning false', () => {
+  describe('Schema Compatibility Check', () => {
     it('should return undefined when schema function returns false', async () => {
       const prompt = new Prompt({
         name: 'schema-false',
@@ -574,7 +573,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Line 977: No way to know token counts', () => {
+  describe('Token Counting Fallback', () => {
     it('should return messages as-is when no token counting method available', async () => {
       const prompt = new Prompt({
         name: 'no-token-info',
@@ -614,7 +613,7 @@ describe('Prompt Final Coverage Lines', () => {
     });
   });
 
-  describe('Line 1074: Early return in parse when status !== ready', () => {
+  describe('Tool Parse Early Return', () => {
     it('should return early from parse when status is not ready', async () => {
       const tool = new Tool({
         name: 'parse-early-return',

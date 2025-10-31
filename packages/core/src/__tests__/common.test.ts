@@ -803,7 +803,7 @@ describe('Common Utilities', () => {
       applicable: jest.fn(() => Promise.resolve(true)),
     });
 
-    it('should call onChild when component has parent (line 348)', async () => {
+    it('should call onChild when component has parent', async () => {
       const onChild = jest.fn();
       const events: Events<any> = {
         onChild,
@@ -838,7 +838,7 @@ describe('Common Utilities', () => {
       expect(childInstance.parent).toBe(parentInstance);
     });
 
-    it('should handle error with interrupted status when signal is aborted (lines 368-370)', async () => {
+    it('should handle error with interrupted status when signal is aborted', async () => {
       const onStatus = jest.fn();
       const events: Events<any> = {
         onStatus,
@@ -874,7 +874,7 @@ describe('Common Utilities', () => {
       expect(interruptedCall[0].completed).toBeDefined();
     });
 
-    it('should handle error with failed status when not aborted (lines 371-372)', async () => {
+    it('should handle error with failed status when not aborted', async () => {
       const onStatus = jest.fn();
       const events: Events<any> = {
         onStatus,
@@ -902,7 +902,7 @@ describe('Common Utilities', () => {
       expect(failedCall[0].status).toBe('failed');
     });
 
-    it('should set completed timestamp and error on failure (lines 373-374)', async () => {
+    it('should set completed timestamp and error on failure', async () => {
       const onStatus = jest.fn();
       const events: Events<any> = {
         onStatus,
@@ -932,7 +932,7 @@ describe('Common Utilities', () => {
       expect(failedCall[0].error).toBe(error);
     });
 
-    it('should call onStatus on error (line 377)', async () => {
+    it('should call onStatus on error', async () => {
       const onStatus = jest.fn();
       const events: Events<any> = {
         onStatus,

@@ -54,7 +54,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Event Emission (lines 460-461, 549-555)', () => {
+  describe('Event Emission in Immediate Tool Mode', () => {
     it('should emit prompt events when onPromptEvent is provided', async () => {
       const tool = new Tool({
         name: 'emitter',
@@ -165,7 +165,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Tool Execution Paths (lines 575-577, 591-592, 609, 615, 618)', () => {
+  describe('Tool Execution Paths', () => {
     it('should handle sequential tool execution with parsing', async () => {
       const tool1 = new Tool({
         name: 'seq1',
@@ -275,7 +275,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Tool Error Handling (lines 638, 654, 671, 716-717)', () => {
+  describe('Tool Error Handling and Status Tracking', () => {
     it('should track tool parse errors', async () => {
       const tool = new Tool({
         name: 'strict-parser',
@@ -410,7 +410,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Message Handling (lines 753-755, 760-764, 773-776)', () => {
+  describe('Message Handling and Reconfiguration', () => {
     it('should handle messages with no content in tool execution', async () => {
       const tool = new Tool({
         name: 'content-checker',
@@ -523,7 +523,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Validation Paths (lines 796, 827)', () => {
+  describe('Output Validation and Schema Parsing', () => {
     it('should handle ZodError during validation', async () => {
       const prompt = new Prompt({
         name: 'validation-error',
@@ -588,7 +588,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Forget Function (lines 934-993)', () => {
+  describe('Context Window Management and Message Trimming', () => {
     it('should use estimateTokens for messages without token counts', async () => {
       const prompt = new Prompt({
         name: 'estimate-in-forget',
@@ -803,7 +803,7 @@ describe('Prompt 100% Coverage', () => {
     });
   });
 
-  describe('Tool Execution Edge Cases (lines 1056, 1081-1083)', () => {
+  describe('Tool Execution Edge Cases', () => {
     it('should handle tool parse that rejects with error', async () => {
       const tool = new Tool({
         name: 'bad-parser',

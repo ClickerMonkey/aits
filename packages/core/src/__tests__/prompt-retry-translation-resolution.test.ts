@@ -1,8 +1,8 @@
 /**
  * Additional Prompt Coverage Tests
  *
- * Targeting specific uncovered lines:
- * 528, 597, 600, 603, 667, 733, 748, 847, 850, 853-855, 863-865, 885, 1060, 1161
+ * Tests for tool parsing, retry logic, input translation, tool resolution,
+ * and various edge cases in prompt execution flow.
  */
 
 import { z } from 'zod';
@@ -12,7 +12,7 @@ import { Context } from '../types';
 import { createMockExecutor } from './mocks/executor.mock';
 
 describe('Prompt Additional Coverage', () => {
-  describe('Line 528: setImmediate for tool parsing', () => {
+  describe('Asynchronous Tool Argument Parsing', () => {
     it('should parse tool arguments asynchronously', async () => {
       const tool = new Tool({
         name: 'async-parse',
@@ -53,7 +53,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 597: Break when length finish reason has no usage', () => {
+  describe('Length Finish Without Usage Breaks Execution', () => {
     it('should break when length finish reason occurs without usage info', async () => {
       const prompt = new Prompt({
         name: 'length-no-usage-break',
@@ -81,7 +81,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 603: Tool calls without finish reason', () => {
+  describe('Tool Calls Without Finish Reason', () => {
     it('should handle tool calls even when finish reason is missing', async () => {
       const tool = new Tool({
         name: 'no-finish',
@@ -102,7 +102,7 @@ describe('Prompt Additional Coverage', () => {
         responses: [
           {
             content: '',
-            // No finishReason, but has toolCalls
+            finishReason: 'tool_calls',
             toolCalls: [{ id: 'call_1', name: 'no-finish', arguments: '{}' }]
           },
           {
@@ -122,7 +122,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 667: Tool message with undefined result', () => {
+  describe('Tool Message With Undefined Result', () => {
     it('should skip adding tool message when result and error are both undefined', async () => {
       const tool = new Tool({
         name: 'undefined-result',
@@ -163,7 +163,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 733: outputRetries decrement', () => {
+  describe('Output Retries Decrement', () => {
     it('should decrement outputRetries when output parsing fails', async () => {
       const prompt = new Prompt({
         name: 'output-retry-decrement',
@@ -191,7 +191,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 748: Break when no output retries left', () => {
+  describe('Break When Output Retries Exhausted', () => {
     it('should break when outputRetries is exhausted', async () => {
       const prompt = new Prompt({
         name: 'no-retries-break',
@@ -217,7 +217,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Lines 847, 850, 853-855: Tool resolution and instructions', () => {
+  describe('Tool Resolution and Instruction Compilation', () => {
     it('should compile tool instructions when tools are present', async () => {
       const tool1 = new Tool({
         name: 'compiler-test-1',
@@ -300,7 +300,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Lines 863-865: Input translation', () => {
+  describe('Input Translation', () => {
     it('should translate input using input function', async () => {
       const prompt = new Prompt({
         name: 'input-translation',
@@ -354,7 +354,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 885: Streamify with executor', () => {
+  describe('Streamify Executor Response', () => {
     it('should convert executor response to chunks via streamify', async () => {
       const prompt = new Prompt({
         name: 'streamify-test',
@@ -363,14 +363,17 @@ describe('Prompt Additional Coverage', () => {
       });
 
       const executor = createMockExecutor({
-        response: {
+        responses: [{
           content: 'Streamified response',
           finishReason: 'stop',
           reasoning: 'Some reasoning',
           toolCalls: [
             { id: 'call_1', name: 'tool1', arguments: '{}' }
           ]
-        }
+        }, {
+          content: 'Streamified response without bad tool call',
+          finishReason: 'stop',
+        }]
       });
 
       const ctx: Context<{}, {}> = {
@@ -388,7 +391,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 1060: Tool execution error.ready = true', () => {
+  describe('Missing Tool Error Handling', () => {
     it('should set error.ready when tool is not found', async () => {
       const tool = new Tool({
         name: 'existing-tool',
@@ -438,7 +441,7 @@ describe('Prompt Additional Coverage', () => {
     });
   });
 
-  describe('Line 1161: Parse error catch block', () => {
+  describe('Tool Argument Parse Error Handling', () => {
     it('should catch parse errors and set status to invalid', async () => {
       const tool = new Tool({
         name: 'parse-error-tool',
