@@ -1017,8 +1017,8 @@ export interface Provider<TConfig = any> {
  * @example
  * ```typescript
  * const hooks: AIHooks<MyAITypes> = {
- *   beforeRequest: async (ctx, selected, tokens) => {
- *     console.log(`Using ${selected.model.id}, estimated ${tokens} tokens`);
+ *   beforeRequest: async (ctx, selected, tokens, cost) => {
+ *     console.log(`Using ${selected.model.id}, estimated ${tokens} tokens, cost ${cost}`);
  *
  *     // Check budget
  *     if (ctx.user.budget < estimatedCost) {
@@ -1064,7 +1064,8 @@ export interface AIHooks<T extends AIBaseTypes> {
   beforeRequest?: (
     ctx: AIContext<T>,
     selected: SelectedModelFor<T>,
-    estimatedTokens: number
+    estimatedTokens: number,
+    estimatedCost: number
   ) => Promise<void> | void;
 
   /**

@@ -5,29 +5,22 @@
  * Implements the template method pattern to eliminate code duplication.
  */
 
-import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, getModel, ModelInput } from '@aits/core';
+import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, getModel } from '@aits/core';
 import type { AI } from '../ai';
+import { isModelInfo } from '../common';
 import type {
   AIBaseTypes,
   AIContext,
   AIContextOptional,
   AIContextRequired,
-  AIMetadata,
   AIMetadataRequired,
   AIProviderNames,
-  ModelHandler,
   ModelCapability,
+  ModelHandlerFor,
   ModelParameter,
   SelectedModelFor,
-  Usage,
-  Executor,
-  Streamer,
-  ModelHandlerFor,
-  AIBaseMetadata,
-  AIProviders,
-  AIProvider,
+  Usage
 } from '../types';
-import { isModelInfo } from '../common';
 
 /**
  * Abstract base class for all API implementations
@@ -157,14 +150,12 @@ export abstract class BaseAPI<
       // Run onModelSelected hook
       const finalSelected = (await hooks.onModelSelected?.(fullCtx, selected)) || selected;
 
-      // Validate provider capability
-      this.validateProviderCapability(finalSelected);
-
       // Estimate tokens
       const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
+      const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
 
       // Run beforeRequest hook
-      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens);
+      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -228,14 +219,12 @@ export abstract class BaseAPI<
         ? (await hooks.onModelSelected(fullCtx, selected)) || selected
         : selected;
 
-      // Validate provider streaming capability
-      this.validateProviderStreamingCapability(finalSelected);
-
       // Estimate tokens
       const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
+      const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
 
       // Run beforeRequest hook
-      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens);
+      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -244,7 +233,7 @@ export abstract class BaseAPI<
       let accumulatedUsage: Usage = {};
 
       for await (const chunk of this.streamRequestWithFallback(request, finalSelected, fullCtx, handler)) {
-        const usage = this.extractChunkUsage(chunk);
+        const usage = chunk.usage;
         if (usage) {
           accumulateUsage(accumulatedUsage, usage);
         }
@@ -358,7 +347,7 @@ export abstract class BaseAPI<
    */
   protected abstract getHandlerGetMethod(
     handler?: ModelHandlerFor<T>
-  ): ((request: any, ctx: AIContext<T>) => Promise<any>) | undefined;
+  ): ((request: TRequest, ctx: AIContext<T>) => Promise<TResponse>) | undefined;
 
   /**
    * Get the appropriate handler stream method for this API
@@ -366,7 +355,7 @@ export abstract class BaseAPI<
    */
   protected abstract getHandlerStreamMethod(
     handler?: ModelHandlerFor<T>
-  ): ((request: any, ctx: AIContext<T>) => AsyncIterable<any>) | undefined;
+  ): ((request: TRequest, ctx: AIContext<T>) => AsyncIterable<TChunk>) | undefined;
 
   // ============================================================================
   // OPTIONAL OVERRIDES (default implementations provided)
@@ -390,32 +379,6 @@ export abstract class BaseAPI<
   }
 
   /**
-   * Validate that the provider supports this operation
-   * (default: no validation)
-   * @param selected - The selected model and provider
-   */
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    // Default: no validation
-  }
-
-  /**
-   * Validate that the provider supports streaming for this operation
-   * (default: no validation)
-   * @param selected - The selected model and provider
-   */
-  protected validateProviderStreamingCapability(selected: SelectedModelFor<T>): void {
-    // Default: no validation
-  }
-
-  /**
-   * Whether to use an adapter for this request
-   * (default: false)
-   */
-  protected shouldUseAdapter(): boolean {
-    return false;
-  }
-
-  /**
    * Estimate tokens for the request
    * (default: delegates to AI instance method)
    * @param request - The request to estimate
@@ -423,6 +386,23 @@ export abstract class BaseAPI<
    */
   protected estimateRequestTokens(request: TRequest, selected: SelectedModelFor<T>): number {
     return 0;
+  }
+
+  /**
+   * Estimate cost for a request before execution
+   * 
+   * @param estimatedTokens - Estimated token count
+   * @param selected - The selected model and provider
+   * @returns Estimated cost
+   */
+  protected estimateRequestCost(
+    estimatedTokens: number,
+    selected: SelectedModelFor<T>
+  ): number {
+    const usage: Usage = { inputTokens: estimatedTokens, outputTokens: 0, totalTokens: estimatedTokens };
+    
+    // If no cost provided, calculate it
+    return this.ai.calculateCost(selected.model, usage);
   }
 
   /**
@@ -437,13 +417,11 @@ export abstract class BaseAPI<
     selected: SelectedModelFor<T>,
     estimatedTokens: number
   ): number {
-    // Try to extract from response first
-    const cost = (response as any).cost;
-    if (cost !== undefined) return cost;
-
     // Otherwise extract usage and check if cost is included
     const usage = this.extractUsage(response, estimatedTokens);
-    if (usage.cost !== undefined) return usage.cost;
+    if (usage.cost !== undefined) {
+      return usage.cost;
+    }
 
     // If no cost provided, calculate it
     return this.ai.calculateCost(selected.model, usage);
@@ -463,6 +441,7 @@ export abstract class BaseAPI<
     if (usage.cost !== undefined) {
       return usage.cost;
     }
+
     return this.ai.calculateCost(selected.model, usage);
   }
 
@@ -474,20 +453,11 @@ export abstract class BaseAPI<
    */
   protected extractUsage(response: TResponse, estimatedTokens: number): Usage {
     // Try to extract from response
-    const usage = (response as any).usage;
+    const usage = response.usage;
     if (usage) return usage;
 
     // Otherwise use estimate
     return { inputTokens: estimatedTokens, outputTokens: 0, totalTokens: estimatedTokens };
-  }
-
-  /**
-   * Extract usage from a streaming chunk
-   * (default: extracts from chunk.usage)
-   * @param chunk - The chunk
-   */
-  protected extractChunkUsage(chunk: TChunk): Usage | undefined {
-    return (chunk as any).usage;
   }
 
   /**
@@ -506,7 +476,7 @@ export abstract class BaseAPI<
     // Try handler first
     const handlerMethod = this.getHandlerGetMethod(handler);
     if (handlerMethod) {
-      return await handlerMethod(request as any, ctx);
+      return await handlerMethod(request, ctx);
     }
 
     // Try provider executor
@@ -518,7 +488,7 @@ export abstract class BaseAPI<
     const streamerMethod = this.getHandlerStreamMethod(handler);
     if (streamerMethod) {
       const chunks: TChunk[] = [];
-      for await (const chunk of streamerMethod(request as any, ctx)) {
+      for await (const chunk of streamerMethod(request, ctx)) {
         chunks.push(chunk);
       }
       return this.chunksToResponse(chunks, selected.model.id);
@@ -554,7 +524,7 @@ export abstract class BaseAPI<
     // Try handler first
     const handlerMethod = this.getHandlerStreamMethod(handler);
     if (handlerMethod) {
-      yield* handlerMethod(request as any, ctx);
+      yield* handlerMethod(request, ctx);
       return;
     }
 
@@ -567,7 +537,7 @@ export abstract class BaseAPI<
     // Fallback: try converting executor to streamer
     const getMethod = this.getHandlerGetMethod(handler);
     if (getMethod) {
-      const response = await getMethod(request as any, ctx);
+      const response = await getMethod(request, ctx);
       for (const chunk of this.responseToChunks(response)) {
         yield chunk;
       }

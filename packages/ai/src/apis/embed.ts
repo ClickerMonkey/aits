@@ -79,12 +79,6 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.embed) {
-      throw new Error(`Provider ${selected.model.provider} does not support embeddings`);
-    }
-  }
-
   protected estimateRequestTokens(request: EmbeddingRequest): number {
     const totalTextLength = request.texts.reduce((sum, text) => sum + text.length, 0);
     return Math.ceil(totalTextLength / 4);

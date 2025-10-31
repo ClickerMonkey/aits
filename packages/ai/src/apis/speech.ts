@@ -85,18 +85,6 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.speech) {
-      throw new Error(`Provider ${selected.model.provider} does not support speech generation`);
-    }
-  }
-
-  protected validateProviderStreamingCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.speech) {
-      throw new Error(`Provider ${selected.model.provider} does not support streaming speech generation`);
-    }
-  }
-
   protected estimateRequestTokens(request: SpeechRequest): number {
     return Math.ceil(request.text.length / 4);
   }

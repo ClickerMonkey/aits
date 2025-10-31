@@ -79,16 +79,6 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.transcribe) {
-      throw new Error(`Provider ${selected.model.provider} does not support transcription`);
-    }
-  }
-
-  protected shouldUseAdapter(): boolean {
-    return true;
-  }
-
   protected estimateRequestTokens(): number {
     return 1000; // Default estimate for audio
   }

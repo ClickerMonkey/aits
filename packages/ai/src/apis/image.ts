@@ -81,18 +81,6 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
       : 'Image generation streaming failed';
   }
 
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.generateImage) {
-      throw new Error(`Provider ${selected.model.provider} does not support image generation`);
-    }
-  }
-
-  protected validateProviderStreamingCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.generateImageStream) {
-      throw new Error(`Provider ${selected.model.provider} does not support streaming image generation`);
-    }
-  }
-
   protected estimateRequestTokens(request: ImageGenerationRequest): number {
     // Rough estimate based on prompt length and image size
     const promptTokens = Math.ceil(request.prompt.length / 4);
@@ -220,18 +208,6 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     return operation === 'request'
       ? 'Image editing failed'
       : 'Image editing streaming failed';
-  }
-
-  protected validateProviderCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.editImage) {
-      throw new Error(`Provider ${selected.model.provider} does not support image editing`);
-    }
-  }
-
-  protected validateProviderStreamingCapability(selected: SelectedModelFor<T>): void {
-    if (!selected.provider.editImageStream) {
-      throw new Error(`Provider ${selected.model.provider} does not support streaming image editing`);
-    }
   }
 
   protected estimateRequestTokens(request: ImageEditRequest): number {

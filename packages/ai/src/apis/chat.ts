@@ -35,7 +35,7 @@
  * ```
  */
 
-import { getChunksFromResponse, getResponseFromChunks, type Executor, type FinishReason, type Streamer, type ToolCall } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, type Executor, type Streamer } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -44,12 +44,11 @@ import type {
   AIMetadataRequired,
   Chunk,
   ModelCapability,
-  ModelParameter,
   ModelHandlerFor,
+  ModelParameter,
   Request,
   Response,
-  SelectedModelFor,
-  Usage
+  SelectedModelFor
 } from '../types';
 import { BaseAPI } from './base';
 
@@ -159,7 +158,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     if (request.reason !== undefined) {
       params.add('reason');
     }
-    if (request.tools !== undefined || request.toolChoice !== undefined || request.toolsOnly) {
+    if (request.tools !== undefined || request.toolChoice !== undefined) {
       params.add('tools');
       if (request.toolChoice !== undefined) {
         params.add('toolChoice');
