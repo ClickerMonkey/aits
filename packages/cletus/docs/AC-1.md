@@ -187,7 +187,7 @@ Stores text & vectors from data and indexed files
         "created": 314531
       },
       {
-        "source": "fileChunk[0]:/path/to/file.txt",
+        "source": "fileChunk:/path/to/file.txt[0]",
         "text": "A chunk from the file individually embedded",
         "vector": [0, 1, 2],
         "created": 314531
@@ -277,9 +277,13 @@ This stores data for a given type.
   "data": [
     {
       "id": "randomly generated uuid",
-      "name": "We need to do the thing!",
-      "details": "It's very important",
-      "dueAt": "2025-11-4"
+      "created": 343453,
+      "updated": 345245,
+      "fields": {
+        "name": "We need to do the thing!",
+        "details": "It's very important",
+        "dueAt": "2025-11-4"
+      }
     }
   ]
 }

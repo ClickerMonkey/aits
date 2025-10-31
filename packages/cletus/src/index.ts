@@ -1,41 +1,66 @@
 #!/usr/bin/env node
 
 import * as clack from '@clack/prompts';
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
+import { configExists } from './file-manager.js';
+import { ConfigFile } from './config.js';
+import { initWizard } from './init-wizard.js';
+import { mainMenu, startChatInteraction } from './main-menu.js';
 
 async function main() {
   console.clear();
 
-  clack.intro('Welcome to Cletus - AITS Demo CLI');
+  try {
+    // Check if config exists
+    const hasConfig = await configExists();
+    let config: ConfigFile;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    clack.outro('OPENAI_API_KEY environment variable is required');
+    if (!hasConfig) {
+      // Run initialization wizard
+      config = await initWizard();
+    } else {
+      // Load existing config
+      config = new ConfigFile();
+
+      try {
+        await config.load();
+
+        // Validate the config loaded successfully
+        const data = config.getData();
+        if (!data.user.name) {
+          clack.log.warn('Config appears corrupted, re-running setup...');
+          config = await initWizard();
+        }
+      } catch (error: any) {
+        clack.log.error(`Failed to load config: ${error.message}`);
+        clack.log.warn('Your config.json may be corrupted. Please fix it or delete it to re-initialize.');
+        process.exit(1);
+      }
+    }
+
+    // Main application loop
+    while (true) {
+      const chatId = await mainMenu(config);
+
+      // Exit if user chose to exit
+      if (chatId === null) {
+        process.exit(0);
+      }
+
+      // Launch chat interface (Ink UI)
+      await startChatInteraction(chatId, config);
+
+      // Reload config in case it was modified
+      await config.load();
+    }
+
+  } catch (error: any) {
+    clack.log.error(`Fatal error: ${error.message}`);
+    console.error(error);
     process.exit(1);
   }
-
-  // Initialize AI with OpenAI provider
-  const provider = new OpenAIProvider({ apiKey });
-  const ai = new AI({ provider });
-
-  const name = await clack.text({
-    message: 'What is your name?',
-    placeholder: 'Enter your name',
-    validate: (value) => {
-      if (!value) return 'Name is required';
-    },
-  });
-
-  if (clack.isCancel(name)) {
-    clack.cancel('Operation cancelled');
-    process.exit(0);
-  }
-
-  clack.outro(`Hello, ${name}! AITS is ready to go.`);
 }
 
 main().catch((error) => {
-  console.error('Error:', error);
+  console.error('Unhandled error:', error);
   process.exit(1);
 });
