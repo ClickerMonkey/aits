@@ -1,0 +1,22 @@
+- [] Add model selection:
+    - For the following categories
+        - embedding
+        - image generation
+        - image editing
+        - image analysis
+        - file summarization
+        - main agent
+        - sub agents
+            - dba
+            - clerk
+            - architect
+            - secretary
+    - Each one has a default based on models available based on providers configured
+    - Model selection allows weights
+- [ ] Add links to providers during setup
+- [ ] Add model selection during setup
+    - model selector component is given criteria and then lists models available based on providers and gives their name, pricing info, metrics, context window, 
+    - the user can decide to enter weights on speed, cost, & accuracy - models are then ordered by that
+- [ ] Add ZDR option to openrouter setup
+- [ ] Detect claude/aws creds and offer connecting to AWS Bedrock
+- [ ] pass down withEvents to capture all prompt events and count tokens

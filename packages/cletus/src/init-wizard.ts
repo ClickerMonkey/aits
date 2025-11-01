@@ -63,7 +63,7 @@ export async function initWizard(): Promise<ConfigFile> {
         process.exit(0);
       }
 
-      providers.openai = { apiKey: apiKey as string };
+      providers.openai = { apiKey };
     }
   }
 

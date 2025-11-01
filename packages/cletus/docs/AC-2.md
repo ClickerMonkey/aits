@@ -33,6 +33,7 @@ Operations can be linked to todos. The agent can get operations/messages/results
 - `secretary` - manages memory & assistants
 - `architect` - manages types
 - `dba` - manages data
+- `artist` - image generation, editing, and analysis
 
 The Chat Agent & Sub Agents are fed a system prompt with this information:
 - User name, pronouns, & memories
@@ -102,6 +103,14 @@ Tools:
 - `data_update_many(name: string, set: {}, where: {})`
 - `data_delete_many(name: string, where: {})`
 - `data_aggregate(name: string, where: {}, having: {}, groupBy: [], orderBy: [], select: [])`
+
+#### artist
+Tools:
+- `image_generate(prompt: string, n: number)` - places generated images in .cletus/images/ and adds link via file:// syntax in chat messages. chat messages convert image file:// to appropriate file object
+- `image_edit(prompt: string, imagePath: string)` - imagePath points to cletus image or relative image file
+- `image_analyze(prompt: string, imagePaths: string[], maxCharacters: number=2084)` - maxCharacters/4=maxTokens
+- `image_describe(imagePath: string)` - describes what's in the image
+- `image_find(prompt: string, glob: string, maxImages: number, n: number)` - finds n scored images in the given path where each image is summarized by AI and the summary is embedded and compared to the embedding of the prompt in order to score it. 
 
 ### Operations
 So a reminder. All tool calls add an operation message to the chat - and then the chat updates based on the mode and decides to prompt the user for permission or the actions available OR does the operation and then re-starts the whole process now that the operation results are in the context. The operation & todo ID in the message are added to the context message content.

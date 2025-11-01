@@ -21,20 +21,62 @@ export const UserSchema = z.object({
 
 export const OpenAIConfigSchema = z.object({
   apiKey: z.string(),
-}).nullable();
+  baseUrl: z.string().optional(),
+  organization: z.string().optional(),
+  project: z.string().optional(),
+  retry: z.object({
+    maxRetries: z.number().optional(),
+    initialDelay: z.number().optional(),
+    maxDelay: z.number().optional(),
+    backoffMultiplier: z.number().optional(),
+    jitter: z.boolean().optional(),
+    retryableStatuses: z.array(z.number()).optional(),
+    timeout: z.number().optional(),
+  }).optional(),
+  defaultModels: z.object({
+    chat: z.string().optional(),
+    imageGenerate: z.string().optional(),
+    imageEdit: z.string().optional(),
+    imageAnalyze: z.string().optional(),
+    transcription: z.string().optional(),
+    speech: z.string().optional(),
+    embedding: z.string().optional(),
+  }).optional(),
+});
 
-export const OpenRouterConfigSchema = z.object({
-  apiKey: z.string(),
-}).nullable();
+export const OpenRouterConfigSchema = OpenAIConfigSchema.extend({
+  defaultParams: z.object({
+    siteUrl: z.string().optional(),
+    appName: z.string().optional(),
+    providers: z.object({
+      order: z.array(z.string()).optional(),
+      allowFallbacks: z.boolean().optional(),
+      requireParameters: z.boolean().optional(),
+      dataCollection: z.enum(['deny', 'allow']).optional(),
+      zdr: z.boolean().optional(),
+      only: z.array(z.string()).optional(),
+      ignore: z.array(z.string()).optional(),
+      quantizations: z.array(z.enum(['int4', 'int8', 'fp4', 'fp6', 'fp8', 'fp16', 'bf16', 'fp32', 'unknown'])).optional(),
+      sort: z.enum(['price', 'throughput', 'latency']).optional(),
+      maxPrice: z.object({
+        prompt: z.number().optional(), // dollars per million tokens
+        completion: z.number().optional(), // dollars per million tokens
+        image: z.number().optional(), // dollars per image
+      }).optional(),
+    }).optional(), 
+    transforms: z.array(z.string()).optional(),
+  }).optional(),
+});
 
 export const ReplicateConfigSchema = z.object({
   apiKey: z.string(),
-}).nullable();
+  baseUrl: z.string().optional(),
+});
 
 export const ProvidersSchema = z.object({
-  openai: OpenAIConfigSchema,
-  openrouter: OpenRouterConfigSchema,
-  replicate: ReplicateConfigSchema,
+  openai: OpenAIConfigSchema.nullable(),
+  openrouter: OpenRouterConfigSchema.nullable(),
+  replicate: ReplicateConfigSchema.nullable(),
 });
 
 // ============================================================================
@@ -57,12 +99,14 @@ export const TodoItemSchema = z.object({
   id: z.string(),
 });
 
+export const ChatModeSchema = z.enum(['none', 'read', 'create', 'update', 'delete']);
+
 export const ChatMetaSchema = z.object({
   id: z.string(),
   title: z.string(),
   assistant: z.string().optional(),
   prompt: z.string().optional(),
-  mode: z.enum(['read', 'write', 'code']).default('read'),
+  mode: ChatModeSchema.default('none'),
   created: z.number(),
   updated: z.number(),
   todos: z.array(TodoItemSchema).default([]),
@@ -119,6 +163,20 @@ export const KnowledgeSchema = z.object({
 });
 
 // ============================================================================
+// Operation Schema
+// ============================================================================
+
+export const OperationSchema = z.object({
+  type: z.string(),
+  input: z.record(z.string(), z.any()),
+  kind: z.enum(['read', 'create', 'update', 'delete']),
+  start: z.number().optional(),
+  end: z.number().optional(),
+  error: z.string().optional(),
+  results: z.any().optional(),
+});
+
+// ============================================================================
 // Message Content Schema
 // ============================================================================
 
@@ -134,7 +192,7 @@ export const MessageSchema = z.object({
   created: z.number(),
   tokens: z.number().optional(),
   todo: z.string().optional(),
-  operation: z.record(z.string(), z.any()).optional(),
+  operation: OperationSchema.optional(),
 });
 
 export const ChatMessagesSchema = z.object({
@@ -171,11 +229,13 @@ export type Providers = z.infer<typeof ProvidersSchema>;
 export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;
 export type ChatMeta = z.infer<typeof ChatMetaSchema>;
+export type ChatMode = z.infer<typeof ChatModeSchema>;
 export type TypeField = z.infer<typeof TypeFieldSchema>;
 export type TypeDefinition = z.infer<typeof TypeDefinitionSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type KnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
 export type Knowledge = z.infer<typeof KnowledgeSchema>;
+export type Operation = z.infer<typeof OperationSchema>;
 export type MessageContent = z.infer<typeof MessageContentSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type ChatMessages = z.infer<typeof ChatMessagesSchema>;

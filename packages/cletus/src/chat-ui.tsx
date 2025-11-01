@@ -38,7 +38,7 @@ const COMMANDS: Command[] = [
   { name: '/quit', description: 'Exit chat', takesInput: false },
   { name: '/exit', description: 'Exit chat', takesInput: false },
   { name: '/assistant', description: 'Change assistant', takesInput: true, placeholder: 'assistant name' },
-  { name: '/mode', description: 'Change mode', takesInput: true, placeholder: 'read|write|code' },
+  { name: '/mode', description: 'Change mode', takesInput: true, placeholder: 'none|read|create|update|delete' },
   { name: '/prompt', description: 'Set custom prompt', takesInput: true, placeholder: 'your prompt' },
   { name: '/title', description: 'Change chat title', takesInput: true, placeholder: 'new title' },
   { name: '/todos', description: 'View todos', takesInput: false },
@@ -130,9 +130,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, messages, onExit, onChatUp
         break;
 
       case '/mode':
-        if (args && ['read', 'write', 'code'].includes(args)) {
-          await onChatUpdate({ mode: args as 'read' | 'write' | 'code' });
-          setChatMeta({ ...chatMeta, mode: args as 'read' | 'write' | 'code' });
+        if (args && ['none', 'read', 'create', 'update', 'delete'].includes(args)) {
+          await onChatUpdate({ mode: args as 'none' | 'read' | 'create' | 'update' | 'delete' });
+          setChatMeta({ ...chatMeta, mode: args as 'none' | 'read' | 'create' | 'update' | 'delete' });
           setChatMessages((prev) => [
             ...prev,
             { role: 'system', content: `✓ Mode changed to: ${args}` },
@@ -142,7 +142,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, messages, onExit, onChatUp
             ...prev,
             {
               role: 'system',
-              content: `Current mode: ${chatMeta.mode}. Valid modes: read, write, code`,
+              content: `Current mode: ${chatMeta.mode}. Valid modes: none, read, create, update, delete`,
             },
           ]);
         }

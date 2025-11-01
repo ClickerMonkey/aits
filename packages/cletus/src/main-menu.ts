@@ -107,9 +107,11 @@ async function createNewChat(config: ConfigFile): Promise<string | null> {
   const mode = await clack.select({
     message: 'Select chat mode:',
     options: [
-      { value: 'read', label: 'Read Mode', hint: 'Read-only access to files' },
-      { value: 'write', label: 'Write Mode', hint: 'Can create and modify files' },
-      { value: 'code', label: 'Code Mode', hint: 'Optimized for coding tasks' },
+      { value: 'none', label: 'None', hint: 'All operations require approval' },
+      { value: 'read', label: 'Read', hint: 'Auto-approve read operations' },
+      { value: 'create', label: 'Create', hint: 'Auto-approve read & create operations' },
+      { value: 'update', label: 'Update', hint: 'Auto-approve read, create & update operations' },
+      { value: 'delete', label: 'Delete', hint: 'Auto-approve all operations including delete' },
       { value: '__cancel__', label: '← Cancel', hint: 'Go back to main menu' },
     ],
   });
@@ -126,7 +128,7 @@ async function createNewChat(config: ConfigFile): Promise<string | null> {
     title: 'New Chat',
     assistant,
     prompt: customPrompt && typeof customPrompt === 'string' ? customPrompt : undefined,
-    mode: mode as 'read' | 'write' | 'code',
+    mode: mode as 'none' | 'read' | 'create' | 'update' | 'delete',
     created: now,
     updated: now,
     todos: [],
