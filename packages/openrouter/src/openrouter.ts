@@ -149,15 +149,12 @@ export function convertOpenRouterModel(
     capabilities.push('zdr');
   }
 
-  // Extract provider from model ID (format: provider/model-name)
-  const provider = model.id.includes('/') ? model.id.split('/')[0] : 'openrouter';
-
   const hasValue = (x: string | undefined): x is string => {
     return x !== undefined && x !== null && x !== '' && x !== '0';
   }
 
   return {
-    provider,
+    provider: 'openrouter',
     id: model.id,
     name: model.name,
     capabilities: new Set(capabilities), // Will be serialized as array
@@ -189,7 +186,6 @@ export function convertOpenRouterModel(
     metadata: {
       description: model.description,
       defaultParameters: model.default_parameters,
-      source: 'openrouter',
       canonicalSlug: model.canonical_slug,
       huggingFaceId: model.hugging_face_id,
       created: model.created,

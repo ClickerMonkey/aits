@@ -105,7 +105,7 @@ export abstract class BaseAPI<
       // Build metadata from what used passed in context
       const metadata = await this.ai.buildMetadata(metadataRequired);
 
-      // Run beforeModelSelection hook to affect which model might be selected
+      // Run beforeModelSelection hook to affect which model might be selected (like restricting providers, zdr, etc)
       const enrichedMetadata = hooks.beforeModelSelection
         ? await hooks.beforeModelSelection(ctx, metadata)
         : metadata;
@@ -154,7 +154,7 @@ export abstract class BaseAPI<
       const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
       const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
 
-      // Run beforeRequest hook
+      // Run beforeRequest hook (hook can override provider config)
       await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens, estimatedCost);
 
       // Get handler if available

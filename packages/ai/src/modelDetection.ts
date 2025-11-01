@@ -66,42 +66,36 @@ export function detectCapabilitiesFromModality(
   const capabilities = new Set<ModelCapability>();
   const lowerModality = modality.toLowerCase();
 
+  const [input, output = input] = lowerModality.split('->').map((s) => s.trim());
+
   // Text capabilities
-  if (lowerModality.includes('text')) {
+  if (output.includes('text')) {
     capabilities.add('chat');
     capabilities.add('json');
-
-    // Assume structured output for modern models (can be overridden)
-    if (!modelId.includes('gpt-3.5') && !modelId.includes('claude-instant')) {
-      capabilities.add('structured');
-    }
-
-    // Function calling for text models
     capabilities.add('tools');
+    // structured output can't be detected from this
   }
 
   // Vision capabilities
-  if (lowerModality.includes('image') && lowerModality.includes('text->')) {
+  if (input.includes('image')) {
     capabilities.add('vision');
   }
 
   // Image generation
-  if (lowerModality.includes('->image')) {
+  if (output.includes('image')) {
     capabilities.add('image');
   }
 
   // Audio capabilities
-  if (lowerModality.includes('audio')) {
-    if (lowerModality.includes('audio->text')) {
-      capabilities.add('hearing');
-    }
-    if (lowerModality.includes('text->audio')) {
-      capabilities.add('audio');
-    }
+  if (input.includes('audio')) {
+    capabilities.add('hearing');
+  }
+  if (output.includes('audio')) {
+    capabilities.add('audio');
   }
 
   // Embedding
-  if (lowerModality.includes('embedding') || lowerModality.includes('text->vector')) {
+  if (output.includes('embedding') || output.includes('vector')) {
     capabilities.add('embedding');
   }
 

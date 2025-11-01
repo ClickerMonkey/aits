@@ -5,7 +5,7 @@
  */
 
 import { AI } from '../ai';
-import { createMockProvider, createMockModels } from './mocks/provider.mock';
+import { createMockProvider } from './mocks/provider.mock';
 
 describe('Models API', () => {
   describe('Model Listing', () => {
@@ -18,11 +18,11 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
+      const modelsList = ai.models.list();
 
-      expect(models).toBeDefined();
-      expect(Array.isArray(models)).toBe(true);
-      expect(models.length).toBeGreaterThan(0);
+      expect(modelsList).toBeDefined();
+      expect(Array.isArray(modelsList)).toBe(true);
+      expect(modelsList.length).toBeGreaterThan(0);
     });
 
     it('should list models from multiple providers', async () => {
@@ -35,10 +35,10 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
+      const modelsList = ai.models.list();
 
-      const provider1Models = models.filter(m => m.provider === 'provider1');
-      const provider2Models = models.filter(m => m.provider === 'provider2');
+      const provider1Models = modelsList.filter(m => m.provider === 'provider1');
+      const provider2Models = modelsList.filter(m => m.provider === 'provider2');
 
       expect(provider1Models.length).toBeGreaterThan(0);
       expect(provider2Models.length).toBeGreaterThan(0);
@@ -53,9 +53,9 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
+      const modelsList = ai.models.list();
 
-      models.forEach(model => {
+      modelsList.forEach(model => {
         expect(model.capabilities).toBeDefined();
         expect(model.capabilities.size).toBeGreaterThan(0);
       });
@@ -70,9 +70,9 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
+      const modelsList = ai.models.list();
 
-      models.forEach(model => {
+      modelsList.forEach(model => {
         expect(model.pricing).toBeDefined();
       });
     });
@@ -144,8 +144,8 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
-      const firstModel = models[0];
+      const modelsList = ai.models.list();
+      const firstModel = modelsList[0];
 
       const model = ai.models.get(firstModel.id);
 
@@ -176,9 +176,9 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
+      const modelsList = ai.models.list();
 
-      models.forEach(model => {
+      modelsList.forEach(model => {
         expect(model.contextWindow).toBeDefined();
         expect(typeof model.contextWindow).toBe('number');
         expect(model.contextWindow).toBeGreaterThan(0);
@@ -214,8 +214,8 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
-      const chatModels = models.filter(m =>
+      const modelsList = ai.models.list();
+      const chatModels = modelsList.filter(m =>
         m.capabilities.has('chat') && m.capabilities.has('streaming')
       );
 
@@ -231,8 +231,8 @@ describe('Models API', () => {
 
       await ai.registry.refresh();
 
-      const models = ai.models.list();
-      const efficientChatModels = models.filter(m =>
+      const modelsList = ai.models.list();
+      const efficientChatModels = modelsList.filter(m =>
         m.tier === 'efficient' && m.capabilities.has('chat')
       );
 

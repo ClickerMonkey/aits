@@ -50,12 +50,6 @@ describe('Model Detection', () => {
       expect(caps.has('tools')).toBe(true);
     });
 
-    it('should detect structured output for modern models', () => {
-      const caps = detectCapabilitiesFromModality('text', 'gpt-4');
-
-      expect(caps.has('structured')).toBe(true);
-    });
-
     it('should not detect structured output for older models', () => {
       const caps1 = detectCapabilitiesFromModality('text', 'gpt-3.5-turbo');
       const caps2 = detectCapabilitiesFromModality('text', 'claude-instant-v1');

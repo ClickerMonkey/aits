@@ -134,6 +134,14 @@ export class AI<T extends AIBaseTypes> {
     // Prepare model sources
     const modelSources = [...(config.modelSources || [])];
 
+    // Register given models as a source so they are not lost on refresh
+    if (config.models) {
+      modelSources.unshift({
+        name: 'config',
+        fetchModels: async () => config.models!,
+      });
+    }
+
     // Initialize registry with model sources
     this.registry = new ModelRegistry<AIProviders<T>>(
       config.providers,
@@ -142,7 +150,7 @@ export class AI<T extends AIBaseTypes> {
       modelSources
     );
 
-    // Register any base models
+    // Push in given models without fetching
     if (config.models) {
       this.registry.registerModels(config.models);
     }
@@ -611,8 +619,8 @@ export class AI<T extends AIBaseTypes> {
     TTools extends Tuple<ToolCompatible<AIContextRequired<T>, AIMetadataRequired<T>>> = []
   >(
     options: Omit<PromptInput<
-      AIContextRequired<T>,
-      AIMetadataRequired<T>,
+      AIContext<T>,
+      AIMetadata<T>,
       TName,
       TInput,
       TOutput,
@@ -702,8 +710,8 @@ export class AI<T extends AIBaseTypes> {
     TRefs extends Tuple<ComponentFor<T>> = []
   >(
     options: Omit<ToolInput<
-      AIContextRequired<T>,
-      AIMetadataRequired<T>,
+      AIContext<T>,
+      AIMetadata<T>,
       TName,
       TParams,
       TOutput,
@@ -764,8 +772,8 @@ export class AI<T extends AIBaseTypes> {
     TRefs extends Tuple<ComponentFor<T>> = []
   >(
     options: Omit<AgentInput<
-      AIContextRequired<T>,
-      AIMetadataRequired<T>,
+      AIContext<T>,
+      AIMetadata<T>,
       TName,
       TInput,
       TOutput,

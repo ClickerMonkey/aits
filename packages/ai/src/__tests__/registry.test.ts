@@ -5,8 +5,7 @@
  */
 
 import { ModelRegistry } from '../registry';
-import { createMockProvider, createMockModels } from './mocks/provider.mock';
-import type { ModelInfo, AIBaseMetadata, Providers } from '../types';
+import { createMockProvider } from './mocks/provider.mock';
 
 describe('ModelRegistry', () => {
   describe('Construction and Initialization', () => {

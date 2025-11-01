@@ -4,6 +4,7 @@
  * Tests for the Embed API covering text embedding generation.
  */
 
+import { models } from '@aits/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { EmbeddingRequest } from '../types';
@@ -15,9 +16,9 @@ describe('Embed API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: EmbeddingRequest = {
         texts: ['Hello world']
@@ -33,13 +34,11 @@ describe('Embed API', () => {
     });
 
     it('should generate embeddings for multiple texts', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: EmbeddingRequest = {
         texts: ['First text', 'Second text', 'Third text']
@@ -59,9 +58,7 @@ describe('Embed API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: EmbeddingRequest = {
         texts: ['Test']
@@ -75,13 +72,11 @@ describe('Embed API', () => {
     });
 
     it('should track usage for embeddings', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: EmbeddingRequest = {
         texts: ['Hello', 'World']
@@ -94,20 +89,18 @@ describe('Embed API', () => {
     });
 
     it('should call hooks for embeddings', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const beforeRequest = jest.fn();
       const afterRequest = jest.fn();
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({})
+        .providers({ openai })
+        .create({ models })
         .withHooks({
           beforeRequest,
           afterRequest
         });
-
-      await ai.registry.refresh();
 
       const request: EmbeddingRequest = {
         texts: ['Test']
@@ -129,9 +122,7 @@ describe('Embed API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: EmbeddingRequest = {
         texts: ['Test']
@@ -145,9 +136,7 @@ describe('Embed API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: EmbeddingRequest = {
         texts: []

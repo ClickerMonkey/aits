@@ -4,6 +4,7 @@
  * Tests for Speech (TTS) and Transcribe (STT) APIs.
  */
 
+import { models } from '@aits/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { SpeechRequest, TranscriptionRequest } from '../types';
@@ -11,13 +12,11 @@ import type { SpeechRequest, TranscriptionRequest } from '../types';
 describe('Speech API', () => {
   describe('Text-to-Speech', () => {
     it('should generate speech', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: SpeechRequest = {
         text: 'Hello world'
@@ -30,13 +29,11 @@ describe('Speech API', () => {
     });
 
     it('should generate speech with voice', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: SpeechRequest = {
         text: 'Hello',
@@ -53,9 +50,7 @@ describe('Speech API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: SpeechRequest = {
         text: 'Test'
@@ -69,20 +64,18 @@ describe('Speech API', () => {
     });
 
     it('should call hooks for speech generation', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const beforeRequest = jest.fn();
       const afterRequest = jest.fn();
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({})
+        .providers({ openai })
+        .create({ models })
         .withHooks({
           beforeRequest,
           afterRequest
         });
-
-      await ai.registry.refresh();
 
       const request: SpeechRequest = {
         text: 'Hello'
@@ -104,9 +97,7 @@ describe('Speech API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: SpeechRequest = {
         text: 'Test'
@@ -120,13 +111,11 @@ describe('Speech API', () => {
 describe('Transcribe API', () => {
   describe('Speech-to-Text', () => {
     it('should transcribe audio', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data')
@@ -140,13 +129,11 @@ describe('Transcribe API', () => {
     });
 
     it('should transcribe with language hint', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data'),
@@ -163,7 +150,7 @@ describe('Transcribe API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       await ai.registry.refresh();
 
@@ -179,13 +166,11 @@ describe('Transcribe API', () => {
     });
 
     it('should stream transcription', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data')
@@ -200,20 +185,18 @@ describe('Transcribe API', () => {
     });
 
     it('should call hooks for transcription', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const beforeRequest = jest.fn();
       const afterRequest = jest.fn();
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({})
+        .providers({ openai })
+        .create({ models })
         .withHooks({
           beforeRequest,
           afterRequest
         });
-
-      await ai.registry.refresh();
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data')
@@ -226,13 +209,11 @@ describe('Transcribe API', () => {
     });
 
     it('should track usage for transcription', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data')
@@ -253,9 +234,7 @@ describe('Transcribe API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: TranscriptionRequest = {
         audio: Buffer.from('audio-data')

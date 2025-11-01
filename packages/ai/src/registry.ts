@@ -270,7 +270,10 @@ export class ModelRegistry<
     const allModels = this.listModels();
     const scored: ScoredModel<TProviderKey>[] = [];
 
-    for (const model of allModels) {
+    // Filter list by models we have providers for
+    const providedModels = allModels.filter(model => this.providers.has(model.provider as TProviderKey));
+
+    for (const model of providedModels) {
       const score = this.scoreModel(model, metadata);
       if (score.score > 0) {
         scored.push(score);

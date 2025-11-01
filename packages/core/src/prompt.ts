@@ -1,4 +1,4 @@
-import Handlebars from "handlebars";
+import Handlebars, { K } from "handlebars";
 import z from 'zod';
 
 import { accumulateUsage, Fn, getChunksFromResponse, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
@@ -160,9 +160,9 @@ export type PromptTools<TTools extends AnyTool[]> =
 export type PromptToolEvents<TTools extends Tuple<AnyTool>> =
   TTools extends Array<infer TTool>
     ? TTool extends Tool<infer t0, infer t1, infer t2, infer t3, infer TOutput, infer t4>
-      ? { type: 'toolStart', tool: TTool, args: any }
-      | { type: 'toolOutput', tool: TTool, args: any, result: Resolved<TOutput> }
-      | { type: 'toolError', tool: TTool, args: any, error: string }
+      ? { type: 'toolStart', tool: TTool, args: any, request: Request }
+      | { type: 'toolOutput', tool: TTool, args: any, result: Resolved<TOutput>, request: Request }
+      | { type: 'toolError', tool: TTool, args: any, error: string, request: Request }
       : never
     : never;
 
@@ -170,19 +170,19 @@ export type PromptToolEvents<TTools extends Tuple<AnyTool>> =
  * The events emitted during prompt execution/streaming.
  */
 export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
-  { type: 'textPartial', content: string } |
-  { type: 'refusal', content: string } |
-  { type: 'reason', content: string } |
-  { type: 'reasonPartial', content: string } |
-  { type: 'toolParseName', tool: PromptTools<TTools> } |
-  { type: 'toolParseArguments', tool: PromptTools<TTools>, args: string } |
+  { type: 'textPartial', content: string, request: Request } |
+  { type: 'refusal', content: string, request: Request } |
+  { type: 'reason', content: string, request: Request } |
+  { type: 'reasonPartial', content: string, request: Request } |
+  { type: 'toolParseName', tool: PromptTools<TTools>, request: Request } |
+  { type: 'toolParseArguments', tool: PromptTools<TTools>, args: string, request: Request } |
   PromptToolEvents<TTools> |
-  { type: 'textComplete', content: string } |
-  { type: 'complete', output: TOutput } |
-  { type: 'textReset', reason?: string } |
-  { type: 'requestTokens', tokens: number } |
-  { type: 'responseTokens', tokens: number } |
-  { type: 'usage', usage: Usage };
+  { type: 'textComplete', content: string, request: Request } |
+  { type: 'complete', output: TOutput, request: Request } |
+  { type: 'textReset', reason?: string, request: Request } |
+  { type: 'requestTokens', tokens: number, request: Request } |
+  { type: 'responseTokens', tokens: number, request: Request } |
+  { type: 'usage', usage: Usage, request: Request };
 
 /**
  * A type representing any prompt component.
@@ -503,6 +503,7 @@ export class Prompt<
           return ev;
         }
       : (ev: PromptEvent<TOutput, TTools>) => ev;
+    const emitTool = (ev: PromptToolEvents<[AnyTool]>) => emit(ev as PromptEvent<TOutput, TTools>);
 
     // Main execution loop!
     while (iterations < maxIterations) {
@@ -531,7 +532,7 @@ export class Prompt<
         if (chunk.usage) {
           usage = chunk.usage;
           if (!requestTokensSent) {
-            yield emit({ type: 'requestTokens', tokens: chunk.usage.inputTokens ?? 0 });
+            yield emit({ type: 'requestTokens', tokens: chunk.usage.inputTokens ?? 0, request });
             requestTokensSent = true;
           }
           accumulateUsage(accumulatedUsage, chunk.usage);
@@ -539,17 +540,17 @@ export class Prompt<
 
         if (chunk.content) {
           content += chunk.content;
-          yield emit({ type: 'textPartial', content: chunk.content });
+          yield emit({ type: 'textPartial', content: chunk.content, request });
         }
 
         if (chunk.refusal) {
           refusal += chunk.refusal;
-          yield emit({ type: 'textPartial', content: chunk.refusal });
+          yield emit({ type: 'textPartial', content: chunk.refusal, request });
         }
 
         if (chunk.reasoning) {
           reasoning += chunk.reasoning;
-          yield emit({ type: 'reasonPartial', content: chunk.reasoning });
+          yield emit({ type: 'reasonPartial', content: chunk.reasoning, request });
         }
 
         // Handle tool calls
@@ -559,7 +560,7 @@ export class Prompt<
           toolCallMap.set(chunk.toolCallNamed.id, toolCall);
           
           if (toolCall.tool) {
-            yield emit({ type: 'toolParseName', tool: toolCall.tool });
+            yield emit({ type: 'toolParseName', tool: toolCall.tool, request });
           } else {
             streamController.abort(toolCall.error);
             break;
@@ -570,7 +571,7 @@ export class Prompt<
           const toolCall = toolCallMap.get(chunk.toolCallArguments.id)!;
           toolCall.toolCall = chunk.toolCallArguments;
   
-          yield emit({ type: 'toolParseArguments', tool: toolCall.tool!, args: chunk.toolCallArguments.arguments });
+          yield emit({ type: 'toolParseArguments', tool: toolCall.tool!, args: chunk.toolCallArguments.arguments, request });
 
           // Start parsing arguments immediately (but not right now)
           setImmediate(toolCall.parse);
@@ -594,13 +595,13 @@ export class Prompt<
         if (toolMode === 'immediate') {
           for (const toolCall of toolCalls) {
             if (toolCall.emitStart()) {
-              yield emit({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args } as any);
+              yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
             }
             if (toolCall.emitOutput()) {
-              yield emit({ type: 'toolOutput', tool: toolCall.tool, args: toolCall.args, result: toolCall.result } as any);
+              yield emitTool({ type: 'toolOutput', tool: toolCall.tool!, args: toolCall.args, result: toolCall.result, request });
             }
             if (toolCall.emitError()) {
-              yield emit({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error } as any)
+              yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
             }
           }
         }
@@ -610,19 +611,19 @@ export class Prompt<
 
       // If the model reasoned, yield it
       if (reasoning) {
-        yield emit({ type: 'reason', content: reasoning });
+        yield emit({ type: 'reason', content: reasoning, request });
       }
 
       // If the model refused to answer and stop
       if (finishReason === 'refusal' || refusal) {
-        yield emit({ type: 'refusal', content: refusal || 'unspecified' });
+        yield emit({ type: 'refusal', content: refusal || 'unspecified', request });
         lastError = refusal || 'Model refused to answer.';
         break;
       }
 
       // If the model was stopped due to content filtering
       if (finishReason === 'content_filter') {
-        yield emit({ type: 'refusal', content: 'Content filtered by AI model' });
+        yield emit({ type: 'refusal', content: 'Content filtered by AI model', request });
         lastError = 'Model response was filtered due to content policy.';
         break;
       }
@@ -633,7 +634,7 @@ export class Prompt<
           request.messages = this.forget(request, ctx, usage)
           forgetRetries--;
 
-          yield emit({ type: 'textReset', reason: 'length' });
+          yield emit({ type: 'textReset', reason: 'length', request });
 
           // Lets retry immediately
           continue;          
@@ -664,10 +665,10 @@ export class Prompt<
             toolCall.parse();
           }
           if (toolCall.emitStart()) {
-            yield emit({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args } as any);
+            yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
           }
           if (toolCall.emitError()) {
-            yield emit({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error } as any)
+            yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
           }
         }
 
@@ -680,14 +681,14 @@ export class Prompt<
             for (const toolCall of toolCalls) {
               await toolCall.parse();
               if (toolCall.emitStart()) {
-                yield emit({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args } as any);
+                yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
               }
               await toolCall.run();
               if (toolCall.emitOutput()) {
-                yield emit({ type: 'toolOutput', tool: toolCall.tool, args: toolCall.args, result: toolCall.result } as any);
+                yield emitTool({ type: 'toolOutput', tool: toolCall.tool!, args: toolCall.args, result: toolCall.result, request });
               }
               if (toolCall.emitError()) {
-                yield emit({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error } as any)
+                yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
               }
             }
             break;
@@ -697,13 +698,13 @@ export class Prompt<
             for await (const { result: toolCallPromise } of yieldAll(parseRuns)) {
               const toolCall = await toolCallPromise;
               if (toolCall.emitStart()) {
-                yield emit({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args } as any);
+                yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
               }
               if (toolCall.emitOutput()) {
-                yield emit({ type: 'toolOutput', tool: toolCall.tool, args: toolCall.args, result: toolCall.result } as any);
+                yield emitTool({ type: 'toolOutput', tool: toolCall.tool!, args: toolCall.args, result: toolCall.result, request });
               }
               if (toolCall.emitError()) {
-                yield emit({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error } as any)
+                yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
               }
             }
             break;
@@ -794,7 +795,7 @@ export class Prompt<
             if (outputRetries > 0) {
               outputRetries--;
 
-              yield emit({ type: 'textReset', reason: resetReason });
+              yield emit({ type: 'textReset', reason: resetReason, request });
 
               request.messages.push({
                 role: 'user',
@@ -870,14 +871,14 @@ export class Prompt<
       iterations++;
     }
 
-    yield emit({ type: 'textComplete', content: completeText });
+    yield emit({ type: 'textComplete', content: completeText, request });
 
     // Yield token usage if available
     if (usage?.outputTokens) {
-      yield emit({ type: 'responseTokens', tokens: usage.outputTokens });
+      yield emit({ type: 'responseTokens', tokens: usage.outputTokens, request });
     }
 
-    yield emit({ type: 'usage', usage: accumulatedUsage });
+    yield emit({ type: 'usage', usage: accumulatedUsage, request });
 
     // We don't emit complete without a valid result unless toolsOnly is set
     if (result === undefined && !this.input.toolsOnly) {
@@ -890,7 +891,7 @@ export class Prompt<
       throw new Error(`Prompt ${this.input.name} failed: ${lastError}`);
     }
 
-    yield emit({ type: 'complete', output: result! });
+    yield emit({ type: 'complete', output: result!, request });
 
     return result!;
   }

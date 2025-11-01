@@ -5,8 +5,9 @@
  * API surface creation, and basic functionality.
  */
 
+import { models } from '@aits/models';
 import { AI } from '../ai';
-import { createMockProvider, createMockModels } from './mocks/provider.mock';
+import { createMockProvider } from './mocks/provider.mock';
 import type { ModelInfo } from '../types';
 
 describe('AI Class', () => {
@@ -16,7 +17,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai).toBeDefined();
       expect(ai.providers).toBeDefined();
@@ -38,7 +39,7 @@ describe('AI Class', () => {
 
       const ai = AI.with<AppContext, AppMetadata>()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai).toBeDefined();
     });
@@ -49,7 +50,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1, provider2 })
-        .create({});
+        .create({ models });
 
       expect(ai.providers.provider1).toBe(provider1);
       expect(ai.providers.provider2).toBe(provider2);
@@ -60,7 +61,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.registry).toBeDefined();
     });
@@ -70,7 +71,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.chat).toBeDefined();
       expect(ai.image).toBeDefined();
@@ -84,6 +85,7 @@ describe('AI Class', () => {
       const provider1 = createMockProvider({ name: 'provider1' });
 
       const config = {
+        models,
         defaultCostPerMillionTokens: 10.0
       };
 
@@ -120,7 +122,6 @@ describe('AI Class', () => {
           models: customModels
         });
 
-      await ai.registry.refresh();
       const models = ai.registry.listModels();
 
       const customModel = models.find(m => m.id === 'custom-model-1');
@@ -144,7 +145,8 @@ describe('AI Class', () => {
           ]
         });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
+
       const models = ai.registry.listModels();
 
       // Model overrides should be applied after refresh
@@ -190,7 +192,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.tokens.text.divisor).toBe(4);
       expect(ai.tokens.text.fallback).toBe(1000);
@@ -206,7 +208,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.hooks).toBeDefined();
       expect(ai.hooks).toEqual({});
@@ -217,7 +219,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       const beforeRequest = jest.fn();
       const afterRequest = jest.fn();
@@ -236,7 +238,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       const result = ai.withHooks({
         beforeRequest: jest.fn()
@@ -252,7 +254,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.components).toBeDefined();
       expect(ai.components).toEqual([]);
@@ -265,7 +267,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.tokens.text).toBeDefined();
       expect(ai.tokens.text.divisor).toBe(4);
@@ -278,7 +280,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.tokens.image).toBeDefined();
       expect(ai.tokens.image.divisor).toBe(1125);
@@ -292,7 +294,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.tokens.audio).toBeDefined();
       expect(ai.tokens.audio.divisor).toBe(3);
@@ -305,7 +307,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai.tokens.file).toBeDefined();
       expect(ai.tokens.file.divisor).toBe(3);
@@ -320,7 +322,7 @@ describe('AI Class', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai).toBeInstanceOf(AI);
     });
@@ -338,7 +340,7 @@ describe('AI Class', () => {
 
       const ai = AI.with<MyContext, MyMetadata>()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
       expect(ai).toBeInstanceOf(AI);
     });
@@ -351,6 +353,7 @@ describe('AI Class', () => {
         .with()
         .providers({ provider1, provider2 })
         .create({
+          models,
           defaultCostPerMillionTokens: 5.0
         });
 

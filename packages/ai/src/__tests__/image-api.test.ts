@@ -4,6 +4,7 @@
  * Tests for the Image API covering generation, editing, and streaming.
  */
 
+import { models } from '@aits/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { ImageGenerationRequest, ImageEditRequest } from '../types';
@@ -15,9 +16,9 @@ describe('Image API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: ImageGenerationRequest = {
         prompt: 'A beautiful sunset'
@@ -31,13 +32,13 @@ describe('Image API', () => {
     });
 
     it('should generate image with options', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
+        .providers({ openai })
+        .create({ models });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: ImageGenerationRequest = {
         prompt: 'A cat',
@@ -55,9 +56,9 @@ describe('Image API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
+        .create({ models });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: ImageGenerationRequest = {
         prompt: 'A dog'
@@ -78,13 +79,13 @@ describe('Image API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({})
+        .create({ models })
         .withHooks({
           beforeRequest,
           afterRequest
         });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: ImageGenerationRequest = {
         prompt: 'A landscape'
@@ -99,13 +100,11 @@ describe('Image API', () => {
 
   describe('Image Streaming', () => {
     it('should stream image generation', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: ImageGenerationRequest = {
         prompt: 'A mountain'
@@ -122,13 +121,11 @@ describe('Image API', () => {
 
   describe('Image Editing', () => {
     it('should edit image', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: ImageEditRequest = {
         image: Buffer.from('image-data'),
@@ -142,13 +139,11 @@ describe('Image API', () => {
     });
 
     it('should edit image with mask', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: ImageEditRequest = {
         image: Buffer.from('image-data'),
@@ -162,13 +157,11 @@ describe('Image API', () => {
     });
 
     it('should stream image editing', async () => {
-      const provider1 = createMockProvider({ name: 'provider1' });
+      const openai = createMockProvider({ name: 'provider1' });
 
       const ai = AI.with()
-        .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .providers({ openai })
+        .create({ models });
 
       const request: ImageEditRequest = {
         image: Buffer.from('image-data'),
@@ -193,9 +186,7 @@ describe('Image API', () => {
 
       const ai = AI.with()
         .providers({ provider1 })
-        .create({});
-
-      await ai.registry.refresh();
+        .create({ models });
 
       const request: ImageGenerationRequest = {
         prompt: 'Test'
@@ -212,9 +203,9 @@ describe('Image API', () => {
 
       const ai = AI.with()
         .providers({ failing: failingProvider })
-        .create({});
+        .create({ models });
 
-      await ai.registry.refresh();
+      await ai.models.refresh();
 
       const request: ImageGenerationRequest = {
         prompt: 'Test'
