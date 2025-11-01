@@ -17,6 +17,8 @@
 - [ ] Add model selection during setup
     - model selector component is given criteria and then lists models available based on providers and gives their name, pricing info, metrics, context window, 
     - the user can decide to enter weights on speed, cost, & accuracy - models are then ordered by that
+    - user can type to filter down list
 - [ ] Add ZDR option to openrouter setup
 - [ ] Detect claude/aws creds and offer connecting to AWS Bedrock
 - [ ] pass down withEvents to capture all prompt events and count tokens
+- [ ] add settings to pause Cletus after X minutes of continuous automatic work. it's a configurable user settings- [ ] add chat model selection which is used for operations that are applicable (tool call, summary, etc)

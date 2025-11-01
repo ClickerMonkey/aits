@@ -4,6 +4,7 @@ import { createLibrarianTools } from '../tools/librarian-tools.js';
 import { createClerkTools } from '../tools/clerk-tools.js';
 import { createSecretaryTools } from '../tools/secretary-tools.js';
 import { createArchitectTools } from '../tools/architect-tools.js';
+import { createArtistTools } from '../tools/artist-tools.js';
 import { createDBAAgent } from '../tools/dba-tools.js';
 
 /**
@@ -15,6 +16,7 @@ export function createSubAgents(ai: CletusAI) {
   const clerkTools = createClerkTools(ai);
   const secretaryTools = createSecretaryTools(ai);
   const architectTools = createArchitectTools(ai);
+  const artistTools = createArtistTools(ai);
   const dbaAgent = createDBAAgent(ai);
 
   // Planner sub-agent
@@ -136,12 +138,32 @@ Your role is to help create and modify type definitions while maintaining data i
     }),
   });
 
+  // Artist sub-agent
+  const artist = ai.prompt({
+    name: 'artist',
+    description: 'Handles image generation, editing, and analysis',
+    content: `You are the Artist agent for Cletus, responsible for image operations.
+
+Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
+You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
+
+User request: {{request}}
+
+Your role is to help with all image-related tasks including creation, modification, and understanding visual content.`,
+    tools: artistTools,
+    schema: false,
+    input: (input, ctx) => ({
+      request: input?.request || '',
+    }),
+  });
+
   return {
     planner,
     librarian,
     clerk,
     secretary,
     architect,
+    artist,
     dba: dbaAgent,
   };
 }

@@ -412,4 +412,53 @@ export function registerAllOperationHandlers(chatId: string) {
     // TODO: Implement aggregation
     return { results: [] };
   });
+
+  // ============================================================================
+  // Artist Handlers
+  // ============================================================================
+
+  registerOperationHandler('image_generate', async (input: { prompt: string; n: number }, signal) => {
+    // TODO: Integrate AITS image generation
+    // Generate images and save to .cletus/images/
+    return {
+      prompt: input.prompt,
+      count: input.n,
+      images: [], // Array of file:// paths
+    };
+  });
+
+  registerOperationHandler('image_edit', async (input: { prompt: string; imagePath: string }, signal) => {
+    // TODO: Integrate AITS image editing
+    return {
+      prompt: input.prompt,
+      originalPath: input.imagePath,
+      editedPath: '', // file:// path to edited image
+    };
+  });
+
+  registerOperationHandler('image_analyze', async (input: { prompt: string; imagePaths: string[]; maxCharacters: number }, signal) => {
+    // TODO: Integrate AITS image analysis
+    return {
+      prompt: input.prompt,
+      imagePaths: input.imagePaths,
+      analysis: '[AI analysis would be here]',
+    };
+  });
+
+  registerOperationHandler('image_describe', async (input: { imagePath: string }, signal) => {
+    // TODO: Integrate AITS image description
+    return {
+      imagePath: input.imagePath,
+      description: '[AI description would be here]',
+    };
+  });
+
+  registerOperationHandler('image_find', async (input: { prompt: string; glob: string; maxImages: number; n: number }, signal) => {
+    // TODO: Integrate AITS image search with embeddings
+    return {
+      prompt: input.prompt,
+      searched: 0,
+      results: [], // Array of { path, score }
+    };
+  });
 }

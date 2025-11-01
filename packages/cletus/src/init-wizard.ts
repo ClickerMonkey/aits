@@ -49,6 +49,11 @@ export async function initWizard(): Promise<ConfigFile> {
     }
 
     if (enterOpenAI) {
+      clack.note(
+        'Get your API key from: \x1b]8;;https://platform.openai.com/api-keys\x1b\\https://platform.openai.com/api-keys\x1b]8;;\x1b\\\n\nNote: You\'ll need to create an account and add credits to use OpenAI.',
+        'OpenAI Setup'
+      );
+
       const apiKey = await clack.text({
         message: 'Enter your OpenAI API key:',
         placeholder: 'sk-...',
@@ -94,6 +99,11 @@ export async function initWizard(): Promise<ConfigFile> {
     }
 
     if (enterOpenRouter) {
+      clack.note(
+        'Get your API key from: \x1b]8;;https://openrouter.ai/settings/keys\x1b\\https://openrouter.ai/settings/keys\x1b]8;;\x1b\\\n\nNote: You\'ll need to create an account and add credits to use OpenRouter.',
+        'OpenRouter Setup'
+      );
+
       const apiKey = await clack.text({
         message: 'Enter your OpenRouter API key:',
         placeholder: 'sk-or-...',
@@ -138,6 +148,11 @@ export async function initWizard(): Promise<ConfigFile> {
     }
 
     if (enterReplicate) {
+      clack.note(
+        'Get your API key from: \x1b]8;;https://replicate.com/account/api-tokens\x1b\\https://replicate.com/account/api-tokens\x1b]8;;\x1b\\\n\nNote: You\'ll need to create an account and add credits to use Replicate.',
+        'Replicate Setup'
+      );
+
       const apiKey = await clack.text({
         message: 'Enter your Replicate API key:',
         placeholder: 'r8_...',

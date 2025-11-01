@@ -427,6 +427,18 @@ async function manageProviders(config: ConfigFile): Promise<void> {
 
       clack.log.success(`${providerName} removed.`);
     } else if (action === 'update') {
+      // Show API key link
+      const links: Record<string, string> = {
+        openai: 'https://platform.openai.com/api-keys',
+        openrouter: 'https://openrouter.ai/settings/keys',
+        replicate: 'https://replicate.com/account/api-tokens',
+      };
+
+      clack.note(
+        `Get your API key from: \x1b]8;;${links[providerName]}\x1b\\${links[providerName]}\x1b]8;;\x1b\\ \n\nNote: You'll need an account with credits to use ${providerName}.`,
+        `${providerName.charAt(0).toUpperCase() + providerName.slice(1)} Setup`
+      );
+
       const apiKey = await clack.text({
         message: `Enter new API key for ${providerName}:`,
         placeholder: 'sk-...',
@@ -446,6 +458,18 @@ async function manageProviders(config: ConfigFile): Promise<void> {
       clack.log.success(`${providerName} API key updated.`);
     }
   } else {
+    // Show API key link
+    const links: Record<string, string> = {
+      openai: 'https://platform.openai.com/api-keys',
+      openrouter: 'https://openrouter.ai/settings/keys',
+      replicate: 'https://replicate.com/account/api-tokens',
+    };
+
+    clack.note(
+      `Get your API key from: \x1b]8;;${links[providerName]}\x1b\\${links[providerName]}\x1b]8;;\x1b\\\n\nNote: You'll need an account with credits to use ${providerName}.`,
+      `${providerName.charAt(0).toUpperCase() + providerName.slice(1)} Setup`
+    );
+
     const apiKey = await clack.text({
       message: `Enter API key for ${providerName}:`,
       placeholder: 'sk-...',

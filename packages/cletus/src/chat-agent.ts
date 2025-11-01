@@ -21,12 +21,12 @@ export function createChatAgent(ai: CletusAI) {
 - **clerk**: File operations (search, read, create, edit, delete files and directories)
 - **secretary**: User memory, assistant personas, switching assistants
 - **architect**: Type definitions, creating/modifying data schemas
+- **artist**: Image generation, editing, analysis, and search
 - **dba**: Data operations (CRUD, queries, aggregations on custom data types)
-- **artist**: Image generation and manipulation tasks
 
 Choose the appropriate agent based on what the user needs to do.`,
     schema: z.object({
-      agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'dba']).describe('Which sub-agent to use'),
+      agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
       request: z.string().describe('The request to send to the sub-agent'),
     }),
     refs: [
@@ -35,23 +35,26 @@ Choose the appropriate agent based on what the user needs to do.`,
       subAgents.clerk,
       subAgents.secretary,
       subAgents.architect,
+      subAgents.artist,
       subAgents.dba,
     ],
-    call: async (params, [planner, librarian, clerk, secretary, architect, dba], ctx) => {
+    call: async (params, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       // Route to the appropriate sub-agent
       switch (params.agent) {
         case 'planner':
-          return planner.run({ request: params.request }, ctx);
+          return await planner.run({ request: params.request }, ctx);
         case 'librarian':
-          return librarian.run({ request: params.request }, ctx);
+          return await librarian.run({ request: params.request }, ctx);
         case 'clerk':
-          return clerk.run({ request: params.request }, ctx);
+          return await clerk.run({ request: params.request }, ctx);
         case 'secretary':
-          return secretary.run({ request: params.request }, ctx);
+          return await secretary.run({ request: params.request }, ctx);
         case 'architect':
-          return architect.run({ request: params.request }, ctx);
+          return await architect.run({ request: params.request }, ctx);
+        case 'artist':
+          return await artist.run({ request: params.request }, ctx);
         case 'dba':
-          return dba.run({ request: params.request }, ctx);
+          return await dba.run({ request: params.request }, ctx);
         default:
           throw new Error(`Unknown agent: ${params.agent}`);
       }

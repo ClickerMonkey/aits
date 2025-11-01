@@ -490,6 +490,11 @@ export type AIContextUser = { [P in PropertyKey]?: P extends keyof AIContextAny 
 export type AIContext<T extends AIBaseTypes> = Simplify<AIBaseContext<T> & Omit<T['Context'], keyof AIContextAny>>;
 
 /**
+ * Infers the context type from an AI instance
+ */
+export type AIContextInfer<A> = A extends AI<infer T> ? AIContext<T> : never;
+
+/**
  * Required context that must be provided by caller
  * This relaxes properties that are satisfied by defaults or providers
  */
@@ -533,6 +538,11 @@ export type Context<T extends AIBaseTypes> = CoreContext<
   AIContext<T>,
   AIMetadata<T>
 >;
+
+/**
+ * Infers the component context type from an AI instance
+ */
+export type ContextInfer<A> = A extends AI<infer T> ? Context<T> : never;
 
 /**
  * Component type for AI instance

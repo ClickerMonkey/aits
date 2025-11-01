@@ -24,7 +24,8 @@ type CommandType =
   | '/title'
   | '/todos'
   | '/reset'
-  | '/done';
+  | '/done'
+  | '/do';
 
 
 interface Command {
@@ -42,8 +43,9 @@ const COMMANDS: Command[] = [
   { name: '/prompt', description: 'Set custom prompt', takesInput: true, placeholder: 'your prompt' },
   { name: '/title', description: 'Change chat title', takesInput: true, placeholder: 'new title' },
   { name: '/todos', description: 'View todos', takesInput: false },
-  { name: '/reset', description: 'Clear all todos', takesInput: false },
+  { name: '/do', description: 'Add a todo', takesInput: true, placeholder: 'todo description' },
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
+  { name: '/reset', description: 'Clear all todos', takesInput: false },
 ];
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, messages, onExit, onChatUpdate }) => {
@@ -196,6 +198,28 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, messages, onExit, onChatUp
           setChatMessages((prev) => [
             ...prev,
             { role: 'system', content: `Todos:\n${todoList}` },
+          ]);
+        }
+        break;
+
+      case '/do':
+        if (args) {
+          const newTodo = {
+            id: Math.random().toString(36).substring(7),
+            name: args,
+            done: false,
+          };
+          const updatedTodos = [...chatMeta.todos, newTodo];
+          await onChatUpdate({ todos: updatedTodos });
+          setChatMeta({ ...chatMeta, todos: updatedTodos });
+          setChatMessages((prev) => [
+            ...prev,
+            { role: 'system', content: `✓ Added todo: ${args}` },
+          ]);
+        } else {
+          setChatMessages((prev) => [
+            ...prev,
+            { role: 'system', content: 'Usage: /do <todo description>' },
           ]);
         }
         break;

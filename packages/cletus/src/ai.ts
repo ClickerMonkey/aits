@@ -1,4 +1,4 @@
-import { AI } from '@aits/ai';
+import { AI, AIContextInfer, ContextInfer } from '@aits/ai';
 import { OpenAIProvider } from '@aits/openai';
 import { OpenRouterProvider } from '@aits/openrouter';
 import { ReplicateProvider } from '@aits/replicate';
@@ -52,3 +52,5 @@ export function createCletusAI(configFile: ConfigFile) {
 }
 
 export type CletusAI = ReturnType<typeof createCletusAI>;
+export type CletusAIContext = AIContextInfer<CletusAI>;
+export type CletusCoreContext = ContextInfer<CletusAI>;

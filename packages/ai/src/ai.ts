@@ -22,9 +22,11 @@ import type {
   AIContext,
   AIContextOptional,
   AIContextRequired,
+  AIContextUser,
   AIHooks,
   AIMetadata,
   AIMetadataRequired,
+  AIMetadataUser,
   AIProviderNames,
   AIProviders,
   AITypesInfer,
@@ -43,12 +45,10 @@ import type {
   Request,
   SelectedModelFor,
   StrictPartial,
-  Usage,
   ToolInput,
-  AIContextUser,
-  AIMetadataUser,
-  AIContextAny
+  Usage
 } from './types';
+
 
 /**
  * AI Class
