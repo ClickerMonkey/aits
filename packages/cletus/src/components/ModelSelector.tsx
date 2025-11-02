@@ -1,9 +1,8 @@
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, measureElement } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { CletusAI } from '../ai.js';
 import type { AIBaseMetadata, ModelInfo, ScoredModel } from '@aits/ai';
-import { format } from 'path';
 
 interface ModelSelectorProps {
   ai: CletusAI;
@@ -32,7 +31,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [selectedWeightIndex, setSelectedWeightIndex] = useState(0);
   const [filterText, setFilterText] = useState('');
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [scoredModels, setScoredModels] = useState<ScoredModel[]>([]);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [showCostMetrics, setShowCostMetrics] = useState(false);
+  const [showTierCapabilities, setShowTierCapabilities] = useState(false);
 
   const weightKeys: WeightKey[] = ['cost', 'speed', 'accuracy', 'contextWindow'];
 
@@ -65,6 +68,33 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       model.provider.toLowerCase().includes(searchText)
     );
   });
+
+  // Update selected index when filter changes
+  useEffect(() => {
+    if (filteredModels.length === 0) {
+      setSelectedModelIndex(0);
+      setSelectedModelId(null);
+      return;
+    }
+
+    // Try to keep the same model selected
+    if (selectedModelId) {
+      const newIndex = filteredModels.findIndex((s) => s.model.id === selectedModelId);
+      if (newIndex !== -1) {
+        setSelectedModelIndex(newIndex);
+        return;
+      }
+    }
+
+    // Fallback: clamp index to valid range
+    if (selectedModelIndex >= filteredModels.length) {
+      const newIndex = filteredModels.length - 1;
+      setSelectedModelIndex(newIndex);
+      setSelectedModelId(filteredModels[newIndex]?.model.id || null);
+    } else {
+      setSelectedModelId(filteredModels[selectedModelIndex]?.model.id || null);
+    }
+  }, [filterText, filteredModels.length]);
 
   // Handle keyboard input
   useInput((input, key) => {
@@ -104,29 +134,41 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         setWeightInput(weights[key].toString());
       }
     } else if (mode === 'models') {
-      if (input === 'w' || input === 'W') {
+      if (key.meta && input === 'c') {
+        // Toggle cost/metrics visibility
+        setShowCostMetrics(!showCostMetrics);
+      } else if (key.meta && input === 't') {
+        // Toggle tier/capabilities visibility
+        setShowTierCapabilities(!showTierCapabilities);
+      } else if (key.meta && input === 'w') {
         // Switch back to weight editing
         setMode('weights');
         setFilterText('');
-      } else if (key.upArrow && !filterText) {
-        setSelectedModelIndex((prev) => (prev > 0 ? prev - 1 : filteredModels.length - 1));
-      } else if (key.downArrow && !filterText) {
-        setSelectedModelIndex((prev) => (prev < filteredModels.length - 1 ? prev + 1 : 0));
-      } else if (key.return && !filterText) {
-        // Select the model
+      } else if (key.upArrow) {
         if (filteredModels.length > 0) {
+          const newIndex = selectedModelIndex > 0 ? selectedModelIndex - 1 : filteredModels.length - 1;
+          setSelectedModelIndex(newIndex);
+          setSelectedModelId(filteredModels[newIndex].model.id);
+        }
+      } else if (key.downArrow) {
+        if (filteredModels.length > 0) {
+          const newIndex = selectedModelIndex < filteredModels.length - 1 ? selectedModelIndex + 1 : 0;
+          setSelectedModelIndex(newIndex);
+          setSelectedModelId(filteredModels[newIndex].model.id);
+        }
+      } else if (key.return) {
+        // Select the model
+        if (filteredModels.length > 0 && selectedModelIndex < filteredModels.length) {
           onSelect(filteredModels[selectedModelIndex].model);
         }
       } else if (key.backspace) {
         // Allow backspace in filter mode
         if (filterText.length > 0) {
           setFilterText(filterText.slice(0, -1));
-          setSelectedModelIndex(0);
         }
-      } else if (input && input.length === 1 && !key.ctrl && !key.meta && !key.return && input !== 'w' && input !== 'W') {
+      } else if (input && input.length === 1 && !key.ctrl && !key.meta && !key.return) {
         // Start filtering
         setFilterText(filterText + input);
-        setSelectedModelIndex(0);
       }
     }
   });
@@ -280,47 +322,95 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       <Box flexDirection="column" marginBottom={1}>
         <Text dimColor>
           {filteredModels.length} model{filteredModels.length !== 1 ? 's' : ''} found
+          {filteredModels.length > 0 && ` (${selectedModelIndex + 1}/${filteredModels.length})`}
         </Text>
         {filterText && (
-          <Text dimColor>Filter: {filterText} (Backspace to edit, ESC to clear)</Text>
+          <Text dimColor>Filter: "{filterText}" (Backspace to edit, ESC to clear)</Text>
         )}
         {!filterText && <Text dimColor>Type to filter, ↑↓ to navigate, Enter to select</Text>}
       </Box>
 
       <Box flexDirection="column">
-        {filteredModels.slice(0, 15).map((scored, index) => {
-          const model = scored.model;
-          const isSelected = index === selectedModelIndex && !filterText;
-          const cost = formatCost(model);
-          const metrics = formatMetrics(model);
-          const score = (scored.score * 100).toFixed(0) + '%';
-          const context = model.contextWindow ? `${(model.contextWindow / 1000).toFixed(0)}k ctx` : '';
-          const maxOutput = model.maxOutputTokens ? `${(model.maxOutputTokens / 1000).toFixed(0)}k out` : '';
-          const capabilities = Array.from(model.capabilities).join(' ');
+        {(() => {
+          if (filteredModels.length === 0) {
+            return null;
+          }
+
+          // Calculate viewport - simpler approach, each model is ~3 lines
+          const terminalHeight = process.stdout.rows || 30;
+          // Header (3) + filter info (3) + footer (2) + scroll indicators (4) = 12 lines reserved
+          const reservedLines = 16;
+          // Base: name line (1) + margin (1) = 2, plus optional rows
+          let linesPerModel = 2;
+          if (showCostMetrics) linesPerModel += 1;
+          if (showTierCapabilities) linesPerModel += 1;
+          const maxVisibleModels = Math.max(2, Math.floor((terminalHeight - reservedLines) / linesPerModel));
+
+          // Keep selected item in view with some padding
+          const padding = Math.floor(maxVisibleModels / 3);
+          let startIndex = Math.max(0, selectedModelIndex - padding);
+          let endIndex = Math.min(filteredModels.length, startIndex + maxVisibleModels);
+
+          // Adjust if we're near the end
+          if (endIndex === filteredModels.length && filteredModels.length > maxVisibleModels) {
+            startIndex = Math.max(0, filteredModels.length - maxVisibleModels);
+          }
+
+          const visibleModels = filteredModels.slice(startIndex, endIndex);
+          const hasMore = endIndex < filteredModels.length || startIndex > 0;
 
           return (
-            <Box
-              key={model.id}
-              flexDirection="column"
-              borderStyle="round"
-              borderColor={isSelected ? 'cyan' : 'gray'}
-              paddingX={1}
-            >
-              <Box>
-                <Text bold color={isSelected ? 'cyan' : 'white'}>
-                  {isSelected ? '▶ ' : '  '}
-                  {model.name}
-                </Text>
-                <Text dimColor> {score}  {model.provider}  {cost}</Text>
-              </Box>
-              <Box paddingLeft={3}>
-                <Text dimColor>
-                  {context}  {maxOutput}  {metrics}  {model.tier}  {capabilities}
-                </Text>
-              </Box>
-            </Box>
+            <>
+              {startIndex > 0 && (
+                <Box marginBottom={1}>
+                  <Text dimColor>  ↑ {startIndex} more above...</Text>
+                </Box>
+              )}
+              {visibleModels.map((scored, visibleIndex) => {
+                const actualIndex = startIndex + visibleIndex;
+                const model = scored.model;
+                const isSelected = actualIndex === selectedModelIndex;
+                const cost = formatCost(model);
+                const metrics = formatMetrics(model);
+                const score = (scored.score * 100).toFixed(0) + '%';
+                const context = model.contextWindow ? `${(model.contextWindow / 1000).toFixed(0)}k ctx` : '';
+                const maxOutput = model.maxOutputTokens ? `${(model.maxOutputTokens / 1000).toFixed(0)}k out` : '';
+                const capabilities = Array.from(model.capabilities).slice(0, 6).join(' ');
+
+                return (
+                  <Box key={model.id} flexDirection="column" marginBottom={1}>
+                    <Box>
+                      <Text bold color={isSelected ? 'cyan' : 'white'}>
+                        {isSelected ? '▶ ' : '  '}
+                        {model.name}
+                      </Text>
+                      <Text dimColor> [{score}] {model.provider} | {context} {maxOutput && `| ${maxOutput}`}</Text>
+                    </Box>
+                    {showCostMetrics && (
+                      <Box paddingLeft={3}>
+                        <Text dimColor>
+                          {cost} | {metrics}
+                        </Text>
+                      </Box>
+                    )}
+                    {showTierCapabilities && (
+                      <Box paddingLeft={3}>
+                        <Text dimColor>
+                           {model.tier} | {capabilities}
+                        </Text>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
+              {endIndex < filteredModels.length && (
+                <Box marginTop={1}>
+                  <Text dimColor>  ↓ {filteredModels.length - endIndex} more below...</Text>
+                </Box>
+              )}
+            </>
           );
-        })}
+        })()}
       </Box>
 
       {filteredModels.length === 0 && (
@@ -330,7 +420,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>ESC to go back to weights | W to edit weights | Type to filter</Text>
+        <Text dimColor>ESC to go back | Alt+W weights | Alt+C cost/metrics | Alt+T tier/caps</Text>
       </Box>
     </Box>
   );
