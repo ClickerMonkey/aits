@@ -40,7 +40,8 @@ export async function mainMenu(config: ConfigFile): Promise<string | null> {
 
   if (clack.isCancel(selection)) {
     clack.cancel('Goodbye!');
-    process.exit(0);
+    process.exitCode = 0;
+    return null;
   }
 
   if (selection === '__exit__') {
@@ -155,6 +156,8 @@ export async function startChatInteraction(chatId: string, config: ConfigFile): 
     await launchChatInterface(chatId, config);
     // Successfully exited, clear screen before returning to menu
     console.clear();
+    // Give stdin time to settle after Ink exits
+    await new Promise((resolve) => setTimeout(resolve, 100));
   } catch (error: any) {
     console.clear();
     clack.log.error(`Failed to launch chat: ${error.message}`);

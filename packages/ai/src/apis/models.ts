@@ -54,8 +54,8 @@ export class ModelsAPI<TProviders extends Providers> {
    * });
    * ```
    */
-  list(): ModelInfo[] {
-    return this.registry.listModels();
+  list(providedOnly: boolean = false): ModelInfo[] {
+    return providedOnly ? this.registry.providedModels() : this.registry.listModels();
   }
 
   /**

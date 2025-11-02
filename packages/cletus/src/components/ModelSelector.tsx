@@ -45,7 +45,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
       try {
         const models = ai.registry.searchModels(metadata);
-        console.error(`[ModelSelector] Found ${models.length} models`);
         setScoredModels(models);
       } catch (error) {
         console.error('[ModelSelector] Failed to search models:', error);

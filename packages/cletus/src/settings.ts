@@ -519,6 +519,8 @@ async function selectDefaultModel(config: ConfigFile): Promise<void> {
 
   // Clear screen after Ink exits
   console.clear();
+  // Give stdin time to settle after Ink exits
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
   if (selectedModel) {
     await config.save((data) => {

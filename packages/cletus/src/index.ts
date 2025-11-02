@@ -33,7 +33,7 @@ async function main() {
       } catch (error: any) {
         clack.log.error(`Failed to load config: ${error.message}`);
         clack.log.warn('Your config.json may be corrupted. Please fix it or delete it to re-initialize.');
-        process.exit(1);
+        process.exitCode = 1;
       }
     }
 
@@ -43,7 +43,8 @@ async function main() {
 
       // Exit if user chose to exit
       if (chatId === null) {
-        process.exit(0);
+        process.exitCode = 0;
+        break;
       }
 
       // Launch chat interface (Ink UI)
@@ -56,11 +57,11 @@ async function main() {
   } catch (error: any) {
     clack.log.error(`Fatal error: ${error.message}`);
     console.error(error);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
 main().catch((error) => {
   console.error('Unhandled error:', error);
-  process.exit(1);
+  process.exitCode = 1;
 });

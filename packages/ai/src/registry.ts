@@ -74,7 +74,7 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
   const capabilities = new Set<ModelCapability>();
 
   // chat - Basic text completion
-  if (provider.createExecutor !== undefined) {
+  if (provider.createExecutor !== undefined || provider.createStreamer !== undefined) {
     capabilities.add('chat');
   }
 
@@ -88,11 +88,15 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
   if (provider.generateImage !== undefined || provider.generateImageStream !== undefined) {
     capabilities.add('image');
   }
+  if (provider.editImage !== undefined || provider.editImageStream !== undefined) {
+    capabilities.add('image');
+  }
 
   // vision - Image understanding/analysis
   // Note: vision is a model capability, not a provider method
   // Vision is handled through chat messages with image content
   // It cannot be detected from provider methods alone
+  capabilities.add('vision');
 
   // audio - Text-to-speech synthesis
   if (provider.speech !== undefined) {
@@ -112,18 +116,23 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
   // tools - Function/tool calling
   // Note: This is typically a model capability, not detected from provider methods
   // Function calling is handled through createExecutor with tools parameter
+  capabilities.add('tools');
 
   // json - JSON output mode
   // Note: This is a model capability, not a provider method
+  capabilities.add('json');
 
   // structured - Structured output with schemas
   // Note: This is a model capability, not a provider method
+  capabilities.add('structured');
 
   // reasoning - Extended reasoning (like OpenAI o1)
   // Note: This is a model capability, not a provider method
+  capabilities.add('reasoning');
 
   // zdr - Zero data retention
   // Note: This is a privacy/compliance feature, not detected from provider methods
+  capabilities.add('zdr');
 
   return capabilities;
 }
@@ -278,14 +287,20 @@ export class ModelRegistry<
   }
 
   /**
+   * List models for which we have providers
+   */
+  providedModels(): ModelInfo<TProviderKey>[] {
+    return this.listModels().filter(model => this.providers.has(model.provider as TProviderKey));
+  }
+
+  /**
    * Search and score models based on criteria
    */
   searchModels(metadata: AIBaseMetadata<TProviders>): ScoredModel<TProviderKey>[] {
-    const allModels = this.listModels();
     const scored: ScoredModel<TProviderKey>[] = [];
 
     // Filter list by models we have providers for
-    const providedModels = allModels.filter(model => this.providers.has(model.provider as TProviderKey));
+    const providedModels = this.providedModels();
 
     for (const model of providedModels) {
       const score = this.scoreModel(model, metadata);
@@ -490,7 +505,7 @@ export class ModelRegistry<
     }
 
     // Check minimum context window
-    if (criteria.minContextWindow && model.contextWindow < criteria.minContextWindow) {
+    if (criteria.minContextWindow && model.contextWindow && model.contextWindow < criteria.minContextWindow) {
       return result; // score = 0
     }
 
@@ -524,6 +539,7 @@ export class ModelRegistry<
     metadata: AIBaseMetadata<TProviders>
   ): number {
     let score = 0;
+    let weighted = 0;
 
     // Cost score (lower is better, invert)
     if (weights.cost) {
@@ -531,12 +547,18 @@ export class ModelRegistry<
       const avgCost = ((model.pricing.text?.input ?? 0) + (model.pricing.text?.output ?? 0)) / 2;
       const costScore = 1 / (1 + avgCost / 10); // Normalize
       score += weights.cost * costScore;
+      if (avgCost > 0) {
+        weighted++;
+      }
     }
 
     // Speed score
     if (weights.speed && model.metrics?.tokensPerSecond) {
       const speedScore = Math.min(model.metrics.tokensPerSecond / 100, 1); // Normalize to 0-1
       score += weights.speed * speedScore;
+      if (speedScore > 0) {
+        weighted++;
+      }
     }
 
     // Accuracy score - use metrics if available, otherwise tier-based
@@ -548,12 +570,18 @@ export class ModelRegistry<
         const tierScore = model.tier === 'flagship' ? 1.0 : model.tier === 'efficient' ? 0.7 : 0.5;
         score += weights.accuracy * tierScore;
       }
+      if (model.metrics?.accuracyScore || model.tier) {
+        weighted++;
+      }
     }
 
     // Context window score
     if (weights.contextWindow) {
       const contextScore = Math.min(model.contextWindow / 100000, 1); // Normalize
       score += weights.contextWindow * contextScore;
+      if (model.contextWindow > 0) {
+        weighted++;
+      }
     }
 
     // Optional capabilities multiplier - models matching more optional caps get a score multiplier
@@ -581,7 +609,7 @@ export class ModelRegistry<
       score *= multiplier;
     }
 
-    return score;
+    return weighted === 0 ? Math.max(0.0000001, score) : score;
   }
 
   /**

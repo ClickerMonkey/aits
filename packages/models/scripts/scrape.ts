@@ -100,7 +100,7 @@ export async function scrapeAllModels(options: ScraperOptions = {}): Promise<voi
   console.log(`\n${successCount}/${totalCount} sources completed successfully\n`);
 
   if (successCount === 0) {
-    process.exit(1);
+    process.exitCode = 1;
   }
 
   // Generate index files
