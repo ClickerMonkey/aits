@@ -12,6 +12,7 @@ interface ModelSelectorProps {
 }
 
 type WeightKey = 'cost' | 'speed' | 'accuracy' | 'contextWindow';
+type SortMode = 'score' | 'cost-asc' | 'cost-desc' | 'speed-desc' | 'speed-asc' | 'context-desc' | 'context-asc' | 'capable-desc' | 'capable-asc';
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   ai,
@@ -31,13 +32,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [selectedWeightIndex, setSelectedWeightIndex] = useState(0);
   const [filterText, setFilterText] = useState('');
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [scoredModels, setScoredModels] = useState<ScoredModel[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showCostMetrics, setShowCostMetrics] = useState(false);
   const [showTierCapabilities, setShowTierCapabilities] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('score');
 
   const weightKeys: WeightKey[] = ['cost', 'speed', 'accuracy', 'contextWindow'];
+  const sortModes: SortMode[] = ['score', 'cost-asc', 'cost-desc', 'speed-desc', 'speed-asc', 'context-desc', 'context-asc', 'capable-desc', 'capable-asc'];
 
   // Search models when entering model selection mode
   useEffect(() => {
@@ -57,44 +59,195 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
   }, [mode, weights]);
 
-  // Filter models based on filter text
-  const filteredModels = scoredModels.filter((scored) => {
-    if (!filterText) return true;
-    const model = scored.model;
-    const searchText = filterText.toLowerCase();
-    return (
-      model.id.toLowerCase().includes(searchText) ||
-      model.name.toLowerCase().includes(searchText) ||
-      model.provider.toLowerCase().includes(searchText)
-    );
-  });
+  // Helper functions for sorting
+  const getModelCost = (model: ModelInfo): number | null => {
+    let totalCost = 0;
+    let costCount = 0;
 
-  // Update selected index when filter changes
-  useEffect(() => {
-    if (filteredModels.length === 0) {
-      setSelectedModelIndex(0);
-      setSelectedModelId(null);
-      return;
-    }
-
-    // Try to keep the same model selected
-    if (selectedModelId) {
-      const newIndex = filteredModels.findIndex((s) => s.model.id === selectedModelId);
-      if (newIndex !== -1) {
-        setSelectedModelIndex(newIndex);
-        return;
+    // Text pricing
+    if (model.pricing.text) {
+      const { input, output } = model.pricing.text;
+      if (input !== undefined) {
+        totalCost += input;
+        costCount++;
+      }
+      if (output !== undefined) {
+        totalCost += output;
+        costCount++;
       }
     }
 
-    // Fallback: clamp index to valid range
-    if (selectedModelIndex >= filteredModels.length) {
-      const newIndex = filteredModels.length - 1;
-      setSelectedModelIndex(newIndex);
-      setSelectedModelId(filteredModels[newIndex]?.model.id || null);
-    } else {
-      setSelectedModelId(filteredModels[selectedModelIndex]?.model.id || null);
+    // Audio pricing
+    if (model.pricing.audio) {
+      const { input, output, perSecond } = model.pricing.audio;
+      if (perSecond !== undefined) {
+        totalCost += perSecond * 1000; // Convert per-second to comparable scale
+        costCount++;
+      }
+      if (input !== undefined) {
+        totalCost += input;
+        costCount++;
+      }
+      if (output !== undefined) {
+        totalCost += output;
+        costCount++;
+      }
     }
-  }, [filterText, filteredModels.length]);
+
+    // Image pricing
+    if (model.pricing.image) {
+      const { input, output } = model.pricing.image;
+      if (input !== undefined) {
+        totalCost += input;
+        costCount++;
+      }
+      if (output !== undefined) {
+        // Average cost across all output sizes
+        let imageOutputCost = 0;
+        let imageOutputCount = 0;
+        for (const out of output) {
+          for (const size of out.sizes) {
+            imageOutputCost += size.cost;
+            imageOutputCount++;
+          }
+        }
+        if (imageOutputCount > 0) {
+          totalCost += imageOutputCost / imageOutputCount;
+          costCount++;
+        }
+      }
+    }
+
+    // Embeddings pricing
+    if (model.pricing.embeddings?.cost !== undefined) {
+      totalCost += model.pricing.embeddings.cost;
+      costCount++;
+    }
+
+    // Per-request pricing
+    if (model.pricing.perRequest !== undefined) {
+      totalCost += model.pricing.perRequest * 1000; // Scale up to be comparable
+      costCount++;
+    }
+
+    // Reasoning pricing
+    if (model.pricing.reasoning) {
+      const { input, output, cached } = model.pricing.reasoning;
+      if (input !== undefined) {
+        totalCost += input;
+        costCount++;
+      }
+      if (output !== undefined) {
+        totalCost += output;
+        costCount++;
+      }
+      if (cached !== undefined) {
+        totalCost += cached;
+        costCount++;
+      }
+    }
+
+    return costCount > 0 ? totalCost / costCount : null;
+  };
+
+  const getModelSpeed = (model: ModelInfo): number | null => {
+    return model.metrics?.tokensPerSecond ?? null;
+  };
+
+  const getModelContext = (model: ModelInfo): number | null => {
+    return model.contextWindow ?? null;
+  };
+
+  const getModelCapable = (model: ModelInfo): number => {
+    return model.capabilities.size + (model.supportedParameters?.size ?? 0);
+  };
+
+  // Filter and sort models
+  const filteredModels = (() => {
+    let filtered = scoredModels.filter((scored) => {
+      if (!filterText) return true;
+      const model = scored.model;
+      const searchText = filterText.toLowerCase();
+      return (
+        model.id.toLowerCase().includes(searchText) ||
+        model.name.toLowerCase().includes(searchText) ||
+        model.provider.toLowerCase().includes(searchText)
+      );
+    });
+
+    // Sort based on current sort mode
+    if (sortMode !== 'score') {
+      filtered = [...filtered].sort((a, b) => {
+        const modelA = a.model;
+        const modelB = b.model;
+
+        let valueA: number | null;
+        let valueB: number | null;
+        let descending = true;
+
+        switch (sortMode) {
+          case 'cost-asc':
+            valueA = getModelCost(modelA);
+            valueB = getModelCost(modelB);
+            descending = false;
+            break;
+          case 'cost-desc':
+            valueA = getModelCost(modelA);
+            valueB = getModelCost(modelB);
+            break;
+          case 'speed-desc':
+            valueA = getModelSpeed(modelA);
+            valueB = getModelSpeed(modelB);
+            break;
+          case 'speed-asc':
+            valueA = getModelSpeed(modelA);
+            valueB = getModelSpeed(modelB);
+            descending = false;
+            break;
+          case 'context-desc':
+            valueA = getModelContext(modelA);
+            valueB = getModelContext(modelB);
+            break;
+          case 'context-asc':
+            valueA = getModelContext(modelA);
+            valueB = getModelContext(modelB);
+            descending = false;
+            break;
+          case 'capable-desc':
+            valueA = getModelCapable(modelA);
+            valueB = getModelCapable(modelB);
+            break;
+          case 'capable-asc':
+            valueA = getModelCapable(modelA);
+            valueB = getModelCapable(modelB);
+            descending = false;
+            break;
+          default:
+            return 0;
+        }
+
+        // Handle null values - always sort to bottom
+        if (valueA === null && valueB === null) return 0;
+        if (valueA === null) return 1;
+        if (valueB === null) return -1;
+
+        // Sort by value
+        if (descending) {
+          return valueB - valueA;
+        } else {
+          return valueA - valueB;
+        }
+      });
+    }
+
+    return filtered;
+  })();
+
+  // Reset selection to top when filter or sort changes
+  useEffect(() => {
+    setSelectedModelIndex(0);
+    setScrollOffset(0);
+  }, [filterText, sortMode]);
 
   // Handle keyboard input
   useInput((input, key) => {
@@ -144,17 +297,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         // Switch back to weight editing
         setMode('weights');
         setFilterText('');
+      } else if (key.meta && input === 's') {
+        // Cycle through sort modes
+        const currentIndex = sortModes.indexOf(sortMode);
+        const nextIndex = (currentIndex + 1) % sortModes.length;
+        setSortMode(sortModes[nextIndex]);
       } else if (key.upArrow) {
         if (filteredModels.length > 0) {
           const newIndex = selectedModelIndex > 0 ? selectedModelIndex - 1 : filteredModels.length - 1;
           setSelectedModelIndex(newIndex);
-          setSelectedModelId(filteredModels[newIndex].model.id);
         }
       } else if (key.downArrow) {
         if (filteredModels.length > 0) {
           const newIndex = selectedModelIndex < filteredModels.length - 1 ? selectedModelIndex + 1 : 0;
           setSelectedModelIndex(newIndex);
-          setSelectedModelId(filteredModels[newIndex].model.id);
         }
       } else if (key.return) {
         // Select the model
@@ -323,6 +479,18 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         <Text dimColor>
           {filteredModels.length} model{filteredModels.length !== 1 ? 's' : ''} found
           {filteredModels.length > 0 && ` (${selectedModelIndex + 1}/${filteredModels.length})`}
+          {' | Sort: '}
+          <Text color="cyan">
+            {sortMode === 'score' && 'Score'}
+            {sortMode === 'cost-asc' && 'Cheapest'}
+            {sortMode === 'cost-desc' && 'Expensive'}
+            {sortMode === 'speed-desc' && 'Fastest'}
+            {sortMode === 'speed-asc' && 'Slowest'}
+            {sortMode === 'context-desc' && 'Largest Context'}
+            {sortMode === 'context-asc' && 'Smallest Context'}
+            {sortMode === 'capable-desc' && 'Most Capable'}
+            {sortMode === 'capable-asc' && 'Least Capable'}
+          </Text>
         </Text>
         {filterText && (
           <Text dimColor>Filter: "{filterText}" (Backspace to edit, ESC to clear)</Text>
@@ -330,7 +498,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         {!filterText && <Text dimColor>Type to filter, ↑↓ to navigate, Enter to select</Text>}
       </Box>
 
-      <Box flexDirection="column">
+      <Box flexDirection="column" key={`models-${sortMode}-${filterText}`}>
         {(() => {
           if (filteredModels.length === 0) {
             return null;
@@ -346,14 +514,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           if (showTierCapabilities) linesPerModel += 1;
           const maxVisibleModels = Math.max(2, Math.floor((terminalHeight - reservedLines) / linesPerModel));
 
-          // Keep selected item in view with some padding
-          const padding = Math.floor(maxVisibleModels / 3);
-          let startIndex = Math.max(0, selectedModelIndex - padding);
-          let endIndex = Math.min(filteredModels.length, startIndex + maxVisibleModels);
+          // Calculate viewport based on selected index
+          let startIndex = 0;
+          let endIndex = Math.min(filteredModels.length, maxVisibleModels);
 
-          // Adjust if we're near the end
-          if (endIndex === filteredModels.length && filteredModels.length > maxVisibleModels) {
-            startIndex = Math.max(0, filteredModels.length - maxVisibleModels);
+          // If selected index is beyond the visible range, adjust viewport
+          if (selectedModelIndex >= maxVisibleModels) {
+            const padding = Math.floor(maxVisibleModels / 3);
+            startIndex = Math.max(0, selectedModelIndex - padding);
+            endIndex = Math.min(filteredModels.length, startIndex + maxVisibleModels);
+
+            // Adjust if we're near the end
+            if (endIndex === filteredModels.length && filteredModels.length > maxVisibleModels) {
+              startIndex = Math.max(0, filteredModels.length - maxVisibleModels);
+            }
           }
 
           const visibleModels = filteredModels.slice(startIndex, endIndex);
@@ -372,17 +546,17 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 const isSelected = actualIndex === selectedModelIndex;
                 const cost = formatCost(model);
                 const metrics = formatMetrics(model);
-                const score = (scored.score * 100).toFixed(0) + '%';
+                const score = sortMode === 'score' ? `${(scored.score * 100).toFixed(0)}%` : `#${actualIndex + 1}`;
                 const context = model.contextWindow ? `${(model.contextWindow / 1000).toFixed(0)}k ctx` : '';
                 const maxOutput = model.maxOutputTokens ? `${(model.maxOutputTokens / 1000).toFixed(0)}k out` : '';
                 const capabilities = Array.from(model.capabilities).slice(0, 6).join(' ');
 
                 return (
-                  <Box key={model.id} flexDirection="column" marginBottom={1}>
+                  <Box key={`${actualIndex}-${model.id}`} flexDirection="column" marginBottom={1}>
                     <Box>
                       <Text bold color={isSelected ? 'cyan' : 'white'}>
                         {isSelected ? '▶ ' : '  '}
-                        {model.name}
+                        {model.id}
                       </Text>
                       <Text dimColor> [{score}] {model.provider} | {context} {maxOutput && `| ${maxOutput}`}</Text>
                     </Box>
@@ -420,7 +594,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>ESC to go back | Alt+W weights | Alt+C cost/metrics | Alt+T tier/caps</Text>
+        <Text dimColor>ESC to go back | Alt+W weights | Alt+C cost/metrics | Alt+T tier/caps | Alt+S sort</Text>
       </Box>
     </Box>
   );
