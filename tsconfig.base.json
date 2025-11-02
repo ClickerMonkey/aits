@@ -19,12 +19,12 @@
     "target": "es2024",
     "types": ["node"],
     "paths": {
-      "@aits/core": ["./packages/core/src"],
-      "@aits/ai": ["./packages/ai/src"],
-      "@aits/openai": ["./packages/openai/src"],
-      "@aits/openrouter": ["./packages/openrouter/src"],
-      "@aits/replicate": ["./packages/replicate/src"],
-      "@aits/models": ["./packages/models/src"]
+      "@aits/core": ["./packages/core/src/index.ts"],
+      "@aits/ai": ["./packages/ai/src/index.ts"],
+      "@aits/openai": ["./packages/openai/src/index.ts"],
+      "@aits/openrouter": ["./packages/openrouter/src/index.ts"],
+      "@aits/replicate": ["./packages/replicate/src/index.ts"],
+      "@aits/models": ["./packages/models/src/index.ts"]
     }
   }
 }

@@ -107,6 +107,7 @@ export const ChatMetaSchema = z.object({
   assistant: z.string().optional(),
   prompt: z.string().optional(),
   mode: ChatModeSchema.default('none'),
+  model: z.string().optional(),
   created: z.number(),
   updated: z.number(),
   todos: z.array(TodoItemSchema).default([]),
@@ -116,10 +117,12 @@ export const ChatMetaSchema = z.object({
 // Type Definition Schema
 // ============================================================================
 
+export const FieldTypeSchema = z.union([z.enum(['string', 'number', 'boolean', 'date', 'enum']), z.string()]);
+
 export const TypeFieldSchema = z.object({
   name: z.string(),
   friendlyName: z.string(),
-  type: z.string(),
+  type: FieldTypeSchema,
   default: z.union([z.string(), z.number(), z.boolean()]).optional(),
   required: z.boolean().optional(),
   enumOptions: z.array(z.string()).optional(),
@@ -143,6 +146,7 @@ export const ConfigSchema = z.object({
   assistants: z.array(AssistantSchema),
   chats: z.array(ChatMetaSchema),
   types: z.array(TypeDefinitionSchema),
+  defaultModel: z.string().optional(),
 });
 
 // ============================================================================
@@ -230,6 +234,7 @@ export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;
 export type ChatMeta = z.infer<typeof ChatMetaSchema>;
 export type ChatMode = z.infer<typeof ChatModeSchema>;
+export type FieldType = z.infer<typeof FieldTypeSchema>;
 export type TypeField = z.infer<typeof TypeFieldSchema>;
 export type TypeDefinition = z.infer<typeof TypeDefinitionSchema>;
 export type Config = z.infer<typeof ConfigSchema>;

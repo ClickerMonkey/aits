@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "start": "tsx --conditions=source src/index.ts",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },

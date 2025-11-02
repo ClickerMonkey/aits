@@ -230,5 +230,5 @@ export function createClerkTools(ai: CletusAI) {
     fileRead,
     textSearch,
     dirCreate,
-  ];
+  ] as const;
 }

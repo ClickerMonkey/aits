@@ -117,5 +117,5 @@ export function createArtistTools(ai: CletusAI) {
     imageAnalyze,
     imageDescribe,
     imageFind,
-  ];
+  ] as const;
 }

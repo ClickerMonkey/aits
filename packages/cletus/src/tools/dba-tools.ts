@@ -10,7 +10,7 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
 
   switch (field.type) {
     case 'string':
-      schema = field.enumOptions ? z.enum(field.enumOptions as [string, ...string[]]) : z.string();
+      schema = z.string();
       break;
     case 'number':
       schema = z.number();
@@ -18,8 +18,15 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
     case 'boolean':
       schema = z.boolean();
       break;
+    case 'enum':
+      schema = z.enum(field.enumOptions as [string, ...string[]]);
+      break;
+    case 'date':
+      schema = z.iso.date();
+      break;
     default:
       schema = z.string();
+      break;
   }
 
   if (!field.required) {
@@ -54,13 +61,56 @@ function buildWhereSchema(typeDef: TypeDefinition) {
   for (const field of typeDef.fields) {
     switch (field.type) {
       case 'string':
-        fieldConditions[field.name] = z.string().optional();
+        fieldConditions[field.name] = z.object({
+          equals: z.string().optional(),
+          contains: z.string().optional(),
+          startsWith: z.string().optional(),
+          endsWith: z.string().optional(),
+          oneOf: z.array(z.string()).optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
         break;
       case 'number':
-        fieldConditions[field.name] = z.number().optional();
+        fieldConditions[field.name] = z.object({
+          equals: z.number().optional(),
+          lt: z.number().optional(),
+          lte: z.number().optional(),
+          gt: z.number().optional(),
+          gte: z.number().optional(),
+          oneOf: z.array(z.number()).optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
         break;
       case 'boolean':
-        fieldConditions[field.name] = z.boolean().optional();
+        fieldConditions[field.name] = z.object({
+          equals: z.boolean().optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
+        break;
+      case 'date':
+        fieldConditions[field.name] = z.object({
+          equals: z.iso.date().optional(),
+          before: z.iso.date().optional(),
+          after: z.iso.date().optional(),
+          oneOf: z.array(z.iso.date()).optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
+        break;
+      case 'enum':
+        const enumSchema = z.enum(field.enumOptions as [string, ...string[]]);
+        fieldConditions[field.name] = z.object({
+          equals: enumSchema.optional(),
+          oneOf: z.array(enumSchema).optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
+        break;
+      default:
+        // references a data type
+        fieldConditions[field.name] = z.object({
+          equals: z.string().optional(),
+          oneOf: z.array(z.string()).optional(),
+          isEmpty: z.boolean().optional(),
+        }).optional();
         break;
     }
   }
@@ -70,6 +120,7 @@ function buildWhereSchema(typeDef: TypeDefinition) {
     z.object({
       and: z.array(whereSchema).optional(),
       or: z.array(whereSchema).optional(),
+      not: whereSchema.optional(),
       ...fieldConditions,
     })
   );
@@ -83,7 +134,19 @@ function buildWhereSchema(typeDef: TypeDefinition) {
 type WhereClause = {
   and?: WhereClause[];
   or?: WhereClause[];
-  [key: string]: any;
+  not?: WhereClause;
+  [key: string]: {
+    equals?: string | number | boolean;
+    contains?: string;
+    startsWith?: string;
+    endsWith?: string;
+    lt?: number;
+    lte?: number;
+    gt?: number;
+    gte?: number;
+    oneOf?: (string | number | boolean)[];
+    isEmpty?: boolean;
+  } | WhereClause | WhereClause[] | undefined ;
 };
 
 /**
@@ -255,7 +318,7 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
       select: z.array(
         z.object({
           function: z.enum(['count', 'sum', 'avg', 'min', 'max']),
-          field: z.enum([...typeDef.fields.map(f => f.name), '*'] as [string, ...string[]]).optional(),
+          field: z.enum(['*', ...typeDef.fields.map(f => f.name)] as [string, ...string[]]).optional(),
           alias: z.string().optional(),
         })
       ).describe('Aggregation functions'),
@@ -284,23 +347,18 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
     dataUpdateMany,
     dataDeleteMany,
     dataAggregate,
-  ];
+  ] as const;
 }
 
 /**
  * Create the DBA agent that identifies the type first, then creates specific tools
  */
 export function createDBAAgent(ai: CletusAI) {
-  const dbaAgent = ai.agent({
-    name: 'dba',
-    description: 'Database administrator agent for data operations',
-    refs: [],
-    call: async (input: { request: string }, refs, ctx) => {
-      // First, identify which type the user wants to work with
-      const typeIdentifier = ai.prompt({
-        name: 'identify_data_type',
-        description: 'Identify which data type the user wants to operate on',
-        content: `Based on the user's request, identify which data type they want to work with.
+  // First, identify which type the user wants to work with
+  const typeIdentifier = ai.prompt({
+    name: 'identify_data_type',
+    description: 'Identify which data type the user wants to operate on',
+    content: `Based on the user's request, identify which data type they want to work with.
 
 Available types:
 {{#each types}}
@@ -310,17 +368,22 @@ Available types:
 User request: {{request}}
 
 Respond with just the type name.`,
-        schema: z.object({
-          typeName: z.string().describe('The data type name'),
-        }),
-        input: (input, ctx) => ({
-          types: ctx.config.types,
-          request: input?.request || '',
-        }),
-      });
-
+    schema: z.object({
+      typeName: z.string().describe('The data type name'),
+    }),
+    input: (input, ctx) => ({
+      types: ctx.config.getData().types,
+      request: input?.request || '',
+    }),
+  });
+    
+  const dbaAgent = ai.agent({
+    name: 'dba',
+    description: 'Database administrator agent for data operations',
+    refs: [typeIdentifier],
+    call: async (input: { request: string }, [typeIdentifier], ctx) => {
       // Get the type name
-      const result = await typeIdentifier.get({ request: input.request }, 'result', ctx);
+      const result = await typeIdentifier.run({ request: input.request }, ctx);
       const typeDef = ctx.config.types.find((t) => t.name === result.typeName);
 
       if (!typeDef) {
@@ -344,7 +407,7 @@ Fields:
 User request: {{request}}
 
 Use the available tools to complete the data operation.`,
-        tools,
+        tools: tools,
         schema: false,
         input: (input, ctx) => ({
           fields: typeDef.fields,
@@ -353,7 +416,7 @@ Use the available tools to complete the data operation.`,
       });
 
       // Execute the prompt with type-specific tools
-      await dataPrompt.get({ request: input.request }, 'result', ctx);
+      await dataPrompt.run({ request: input.request }, ctx);
 
       return { completed: true, type: typeDef.name };
     },

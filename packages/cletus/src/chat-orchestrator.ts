@@ -53,6 +53,7 @@ export class ChatOrchestrator {
 
     try {
       // Stream the prompt
+      const configData = this.config.getData();
       const stream = this.chatPrompt.get(
         {
           assistant: chat.assistant,
@@ -62,10 +63,13 @@ export class ChatOrchestrator {
         },
         'stream',
         {
-          config: this.config.getData(),
+          config: configData,
           chatId: this.chatId,
           cwd: process.cwd(),
           signal: this.abortController.signal,
+          metadata: {
+            model: chat.model || configData.defaultModel,
+          },
         }
       );
 

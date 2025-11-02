@@ -2,6 +2,7 @@
   "name": "@aits/core",
   "version": "0.1.0",
   "description": "@aits Core - Core primitives for AI components (agents, tools, prompts)",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

@@ -87,5 +87,5 @@ Provide an update object with fields to change.`,
     typeInfo,
     typeUpdate,
     typeCreate,
-  ];
+  ] as const;
 }

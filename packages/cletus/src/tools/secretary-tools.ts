@@ -103,5 +103,5 @@ export function createSecretaryTools(ai: CletusAI) {
     assistantAdd,
     memoryList,
     memoryUpdate,
-  ];
+  ] as const;
 }

@@ -2,8 +2,18 @@
   "name": "@aits/ai",
   "version": "0.1.0",
   "description": "@aits AI - AI TypeScript library main functionality",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",

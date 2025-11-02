@@ -139,5 +139,5 @@ export function createPlannerTools(ai: CletusAI) {
     todosGet,
     todosRemove,
     todosReplace,
-  ];
+  ] as const;
 }

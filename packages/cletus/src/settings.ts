@@ -3,6 +3,8 @@ import { ConfigFile } from './config.js';
 import type { Providers } from './schemas.js';
 import fs from 'fs/promises';
 import { getChatPath, getDataPath } from './file-manager.js';
+import { launchModelSelector } from './components/model-selector-launcher.js';
+import { createCletusAI } from './ai.js';
 
 /**
  * Display settings menu
@@ -21,6 +23,7 @@ export async function settingsMenu(config: ConfigFile): Promise<void> {
         { value: 'chat-delete', label: '🗑️  Delete a chat' },
         { value: 'type-delete', label: '🗑️  Delete a data type' },
         { value: 'provider-manage', label: '🔌 Manage providers' },
+        { value: 'model-select', label: '🤖 Select default model' },
         { value: '__back__', label: '← Back to main menu' },
       ],
     });
@@ -60,6 +63,9 @@ export async function settingsMenu(config: ConfigFile): Promise<void> {
         break;
       case 'provider-manage':
         await manageProviders(config);
+        break;
+      case 'model-select':
+        await selectDefaultModel(config);
         break;
     }
   }
@@ -487,5 +493,39 @@ async function manageProviders(config: ConfigFile): Promise<void> {
     });
 
     clack.log.success(`${providerName} configured!`);
+  }
+}
+
+/**
+ * Select default model
+ */
+async function selectDefaultModel(config: ConfigFile): Promise<void> {
+  const currentModel = config.getData().defaultModel;
+
+  if (currentModel) {
+    clack.log.info(`Current default model: ${currentModel}`);
+  } else {
+    clack.log.info('No default model set (auto-selection will be used)');
+  }
+
+  const ai = createCletusAI(config);
+
+  // Clear screen before launching Ink
+  console.clear();
+
+  const selectedModel = await launchModelSelector(ai, {
+    required: ['chat', 'tools'],
+  });
+
+  // Clear screen after Ink exits
+  console.clear();
+
+  if (selectedModel) {
+    await config.save((data) => {
+      data.defaultModel = selectedModel.id;
+    });
+    clack.log.success(`Default model set to: ${selectedModel.name} (${selectedModel.id})`);
+  } else {
+    clack.log.info('Model selection cancelled');
   }
 }

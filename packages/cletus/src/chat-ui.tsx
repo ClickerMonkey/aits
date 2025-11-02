@@ -20,6 +20,7 @@ type CommandType =
   | '/exit'
   | '/assistant'
   | '/mode'
+  | '/model'
   | '/prompt'
   | '/title'
   | '/todos'
@@ -40,6 +41,7 @@ const COMMANDS: Command[] = [
   { name: '/exit', description: 'Exit chat', takesInput: false },
   { name: '/assistant', description: 'Change assistant', takesInput: true, placeholder: 'assistant name' },
   { name: '/mode', description: 'Change mode', takesInput: true, placeholder: 'none|read|create|update|delete' },
+  { name: '/model', description: 'Select model', takesInput: false },
   { name: '/prompt', description: 'Set custom prompt', takesInput: true, placeholder: 'your prompt' },
   { name: '/title', description: 'Change chat title', takesInput: true, placeholder: 'new title' },
   { name: '/todos', description: 'View todos', takesInput: false },
@@ -148,6 +150,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, messages, onExit, onChatUp
             },
           ]);
         }
+        break;
+
+      case '/model':
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: 'system',
+            content: chatMeta.model
+              ? `Current chat model: ${chatMeta.model}\n\nTo change the default model, exit to Settings > Select default model`
+              : `No chat-specific model set (using default model)\n\nTo set a default model, exit to Settings > Select default model`,
+          },
+        ]);
         break;
 
       case '/prompt':

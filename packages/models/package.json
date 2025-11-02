@@ -1,7 +1,8 @@
 {
   "name": "@aits/models",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Static model information scraped from OpenAI, OpenRouter, and Replicate",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -13,19 +14,34 @@
     "scrape:replicate": "tsx scripts/scrapers/replicate.ts"
   },
   "keywords": ["ai", "models", "openai", "openrouter", "replicate"],
-  "author": "",
+  "author": "ClickerMonkey",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClickerMonkey/aits.git",
+    "directory": "packages/models"
+  },
   "dependencies": {
     "@aits/ai": "^0.1.0",
-    "@aits/openrouter": "^0.1.0",
-    "axios": "^1.7.2",
-    "replicate": "^0.34.1"
+    "@aits/openrouter": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
     "puppeteer": "^23.11.1",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "axios": "^1.7.2",
+    "replicate": "^0.34.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "bugs": {
+    "url": "https://github.com/ClickerMonkey/aits/issues"
   }
 }

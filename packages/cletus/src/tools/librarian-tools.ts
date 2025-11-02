@@ -85,5 +85,5 @@ export function createLibrarianTools(ai: CletusAI) {
     knowledgeSources,
     knowledgeAdd,
     knowledgeDelete,
-  ];
+  ] as const;
 }
