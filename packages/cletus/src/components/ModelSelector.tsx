@@ -3,6 +3,7 @@ import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
 import type { CletusAI } from '../ai.js';
 import type { AIBaseMetadata, ModelInfo, ScoredModel } from '@aits/ai';
+import { format } from 'path';
 
 interface ModelSelectorProps {
   ai: CletusAI;
@@ -142,12 +143,68 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   };
 
   const formatCost = (model: ModelInfo): string => {
-    const input = model.pricing?.text?.input;
-    const output = model.pricing?.text?.output;
-    if (input !== undefined && output !== undefined) {
-      return `$${input.toFixed(2)}/$${output.toFixed(2)}/M`;
+    let costs: string[] = [];
+    if (model.pricing.text) {
+      const { input , output  } = model.pricing.text;
+      if (input !== undefined && output !== undefined) {
+        costs.push(`$${input.toFixed(2)}/$${output.toFixed(2)}/M`);
+      } else if (input !== undefined) {
+        costs.push(`$${input.toFixed(2)}/M input`);
+      } else if (output !== undefined) {
+        costs.push(`$${output.toFixed(2)}/M output`);
+      }
     }
-    return 'N/A';
+    if (model.pricing.audio) {
+      const { input , output, perSecond } = model.pricing.audio;
+      if (perSecond !== undefined) {
+        costs.push(`$${perSecond.toFixed(2)}/s 🎵`);
+      }
+      if (output !== undefined && input !== undefined) {
+        costs.push(`$${input.toFixed(1)}/${output.toFixed(2)}/M 🎵`);
+      } else if (output !== undefined) {
+        costs.push(`$${output.toFixed(2)}/M 🎵`);
+      } else if (input !== undefined) {
+        costs.push(`$${input.toFixed(2)}/M 👂`);
+      }
+    }
+    if (model.pricing.image) {
+      const { input , output  } = model.pricing.image;
+      if (input !== undefined) {
+        costs.push(`$${input.toFixed(2)}/M 👁 in`);
+      } else if (output !== undefined) {
+        for (const out of output) {
+          const { quality, sizes } = out;
+          costs.push(`${quality}:`);
+          for (const size of sizes) {
+            costs.push(`${size.width}x${size.height}=$${size.cost.toFixed(2)}/M`);
+          }
+        }
+      }
+    }
+    if (model.pricing.embeddings) {
+      const { cost  } = model.pricing.embeddings;
+      if (cost !== undefined) {
+        costs.push(`$${cost.toFixed(2)}/M embed`);
+      }
+    }
+    if (model.pricing.perRequest) {
+      costs.push(`$${model.pricing.perRequest.toFixed(4)}/req`);
+    }
+    if (model.pricing.reasoning) {
+      const { input, output, cached } = model.pricing.reasoning;
+      if (input !== undefined && output !== undefined) {
+        costs.push(`$${input.toFixed(2)}/$${output.toFixed(2)}/M 🧠`);
+      } else if (output !== undefined) {
+        costs.push(`$${output.toFixed(2)}/M 🧠 out`);
+      } else if (input !== undefined) {
+        costs.push(`$${input.toFixed(2)}/M 🧠 in`);
+      }
+      if (cached !== undefined) {
+        costs.push(`$${cached.toFixed(2)}/M cached 🧠`);
+      }
+    }
+    
+    return costs.join(', ');
   };
 
   const formatMetrics = (model: ModelInfo): string => {
@@ -158,7 +215,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     if (model.metrics?.timeToFirstToken) {
       parts.push(`${model.metrics.timeToFirstToken.toFixed(0)}ms TTFT`);
     }
-    return parts.length > 0 ? parts.join(', ') : 'No metrics';
+    return parts.join(', ');
   };
 
   if (mode === 'weights') {
@@ -182,7 +239,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             <Text color={index === selectedWeightIndex ? 'cyan' : 'white'}>
               {index === selectedWeightIndex ? '▶ ' : '  '}
               {key.charAt(0).toUpperCase() + key.slice(1)}:{' '}
-            </Text>
+            </Text> 
             {editingWeight === key ? (
               <TextInput
                 value={weightInput}
@@ -234,6 +291,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         {filteredModels.slice(0, 15).map((scored, index) => {
           const model = scored.model;
           const isSelected = index === selectedModelIndex && !filterText;
+          const cost = formatCost(model);
+          const metrics = formatMetrics(model);
+          const score = (scored.score * 100).toFixed(0) + '%';
+          const context = model.contextWindow ? `${(model.contextWindow / 1000).toFixed(0)}k ctx` : '';
+          const maxOutput = model.maxOutputTokens ? `${(model.maxOutputTokens / 1000).toFixed(0)}k out` : '';
+          const capabilities = Array.from(model.capabilities).join(' ');
 
           return (
             <Box
@@ -242,32 +305,17 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               borderStyle="round"
               borderColor={isSelected ? 'cyan' : 'gray'}
               paddingX={1}
-              marginBottom={1}
             >
               <Box>
                 <Text bold color={isSelected ? 'cyan' : 'white'}>
                   {isSelected ? '▶ ' : '  '}
                   {model.name}
                 </Text>
-                <Text dimColor> (Score: {scored.score.toFixed(2)})</Text>
+                <Text dimColor> {score}  {model.provider}  {cost}</Text>
               </Box>
               <Box paddingLeft={3}>
                 <Text dimColor>
-                  Provider: {model.provider} | ID: {model.id}
-                </Text>
-              </Box>
-              <Box paddingLeft={3}>
-                <Text dimColor>
-                  Cost: {formatCost(model)} | Context: {(model.contextWindow / 1000).toFixed(0)}k
-                  {model.maxOutputTokens && ` | Max Out: ${(model.maxOutputTokens / 1000).toFixed(0)}k`}
-                </Text>
-              </Box>
-              <Box paddingLeft={3}>
-                <Text dimColor>Metrics: {formatMetrics(model)}</Text>
-              </Box>
-              <Box paddingLeft={3}>
-                <Text dimColor>
-                  Tier: {model.tier} | Capabilities: {Array.from(model.capabilities).slice(0, 5).join(', ')}
+                  {context}  {maxOutput}  {metrics}  {model.tier}  {capabilities}
                 </Text>
               </Box>
             </Box>
