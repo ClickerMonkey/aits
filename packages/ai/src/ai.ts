@@ -147,7 +147,9 @@ export class AI<T extends AIBaseTypes> {
       config.providers,
       config.modelOverrides || [],
       config.defaultCostPerMillionTokens || 5.0,
-      modelSources
+      modelSources,
+      config.defaultWeights,
+      config.weightProfiles || {}
     );
 
     // Push in given models without fetching
@@ -887,10 +889,15 @@ export class AI<T extends AIBaseTypes> {
         ...config?.tokens,
       },
 
-      // Profiles: merge
-      profiles: {
-        ...this.config.profiles,
-        ...config?.profiles,
+      // Default scoring weights
+      defaultWeights: {
+        ...this.config.defaultWeights,
+        ...config?.defaultWeights,
+      },
+      // Weight profiles: merge
+      weightProfiles: {
+        ...this.config.weightProfiles,
+        ...config?.weightProfiles,
       },
     } as AIConfig<TContext, TMetadata, TProviders>);
   }

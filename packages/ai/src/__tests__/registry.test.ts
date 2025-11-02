@@ -5,6 +5,7 @@
  */
 
 import { ModelRegistry } from '../registry';
+import { ModelHandler } from '../types';
 import { createMockProvider } from './mocks/provider.mock';
 
 describe('ModelRegistry', () => {
@@ -44,14 +45,14 @@ describe('ModelRegistry', () => {
       const models = registry.listModels();
 
       // Each provider has 4 models
-      expect(models.length).toBe(8);
+      expect(models.length).toBe(16);
 
       // Check both providers are represented
       const provider1Models = models.filter(m => m.provider === 'provider1');
       const provider2Models = models.filter(m => m.provider === 'provider2');
 
-      expect(provider1Models.length).toBe(4);
-      expect(provider2Models.length).toBe(4);
+      expect(provider1Models.length).toBe(8);
+      expect(provider2Models.length).toBe(8);
     });
 
     it('should return empty list before refresh', () => {
@@ -308,9 +309,8 @@ describe('ModelRegistry', () => {
     it('should register and retrieve model handlers', () => {
       const registry = new ModelRegistry({});
 
-      const handler = {
-        provider: 'test-provider',
-        modelId: 'test-model',
+      const handler: ModelHandler = {
+        models: ['test-model'],
         chat: {
           get: jest.fn(),
           stream: jest.fn()
@@ -335,15 +335,13 @@ describe('ModelRegistry', () => {
     it('should handle multiple handlers for same provider', () => {
       const registry = new ModelRegistry({});
 
-      const handler1 = {
-        provider: 'provider',
-        modelId: 'model1',
+      const handler1: ModelHandler = {
+        models: ['model1'],
         chat: { get: jest.fn() }
       };
-      const handler2 = {
-        provider: 'provider',
-        modelId: 'model2',
-        image: { get: jest.fn() }
+      const handler2: ModelHandler = {
+        models: ['model2'],
+        imageGenerate: { get: jest.fn() }
       };
 
       registry.registerHandler(handler1);

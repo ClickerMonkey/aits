@@ -374,9 +374,8 @@ describe('AI Class Methods', () => {
     it('should register model handlers from config', async () => {
       const provider1 = createMockProvider({ name: 'provider1' });
 
-      const handler: ModelHandler<{}, string> = {
-        provider: 'provider1',
-        modelId: 'provider1-chat-flagship',
+      const handler: ModelHandler = {
+        models: ['provider1-chat-flagship'],
       };
 
       const ai = AI.with()

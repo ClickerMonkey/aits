@@ -45,9 +45,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
       try {
         const models = ai.registry.searchModels(metadata);
+        console.error(`[ModelSelector] Found ${models.length} models`);
         setScoredModels(models);
       } catch (error) {
-        console.error('Failed to search models:', error);
+        console.error('[ModelSelector] Failed to search models:', error);
         setScoredModels([]);
       }
     }
@@ -73,7 +74,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         setWeightInput('');
       } else if (mode === 'models' && filterText) {
         setFilterText('');
+      } else if (mode === 'models') {
+        // ESC in models mode with no filter - go back to weights
+        setMode('weights');
       } else {
+        // ESC in weights mode - cancel
         onCancel();
       }
       return;
@@ -89,19 +94,21 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         setSelectedWeightIndex((prev) => (prev > 0 ? prev - 1 : weightKeys.length - 1));
       } else if (key.downArrow) {
         setSelectedWeightIndex((prev) => (prev < weightKeys.length - 1 ? prev + 1 : 0));
-      } else if (key.return) {
-        if (input === '') {
-          // Enter on unedited - go to model selection
-          setMode('models');
-        } else {
-          // Enter while editing - start editing the selected weight
-          const key = weightKeys[selectedWeightIndex];
-          setEditingWeight(key);
-          setWeightInput(weights[key].toString());
-        }
+      } else if (key.return && !editingWeight) {
+        // Enter without editing a weight - go to model selection
+        setMode('models');
+      } else if (input === 'e' || input === 'E') {
+        // Press 'e' to edit weights
+        const key = weightKeys[selectedWeightIndex];
+        setEditingWeight(key);
+        setWeightInput(weights[key].toString());
       }
     } else if (mode === 'models') {
-      if (key.upArrow && !filterText) {
+      if (input === 'w' || input === 'W') {
+        // Switch back to weight editing
+        setMode('weights');
+        setFilterText('');
+      } else if (key.upArrow && !filterText) {
         setSelectedModelIndex((prev) => (prev > 0 ? prev - 1 : filteredModels.length - 1));
       } else if (key.downArrow && !filterText) {
         setSelectedModelIndex((prev) => (prev < filteredModels.length - 1 ? prev + 1 : 0));
@@ -110,13 +117,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         if (filteredModels.length > 0) {
           onSelect(filteredModels[selectedModelIndex].model);
         }
-      } else if (key.backspace && mode === 'models') {
+      } else if (key.backspace) {
         // Allow backspace in filter mode
         if (filterText.length > 0) {
           setFilterText(filterText.slice(0, -1));
           setSelectedModelIndex(0);
         }
-      } else if (input && input.length === 1 && !key.ctrl && !key.meta) {
+      } else if (input && input.length === 1 && !key.ctrl && !key.meta && !key.return && input !== 'w' && input !== 'W') {
         // Start filtering
         setFilterText(filterText + input);
         setSelectedModelIndex(0);
@@ -168,7 +175,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
         <Box flexDirection="column" marginBottom={1}>
           <Text dimColor>Adjust weights for model scoring (should sum to ~1.0):</Text>
-          <Text dimColor>↑↓ to navigate, Enter to edit, Enter again to continue</Text>
+          <Text dimColor>↑↓ to navigate, E to edit weight, Enter to continue to models</Text>
         </Box>
 
         {weightKeys.map((key, index) => (
@@ -199,7 +206,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         </Box>
 
         <Box marginTop={1}>
-          <Text dimColor>Press ESC to cancel</Text>
+          <Text dimColor>ESC to cancel</Text>
         </Box>
       </Box>
     );
@@ -276,7 +283,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>Press ESC to go back</Text>
+        <Text dimColor>ESC to go back to weights | W to edit weights | Type to filter</Text>
       </Box>
     </Box>
   );

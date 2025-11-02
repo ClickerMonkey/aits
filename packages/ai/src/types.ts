@@ -447,8 +447,10 @@ export interface AIBaseMetadata<TProviders extends Providers> {
     maxCostPerRequest?: number;
     maxCostPerMillionTokens?: number;
   };
-  // Scoring weights for model selection
+  // Scoring weights for model selection (takes priority over weightProfile)
   weights?: ModelSelectionWeights;
+  // Named weight profile to use (from weightProfiles config)
+  weightProfile?: string;
   // Minimum context window size required
   minContextWindow?: number;
   // The tier to use to pick the best model
@@ -493,6 +495,19 @@ export type AIContext<T extends AIBaseTypes> = Simplify<AIBaseContext<T> & Omit<
  * Infers the context type from an AI instance
  */
 export type AIContextInfer<A> = A extends AI<infer T> ? AIContext<T> : never;
+
+/**
+ * Full context for given user/context/provider types
+ */
+export type AIContextFor<
+  TContext extends AIContextUser,
+  TMetadata extends AIMetadataUser,
+  TProviders extends Providers
+> = AIContext<
+  AITypesInfer<TContext, TMetadata, TProviders, 
+    AIConfig<TContext, TMetadata, TProviders>
+  >
+> & AIContextAny;
 
 /**
  * Required context that must be provided by caller
@@ -769,9 +784,8 @@ export interface ImageAnalyzeRequest extends BaseRequest{
  * };
  * ```
  */
-export interface ModelHandler<TContext = {}, TProvider extends string = string> {
-  provider: TProvider;
-  modelId: string;
+export interface ModelHandler<TContext extends AIContextAny = AIContextAny> {
+  models: string[];
 
   chat?: {
     get?: (request: Request, ctx: TContext) => Promise<Response>;
@@ -810,7 +824,7 @@ export interface ModelHandler<TContext = {}, TProvider extends string = string> 
 /**
  * Model handler for AIBaseTypes instance
  */
-export type ModelHandlerFor<T extends AIBaseTypes> = ModelHandler<AIContext<T>, AIProviderNames<T>>;
+export type ModelHandlerFor<T extends AIBaseTypes> = ModelHandler<AIContext<T>>;
 
 /**
  * Model transformer for providers with inconsistent request/response shapes.
@@ -1168,19 +1182,14 @@ export interface AIConfig<
   // Model property overrides
   modelOverrides?: ModelOverride[];
   // Model-specific handlers
-  modelHandlers?: ModelHandler<TContext>[];
-
+  modelHandlers?: ModelHandler<AIContextFor<TContext, TMetadata, TProviders>>[];
   // External model sources
   modelSources?: ModelSource[];
 
   // Default scoring weights for model selection
   defaultWeights?: ModelSelectionWeights;
-  // Named weight profiles
-  profiles?: {
-    costPriority?: ModelSelectionWeights;
-    balanced?: ModelSelectionWeights;
-    performance?: ModelSelectionWeights;
-  };
+  // Named weight profiles for model selection
+  weightProfiles?: Record<string, ModelSelectionWeights>;
 
   tokens?: {
     textDivisor?: number;        // Default: 4

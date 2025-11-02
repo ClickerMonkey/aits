@@ -133,7 +133,7 @@ export function getProviderCapabilities(provider: Provider): Set<ModelCapability
 // ============================================================================
 
 export class ModelRegistry<
-  TProviders extends Providers, 
+  TProviders extends Providers,
   TProviderKey extends keyof TProviders & string = keyof TProviders & string,
   TProvider extends TProviders[TProviderKey] = TProviders[TProviderKey]
 > {
@@ -145,12 +145,16 @@ export class ModelRegistry<
   private modelSources: ModelSource[] = [];
   private modelOverrides: ModelOverride[];
   private defaultCostPerMillionTokens: number;
+  private defaultWeights?: ModelSelectionWeights;
+  private weightProfiles: Record<string, ModelSelectionWeights>;
 
   constructor(
     providers: TProviders,
     modelOverrides: ModelOverride[] = [],
     defaultCostPerMillionTokens: number = 5.0,
-    modelSources: ModelSource[] = []
+    modelSources: ModelSource[] = [],
+    defaultWeights?: ModelSelectionWeights,
+    weightProfiles: Record<string, ModelSelectionWeights> = {}
   ) {
     // Store providers
     this.providers = new Map(Object.entries(providers)) as Map<TProviderKey, TProvider>;
@@ -165,6 +169,8 @@ export class ModelRegistry<
     this.modelOverrides = modelOverrides;
     this.defaultCostPerMillionTokens = defaultCostPerMillionTokens;
     this.modelSources = modelSources;
+    this.defaultWeights = defaultWeights;
+    this.weightProfiles = weightProfiles;
   }
 
   /**
@@ -176,23 +182,31 @@ export class ModelRegistry<
 
   /**
    * Register a model in the registry
-   * Provider order matters: first to register wins
+   *
+   * Always registers under two keys:
+   * - model.id (e.g., "gpt-4" or "openai/gpt-4")
+   * - provider/model.id (e.g., "openai/gpt-4" or "openrouter/openai/gpt-4")
+   *
+   * On collision, models are merged
    */
   registerModel(model: ModelInfo<TProviderKey>): void {
-    const key = `${model.provider}/${model.id}`;
+    const processedModel = this.applyOverrides(model);
 
-    // If model already exists, only override if new provider has higher priority
-    if (this.models.has(key)) {
-      const existing = this.models.get(key)!;
-      const existingPriority = existing.provider || 0;
-      const newPriority = model.provider || 0;
+    // Register under both keys
+    const keys = [
+      model.id,                              // "gpt-4" or "openai/gpt-4"
+      `${model.provider}/${model.id}`,       // "openai/gpt-4" or "openrouter/openai/gpt-4"
+    ];
 
-      // Lower index = higher priority
-      if (newPriority < existingPriority) {
-        this.models.set(key, this.applyOverrides(model));
+    for (const key of keys) {
+      if (this.models.has(key)) {
+        // Merge with existing
+        const existing = this.models.get(key)!;
+        const merged = this.mergeModelInfo(existing, processedModel);
+        this.models.set(key, merged);
+      } else {
+        this.models.set(key, processedModel);
       }
-    } else {
-      this.models.set(key, this.applyOverrides(model));
     }
   }
 
@@ -372,16 +386,14 @@ export class ModelRegistry<
    * Register a model handler
    */
   registerHandler(handler: ModelHandler<any>): void {
-    const key = `${handler.provider}/${handler.modelId}`;
-    this.modelHandlers.set(key, handler);
+    handler.models.forEach(model => this.modelHandlers.set(model, handler));
   }
 
   /**
    * Get handler for a model
    */
-  getHandler(provider: string, modelId: string): ModelHandler | undefined {
-    const key = `${provider}/${modelId}`;
-    return this.modelHandlers.get(key);
+  getHandler(provider: string, model: string): ModelHandler | undefined {
+    return this.modelHandlers.get(model) ?? this.modelHandlers.get(`${provider}/${model}`);
   }
 
   /**
@@ -486,8 +498,18 @@ export class ModelRegistry<
       return result; // score = 0
     }
 
-    // Calculate score based on weights
-    const weights = criteria.weights || { cost: 0.5, speed: 0.3, accuracy: 0.2 };
+    // Determine weights with priority: metadata.weights > weightProfile > defaultWeights
+    let weights: ModelSelectionWeights;
+    if (criteria.weights) {
+      weights = criteria.weights;
+    } else if (criteria.weightProfile && this.weightProfiles[criteria.weightProfile]) {
+      weights = this.weightProfiles[criteria.weightProfile];
+    } else if (this.defaultWeights) {
+      weights = this.defaultWeights;
+    } else {
+      weights = { cost: 0.5, speed: 0.3, accuracy: 0.2 };
+    }
+
     result.score = this.calculateWeightedScore(model, weights, criteria);
 
     return result;
