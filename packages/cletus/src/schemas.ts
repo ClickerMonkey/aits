@@ -13,6 +13,15 @@ export const UserSchema = z.object({
   name: z.string(),
   pronouns: z.string().optional(),
   memory: z.array(UserMemorySchema).default([]),
+  models: z.object({
+    chat: z.string().optional(),
+    imageGenerate: z.string().optional(),
+    imageEdit: z.string().optional(),
+    imageAnalyze: z.string().optional(),
+    transcription: z.string().optional(),
+    speech: z.string().optional(),
+    embedding: z.string().optional(),
+  }).optional(),
 });
 
 // ============================================================================
@@ -146,7 +155,6 @@ export const ConfigSchema = z.object({
   assistants: z.array(AssistantSchema),
   chats: z.array(ChatMetaSchema),
   types: z.array(TypeDefinitionSchema),
-  defaultModel: z.string().optional(),
 });
 
 // ============================================================================

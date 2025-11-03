@@ -500,7 +500,7 @@ async function manageProviders(config: ConfigFile): Promise<void> {
  * Select default model
  */
 async function selectDefaultModel(config: ConfigFile): Promise<void> {
-  const currentModel = config.getData().defaultModel;
+  const currentModel = config.getData().user.models?.chat;
 
   if (currentModel) {
     clack.log.info(`Current default model: ${currentModel}`);
@@ -515,16 +515,17 @@ async function selectDefaultModel(config: ConfigFile): Promise<void> {
 
   const selectedModel = await launchModelSelector(ai, {
     required: ['chat', 'tools'],
-  });
+  }, currentModel);
 
   // Clear screen after Ink exits
-  console.clear();
-  // Give stdin time to settle after Ink exits
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // console.clear();
+  // Give stdin time to settle after Ink exits (needs more time on some terminals)
+  // await new Promise((resolve) => setTimeout(resolve, 300));
 
   if (selectedModel) {
     await config.save((data) => {
-      data.defaultModel = selectedModel.id;
+      data.user.models = data.user.models || {};
+      data.user.models.chat = selectedModel.id;
     });
     clack.log.success(`Default model set to: ${selectedModel.name} (${selectedModel.id})`);
   } else {

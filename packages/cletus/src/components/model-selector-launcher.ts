@@ -1,45 +1,38 @@
+import fs from 'fs';
 import { render } from 'ink';
 import React from 'react';
 import { ModelSelector } from './ModelSelector.js';
 import type { CletusAI } from '../ai.js';
 import type { AIBaseMetadata, ModelInfo } from '@aits/ai';
+import { ReadStream } from 'tty';
 
 /**
  * Launch the model selector UI and return the selected model
  */
 export async function launchModelSelector(
   ai: CletusAI,
-  baseMetadata?: Partial<AIBaseMetadata<any>>
+  baseMetadata?: Partial<AIBaseMetadata<any>>,
+  currentModelId?: string,
 ): Promise<ModelInfo | null> {
-  return new Promise((resolve) => {
-    let hasResolved = false;
+  let inkInstance: ReturnType<typeof render> | null = null;
+  let modelSelected: ModelInfo | null = null;
 
-    const { waitUntilExit, unmount } = render(
-      React.createElement(ModelSelector, {
-        ai,
-        baseMetadata,
-        onSelect: (model) => {
-          if (!hasResolved) {
-            hasResolved = true;
-            unmount();
-            resolve(model);
-          }
-        },
-        onCancel: () => {
-          if (!hasResolved) {
-            hasResolved = true;
-            unmount();
-            resolve(null);
-          }
-        },
-      })
-    );
+  inkInstance = render(
+    React.createElement(ModelSelector, {
+      ai,
+      baseMetadata,
+      onSelect: (model) => {
+        modelSelected = model;
+      },
+      onCancel: () => {
+        modelSelected = null;
+      },
+    }), {
+      exitOnCtrlC: false,
+    }
+  );
 
-    waitUntilExit().then(() => {
-      if (!hasResolved) {
-        hasResolved = true;
-        resolve(null);
-      }
-    });
-  });
+  await inkInstance.waitUntilExit();
+
+  return modelSelected;
 }
