@@ -2,6 +2,12 @@ import { CletusCoreContext } from "../ai";
 import { ChatMode } from "../schemas";
 
 import * as planner from './planner';
+import * as librarian from './librarian';
+import * as clerk from './clerk';
+import * as secretary from './secretary';
+import * as architect from './architect';
+import * as dba from './dba';
+import * as artist from './artist';
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -80,6 +86,12 @@ export function operationOf<TInput, TOutput>(def: OperationDefinition<TInput, TO
 // All operations are listed here.
 export const Operations = {
   ...planner,
+  ...librarian,
+  ...clerk,
+  ...secretary,
+  ...architect,
+  ...dba,
+  ...artist,
 } as const;
 
 // A supported operation kind
