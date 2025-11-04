@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput, Static } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useRef, useState, useEffect } from 'react';
 import type { ChatMeta, Message } from './schemas.js';
@@ -10,6 +10,7 @@ import { createCletusAI } from './ai.js';
 import { Message as AIMessage, MessageContent } from '@aits/core';
 // @ts-ignore
 import mic from 'mic';
+import { Writer } from 'wav';
 import { createChatAgent } from './chat-agent.js';
 
 
@@ -55,7 +56,7 @@ const COMMANDS: Command[] = [
   { name: '/do', description: 'Add a todo', takesInput: true, placeholder: 'todo description' },
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
   { name: '/reset', description: 'Clear all todos', takesInput: false },
-  { name: '/transcribe', description: 'Voice input - requires SoX (say "send/stop command")', takesInput: false },
+  { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
 ];
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
@@ -75,7 +76,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
   const transcriptionAbortRef = useRef<AbortController | null>(null);
-  const { exit } = useApp();
+  const [ai, _] = useState(() => createCletusAI(config));
+  const [chatAgent, __] = useState(() => createChatAgent(ai));
 
   // Convenience function to add message
   const addMessage = (message: Message) => {
@@ -149,11 +151,33 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       return;
     }
 
-    // ESC to interrupt AI
-    if (key.escape && isWaitingForResponse && abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsWaitingForResponse(false);
-      addSystemMessage('⚠️  Response interrupted by user');
+    // Alt+T to start/stop transcription
+    if (key.meta && input === 't') {
+      if (isTranscribing && transcriptionAbortRef.current) {
+        // Stop transcription
+        transcriptionAbortRef.current.abort();
+        setIsTranscribing(false);
+      } else if (!isWaitingForResponse && !isTranscribing) {
+        // Start transcription
+        startTranscription();
+      }
+      if (inputValue === '') {
+        setInputValue('');
+      }
+      return;
+    }
+
+    // ESC to interrupt AI or transcription
+    if (key.escape) {
+      if (isWaitingForResponse && abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        setIsWaitingForResponse(false);
+        addSystemMessage('⚠️ Response interrupted by user');
+      } else if (isTranscribing && transcriptionAbortRef.current) {
+        transcriptionAbortRef.current.abort();
+        setIsTranscribing(false);
+        addSystemMessage('⚠️ Transcription aborted');
+      }
     }
 
     // Arrow keys to navigate command menu
@@ -173,11 +197,21 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       } else if (key.tab && filteredCommands.length > 0) {
         // Tab to autocomplete the selected command
         const selectedCmd = filteredCommands[selectedCommandIndex];
-        const newValue = selectedCmd.takesInput ? selectedCmd.name + ' ' : selectedCmd.name;
-        setInputValue(newValue);
-        setCursorOffset(newValue.length);
-        setShowCommandMenu(false);
-        setSelectedCommandIndex(0);
+
+        if (selectedCmd.takesInput) {
+          // Command takes input - autocomplete with space
+          const newValue = selectedCmd.name + ' ';
+          setInputValue(newValue);
+          setCursorOffset(newValue.length);
+          setShowCommandMenu(false);
+          setSelectedCommandIndex(0);
+        } else {
+          // Command doesn't take input - run it immediately
+          handleCommand(selectedCmd.name);
+          setInputValue('');
+          setShowCommandMenu(false);
+          setSelectedCommandIndex(0);
+        }
       }
     }
   });
@@ -221,7 +255,7 @@ AVAILABLE COMMANDS:
 /model      - Select a different AI model for this chat
 /prompt     - View or set a custom system prompt
 /title      - Change the chat title
-/transcribe - Voice input (say "send command" or "stop command")
+/transcribe - Voice input (press ESC or wait for silence to stop)
 /todos      - View all todos
 /do         - Add a new todo
 /done       - Mark a todo as complete
@@ -230,7 +264,8 @@ AVAILABLE COMMANDS:
 KEYBOARD SHORTCUTS:
 • Enter       - Send message
 • Ctrl+C      - Exit chat
-• ESC         - Interrupt AI response
+• ESC         - Interrupt AI response or stop transcription
+• Alt+T       - Start/stop voice transcription
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
 
@@ -344,7 +379,7 @@ TIP: Type '/' to see all available commands with descriptions!`,
 
   const startTranscription = async () => {
     if (isTranscribing) {
-      addSystemMessage(`⚠️ Already transcribing. Say "stop command" to stop.`);
+      addSystemMessage(`⚠️ Already transcribing. Press ESC or Alt+T to stop.`);
       return;
     }
 
@@ -362,121 +397,136 @@ Please install SoX to use voice input:
 • Mac: brew install sox
 • Linux: sudo apt-get install sox alsa-utils
 
-After installation, restart Cletus and try /transcribe again.`
+After installation and the SoX executable is in the path, restart Cletus and try /transcribe again.`
       );
       return;
     }
 
     try {
       setIsTranscribing(true);
-      const ai = createCletusAI(config);
-
+      
       // Create abort controller for this transcription
       const controller = new AbortController();
       transcriptionAbortRef.current = controller;
+
+      addSystemMessage('🎤 Recording... Press ESC to stop or wait for silence.');
 
       // Get microphone audio stream
       // @ts-ignore
       const micInstance = mic({
         rate: '16000',
         channels: '1',
-        debug: false,
-        exitOnSilence: 10,
+        bitwidth: '16',
+        exitOnSilence: 10, // Stop after 3 seconds of silence
+        fileType: 'wav',
       });
 
       const micInputStream = micInstance.getAudioStream();
-      let transcribedText = '';
 
-      micInputStream.on('data', function(data: any[]) {
-        log("Recieved Input Stream: " + data.length);
+      // Collect audio data in memory
+      const audioChunks: Buffer[] = [];
+
+      micInputStream.on('data', function(data: Buffer) {
+        if (!controller.signal.aborted) {
+          audioChunks.push(data);
+          log(`Received audio chunk: ${data.length} bytes`);
+        }
       });
-      
+
       micInputStream.on('error', function(err: any) {
-        log("Error in Input Stream: " + err);
+        log(`Microphone error: ${err}`);
       });
-      
-      micInputStream.on('startComplete', function() {
-        log("Got SIGNAL startComplete");
-      });
-          
-      micInputStream.on('stopComplete', function() {
-        log("Got SIGNAL stopComplete");
-      });
-          
-      micInputStream.on('pauseComplete', function() {
-        log("Got SIGNAL pauseComplete");
-      });
-      
-      micInputStream.on('resumeComplete', function() {
-        log("Got SIGNAL resumeComplete");
-      });
-      
+
       micInputStream.on('silence', function() {
-        log("Got SIGNAL silence");
+        log('Silence detected - stopping recording');
         micInstance.stop();
       });
-      
-      micInputStream.on('processExitComplete', function() {
-        log("Got SIGNAL processExitComplete");
+
+      // Wait for recording to complete (either ESC or silence)
+      const recordingComplete = new Promise<void>((resolve) => {
+        micInputStream.on('stopComplete', function() {
+          log('Recording stopped');
+          resolve();
+        });
+
+        controller.signal.addEventListener('abort', () => {
+          log('Recording aborted by user');
+          micInstance.stop();
+        });
       });
 
       // Start the microphone
       micInstance.start();
 
-      // Stream audio to transcription
-      const stream = ai.transcribe.stream({
-        audio: micInputStream,
-      }, {
-        signal: controller.signal,
-      });
-      
-      addSystemMessage('🎤 Listening... Say "send command" to send or "stop command" to stop.');
+      // Wait for recording to finish
+      await recordingComplete;
 
-      log('Transcription started');
+      // if (controller.signal.aborted) {
+      //   addSystemMessage('⚠️  Recording cancelled');
+      //   return;
+      // }
+
+      if (audioChunks.length === 0) {
+        addSystemMessage('❌ No audio recorded');
+        return;
+      }
+
+      // Combine all audio chunks
+      const audioBuffer = Buffer.concat(audioChunks);
+      log(`Total audio data: ${audioBuffer.length} bytes`);
+
+      // Create WAV file in memory
+      const wavWriter = new Writer({
+        sampleRate: 16000,
+        channels: 1,
+        bitDepth: 16
+      });
+
+      const wavChunks: Buffer[] = [];
+      wavWriter.on('data', (chunk: Buffer) => {
+        wavChunks.push(chunk);
+      });
+
+      const wavComplete = new Promise<Buffer>((resolve) => {
+        wavWriter.on('end', () => {
+          resolve(Buffer.concat(wavChunks));
+        });
+      });
+
+      // Write audio data to WAV encoder
+      const wavWriterPromise = new Promise((resolve, reject) => {
+        wavWriter.on('error', (e) => e ? reject(e) : resolve(null));
+      });
+      wavWriter.end();
+      await wavWriterPromise;
+
+      const wavBuffer = await wavComplete;
+      log(`WAV buffer size: ${wavBuffer.length} bytes`);
+
+      addSystemMessage('🔄 Transcribing audio...');
+
+      // Stream transcription from buffer
+      const stream = ai.transcribe.stream({
+        audio: new File([wavBuffer], 'audio.wav', { type: 'audio/wav' }),
+      });
+
+      let transcribedText = '';
 
       for await (const chunk of stream) {
-        if (controller.signal.aborted) {
-          break;
-        }
-
         log(chunk);
 
         if (chunk.text) {
           transcribedText += chunk.text;
           setInputValue(transcribedText);
-
-          // Check for voice commands
-          const lowerText = transcribedText.toLowerCase().trim();
-
-          if (lowerText.includes('send command')) {
-            // Remove "send command" from the text and send
-            const finalText = transcribedText.substring(0, transcribedText.toLowerCase().lastIndexOf('send command')).trim();
-            micInstance.stop();
-            setIsTranscribing(false);
-            setInputValue(finalText);
-
-            // Auto-submit the message
-            setTimeout(() => {
-              if (finalText) {
-                handleSubmit();
-              }
-            }, 100);
-            break;
-          } else if (lowerText.includes('stop command')) {
-            // Remove "stop command" from the text and leave in input
-            const finalText = transcribedText.substring(0, transcribedText.toLowerCase().lastIndexOf('stop command')).trim();
-            micInstance.stop();
-            setIsTranscribing(false);
-            setInputValue(finalText);
-            addSystemMessage('🛑 Transcription stopped. Edit and press Enter to send.');
-            break;
-          }
         }
       }
 
-      micInstance.stop();
+      addSystemMessage('✓ Transcription complete');
+      log(`Final transcription: ${transcribedText}`);
+
     } catch (error: any) {
       addSystemMessage(`❌ Transcription error: ${error.message}`);
+      log(`Transcription error: ${error.message} ${error.stack}`);
     } finally {
       setIsTranscribing(false);
       transcriptionAbortRef.current = null;
@@ -562,11 +612,7 @@ After installation, restart Cletus and try /transcribe again.`
       }));
 
     try {
-      log('creating ai');
-      const ai = createCletusAI(config);
-      const chatAgent = createChatAgent(ai);
-      
-      log('before agent run');
+      log('request starting');
 
       const chatResponse = chatAgent.run({}, {
         chat: chatMeta,
@@ -579,7 +625,7 @@ After installation, restart Cletus and try /transcribe again.`
         },
       });
 
-      log('after agent run');
+      log('request streaming');
 
       for await (const chunk of chatResponse) {
         if (controller.signal.aborted) {
@@ -593,6 +639,7 @@ After installation, restart Cletus and try /transcribe again.`
           case 'textComplete':
             pending.content[0].content = chunk.content;
             setPendingMessage({ ...pending });
+            break;
           case 'textReset':
             pending.content[0].content = '';
             setPendingMessage({ ...pending });
@@ -719,61 +766,54 @@ After installation, restart Cletus and try /transcribe again.`
     );
   }
 
-  const renderMessages = pendingMessage ? [...visibleMessages, pendingMessage] : visibleMessages;
-
   return (
     <Box flexDirection="column" height="100%">
-      {/* Header */}
-      <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
-        <Text bold color="cyan">
-          {chatMeta.title}
-          {chatMeta.assistant && <Text dimColor> ({chatMeta.assistant})</Text>}
-        </Text>
-      </Box>
-
+      
       {/* Messages Area */}
       <Box flexDirection="column" flexGrow={1} marginBottom={1}>
-        {renderMessages.length === 0 ? (
+        {visibleMessages.length === 0 && !pendingMessage ? (
           <Box justifyContent="center" alignItems="center" flexGrow={1}>
             <Text dimColor>No messages yet. Type / for commands or start chatting!</Text>
           </Box>
         ) : (
           <>
-            {renderMessages.map((msg, index) => {
-              const color =
-                msg.role === 'user' ? 'green' : msg.role === 'system' ? 'yellow' : 'blue';
-              const prefix =
-                msg.role === 'user'
-                  ? '👤 You'
-                  : msg.role === 'system'
-                  ? '⚙️ System'
-                  : `🤖 ${chat.assistant ?? 'Assistant'}`;
+            <Static items={visibleMessages}>
+              {(msg, index) => {
+                const color =
+                  msg.role === 'user' ? 'green' : msg.role === 'system' ? 'yellow' : 'blue';
+                const prefix =
+                  msg.role === 'user'
+                    ? '👤 You'
+                    : msg.role === 'system'
+                    ? '⚙️ System'
+                    : `🤖 ${chat.assistant ?? 'Assistant'}`;
 
-              return (
-                <Box key={index} flexDirection="column" marginBottom={1}>
-                  <Text bold color={color}>
-                    {prefix}:
-                  </Text>
-                  <Box paddingLeft={3}>
-                    {msg.content.map((part, i) => (
-                      <Text key={i}>{part.content}</Text>
-                    ))}
+                return (
+                  <Box key={index} flexDirection="column" marginBottom={1}>
+                    <Text bold color={color}>
+                      {prefix}:
+                    </Text>
+                    <Box paddingLeft={3}>
+                      {msg.content.map((part, i) => (
+                        <Text key={i}>{part.content}</Text>
+                      ))}
+                    </Box>
                   </Box>
-                </Box>
-              );
-            })}
-            {/*
-            {isWaitingForResponse && (
+                );
+              }}
+            </Static>
+            {pendingMessage && (
               <Box flexDirection="column" marginBottom={1}>
                 <Text bold color="blue">
                   {`🤖 ${chat.assistant ?? 'Assistant'}`}:
                 </Text>
                 <Box paddingLeft={3}>
-                  <Text dimColor>Thinking... (Press ESC to interrupt)</Text>
+                  {pendingMessage.content.map((part, i) => (
+                    <Text key={i}>{part.content || <Text dimColor>Thinking...</Text>}</Text>
+                  ))}
                 </Box>
               </Box>
             )}
-            */}
           </>
         )}
       </Box>
@@ -806,11 +846,17 @@ After installation, restart Cletus and try /transcribe again.`
       {/* Input Area */}
       <Box
         borderStyle="round"
-        borderColor={isWaitingForResponse ? 'gray' : 'green'}
+        borderColor={isTranscribing ? 'blue' : isWaitingForResponse ? 'gray' : 'green'}
         paddingX={1}
       >
         <Box width="100%">
-          <Text color="green">{'> '}</Text>
+          {isTranscribing ? (
+            <Text color="blue">🎤 </Text>
+          ) : isWaitingForResponse ? (
+            <Text color="gray">{'> '}</Text>
+          ) : (
+            <Text color="green">{'> '}</Text>
+          )}
           <TextInput
             value={inputValue}
             onChange={handleInputChange}
@@ -828,6 +874,7 @@ After installation, restart Cletus and try /transcribe again.`
       {/* Footer */}
       <Box marginTop={1}>
         <Text dimColor>
+          {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           Mode: {chatMeta.mode} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length} todo{chatMeta.todos.length !== 1 ? 's' : ''}
           {isWaitingForResponse && (
@@ -842,7 +889,7 @@ After installation, restart Cletus and try /transcribe again.`
               </Text>
             </>
           )}
-          {' | Ctrl+C: exit │ ESC: interrupt AI'}
+          {' | Ctrl+C: exit │ ESC: interrupt │ Alt+T: transcribe'}
         </Text>
       </Box>
     </Box>
@@ -859,6 +906,7 @@ async function prepareLog() {
     return;
   }
   logStream = fs.createWriteStream(logFile, { flags: 'a' });
+  logStream.setMaxListeners(100);
 }
 
 async function log(msg: any) {

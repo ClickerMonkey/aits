@@ -136,9 +136,13 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
             const chatId = uuidv4();
             const now = Date.now();
 
+            const title = selectedAssistant
+              ? `Chat with ${selectedAssistant} on ${new Date().toLocaleDateString()}`
+              : `New Chat on ${new Date().toLocaleDateString()}`;
+
             const newChat: ChatMeta = {
               id: chatId,
-              title: 'New Chat',
+              title,
               assistant: selectedAssistant,
               prompt: customPrompt.trim() || undefined,
               mode: item.value as 'none' | 'read' | 'create' | 'update' | 'delete',
@@ -175,7 +179,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
       value: chat.id,
     })),
     ...(chats.length > 0 ? [{ label: '', value: '__separator_bottom__' }] : []),
-    { label: '⚙️  Settings', value: '__settings__' },
+    { label: '⚙️ Settings', value: '__settings__' },
     { label: '👋 Exit', value: '__exit__' },
   ];
 
