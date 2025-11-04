@@ -56,6 +56,7 @@ export async function launchChatInterface(
     const { waitUntilExit, unmount } = render(
       <ChatUI
         chat={chat}
+        config={config}
         messages={messages}
         onExit={() => {
           if (!hasExited) {

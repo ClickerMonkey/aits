@@ -677,11 +677,6 @@ class CustomProvider extends OpenAIProvider<CustomConfig> {
     });
   }
 
-  protected modelFilter(model: OpenAI.Model): boolean {
-    // Only include models with specific prefix
-    return model.id.startsWith('custom-');
-  }
-
   protected customizeChatParams(params: any, config: CustomConfig, request: any) {
     // Add custom parameters
     return {
@@ -844,7 +839,6 @@ Main provider class implementing the @aits Provider interface.
 **Protected Methods** (for extending):
 - `createClient(config): OpenAI` - Create OpenAI client
 - `convertModel(model): ModelInfo` - Convert model format
-- `modelFilter(model): boolean` - Filter models
 - `convertMessages(request): OpenAI.ChatCompletionMessageParam[]` - Convert messages
 - `convertTools(request): OpenAI.ChatCompletionTool[]` - Convert tools
 - `convertToolChoice(request): OpenAI.ChatCompletionToolChoiceOption` - Convert tool choice

@@ -684,18 +684,13 @@ export class AI<T extends AIBaseTypes> {
       // @ts-ignore
       events: Events<any>, 
       ctxRequired: CoreContext<AIContextRequired<T>, AIMetadataRequired<T>>
-    ): any {
+    ): AsyncGenerator<any, any, any> {
       // Build core context with executor/streamer
       const coreContext = await ai.buildCoreContext(ctxRequired);
       coreContext.metadata = ai.mergeMetadata(prompt.input.metadata, coreContext.metadata) as any;
 
-      return originalStream(input, preferStream, events, coreContext as any);
+      yield* originalStream(input, preferStream, events, coreContext as any);
     };
-
-    type P = typeof prompt;
-    type X = P extends Component<infer IC, infer IM, infer N, infer I, infer O, infer TS>
-      ? { input: IC; metadata: IM; name: N; params: I; output: O; tools: TS }
-      : never;
 
     this.components.push(prompt as ComponentFor<T>);
 

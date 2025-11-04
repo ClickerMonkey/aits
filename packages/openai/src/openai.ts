@@ -160,10 +160,6 @@ export interface OpenAIConfig {
  *       baseURL: 'https://custom-api.example.com/v1',
  *     });
  *   }
- *
- *   protected modelFilter(model: OpenAI.Model): boolean {
- *     return model.id.startsWith('custom-');
- *   }
  * }
  * ```
  *
@@ -171,7 +167,6 @@ export interface OpenAIConfig {
  *
  * Subclasses can optionally override:
  * - `listModels(config)`: Custom model listing logic
- * - `modelFilter(model)`: Filter which models to include
  * - `createClient(config)`: Customize client creation
  * - `convertModel(model)`: Customize model conversion
  * - `customizeImageParams(params, config)`: Modify image params
@@ -251,28 +246,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         created: model.created,
       },
     };
-  }
-
-  /**
-   * Filter which models to include from listModels API.
-   *
-   * Default implementation includes only official OpenAI models
-   * (GPT, o1/o3, DALL-E, Whisper, TTS, embeddings).
-   *
-   * Subclasses can override this to include custom model patterns.
-   *
-   * @param model OpenAI model object
-   * @returns true if model should be included, false otherwise
-   */
-  protected modelFilter(model: OpenAI.Model): boolean {
-    return (
-      model.id.startsWith('gpt-') ||
-      model.id.startsWith('o1') ||
-      model.id.startsWith('dall-e') ||
-      model.id.startsWith('whisper') ||
-      model.id.startsWith('tts-') ||
-      model.id.includes('embedding')
-    );
   }
 
   // ============================================================================
@@ -645,6 +618,22 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Converts a name on a message to conform to OpenAI's naming rules.
+   * Removes invalid characters and truncates to max length.
+   * 
+   * @param name - Original name
+   * @returns Converted name or undefined
+   */
+  protected convertName(name: string | undefined): string | undefined {
+    if (!name) {
+      return undefined;
+    }
+    return name.replace(/\s+/g, '-')
+      .replace(/[^a-zA-Z0-9-_]/g, '')
+      .substring(0, 64);
+  }
+
+  /**
    * Convert @aits Request messages to OpenAI format.
    *
    * Handles conversion of all message types (system, user, assistant, tool)
@@ -659,7 +648,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         case 'system':
           return {
             role: 'developer',
-            name: msg.name,
+            name: this.convertName(msg.name),
             content: this.convertContentText(msg.content, msg.name || 'system'),
           };
         case 'tool':
@@ -671,14 +660,14 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         case 'assistant':
           return {
             role: msg.role,
-            name: msg.name,
+            name: this.convertName(msg.name),
             tool_calls: msg.toolCalls?.map((tc) => this.convertToolCall(tc)),
             content: this.convertContentText(msg.content, msg.name || 'assistant'),
           };
         case 'user':
           return {
             role: msg.role,
-            name: msg.name,
+            name: this.convertName(msg.name),
             content: this.convertContent(msg.content, msg.name || 'user'),
           };
       }
@@ -783,7 +772,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     try {
       const response = await client.models.list();
-      const models = response.data.filter((m) => this.modelFilter(m));
+      const models = response.data;
       return models.map((m) => this.convertModel(m));
     } catch (error) {
       throw new ProviderError(this.name, 'Failed to list models', error as Error);
@@ -1046,13 +1035,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         const delta = choice?.delta;
         
         const yieldChunk: Chunk = {
-          content: delta.content || undefined,
+          content: delta?.content || undefined,
           finishReason: choice?.finish_reason as FinishReason | undefined,
           refusal: delta?.refusal ?? undefined,
           usage: !chunk.usage ? undefined : {
-            inputTokens: chunk.usage.prompt_tokens || 0,
-            outputTokens: chunk.usage.completion_tokens || 0,
-            totalTokens: chunk.usage.total_tokens || 0,
+            inputTokens: chunk.usage.prompt_tokens,
+            outputTokens: chunk.usage.completion_tokens,
+            totalTokens: chunk.usage.total_tokens,
           },
         };
 

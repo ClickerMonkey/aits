@@ -42,19 +42,19 @@ Choose the appropriate agent based on what the user needs to do.`,
       // Route to the appropriate sub-agent
       switch (params.agent) {
         case 'planner':
-          return await planner.run({ request: params.request }, ctx);
+          return planner.run({ request: params.request }, ctx);
         case 'librarian':
-          return await librarian.run({ request: params.request }, ctx);
+          return librarian.run({ request: params.request }, ctx);
         case 'clerk':
-          return await clerk.run({ request: params.request }, ctx);
+          return clerk.run({ request: params.request }, ctx);
         case 'secretary':
-          return await secretary.run({ request: params.request }, ctx);
+          return secretary.run({ request: params.request }, ctx);
         case 'architect':
-          return await architect.run({ request: params.request }, ctx);
+          return architect.run({ request: params.request }, ctx);
         case 'artist':
-          return await artist.run({ request: params.request }, ctx);
+          return artist.run({ request: params.request }, ctx);
         case 'dba':
-          return await dba.run({ request: params.request }, ctx);
+          return dba.run({ request: params.request }, ctx);
         default:
           throw new Error(`Unknown agent: ${params.agent}`);
       }
@@ -95,8 +95,8 @@ Active Todos:
 {{/if}}
 
 Chat Mode: {{mode}}
-- none: All operations require user approval
-- read: Read operations are automatic, others require approval
+- none: All AI operations require user approval
+- read: Read operations involving AI are automatic, others require approval
 - create: Read & create operations are automatic, others require approval
 - update: Read, create, & update operations are automatic, delete requires approval
 - delete: All operations are automatic

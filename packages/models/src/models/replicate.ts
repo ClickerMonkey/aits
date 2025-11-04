@@ -465,7 +465,7 @@ export const replicateModels: ModelInfo[] = [{
   name: 'nano-banana',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
+  capabilities: new Set(['vision', 'image']),
   pricing: {},
   metadata: {
     owner: "google",

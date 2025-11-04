@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx --conditions=source src/index.ts",
+    "dev": "tsx watch src/index.tsx",
+    "start": "tsx --conditions=source src/index.tsx",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
@@ -36,14 +36,15 @@
   "dependencies": {
     "@aits/ai": "^0.1.0",
     "@aits/core": "^0.1.0",
+    "@aits/models": "^0.1.0",
     "@aits/openai": "^0.1.0",
     "@aits/openrouter": "^0.1.0",
     "@aits/replicate": "^0.1.0",
-    "@aits/models": "^0.1.0",
-    "@clack/prompts": "^0.7.0",
     "glob": "^11.0.0",
     "ink": "^6.4.0",
+    "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
+    "mic": "^2.1.2",
     "react": "^19.2.0",
     "uuid": "^13.0.0",
     "zod": "^4.1.12"

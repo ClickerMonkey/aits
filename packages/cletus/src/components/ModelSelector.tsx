@@ -1,4 +1,4 @@
-import { Box, Text, useInput, measureElement, useApp, useStdin } from 'ink';
+import { Box, Text, useInput, measureElement } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect, useRef } from 'react';
 import type { CletusAI } from '../ai.js';
@@ -40,8 +40,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [showTierCapabilities, setShowTierCapabilities] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('score');
 
-  const { exit } = useApp();
-  
   const weightKeys: WeightKey[] = ['cost', 'speed', 'accuracy', 'contextWindow'];
   const sortModes: SortMode[] = ['score', 'cost-asc', 'cost-desc', 'speed-desc', 'speed-asc', 'context-desc', 'context-asc', 'capable-desc', 'capable-asc'];
 
@@ -267,8 +265,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       } else {
         // ESC in weights mode - cancel
         onCancel();
-        // Use setImmediate to call exit after callbacks complete
-        setImmediate(() => exit());
       }
       return;
     }
@@ -322,8 +318,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         // Select the model
         if (filteredModels.length > 0 && selectedModelIndex < filteredModels.length) {
           onSelect(filteredModels[selectedModelIndex].model);
-          // Use setImmediate to call exit after callbacks complete
-          setImmediate(() => exit());
         }
       } else if (key.backspace) {
         // Allow backspace in filter mode
@@ -482,6 +476,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           Model Selection - Choose Model
         </Text>
       </Box>
+
+      {current && (
+        <Box marginBottom={1}>
+          <Text dimColor>Current: </Text>
+          <Text color="green">{current}</Text>
+        </Box>
+      )}
 
       <Box flexDirection="column" marginBottom={1}>
         <Text dimColor>
