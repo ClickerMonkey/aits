@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { any, z } from 'zod';
 
 // ============================================================================
 // User Schema
@@ -181,12 +181,14 @@ export const KnowledgeSchema = z.object({
 
 export const OperationSchema = z.object({
   type: z.string(),
-  input: z.record(z.string(), z.any()),
-  kind: z.enum(['read', 'create', 'update', 'delete']),
-  start: z.number().optional(),
+  input: z.any(),
+  output: z.any().optional(),
+  analysis: z.string().optional(),
+  doable: z.boolean().optional(),
+  start: z.number(),
   end: z.number().optional(),
   error: z.string().optional(),
-  results: z.any().optional(),
+  message: z.string().optional(),
 });
 
 // ============================================================================
@@ -205,7 +207,7 @@ export const MessageSchema = z.object({
   created: z.number(),
   tokens: z.number().optional(),
   todo: z.string().optional(),
-  operation: OperationSchema.optional(),
+  operations: z.array(OperationSchema).optional(),
 });
 
 export const ChatMessagesSchema = z.object({

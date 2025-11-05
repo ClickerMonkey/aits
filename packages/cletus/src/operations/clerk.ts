@@ -153,8 +153,8 @@ export const file_index = operationOf<
       });
       
       const getSource = input.index === 'content'
-        ? (sectionIndex: number) => `fileChunk:${file.file}[${sectionIndex}]`
-        : (sectionIndex: number) => `fileSummary:${file.file}`;
+        ? (sectionIndex: number) => `file@${file.file}:chunk[${sectionIndex}]`
+        : (sectionIndex: number) => `file@${file.file}:summary`;
       const chunkables = input.index === 'content' 
         ? parsed.sections 
         : [parsed.description || ''];

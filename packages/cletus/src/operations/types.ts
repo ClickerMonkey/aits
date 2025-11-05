@@ -1,5 +1,5 @@
 import { CletusCoreContext } from "../ai";
-import { ChatMode } from "../schemas";
+import { ChatMode, Operation } from "../schemas";
 
 import * as planner from './planner';
 import * as librarian from './librarian';
@@ -27,21 +27,6 @@ const ModeLevels: Record<OperationMode, number> = {
   create: 2,
   update: 3,
   delete: 4,
-};
-
-/**
- * Record of a performed operation.
- */
-export type OperationRecord = {
-  type: string;
-  input: any;
-  output?: any;
-  analysis?: string;
-  doable?: boolean;
-  start: number;
-  end?: number;
-  error?: string;
-  message?: string;
 };
 
 /**
@@ -135,7 +120,7 @@ export type OperationInput<K extends OperationKind> = {
 export class OperationManager {
   public constructor(
     public mode: ChatMode,
-    public operations: OperationRecord[] = [],
+    public operations: Operation[] = [],
   ) {
   }
   
@@ -154,7 +139,7 @@ export class OperationManager {
     const operationMode = typeof def.mode === 'function' ? def.mode(operation.input, ctx) : def.mode;
     const doNow = ModeLevels[this.mode] >= ModeLevels[operationMode];
     
-    const op: OperationRecord = {
+    const op: Operation = {
       type: operation.type,
       input: operation.input,
       start: 0,
@@ -174,7 +159,7 @@ export class OperationManager {
    * @param ctx - Cletus core context
    * @returns Result message
    */
-  public async execute(op: OperationRecord, doit: boolean, ctx: CletusCoreContext): Promise<string> {
+  public async execute(op: Operation, doit: boolean, ctx: CletusCoreContext): Promise<string> {
     const def = Operations[op.type as OperationKind] as OperationDefinition<any, any>;
 
     if (!op.doable && doit) {
@@ -197,13 +182,15 @@ export class OperationManager {
       op.end = performance.now();
     }
 
+    const inputDetails = `<input>\n${JSON.stringify(op.input, undefined, 2)}\n</input>`
+
     op.message = op.error
-      ? `Operation ${op.type} failed: ${op.error}`
+      ? `Operation ${op.type} failed: ${op.error}\n\n${inputDetails}`
       : doit
-        ? `Operation ${op.type} completed successfully: ${JSON.stringify(op.output)}`
+        ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${JSON.stringify(op.output), undefined, 2}\n</output>`
         : op.doable
-          ? `Operation ${op.type} requires approval: ${op.analysis}`
-          : `Operation ${op.type} cannot be performed: ${op.analysis}`;
+          ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
+          : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
 
     return op.message;
   }

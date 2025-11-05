@@ -196,7 +196,7 @@ export const data_select = operationOf<
 });
 
 export const data_update_many = operationOf<
-  { name: string; set: Record<string, any>; where: WhereClause },
+  { name: string; set: Record<string, any>; where: WhereClause; limit?: number },
   { updated: number }
 >({
   mode: 'update',
@@ -213,10 +213,12 @@ export const data_update_many = operationOf<
     await dataManager.load();
 
     const matchingCount = countByWhere(dataManager.getAll(), input.where);
+    const actualCount = input.limit ? Math.min(matchingCount, input.limit) : matchingCount;
 
     const setFields = Object.keys(input.set);
+    const limitText = input.limit ? ` (limited to ${input.limit})` : '';
     return {
-      analysis: `This will bulk update ${matchingCount} ${type.friendlyName} record(s) matching criteria, setting: ${setFields.join(', ')}.`,
+      analysis: `This will bulk update ${actualCount} ${type.friendlyName} record(s) matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
       doable: true,
     };
   },
@@ -229,7 +231,12 @@ export const data_update_many = operationOf<
     const dataManager = new DataManager(input.name);
     await dataManager.load();
 
-    const matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+    let matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+
+    // Apply limit if specified
+    if (input.limit) {
+      matchingRecords = matchingRecords.slice(0, input.limit);
+    }
 
     // Update all matching records
     await Promise.all(matchingRecords.map((record) =>
@@ -241,7 +248,7 @@ export const data_update_many = operationOf<
 });
 
 export const data_delete_many = operationOf<
-  { name: string; where: WhereClause },
+  { name: string; where: WhereClause; limit?: number },
   { deleted: number }
 >({
   mode: 'delete',
@@ -258,9 +265,11 @@ export const data_delete_many = operationOf<
     await dataManager.load();
 
     const matchingCount = countByWhere(dataManager.getAll(), input.where);
+    const actualCount = input.limit ? Math.min(matchingCount, input.limit) : matchingCount;
 
+    const limitText = input.limit ? ` (limited to ${input.limit})` : '';
     return {
-      analysis: `This will bulk delete ${matchingCount} ${type.friendlyName} record(s) matching the specified criteria.`,
+      analysis: `This will bulk delete ${actualCount} ${type.friendlyName} record(s) matching the specified criteria${limitText}.`,
       doable: true,
     };
   },
@@ -273,7 +282,12 @@ export const data_delete_many = operationOf<
     const dataManager = new DataManager(input.name);
     await dataManager.load();
 
-    const matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+    let matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+
+    // Apply limit if specified
+    if (input.limit) {
+      matchingRecords = matchingRecords.slice(0, input.limit);
+    }
 
     // Delete all matching records
     await Promise.all(matchingRecords.map((record) =>

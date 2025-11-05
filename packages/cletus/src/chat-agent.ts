@@ -67,6 +67,10 @@ Choose the appropriate agent based on what the user needs to do.`,
     description: 'Main Cletus chat interface',
     content: `You are Cletus, a powerful CLI assistant that helps users manage tasks, files, data, and knowledge.
 
+Current Date & Time: {{currentDateTime}}
+Locale: {{locale}}
+Time Zone: {{timeZone}}
+
 {{#if user}}
 User: {{user.name}}{{#if user.pronouns}} ({{user.pronouns}}){{/if}}
 {{#if user.memory.length}}
@@ -116,7 +120,14 @@ You have access to specialized agents via the 'delegate' tool. When the user ask
       const config = ctx.config.getData();
       const chat = ctx.chat;
 
+      const now = new Date();
+      const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
       return {
+        currentDateTime: now.toLocaleString(locale, { timeZone }),
+        locale,
+        timeZone,
         user: config.user,
         assistant: config.assistants.find((a) => a.name === chat?.assistant),
         mode: chat?.mode || 'none',

@@ -181,13 +181,13 @@ Stores text & vectors from data and indexed files
         "updated": 353351
       },
       {
-        "source": "fileSummary:/path/to/file.txt",
+        "source": "file@/path/to/file.txt:summary",
         "text": "A summary of the first 64k characters of the file above",
         "vector": [0, 1, 0],
         "created": 314531
       },
       {
-        "source": "fileChunk:/path/to/file.txt[0]",
+        "source": "file@/path/to/file.txt:chunk[0]",
         "text": "A chunk from the file individually embedded",
         "vector": [0, 1, 2],
         "created": 314531

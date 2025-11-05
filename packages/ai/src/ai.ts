@@ -30,7 +30,6 @@ import type {
   AIProviderNames,
   AIProviders,
   AITypesInfer,
-  Component,
   ComponentFor,
   ComponentInput,
   ComponentOutput,

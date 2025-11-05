@@ -56,8 +56,8 @@ Your role is to help break down complex requests into manageable todos, track pr
 
 Knowledge sources can be formatted as:
 - {dataType}:{id} - Knowledge from data records
-- fileSummary:{path} - High-level file summaries
-- fileChunk:{path}[{index}] - Specific file sections
+- file@{path}:summary - High-level file summaries
+- file@{path}:chunk[{index}] - Specific file sections
 - user - User-provided memories
 
 User request: {{request}}

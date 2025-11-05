@@ -6,12 +6,14 @@ import { models } from '@aits/models';
 import { ConfigFile } from './config';
 import { ChatFile } from './chat';
 import { ChatMeta } from './schemas';
+import { OperationManager } from './operations/types';
 
 /**
  * Cletus AI Context
  */
 export interface CletusContext {
   config: ConfigFile;
+  ops: OperationManager;
   chatData?: ChatFile;
   chat?: ChatMeta;
   cwd: string;
@@ -44,6 +46,7 @@ export function createCletusAI(configFile: ConfigFile) {
       defaultContext: {
         config: configFile,
         cwd: process.cwd(),
+        ops: new OperationManager('none'),
       },
       models,
     });

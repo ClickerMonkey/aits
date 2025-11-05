@@ -53,10 +53,10 @@ Tools:
 
 #### librarian
 Prompt:
-- Includes explanation that knowledge sources can be in `{dataType}:{id}`, `fileSummary:{path}`, `fileChunk:{path}[{index}]`, and `user`.
+- Includes explanation that knowledge sources can be in `{dataType}:{id}`, `file@{path}:summary`, `file@{path}:chunk[{index}]`, `user:{date}`.
 Tools:
 - `knowledge_search(query: string, limit: number=10, sourcePrefix?: string)` returns limit knowledges that are most similary to query where source starts with sourcePrefix
-- `knowledge_sources()` returns all the source prefixes that are useful (dataType:, fileSummary:path, fileChunk:path, user) based on what's in the knowledge base.
+- `knowledge_sources()` returns all the source prefixes that are useful (dataType:, file@path:chunk[n], file@path:summary, user) based on what's in the knowledge base.
 - `knowledge_add(text: string)` adds user memory
 - `knowledge_delete(sourcePrefix: string)` deletes all knowledge that starts with the prefix
 

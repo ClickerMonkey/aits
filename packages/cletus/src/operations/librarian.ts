@@ -1,4 +1,3 @@
-import { CletusCoreContext } from "../ai";
 import { operationOf } from "./types";
 import { KnowledgeFile } from "../knowledge";
 import { getModel } from "@aits/core";
@@ -7,7 +6,7 @@ export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
-  mode: 'local',
+  mode: 'read',
   analyze: async (input, ctx) => {
     const limit = input.limit || 10;
     const prefix = input.sourcePrefix ? ` with source prefix "${input.sourcePrefix}"` : '';
@@ -66,7 +65,7 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
 
     for (const entries of Object.values(data.knowledge)) {
       for (const entry of entries) {
-        const prefix = entry.source.split(':')[0];
+        const prefix = entry.source.substring(0, entry.source.lastIndexOf(':'));
         sources.add(prefix);
       }
     }

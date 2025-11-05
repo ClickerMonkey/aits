@@ -24,12 +24,18 @@
 - [ ] add settings to pause Cletus after X minutes of continuous automatic work. it's a configurable user settings- [ ] add chat model selection which is used for operations that are applicable (tool call, summary, etc)
 - [ ] update prompts to match operations
 - [ ] update context to include `ops: OperationManager` and calls do `ops.handle({})`
-- [ ] add limit to update & delete
+- [x] add limit to update & delete
 - [ ] improve image search
-- [ ] change knowledge source syntax
+- [x] change knowledge source syntax
 - [ ] add knowledge index
 - [ ] add fileType, characters, lines, size to file_stats
 - [ ] data operations update knowledge
-- [ ] cd command
+- [x] cd command
 - [ ] operation custom rendering
 - [ ] token recording
+- [x] add in user locale, timezone, and current time into chat prompt
+- [ ] add netizen/spiderman/spider agent & tools
+    - web search using tavily if key is provided at setup
+    - get page content (html | text) optionally do regex search (like text search)
+- [ ] update clerk so they see text files as lines - can search by lines
+- [ ] add offset to summarization inputs

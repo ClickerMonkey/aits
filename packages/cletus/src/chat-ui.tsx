@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { Box, Text, useApp, useInput, Static } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useRef, useState, useEffect } from 'react';
@@ -12,6 +13,7 @@ import { Message as AIMessage, MessageContent } from '@aits/core';
 import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './chat-agent.js';
+import { fileIsDirectory } from './operations/file-helper.js';
 
 
 interface ChatUIProps {
@@ -34,7 +36,8 @@ type CommandType =
   | '/reset'
   | '/done'
   | '/do'
-  | '/transcribe';
+  | '/transcribe'
+  | '/cd';
 
 
 interface Command {
@@ -57,6 +60,7 @@ const COMMANDS: Command[] = [
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
   { name: '/reset', description: 'Clear all todos', takesInput: false },
   { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
+  { name: '/cd', description: 'Change current working directory', takesInput: true, placeholder: 'directory path' },
 ];
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
@@ -260,6 +264,7 @@ AVAILABLE COMMANDS:
 /do         - Add a new todo
 /done       - Mark a todo as complete
 /reset      - Clear all todos
+/cd         - Change or view current working directory
 
 KEYBOARD SHORTCUTS:
 • Enter       - Send message
@@ -370,6 +375,30 @@ TIP: Type '/' to see all available commands with descriptions!`,
 
       case '/transcribe':
         await startTranscription();
+        break;
+
+      case '/cd':
+        const cwd = ai.config.defaultContext!.cwd!;
+        if (args) {
+          try {
+            const resolvedPath = path.resolve(cwd, args);
+
+            const dir = await fileIsDirectory(resolvedPath);
+
+            if (!dir.exists || !dir.isDirectory) {
+              addSystemMessage(`❌ Directory does not exist: ${resolvedPath}`);
+              return;
+            }
+
+            // Change directory
+            ai.config.defaultContext!.cwd = resolvedPath;
+            addSystemMessage(`✓ Changed directory to: ${resolvedPath}`);
+          } catch (error: any) {
+            addSystemMessage(`❌ Failed to change directory: ${error.message}`);
+          }
+        } else {
+          addSystemMessage(`Current directory: ${cwd}`);
+        }
         break;
 
       default:
