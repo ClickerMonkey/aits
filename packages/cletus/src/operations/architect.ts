@@ -1,7 +1,7 @@
+import Handlebars from 'handlebars';
 import { operationOf } from "./types";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
-import Handlebars from 'handlebars';
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {

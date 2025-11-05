@@ -1,4 +1,4 @@
-import Handlebars, { K } from "handlebars";
+import Handlebars from "handlebars";
 import z from 'zod';
 
 import { accumulateUsage, Fn, getChunksFromResponse, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";

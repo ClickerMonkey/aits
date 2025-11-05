@@ -14,7 +14,7 @@ import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent.js';
 import { fileIsDirectory } from './operations/file-helper.js';
-import { OperationManager } from './operations/types.js';
+import { OperationManager } from './operations/manager.js';
 
 
 interface ChatUIProps {

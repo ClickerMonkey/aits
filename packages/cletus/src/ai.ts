@@ -1,3 +1,4 @@
+import Handlebars from 'handlebars';
 import { AI, AIContextInfer, ContextInfer } from '@aits/ai';
 import { OpenAIProvider } from '@aits/openai';
 import { OpenRouterProvider } from '@aits/openrouter';
@@ -6,7 +7,7 @@ import { models } from '@aits/models';
 import { ConfigFile } from './config';
 import { ChatFile } from './chat';
 import { ChatMeta } from './schemas';
-import { OperationManager } from './operations/types';
+import { OperationManager } from './operations/manager';
 
 /**
  * Cletus AI Context
@@ -69,6 +70,7 @@ export function createCletusAI(configFile: ConfigFile) {
           currentTodo: chat?.todos.find((t) => !t.done),
           todos: chat?.todos || [],
           types: config.types,
+          chatPrompt: chat?.prompt,
         };
         const userPrompt = USER_PROMPT(userPromptData);
         
@@ -124,7 +126,8 @@ export async function transcribe(ai: CletusAI, image: string): Promise<string> {
   return response.content;
 }
 
-const USER_PROMPT = Handlebars.compile(`Current Date & Time: {{currentDateTime}}
+const USER_PROMPT = Handlebars.compile(
+`Current Date & Time: {{currentDateTime}}
 Locale: {{locale}}
 Time Zone: {{timeZone}}
 
@@ -136,12 +139,16 @@ User Memories:
 {{#each user.memory}}
 - {{this.text}}
 {{/each}}
+{{else}}
+No user memories.
 {{/if}}
 {{/if}}
 
 {{#if assistant}}
 Assistant Persona: {{assistant.name}}
 {{assistant.prompt}}
+{{else}}
+No assistant persona selected.
 {{/if}}
 
 {{#if currentTodo}}
@@ -153,6 +160,8 @@ Active Todos:
 {{#each todos}}
 {{@index}}. [{{#if this.done}}✓{{else}} {{/if}}] {{this.name}}
 {{/each}}
+{{else}}
+No Todos.
 {{/if}}
 
 Chat Mode: {{mode}}
@@ -162,12 +171,25 @@ Chat Mode: {{mode}}
 - update: Read, create, & update operations are automatic, delete requires approval
 - delete: All operations are automatic
 
+{{#if chatPrompt}}
+Chat Prompt:
+{{chatPrompt}}
+{{/if}}
+
 {{#if types.length}}
 Available Data Types:
 {{#each types}}
 - {{this.name}}: {{this.friendlyName}}{{#if this.description}} - {{this.description}}{{/if}}
 {{/each}}
-{{/if}}`);
+{{else}}
+No custom data types defined.
+{{/if}}
+
+IMPORTANT:
+- Do not offer any functionality or options you cannot perform based on the tools available.
+- Base your responses in what you know based on the context or what tool results you have.
+- If your response is not based on tool results or context, clearly state that you are not basing it on any known information.
+`);
 
 const DESCRIBE_PROMPT = `Analyze this image in detail and describe its key elements, context, and any notable aspects.`;
 
