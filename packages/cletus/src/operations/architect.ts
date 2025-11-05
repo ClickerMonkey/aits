@@ -4,6 +4,32 @@ import type { TypeDefinition, TypeField } from "../schemas";
 import Handlebars from 'handlebars';
 
 
+function validateTemplate(template: string, fields: TypeField[]): string | true {
+  try {
+    const compiled = Handlebars.compile(template);
+    // Test with sample data based on fields
+    const testData: Record<string, any> = {};
+
+    for (const field of fields) {
+      testData[field.name] = field.default ?? (
+        field.type === 'string' ? '' :
+        field.type === 'number' ? 0 :
+        field.type === 'boolean' ? false :
+        field.type === 'date' ? new Date().toISOString() :
+        field.type === 'enum' ? (field.enumOptions?.[0] ?? '') :
+        ''
+      );
+    }
+
+    compiled(testData);
+
+    return true;
+  } catch (error: any) {
+    return `Invalid knowledge template: ${error.message}`;
+  }
+}
+
+
 export const type_info = operationOf<
   { name: string },
   { type: TypeDefinition | null }
@@ -37,26 +63,9 @@ export const type_update = operationOf<
 
     // Validate knowledgeTemplate if provided
     if (input.update.knowledgeTemplate) {
-      try {
-        const template = Handlebars.compile(input.update.knowledgeTemplate);
-        // Test with empty object to ensure template compiles and renders
-        const testData: Record<string, any> = {};
-
-        // Create test data based on existing fields
-        for (const field of existing.fields) {
-          testData[field.name] = field.default ?? (
-            field.type === 'string' ? '' :
-            field.type === 'number' ? 0 :
-            field.type === 'boolean' ? false :
-            field.type === 'date' ? new Date().toISOString() :
-            field.type === 'enum' ? (field.enumOptions?.[0] ?? '') :
-            ''
-          );
-        }
-
-        template(testData);
-      } catch (error: any) {
-        return `Invalid knowledgeTemplate: ${error.message}`;
+      const validation = validateTemplate(input.update.knowledgeTemplate, existing.fields);
+      if (validation !== true) {
+        return validation;
       }
     }
 
@@ -222,25 +231,9 @@ export const type_create = operationOf<
 
     // Validate knowledgeTemplate
     if (input.knowledgeTemplate) {
-      try {
-        const template = Handlebars.compile(input.knowledgeTemplate);
-        // Test with sample data based on fields
-        const testData: Record<string, any> = {};
-
-        for (const field of input.fields) {
-          testData[field.name] = field.default ?? (
-            field.type === 'string' ? '' :
-            field.type === 'number' ? 0 :
-            field.type === 'boolean' ? false :
-            field.type === 'date' ? new Date().toISOString() :
-            field.type === 'enum' ? (field.enumOptions?.[0] ?? '') :
-            ''
-          );
-        }
-
-        template(testData);
-      } catch (error: any) {
-        return `Invalid knowledgeTemplate: ${error.message}`;
+      const validation = validateTemplate(input.knowledgeTemplate, input.fields);
+      if (validation !== true) {
+        return validation;
       }
     }
 

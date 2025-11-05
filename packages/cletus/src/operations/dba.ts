@@ -1,10 +1,9 @@
-import { CletusCoreContext } from "../ai";
-import { operationOf } from "./types";
 import { DataManager } from "../data";
-import { WhereClause, filterByWhere, countByWhere } from "./where-helpers";
+import { operationOf } from "./types";
+import { WhereClause, countByWhere, filterByWhere } from "./where-helpers";
 
 export const data_create = operationOf<
-  { name: string; fields: any },
+  { name: string; fields: Record<string, any> },
   { id: string; name: string }
 >({
   mode: 'create',
@@ -38,7 +37,7 @@ export const data_create = operationOf<
 });
 
 export const data_update = operationOf<
-  { name: string; id: string; fields: any },
+  { name: string; id: string; fields: Record<string, any> },
   { id: string; updated: boolean }
 >({
   mode: 'update',
@@ -148,7 +147,7 @@ export const data_select = operationOf<
       records = filterByWhere(records, input.where);
     }
 
-    const limit = input.limit || 10;
+    const limit = input.limit || records.length;
     const offset = input.offset || 0;
 
     return {
@@ -187,7 +186,7 @@ export const data_select = operationOf<
     }
 
     const offset = input.offset || 0;
-    const limit = input.limit || 10;
+    const limit = input.limit || (results.length - offset);
 
     return {
       count: results.length,
@@ -197,7 +196,7 @@ export const data_select = operationOf<
 });
 
 export const data_update_many = operationOf<
-  { name: string; set: any; where: WhereClause },
+  { name: string; set: Record<string, any>; where: WhereClause },
   { updated: number }
 >({
   mode: 'update',
@@ -340,7 +339,7 @@ export const data_aggregate = operationOf<
 
     if (input.groupBy && input.groupBy.length > 0) {
       for (const record of records) {
-        const key = input.groupBy.map((field) => record.fields[field]).join('|');
+        const key = input.groupBy.map((field) => record.fields[field]).join('|||');
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -358,7 +357,7 @@ export const data_aggregate = operationOf<
 
       // Add group by fields
       if (input.groupBy && input.groupBy.length > 0) {
-        const keyParts = key.split('|');
+        const keyParts = key.split('|||');
         input.groupBy.forEach((field, i) => {
           result[field] = keyParts[i];
         });
@@ -367,36 +366,40 @@ export const data_aggregate = operationOf<
       // Compute aggregation functions
       for (const agg of input.select) {
         const alias = agg.alias || `${agg.function}_${agg.field || '*'}`;
+        const numbers = groupRecords
+          .map((r) => agg.field ? r.fields[agg.field] : null)
+          .filter((v) => v !== null && v !== undefined)
+          .map((v) => Number(v))
+          .filter((v) => isFinite(v));
 
         switch (agg.function) {
           case 'count':
-            result[alias] = groupRecords.length;
+            const count = groupRecords.filter((r) => r.fields[agg.field!] !== null && r.fields[agg.field!] !== undefined).length;
+            result[alias] = count;
             break;
 
           case 'sum':
             if (agg.field) {
-              result[alias] = groupRecords.reduce((sum, r) => sum + (Number(r.fields[agg.field!]) || 0), 0);
+              result[alias] = numbers.reduce((sum, n) => sum + n, 0);
             }
             break;
 
           case 'avg':
             if (agg.field) {
-              const sum = groupRecords.reduce((sum, r) => sum + (Number(r.fields[agg.field!]) || 0), 0);
-              result[alias] = groupRecords.length > 0 ? sum / groupRecords.length : 0;
+              const sum = numbers.reduce((sum, n) => sum + n, 0);
+              result[alias] = numbers.length > 0 ? sum / numbers.length : 0;
             }
             break;
 
           case 'min':
             if (agg.field) {
-              const values = groupRecords.map((r) => r.fields[agg.field!]).filter((v) => v !== null && v !== undefined);
-              result[alias] = values.length > 0 ? Math.min(...values.map(Number)) : null;
+              result[alias] = numbers.length > 0 ? Math.min(...numbers) : null;
             }
             break;
 
           case 'max':
             if (agg.field) {
-              const values = groupRecords.map((r) => r.fields[agg.field!]).filter((v) => v !== null && v !== undefined);
-              result[alias] = values.length > 0 ? Math.max(...values.map(Number)) : null;
+              result[alias] = numbers.length > 0 ? Math.max(...numbers) : null;
             }
             break;
         }

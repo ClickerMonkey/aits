@@ -29,3 +29,7 @@
 - [ ] change knowledge source syntax
 - [ ] add knowledge index
 - [ ] add fileType, characters, lines, size to file_stats
+- [ ] data operations update knowledge
+- [ ] cd command
+- [ ] operation custom rendering
+- [ ] token recording
