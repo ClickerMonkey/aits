@@ -370,28 +370,38 @@ export const file_move = operationOf<
 
 export const file_stats = operationOf<
   { path: string },
-  { path: string; size: number; created: number; modified: number; isDirectory: boolean }
+  { path: string; size: number; created: number; modified: number; isDirectory: boolean, type: string, lines?: number, characters?: number }
 >({
   mode: 'local',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
+    const fileExists = await fileIsReadable(fullPath);
 
-    try {
-      await fs.stat(fullPath);
+    if (!fileExists) {
       return {
-        analysis: `This will get file statistics for "${input.path}".`,
-        doable: true,
-      };
-    } catch (error) {
-      return {
-        analysis: `This would fail - path "${input.path}" not found.`,
+        analysis: `This would fail - path "${input.path}" not found or readable.`,
         doable: false,
       };
     }
+
+    return {
+      analysis: `This will get file statistics for "${input.path}".`,
+      doable: true,
+    };
   },
   do: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const stats = await fs.stat(fullPath);
+
+    const type = await categorizeFile(fullPath, input.path);
+    let lines: number | undefined = undefined;
+    let characters: number | undefined = undefined;
+
+    if (type === 'text') {
+      const file = await fs.readFile(fullPath, 'utf-8');
+      characters = file.length;
+      lines = file.split('\n').length;
+    }
 
     return {
       path: input.path,
@@ -399,6 +409,9 @@ export const file_stats = operationOf<
       created: stats.birthtime.getTime(),
       modified: stats.mtime.getTime(),
       isDirectory: stats.isDirectory(),
+      type,
+      lines,
+      characters
     };
   },
 });

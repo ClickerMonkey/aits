@@ -28,7 +28,7 @@
 - [ ] improve image search
 - [x] change knowledge source syntax
 - [ ] add knowledge index
-- [ ] add fileType, characters, lines, size to file_stats
+- [x] add fileType, characters, lines, size to file_stats
 - [ ] data operations update knowledge
 - [x] cd command
 - [ ] operation custom rendering
