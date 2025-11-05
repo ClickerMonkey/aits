@@ -4,33 +4,59 @@ import { KnowledgeFile } from "../knowledge";
 
 export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },
-  { query: string; results: any[] }
+  { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
-  mode: 'read',
+  mode: 'local',
   analyze: async (input, ctx) => {
     const limit = input.limit || 10;
     const prefix = input.sourcePrefix ? ` with source prefix "${input.sourcePrefix}"` : '';
-    return `This will search knowledge for "${input.query}"${prefix}, returning up to ${limit} results.`;
+    return {
+      analysis: `This will search knowledge for "${input.query}"${prefix}, returning up to ${limit} results.`,
+      doable: true,
+    };
   },
-  do: async (input, ctx) => {
+  do: async (input, { ai }) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
     const limit = input.limit || 10;
 
-    // TODO: Generate embedding for query and perform similarity search
-    // For now return structure
+    // Get embedding model from AI metadata or use default
+    const modelId = 'text-embedding-3-small'; // Could come from config
+
+    // Generate embedding for query
+    const embeddingResult = await ai.embed.get({ texts: [input.query] });
+    const queryVector = embeddingResult.embeddings[0].embedding;
+
+    // Search for similar entries
+    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit);
+
+    // Filter by source prefix if provided
+    let filteredEntries = similarEntries;
+    if (input.sourcePrefix) {
+      filteredEntries = similarEntries.filter((result) =>
+        result.entry.source.startsWith(input.sourcePrefix!)
+      );
+    }
+
     return {
       query: input.query,
-      results: [],
+      results: filteredEntries.map((result) => ({
+        source: result.entry.source,
+        text: result.entry.text,
+        similarity: result.similarity,
+      })),
     };
   },
 });
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
-  mode: 'read',
+  mode: 'local',
   analyze: async (input, ctx) => {
-    return 'This will list all unique source prefixes in the knowledge base.';
+    return {
+      analysis: 'This will list all unique source prefixes in the knowledge base.',
+      doable: true,
+    };
   },
   do: async (input, ctx) => {
     const knowledge = new KnowledgeFile();
@@ -57,16 +83,29 @@ export const knowledge_add = operationOf<
   mode: 'create',
   analyze: async (input, ctx) => {
     const preview = input.text.length > 50 ? input.text.substring(0, 50) + '...' : input.text;
-    return `This will add user memory: "${preview}"`;
+    return {
+      analysis: `This will add user memory: "${preview}"`,
+      doable: true,
+    };
   },
-  do: async (input, ctx) => {
+  do: async (input, { ai }) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
-    const source = 'user';
+    const source = `user:${Date.now()}`;
+    const modelId = 'text-embedding-3-small'; // Could come from config
 
-    // TODO: Generate embedding and store
-    // For now just structure
+    // Generate embedding
+    const embeddingResult = await ai.embed.get({ texts: [input.text] });
+    const vector = embeddingResult.embeddings[0].embedding;
+
+    // Store in knowledge base
+    await knowledge.addEntry(modelId, {
+      source,
+      text: input.text,
+      vector,
+    });
+
     return { source, added: true };
   },
 });
@@ -80,24 +119,44 @@ export const knowledge_delete = operationOf<
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
-    const sources = Object.keys(knowledge.getData().knowledge).filter((s) =>
-      s.startsWith(input.sourcePrefix)
-    );
+    const data = knowledge.getData();
+    let count = 0;
 
-    return `This will delete ${sources.length} knowledge entries with source prefix "${input.sourcePrefix}".`;
+    for (const entries of Object.values(data.knowledge)) {
+      count += entries.filter((e) => e.source.startsWith(input.sourcePrefix)).length;
+    }
+
+    return {
+      analysis: `This will delete ${count} knowledge entries with source prefix "${input.sourcePrefix}".`,
+      doable: true,
+    };
   },
   do: async (input, ctx) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
-    const sources = Object.keys(knowledge.getData().knowledge).filter((s) =>
-      s.startsWith(input.sourcePrefix)
-    );
+    const data = knowledge.getData();
+    let count = 0;
+
+    // Count entries to delete
+    for (const entries of Object.values(data.knowledge)) {
+      count += entries.filter((e) => e.source.startsWith(input.sourcePrefix)).length;
+    }
+
+    // Delete all matching sources
+    const sources = new Set<string>();
+    for (const entries of Object.values(data.knowledge)) {
+      for (const entry of entries) {
+        if (entry.source.startsWith(input.sourcePrefix)) {
+          sources.add(entry.source);
+        }
+      }
+    }
 
     for (const source of sources) {
       await knowledge.deleteBySource(source);
     }
 
-    return { sourcePrefix: input.sourcePrefix, deletedCount: sources.length };
+    return { sourcePrefix: input.sourcePrefix, deletedCount: count };
   },
 });

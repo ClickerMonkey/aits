@@ -40,6 +40,18 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
       });
     });
   }
+  
+  /**
+   * Add a knowledge entry for a specific embedding model
+   */
+  async addEntries(model: string, entries: KnowledgeEntry[]): Promise<void> {
+    await this.save((knowledge) => {
+      if (!knowledge.knowledge[model]) {
+        knowledge.knowledge[model] = [];
+      }
+      knowledge.knowledge[model].push(...entries);
+    });
+  }
 
   /**
    * Update an existing knowledge entry

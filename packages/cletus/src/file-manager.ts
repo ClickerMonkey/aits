@@ -135,6 +135,13 @@ export function getDataPath(typeName: string): string {
 }
 
 /**
+ * Get path to config file
+ */
+export function getAssetPath(): string {
+  return path.join(getCletusHome(), 'assets');
+}
+
+/**
  * Check if config exists
  */
 export async function configExists(): Promise<boolean> {

@@ -9,9 +9,15 @@ export const assistant_switch = operationOf<
   analyze: async (input, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
-      return `This would fail - assistant "${input.name}" not found.`;
+      return {
+        analysis: `This would fail - assistant "${input.name}" not found.`,
+        doable: false,
+      };
     }
-    return `This will switch the current chat to use the "${input.name}" assistant.`;
+    return {
+      analysis: `This will switch the current chat to use the "${input.name}" assistant.`,
+      doable: !!chat,
+    };
   },
   do: async (input, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
@@ -36,14 +42,20 @@ export const assistant_update = operationOf<
   analyze: async (input, { config }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
-      return `This would fail - assistant "${input.name}" not found.`;
+      return {
+        analysis: `This would fail - assistant "${input.name}" not found.`,
+        doable: false,
+      };
     }
 
     const promptPreview = input.prompt.length > 50
       ? input.prompt.substring(0, 50) + '...'
       : input.prompt;
 
-    return `This will update assistant "${input.name}" prompt to: "${promptPreview}"`;
+    return {
+      analysis: `This will update assistant "${input.name}" prompt to: "${promptPreview}"`,
+      doable: true,
+    };
   },
   do: async (input, { config }) => {
     const assistants = config.getData().assistants;
@@ -72,14 +84,20 @@ export const assistant_add = operationOf<
   analyze: async (input, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
     if (existing) {
-      return `This would fail - assistant "${input.name}" already exists.`;
+      return {
+        analysis: `This would fail - assistant "${input.name}" already exists.`,
+        doable: false,
+      };
     }
 
     const promptPreview = input.prompt.length > 50
       ? input.prompt.substring(0, 50) + '...'
       : input.prompt;
 
-    return `This will create a new assistant "${input.name}" with prompt: "${promptPreview}"`;
+    return {
+      analysis: `This will create a new assistant "${input.name}" with prompt: "${promptPreview}"`,
+      doable: true,
+    };
   },
   do: async (input, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
@@ -104,7 +122,10 @@ export const memory_list = operationOf<
   mode: 'local',
   analyze: async (input, { config }) => {
     const memoryCount = config.getData().user.memory.length;
-    return `This will list ${memoryCount} user memories.`;
+    return {
+      analysis: `This will list ${memoryCount} user memories.`,
+      doable: true,
+    };
   },
   do: async (input, { config }) => {
     const user = config.getData().user;
@@ -122,7 +143,10 @@ export const memory_update = operationOf<
       ? input.content.substring(0, 50) + '...'
       : input.content;
 
-    return `This will add a new user memory: "${preview}"`;
+    return {
+      analysis: `This will add a new user memory: "${preview}"`,
+      doable: true,
+    };
   },
   do: async (input, { config }) => {
     await config.addMemory(input.content);

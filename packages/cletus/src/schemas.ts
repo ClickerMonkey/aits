@@ -141,6 +141,7 @@ export const TypeDefinitionSchema = z.object({
   name: z.string(),
   friendlyName: z.string(),
   description: z.string().optional(),
+  knowledgeTemplate: z.string(),
   fields: z.array(TypeFieldSchema),
 });
 

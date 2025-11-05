@@ -10,7 +10,10 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
     const doneCount = chatObject?.todos.filter((t) => t.done).length || 0;
     const undoneCount = todoCount - doneCount;
 
-    return `This will clear ${todoCount} todos (${doneCount} done, ${undoneCount} not done).`;
+    return {
+      analysis: `This will clear ${todoCount} todos (${doneCount} done, ${undoneCount} not done).`,
+      doable: !!chatObject,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -27,7 +30,10 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
   analyze: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todoCount = chatObject?.todos.length || 0;
-    return `This will list ${todoCount} todos.`;
+    return {
+      analysis: `This will list ${todoCount} todos.`,
+      doable: !!chatObject,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -38,7 +44,11 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
 export const todos_add = operationOf<{ name: string }, { id: string; name: string }>({
   mode: 'create',
   analyze: async (input, { chat, config }: CletusCoreContext) => {
-    return `This will add a new todo: "${input.name}"`;
+    const chatObject = config.getChats().find((c) => c.id === chat?.id);
+    return {
+      analysis: `This will add a new todo: "${input.name}"`,
+      doable: !!chatObject,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -63,10 +73,16 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
     const todo = chatObject?.todos.find((t) => t.id === input.id);
 
     if (!todo) {
-      return `This would fail - todo with id "${input.id}" not found.`;
+      return {
+        analysis: `This would fail - todo with id "${input.id}" not found.`,
+        doable: false,
+      };
     }
 
-    return `This will mark todo "${todo.name}" as done.`;
+    return {
+      analysis: `This will mark todo "${todo.name}" as done.`,
+      doable: true,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -92,7 +108,11 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
 export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
   mode: 'local',
   analyze: async (input, { chat, config }: CletusCoreContext) => {
-    return `This will get details for todo with id "${input.id}"`;
+    const chatObject = config.getChats().find((c) => c.id === chat?.id);
+    return {
+      analysis: `This will get details for todo with id "${input.id}"`,
+      doable: !!chatObject,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -108,10 +128,16 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
     const todo = chatObject?.todos.find((t) => t.id === input.id);
 
     if (!todo) {
-      return `This would fail - todo with id "${input.id}" not found.`;
+      return {
+        analysis: `This would fail - todo with id "${input.id}" not found.`,
+        doable: false,
+      };
     }
 
-    return `This will remove todo "${todo.name}"`;
+    return {
+      analysis: `This will remove todo "${todo.name}"`,
+      doable: true,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -133,7 +159,10 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
     const currentCount = chatObject?.todos.length || 0;
     const newCount = input.todos.length;
 
-    return `This will replace ${currentCount} todos with ${newCount} new todos.`;
+    return {
+      analysis: `This will replace ${currentCount} todos with ${newCount} new todos.`,
+      doable: !!chatObject,
+    };
   },
   do: async (input, { chat, config }: CletusCoreContext) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);

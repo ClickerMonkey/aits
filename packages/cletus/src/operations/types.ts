@@ -37,6 +37,7 @@ export type OperationRecord = {
   input: any;
   output?: any;
   analysis?: string;
+  doable?: boolean;
   start: number;
   end?: number;
   error?: string;
@@ -44,8 +45,22 @@ export type OperationRecord = {
 };
 
 /**
+ * Analysis result from an operation.
+ */
+export type OperationAnalysis = {
+  /**
+   * Description of what the operation would do.
+   */
+  analysis: string;
+  /**
+   * Whether the operation can actually be performed (validation passed).
+   */
+  doable: boolean;
+};
+
+/**
  * Definition of an operation.
- * 
+ *
  * @param TInput  Type of the operation input
  * @param TOutput Type of the operation output
  */
@@ -56,18 +71,18 @@ export type OperationDefinition<TInput, TOutput> = {
   mode: OperationMode | ((input: TInput, context: CletusCoreContext) => OperationMode);
 
   /**
-   * Analyze the operation input and return a string describing what would be done.
+   * Analyze the operation input and return a description and doability status.
    * This is used when the current chat mode does not allow automatic execution.
-   * 
+   *
    * @param input - Operation input
    * @param context - Cletus core context
-   * @returns Analysis string
+   * @returns Analysis result with description and doability
    */
-  analyze: (input: TInput, context: CletusCoreContext) => Promise<string>;
+  analyze: (input: TInput, context: CletusCoreContext) => Promise<OperationAnalysis>;
 
   /**
    * Run the operation and return the output.
-   * 
+   *
    * @param input - Operation input
    * @param context - Cletus core context
    * @returns - Operation output
@@ -79,7 +94,7 @@ export type OperationDefinition<TInput, TOutput> = {
 export type OperationDefinitionFor<K extends OperationKind> = OperationDefinition<OperationInputFor<K>, OperationOutputFor<K>>;
 
 // Helper to define an operation
-export function operationOf<TInput, TOutput>(def: OperationDefinition<TInput, TOutput>): OperationDefinition<TInput, TOutput> {
+export function operationOf<TInput, TOutput>(def: OperationDefinition<TInput, TOutput> & { [K in string]: K extends keyof OperationDefinition<TInput, TOutput> ? never : any }): OperationDefinition<TInput, TOutput> {
   return def;
 }
 
@@ -137,48 +152,59 @@ export class OperationManager {
       throw new Error(`Unknown operation type: ${operation.type}`);
     }
     const operationMode = typeof def.mode === 'function' ? def.mode(operation.input, ctx) : def.mode;
-    const canDo = ModeLevels[this.mode] >= ModeLevels[operationMode];
+    const doNow = ModeLevels[this.mode] >= ModeLevels[operationMode];
     
     const op: OperationRecord = {
       type: operation.type,
       input: operation.input,
-      start: Date.now(),
+      start: 0,
+      doable: true,
     };
 
     this.operations.push(op);
 
-    return this.execute(op, canDo, ctx);
+    return this.execute(op, doNow, ctx);
   }
 
   /**
    * Execute the operation, either analyzing or performing it.
-   * 
+   *
    * @param op - Operation record
-   * @param canDo - Whether the operation can be performed automatically
+   * @param doit - Whether the operation can be performed automatically
    * @param ctx - Cletus core context
    * @returns Result message
    */
-  public async execute(op: OperationRecord, canDo: boolean, ctx: CletusCoreContext): Promise<string> {
+  public async execute(op: OperationRecord, doit: boolean, ctx: CletusCoreContext): Promise<string> {
     const def = Operations[op.type as OperationKind] as OperationDefinition<any, any>;
 
+    if (!op.doable && doit) {
+      throw new Error(`Operation ${op.type} is not doable`);
+    }
+
+    op.start = performance.now();
     try {
-      if (canDo) {
+      if (doit) {
         op.output = await def.do(op.input, ctx);
       } else {
-        op.analysis = await def.analyze(op.input, ctx);
+        const analysisResult = await def.analyze(op.input, ctx);
+        op.analysis = analysisResult.analysis;
+        op.doable = analysisResult.doable;
       }
     } catch (e: any) {
       op.error = e.message || String(e);
+      op.doable = false;
     } finally {
-      op.end = Date.now();
+      op.end = performance.now();
     }
-    
+
     op.message = op.error
       ? `Operation ${op.type} failed: ${op.error}`
-      : canDo
+      : doit
         ? `Operation ${op.type} completed successfully: ${JSON.stringify(op.output)}`
-        : `Operation ${op.type} requires approval: ${op.analysis}`;
-      
+        : op.doable
+          ? `Operation ${op.type} requires approval: ${op.analysis}`
+          : `Operation ${op.type} cannot be performed: ${op.analysis}`;
+
     return op.message;
   }
 }
