@@ -558,8 +558,6 @@ export const text_search = operationOf<
         }
       }
 
-      const matches = sections.length;
-
       const joinedSections: Section[] = [];
       let currentSection: Section | null = null;
       for(const section of sections) {

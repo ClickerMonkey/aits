@@ -28,3 +28,4 @@
 - [ ] improve image search
 - [ ] change knowledge source syntax
 - [ ] add knowledge index
+- [ ] add fileType, characters, lines, size to file_stats
