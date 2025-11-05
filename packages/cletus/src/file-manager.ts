@@ -137,8 +137,23 @@ export function getDataPath(typeName: string): string {
 /**
  * Get path to config file
  */
-export function getAssetPath(): string {
-  return path.join(getCletusHome(), 'assets');
+export async function getAssetPath(createIfNotExists: boolean = false): Promise<string> {
+  const fullPath = path.join(getCletusHome(), 'assets');
+  if (createIfNotExists) {
+    await fs.mkdir(fullPath, { recursive: true });
+  }
+  return fullPath;
+}
+
+/**
+ * Get path to images directory for generated images
+ */
+export async function getImagePath(createIfNotExists: boolean = false): Promise<string> {
+  const fullPath = path.join(getCletusHome(), 'images');
+  if (createIfNotExists) {
+    await fs.mkdir(fullPath, { recursive: true })
+  }
+  return fullPath;
 }
 
 /**

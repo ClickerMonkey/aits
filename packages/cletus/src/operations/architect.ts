@@ -1,6 +1,7 @@
 import { operationOf } from "./types";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
+import Handlebars from 'handlebars';
 
 
 export const type_info = operationOf<
@@ -34,8 +35,67 @@ export const type_update = operationOf<
       return `Type not found: ${input.name}`;
     }
 
-    // TODO: Validate backwards compatibility (check for breaking changes)
-    // TODO: validate knowledgeTemplate (compile handlebars, generate empty object to test) if given
+    // Validate knowledgeTemplate if provided
+    if (input.update.knowledgeTemplate) {
+      try {
+        const template = Handlebars.compile(input.update.knowledgeTemplate);
+        // Test with empty object to ensure template compiles and renders
+        const testData: Record<string, any> = {};
+
+        // Create test data based on existing fields
+        for (const field of existing.fields) {
+          testData[field.name] = field.default ?? (
+            field.type === 'string' ? '' :
+            field.type === 'number' ? 0 :
+            field.type === 'boolean' ? false :
+            field.type === 'date' ? new Date().toISOString() :
+            field.type === 'enum' ? (field.enumOptions?.[0] ?? '') :
+            ''
+          );
+        }
+
+        template(testData);
+      } catch (error: any) {
+        return `Invalid knowledgeTemplate: ${error.message}`;
+      }
+    }
+
+    // Validate field updates if provided
+    if (input.update.fields) {
+      for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
+        if (fieldUpdate === null) {
+          // Deleting a field - check if it's required (breaking change)
+          const existingField = existing.fields.find((f) => f.name === fieldName);
+          if (existingField?.required) {
+            return `Cannot delete required field "${fieldName}" - this is a breaking change`;
+          }
+        } else {
+          // Adding or updating a field
+          const existingField = existing.fields.find((f) => f.name === fieldName);
+
+          if (existingField) {
+            // Updating existing field - check for breaking changes
+            if (fieldUpdate.type && fieldUpdate.type !== existingField.type) {
+              return `Cannot change type of field "${fieldName}" from "${existingField.type}" to "${fieldUpdate.type}" - this is a breaking change`;
+            }
+            if (fieldUpdate.required && !existingField.required && !fieldUpdate.default && !existingField.default) {
+              return `Cannot make field "${fieldName}" required without a default value - this is a breaking change`;
+            }
+          } else {
+            // Adding new field - ensure it has required properties
+            if (!fieldUpdate.type) {
+              return `New field "${fieldName}" must have a type`;
+            }
+            if (fieldUpdate.friendlyName === undefined) {
+              return `New field "${fieldName}" must have a friendlyName`;
+            }
+            if (fieldUpdate.required && !fieldUpdate.default) {
+              return `New required field "${fieldName}" must have a default value`;
+            }
+          }
+        }
+      }
+    }
 
     return '';
   },
@@ -132,11 +192,57 @@ export const type_create = operationOf<
   validate(input: TypeDefinition, config: ConfigFile): string {
     const existing = config.getData().types.find((t) => t.name === input.name);
     if (existing) {
-      throw new Error(`Type already exists: ${input.name}`);
+      return `Type already exists: ${input.name}`;
     }
 
-    // TODO validate fields (no duplicates, etc)
-    // TODO validate knowledgeTemplate (compile handlebars, generate empty object to test)
+    // Validate fields for duplicates and required properties
+    const fieldNames = new Set<string>();
+    for (const field of input.fields) {
+      if (fieldNames.has(field.name)) {
+        return `Duplicate field name: "${field.name}"`;
+      }
+      fieldNames.add(field.name);
+
+      if (!field.name) {
+        return `Field must have a name`;
+      }
+      if (!field.friendlyName) {
+        return `Field "${field.name}" must have a friendlyName`;
+      }
+      if (!field.type) {
+        return `Field "${field.name}" must have a type`;
+      }
+      if (field.type === 'enum' && (!field.enumOptions || field.enumOptions.length === 0)) {
+        return `Enum field "${field.name}" must have enumOptions`;
+      }
+      if (field.required && !field.default) {
+        return `Required field "${field.name}" must have a default value`;
+      }
+    }
+
+    // Validate knowledgeTemplate
+    if (input.knowledgeTemplate) {
+      try {
+        const template = Handlebars.compile(input.knowledgeTemplate);
+        // Test with sample data based on fields
+        const testData: Record<string, any> = {};
+
+        for (const field of input.fields) {
+          testData[field.name] = field.default ?? (
+            field.type === 'string' ? '' :
+            field.type === 'number' ? 0 :
+            field.type === 'boolean' ? false :
+            field.type === 'date' ? new Date().toISOString() :
+            field.type === 'enum' ? (field.enumOptions?.[0] ?? '') :
+            ''
+          );
+        }
+
+        template(testData);
+      } catch (error: any) {
+        return `Invalid knowledgeTemplate: ${error.message}`;
+      }
+    }
 
     return '';
   },

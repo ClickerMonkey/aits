@@ -1,6 +1,7 @@
 import { CletusCoreContext } from "../ai";
 import { operationOf } from "./types";
 import { KnowledgeFile } from "../knowledge";
+import { getModel } from "@aits/core";
 
 export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },
@@ -20,12 +21,10 @@ export const knowledge_search = operationOf<
     await knowledge.load();
 
     const limit = input.limit || 10;
-
-    // Get embedding model from AI metadata or use default
-    const modelId = 'text-embedding-3-small'; // Could come from config
-
+    
     // Generate embedding for query
     const embeddingResult = await ai.embed.get({ texts: [input.query] });
+    const modelId = getModel(embeddingResult.model).id;
     const queryVector = embeddingResult.embeddings[0].embedding;
 
     // Search for similar entries
@@ -93,10 +92,10 @@ export const knowledge_add = operationOf<
     await knowledge.load();
 
     const source = `user:${Date.now()}`;
-    const modelId = 'text-embedding-3-small'; // Could come from config
 
     // Generate embedding
     const embeddingResult = await ai.embed.get({ texts: [input.text] });
+    const modelId = getModel(embeddingResult.model).id;
     const vector = embeddingResult.embeddings[0].embedding;
 
     // Store in knowledge base

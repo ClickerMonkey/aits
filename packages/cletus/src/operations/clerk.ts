@@ -10,7 +10,7 @@ import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWrit
 import { operationOf } from "./types";
 
 
-async function searchFiles(cwd: string, pattern: string) {
+export async function searchFiles(cwd: string, pattern: string) {
   const filePaths = await glob(pattern, { cwd });
   const files = await Promise.all(filePaths.map(async (file) => ({
     file,
@@ -82,7 +82,7 @@ export const file_summary = operationOf<
     const characters = Math.min(input.characterLimit || 64_000, 64_000);
 
     const summarized = await processFile(fullPath, input.path, {
-      assetPath: getAssetPath(),
+      assetPath: await getAssetPath(true),
       sections: false,
       describeImages: input.describeImages ?? false,
       extractImages: input.extractImages ?? false,
@@ -105,7 +105,7 @@ export const file_summary = operationOf<
 });
 
 export const file_index = operationOf<
-  { glob: string, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
+  { glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
   { glob: string; files: string[], knowledge: number }
 >({
   mode: 'create',
@@ -141,23 +141,31 @@ export const file_index = operationOf<
       const fullPath = path.resolve(cwd, file.file);
     
       const parsed = await processFile(fullPath, file.file, {
-        assetPath: getAssetPath(),
+        assetPath: await getAssetPath(true),
         sections: true,
         describeImages: input.describeImages ?? false,
         extractImages: input.extractImages ?? false,
         transcribeImages: input.transcribeImages ?? false,
-        summarize: false,
+        summarize: input.index === 'summary',
+        summarizer: (text) => summarize(ai, text),
         describer: (image) => describe(ai, image),
         transcriber: (image) => transcribe(ai, image),
       });
+      
+      const getSource = input.index === 'content'
+        ? (sectionIndex: number) => `fileChunk:${file.file}[${sectionIndex}]`
+        : (sectionIndex: number) => `fileSummary:${file.file}`;
+      const chunkables = input.index === 'content' 
+        ? parsed.sections 
+        : [parsed.description || ''];
 
-      const embedChunks = chunkArray(parsed.sections.filter(s => s && s.length > 0));
+      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0));
       indexingPromises.push(...embedChunks.map(async (texts, textIndex) => {
         const offset = textIndex * EMBED_CHUNK_SIZE;
         const { embeddings, model } = await ai.embed.get({ texts });
         embeddings.forEach(({ embedding: vector, index }, i) => {
           knowledge.push({
-            source: `fileSummary:${file.file}[${index + offset}]`,
+            source: getSource(index + offset),
             text: texts[index],
             vector: vector,
             created: Date.now()
@@ -459,7 +467,7 @@ export const file_read = operationOf<
     const characters = Math.min(input.characterLimit || 64_000, 64_000);
 
     const processed = await processFile(fullPath, input.path, {
-      assetPath: getAssetPath(),
+      assetPath: await getAssetPath(true),
       sections: false,
       describeImages: input.describeImages ?? false,
       extractImages: input.extractImages ?? false,
@@ -523,7 +531,7 @@ export const text_search = operationOf<
     const results = await Promise.all(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
-        assetPath: getAssetPath(),
+        assetPath: await getAssetPath(true),
         sections: false,
         describeImages: false,
         extractImages: false,

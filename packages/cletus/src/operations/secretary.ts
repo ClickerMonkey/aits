@@ -108,7 +108,6 @@ export const assistant_add = operationOf<
     await config.addAssistant({
       name: input.name,
       prompt: input.prompt,
-      created: Date.now(),
     });
 
     return { name: input.name, created: true };
@@ -117,7 +116,7 @@ export const assistant_add = operationOf<
 
 export const memory_list = operationOf<
   {},
-  { memories: string[] }
+  { memories: { text: string; created: string }[] }
 >({
   mode: 'local',
   analyze: async (input, { config }) => {
@@ -129,7 +128,10 @@ export const memory_list = operationOf<
   },
   do: async (input, { config }) => {
     const user = config.getData().user;
-    return { memories: user.memory };
+    return { memories: user.memory.map((m) => ({
+      text: m.text,
+      created: new Date(m.created).toLocaleString(),
+    }))};
   },
 });
 

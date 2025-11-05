@@ -1,8 +1,69 @@
-import { CletusCoreContext } from "../ai";
-import { operationOf } from "./types";
-import path from 'path';
+import { ImageGenerationResponse } from "@aits/ai";
 import fs from 'fs/promises';
 import { glob } from 'glob';
+import path from 'path';
+import sharp from "sharp";
+import { getImagePath } from "../file-manager";
+import { fileIsReadable } from "./file-helper";
+import { operationOf } from "./types";
+
+function resolveImage(cwd: string, imagePath: string): string {
+  const cleanPath = imagePath.replace('file://', '');
+  return path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
+}
+
+async function loadImageAsDataUrl(cwd: string, imagePath: string): Promise<string> {
+  const fullPath = resolveImage(cwd, imagePath);
+
+  const metadata = await sharp(fullPath).metadata();
+  const width = metadata.width || 0;
+  const height = metadata.height || 0;
+  const format = metadata.format;
+  const needsResize = width > 2048 || height > 2048;
+  const needsConversion = format !== 'png';
+
+  let buffer: Buffer<ArrayBufferLike>;
+
+  if (needsResize || needsConversion) {
+    let pipeline = sharp(fullPath);
+
+    if (needsResize) {
+      pipeline = pipeline.resize(2048, 2048, {
+        fit: 'inside',
+      });
+    }
+
+    pipeline = pipeline.png();
+    buffer = await pipeline.toBuffer();
+  } else {
+    buffer = await fs.readFile(fullPath);
+  }
+
+  const base64 = buffer.toString('base64');
+
+  return `data:image/png;base64,${base64}`;
+}
+
+async function saveGeneratedImage(response: ImageGenerationResponse) {
+  const imagesDir = await getImagePath(true);
+
+  return await Promise.all(response.images.map(async (img, index) => {
+    const timestamp = Date.now();
+    const filename = `image_${timestamp}_${index}.png`;
+    const filepath = path.join(imagesDir, filename);
+
+    if (img.b64_json) {
+      const buffer = Buffer.from(img.b64_json, 'base64');
+      await fs.writeFile(filepath, buffer);
+    } else if (img.url) {
+      const urlResponse = await fetch(img.url);
+      const buffer = Buffer.from(await urlResponse.arrayBuffer());
+      await fs.writeFile(filepath, buffer);
+    }
+
+    return filepath;
+  }));
+}
 
 export const image_generate = operationOf<
   { prompt: string; n?: number },
@@ -11,46 +72,22 @@ export const image_generate = operationOf<
   mode: 'create',
   analyze: async (input, ctx) => {
     const count = input.n || 1;
+
     return {
       analysis: `This will generate ${count} image(s) with prompt: "${input.prompt}"`,
       doable: true,
     };
   },
   do: async (input, { ai, cwd }) => {
-    const count = input.n || 1;
-
-    // Ensure .cletus/images directory exists
-    const imagesDir = path.join(cwd, '.cletus', 'images');
-    await fs.mkdir(imagesDir, { recursive: true });
-
     // Generate images
     const response = await ai.image.generate.get({
       prompt: input.prompt,
-      n: count,
+      n: input.n || 1,
     });
 
     // Save images to files and collect file URLs
-    const imagePaths: string[] = [];
-
-    for (let i = 0; i < response.images.length; i++) {
-      const image = response.images[i];
-      const timestamp = Date.now();
-      const filename = `gen_${timestamp}_${i}.png`;
-      const filepath = path.join(imagesDir, filename);
-
-      if (image.b64_json) {
-        // Decode base64 and save
-        const buffer = Buffer.from(image.b64_json, 'base64');
-        await fs.writeFile(filepath, buffer);
-      } else if (image.url) {
-        // Download from URL and save
-        const response = await fetch(image.url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        await fs.writeFile(filepath, buffer);
-      }
-
-      imagePaths.push(`file://${filepath}`);
-    }
+    const imagePaths = await saveGeneratedImage(response);
+    const imageUrls = imagePaths.map((p) => `file://${p}`);
 
     return {
       prompt: input.prompt,
@@ -66,58 +103,35 @@ export const image_edit = operationOf<
 >({
   mode: 'update',
   analyze: async (input, { cwd }) => {
-    const imagePath = input.imagePath.replace('file://', '');
-    const fullImagePath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
-
-    try {
-      await fs.stat(fullImagePath);
+    const fullImagePath = resolveImage(cwd, input.imagePath);
+    
+    if (!await fileIsReadable(fullImagePath)) {
       return {
-        analysis: `This will edit image "${input.imagePath}" with prompt: "${input.prompt}"`,
-        doable: true,
-      };
-    } catch {
-      return {
-        analysis: `This would fail - image "${input.imagePath}" not found.`,
+        analysis: `This would fail - image "${input.imagePath}" not found or not readable.`,
         doable: false,
       };
     }
+
+    return {
+      analysis: `This will edit image "${input.imagePath}" with prompt: "${input.prompt}"`,
+      doable: true,
+    };
   },
   do: async (input, { ai, cwd }) => {
-    // Ensure .cletus/images directory exists
-    const imagesDir = path.join(cwd, '.cletus', 'images');
-    await fs.mkdir(imagesDir, { recursive: true });
-
-    // Resolve image path
-    const imagePath = input.imagePath.replace('file://', '');
-    const fullImagePath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
-
-    // Read image file
-    const imageBuffer = await fs.readFile(fullImagePath);
+    const image = await loadImageAsDataUrl(cwd, input.imagePath);
 
     // Edit image
     const response = await ai.image.edit.get({
       prompt: input.prompt,
-      image: imageBuffer,
+      image,
     });
 
-    // Save edited image
-    const timestamp = Date.now();
-    const filename = `edit_${timestamp}.png`;
-    const filepath = path.join(imagesDir, filename);
-
-    if (response.images[0].b64_json) {
-      const buffer = Buffer.from(response.images[0].b64_json, 'base64');
-      await fs.writeFile(filepath, buffer);
-    } else if (response.images[0].url) {
-      const urlResponse = await fetch(response.images[0].url);
-      const buffer = Buffer.from(await urlResponse.arrayBuffer());
-      await fs.writeFile(filepath, buffer);
-    }
+    const edited = await saveGeneratedImage(response);
 
     return {
       prompt: input.prompt,
       originalPath: input.imagePath,
-      editedPath: `file://${filepath}`,
+      editedPath: `file://${edited[0]}`,
     };
   },
 });
@@ -133,14 +147,7 @@ export const image_analyze = operationOf<
 
     // Check if all images exist
     const imageChecks = await Promise.all(input.imagePaths.map(async (imagePath) => {
-      const cleanPath = imagePath.replace('file://', '');
-      const fullPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
-      try {
-        await fs.stat(fullPath);
-        return true;
-      } catch {
-        return false;
-      }
+      return await fileIsReadable(resolveImage(cwd, imagePath));
     }));
 
     const allExist = imageChecks.every((exists) => exists);
@@ -158,16 +165,8 @@ export const image_analyze = operationOf<
     };
   },
   do: async (input, { ai, cwd }) => {
-    // Convert file:// paths to absolute paths and read images
     const imageUrls = await Promise.all(input.imagePaths.map(async (imagePath) => {
-      const cleanPath = imagePath.replace('file://', '');
-      const fullPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
-
-      // Read image and convert to base64 data URL
-      const imageBuffer = await fs.readFile(fullPath);
-      const base64 = imageBuffer.toString('base64');
-      const mimeType = fullPath.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      return `data:${mimeType};base64,${base64}`;
+      return loadImageAsDataUrl(cwd, imagePath);
     }));
 
     // Analyze images
@@ -191,37 +190,27 @@ export const image_describe = operationOf<
 >({
   mode: 'local',
   analyze: async (input, { cwd }) => {
-    const cleanPath = input.imagePath.replace('file://', '');
-    const fullPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
+    const fullPath = resolveImage(cwd, input.imagePath);
 
-    try {
-      await fs.stat(fullPath);
+    if (!await fileIsReadable(fullPath)) {
       return {
-        analysis: `This will describe the image at "${input.imagePath}"`,
-        doable: true,
-      };
-    } catch {
-      return {
-        analysis: `This would fail - image "${input.imagePath}" not found.`,
+        analysis: `This would fail - image "${input.imagePath}" not found or not readable.`,
         doable: false,
       };
     }
+
+    return {
+      analysis: `This will describe the image at "${input.imagePath}"`,
+      doable: true,
+    };
   },
   do: async (input, { ai, cwd }) => {
-    // Convert file:// path to absolute path
-    const cleanPath = input.imagePath.replace('file://', '');
-    const fullPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
-
-    // Read image and convert to base64 data URL
-    const imageBuffer = await fs.readFile(fullPath);
-    const base64 = imageBuffer.toString('base64');
-    const mimeType = fullPath.endsWith('.png') ? 'image/png' : 'image/jpeg';
-    const dataUrl = `data:${mimeType};base64,${base64}`;
-
+    const image = await loadImageAsDataUrl(cwd, input.imagePath);
+ 
     // Describe image
     const response = await ai.image.analyze.get({
       prompt: 'Describe this image in detail.',
-      images: [dataUrl],
+      images: [image],
     });
 
     return {
@@ -231,6 +220,7 @@ export const image_describe = operationOf<
   },
 });
 
+// TODO phil this
 export const image_find = operationOf<
   { prompt: string; glob: string; maxImages?: number; n?: number },
   { prompt: string; searched: number; results: Array<{ path: string; score: number }> }
