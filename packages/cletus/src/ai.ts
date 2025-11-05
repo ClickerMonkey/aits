@@ -14,6 +14,7 @@ import { OperationManager } from './operations/types';
 export interface CletusContext {
   config: ConfigFile;
   ops: OperationManager;
+  userPrompt: string;
   chatData?: ChatFile;
   chat?: ChatMeta;
   cwd: string;
@@ -47,6 +48,31 @@ export function createCletusAI(configFile: ConfigFile) {
         config: configFile,
         cwd: process.cwd(),
         ops: new OperationManager('none'),
+      },
+      providedContext: async (ctx) => {
+        if (ctx.userPrompt) {
+          return ctx;
+        }
+        const config = ctx.config!.getData();
+        const chat = ctx.chat;
+        const now = new Date();
+        const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const data = {
+          currentDateTime: now.toLocaleString(locale, { timeZone }),
+          locale,
+          timeZone,
+          user: config.user,
+          assistant: config.assistants.find((a) => a.name === chat?.assistant),
+          mode: chat?.mode || 'none',
+          currentTodo: chat?.todos.find((t) => !t.done),
+          todos: chat?.todos || [],
+          types: config.types,
+        };
+        const userPrompt = USER_PROMPT(data);
+        
+        return { ...ctx, userPrompt };
       },
       models,
     });
@@ -97,6 +123,51 @@ export async function transcribe(ai: CletusAI, image: string): Promise<string> {
 
   return response.content;
 }
+
+const USER_PROMPT = Handlebars.compile(`Current Date & Time: {{currentDateTime}}
+Locale: {{locale}}
+Time Zone: {{timeZone}}
+
+{{#if user}}
+User: {{user.name}}{{#if user.pronouns}} ({{user.pronouns}}){{/if}}
+{{#if user.memory.length}}
+
+User Memories:
+{{#each user.memory}}
+- {{this.text}}
+{{/each}}
+{{/if}}
+{{/if}}
+
+{{#if assistant}}
+Assistant Persona: {{assistant.name}}
+{{assistant.prompt}}
+{{/if}}
+
+{{#if currentTodo}}
+Current Todo: {{currentTodo.name}}
+{{/if}}
+
+{{#if todos.length}}
+Active Todos:
+{{#each todos}}
+{{@index}}. [{{#if this.done}}✓{{else}} {{/if}}] {{this.name}}
+{{/each}}
+{{/if}}
+
+Chat Mode: {{mode}}
+- none: All AI operations require user approval
+- read: Read operations involving AI are automatic, others require approval
+- create: Read & create operations are automatic, others require approval
+- update: Read, create, & update operations are automatic, delete requires approval
+- delete: All operations are automatic
+
+{{#if types.length}}
+Available Data Types:
+{{#each types}}
+- {{this.name}}: {{this.friendlyName}}{{#if this.description}} - {{this.description}}{{/if}}
+{{/each}}
+{{/if}}`);
 
 const DESCRIBE_PROMPT = `Analyze this image in detail and describe its key elements, context, and any notable aspects.`;
 

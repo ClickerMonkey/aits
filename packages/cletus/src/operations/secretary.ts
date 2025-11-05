@@ -1,4 +1,3 @@
-import { CletusCoreContext } from "../ai";
 import { operationOf } from "./types";
 
 export const assistant_switch = operationOf<

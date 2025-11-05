@@ -82,7 +82,7 @@ export const knowledge_add = operationOf<
   analyze: async (input, ctx) => {
     const preview = input.text.length > 50 ? input.text.substring(0, 50) + '...' : input.text;
     return {
-      analysis: `This will add user memory: "${preview}"`,
+      analysis: `This will add user knowledge: "${preview}"`,
       doable: true,
     };
   },

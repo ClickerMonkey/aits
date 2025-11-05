@@ -36,16 +36,18 @@ Active Todos:
 {{/each}}
 {{/if}}
 
-User request: {{request}}
-
 Your role is to help break down complex requests into manageable todos, track progress, and keep tasks organized.`,
     tools: plannerTools,
     schema: false,
-    input: (input, ctx) => ({
-      currentTodo: input?.currentTodo,
-      todos: input?.todos || [],
-      request: input?.request || '',
-    }),
+    input: (input, ctx) => {
+      const config = ctx.config.getData();
+      const chat = ctx.chat; 
+
+      return {
+        currentTodo: chat?.todos.find((t) => !t.done),
+        todos: chat?.todos || [],
+      };
+    },
   });
 
   // Librarian sub-agent
@@ -60,14 +62,10 @@ Knowledge sources can be formatted as:
 - file@{path}:chunk[{index}] - Specific file sections
 - user - User-provided memories
 
-User request: {{request}}
-
 Your role is to help search, add, and manage knowledge entries for semantic search and context retrieval.`,
     tools: librarianTools,
     schema: false,
-    input: (input, ctx) => ({
-      request: input?.request || '',
-    }),
+    input: (input, ctx) => ({}),
   });
 
   // Clerk sub-agent
@@ -79,14 +77,11 @@ Your role is to help search, add, and manage knowledge entries for semantic sear
 IMPORTANT: All file operations are relative to the current working directory: {{cwd}}
 You do not have access outside of it. You can only operate on text-based files.
 
-User request: {{request}}
-
 Your role is to help search, read, create, modify, and organize files within the project directory.`,
     tools: clerkTools,
     schema: false,
     input: (input, ctx) => ({
       cwd: ctx.cwd,
-      request: input?.request || '',
     }),
   });
 
@@ -98,15 +93,23 @@ Your role is to help search, read, create, modify, and organize files within the
 
 Available Assistants: {{assistants}}
 
-User request: {{request}}
+{{#if assistant}}
+Current Assistant Persona: {{assistant.name}}
+{{assistant.prompt}}
+{{/if}}
 
 Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.`,
     tools: secretaryTools,
     schema: false,
-    input: (input, ctx) => ({
-      assistants: input?.assistants || [],
-      request: input?.request || '',
-    }),
+    input: (input, ctx) => {
+      const config = ctx.config.getData();
+      const chat = ctx.chat;
+
+      return {
+        assistants: config.assistants,
+        assistant: config.assistants.find((a) => a.name === chat?.assistant),
+      };
+    },
   });
 
   // Architect sub-agent
@@ -127,14 +130,11 @@ Current Types:
 {{/each}}
 {{/if}}
 
-User request: {{request}}
-
 Your role is to help create and modify type definitions while maintaining data integrity.`,
     tools: architectTools,
     schema: false,
     input: (input, ctx) => ({
       types: ctx.config.types,
-      request: input?.request || '',
     }),
   });
 
@@ -147,14 +147,10 @@ Your role is to help create and modify type definitions while maintaining data i
 Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
 
-User request: {{request}}
-
 Your role is to help with all image-related tasks including creation, modification, and understanding visual content.`,
     tools: artistTools,
     schema: false,
-    input: (input, ctx) => ({
-      request: input?.request || '',
-    }),
+    input: (input, ctx) => ({}),
   });
 
   return {

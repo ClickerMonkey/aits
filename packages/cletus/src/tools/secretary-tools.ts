@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
-import type { Operation } from '../schemas.js';
 
 /**
  * Create secretary tools for assistant and memory management
- * Tools return operations that will be executed based on chat mode
  */
 export function createSecretaryTools(ai: CletusAI) {
   const assistantSwitch = ai.tool({
@@ -14,14 +12,13 @@ export function createSecretaryTools(ai: CletusAI) {
     schema: z.object({
       name: z.string().describe('Assistant name'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'assistant_switch',
         input: {
           name: params.name,
-        },
-        kind: 'update',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -33,15 +30,14 @@ export function createSecretaryTools(ai: CletusAI) {
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('New system prompt'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'assistant_update',
         input: {
           name: params.name,
           prompt: params.prompt,
-        },
-        kind: 'update',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -53,15 +49,14 @@ export function createSecretaryTools(ai: CletusAI) {
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('System prompt for the assistant'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'assistant_add',
         input: {
           name: params.name,
           prompt: params.prompt,
-        },
-        kind: 'create',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -70,12 +65,11 @@ export function createSecretaryTools(ai: CletusAI) {
     description: 'List all user memories',
     instructions: 'Use this to see what the user has asked to remember.',
     schema: z.object({}),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'memory_list',
-        input: {},
-        kind: 'read',
-      };
+        input: {}
+      }, ctx);
     },
   });
 
@@ -86,14 +80,13 @@ export function createSecretaryTools(ai: CletusAI) {
     schema: z.object({
       content: z.string().describe('Memory content to add or update'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'memory_update',
         input: {
           content: params.content,
-        },
-        kind: 'create',
-      };
+        }
+      }, ctx);
     },
   });
 

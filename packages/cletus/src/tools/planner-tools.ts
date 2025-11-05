@@ -1,11 +1,8 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
-import type { Operation } from '../schemas.js';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Create planner tools for todo management
- * Tools return operations that will be executed based on chat mode
  */
 export function createPlannerTools(ai: CletusAI) {
   const todosClear = ai.tool({
@@ -13,12 +10,8 @@ export function createPlannerTools(ai: CletusAI) {
     description: 'Clears all todos from the current chat',
     instructions: 'Use this to clear all todos when starting fresh or when all tasks are complete.',
     schema: z.object({}),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_clear',
-        input: {},
-        kind: 'delete',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_clear', input: {} }, ctx);
     },
   });
 
@@ -27,12 +20,8 @@ export function createPlannerTools(ai: CletusAI) {
     description: 'Lists all current todos',
     instructions: 'Use this to see what tasks are pending or completed.',
     schema: z.object({}),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_list',
-        input: {},
-        kind: 'read',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_list', input: {} }, ctx);
     },
   });
 
@@ -43,16 +32,8 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       name: z.string().describe('The todo name/description'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_add',
-        input: {
-          id: uuidv4(),
-          name: params.name,
-          done: false,
-        },
-        kind: 'create',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_add', input: { name: params.name } }, ctx);
     },
   });
 
@@ -63,12 +44,8 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID to mark as done'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_done',
-        input: { id: params.id },
-        kind: 'update',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_done', input: { id: params.id } }, ctx);
     },
   });
 
@@ -79,12 +56,8 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_get',
-        input: { id: params.id },
-        kind: 'read',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_get', input: { id: params.id } }, ctx);
     },
   });
 
@@ -95,12 +68,8 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID to remove'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_remove',
-        input: { id: params.id },
-        kind: 'delete',
-      };
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({ type: 'todos_remove', input: { id: params.id } }, ctx);
     },
   });
 
@@ -111,23 +80,19 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       todos: z.array(
         z.object({
+          id: z.string().optional(),
           name: z.string(),
           done: z.boolean().optional(),
         })
       ).describe('Array of new todos'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
-        type: 'todos_replace',
-        input: {
-          todos: params.todos.map((t) => ({
-            id: uuidv4(),
-            name: t.name,
-            done: t.done || false,
-          })),
-        },
-        kind: 'update',
-      };
+    call: async (params, refs, ctx) => {
+      const todos = params.todos.map((t) => ({
+        id: t.id || Math.random().toString(36).substring(7),
+        name: t.name,
+        done: t.done || false,
+      }));
+      return await ctx.ops.handle({ type: 'todos_replace', input: { todos } }, ctx);
     },
   });
 

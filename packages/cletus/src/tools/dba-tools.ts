@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
-import type { Operation, TypeDefinition, TypeField } from '../schemas.js';
+import type { TypeDefinition, TypeField } from '../schemas.js';
 
 /**
  * Build a Zod schema from a TypeField definition
@@ -22,7 +22,7 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
       schema = z.enum(field.enumOptions as [string, ...string[]]);
       break;
     case 'date':
-      schema = z.iso.date();
+      schema = z.string().datetime();
       break;
     default:
       schema = z.string();
@@ -89,10 +89,10 @@ function buildWhereSchema(typeDef: TypeDefinition) {
         break;
       case 'date':
         fieldConditions[field.name] = z.object({
-          equals: z.iso.date().optional(),
-          before: z.iso.date().optional(),
-          after: z.iso.date().optional(),
-          oneOf: z.array(z.iso.date()).optional(),
+          equals: z.string().datetime().optional(),
+          before: z.string().datetime().optional(),
+          after: z.string().datetime().optional(),
+          oneOf: z.array(z.string().datetime()).optional(),
           isEmpty: z.boolean().optional(),
         }).optional();
         break;
@@ -165,15 +165,14 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
     schema: z.object({
       fields: fieldsSchema.describe('Field values for the new record'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_create',
         input: {
           name: typeDef.name,
           fields: params.fields,
-        },
-        kind: 'create',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -185,16 +184,15 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
       id: z.string().describe('Record ID'),
       fields: partialFieldsSchema.describe('Fields to update'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_update',
         input: {
           name: typeDef.name,
           id: params.id,
           fields: params.fields,
-        },
-        kind: 'update',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -205,15 +203,14 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
     schema: z.object({
       id: z.string().describe('Record ID'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_delete',
         input: {
           name: typeDef.name,
           id: params.id,
-        },
-        kind: 'delete',
-      };
+        }
+      }, ctx);
     },
   });
 
@@ -237,18 +234,17 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
         })
       ).optional().describe('Sort order'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_select',
         input: {
           name: typeDef.name,
-          where: params.where || {},
-          offset: params.offset || 0,
-          limit: params.limit || 10,
-          orderBy: params.orderBy || [],
-        },
-        kind: 'read',
-      };
+          where: params.where,
+          offset: params.offset,
+          limit: params.limit,
+          orderBy: params.orderBy,
+        }
+      }, ctx);
     },
   });
 
@@ -259,17 +255,18 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
     schema: z.object({
       set: partialFieldsSchema.describe('Fields to set on matching records'),
       where: whereSchema.describe('Filter conditions'),
+      limit: z.number().optional().describe('Maximum records to update'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_update_many',
         input: {
           name: typeDef.name,
           set: params.set,
           where: params.where,
-        },
-        kind: 'update',
-      };
+          limit: params.limit,
+        }
+      }, ctx);
     },
   });
 
@@ -279,16 +276,17 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
     instructions: `Use this to bulk delete ${typeDef.friendlyName} records that match a where clause.`,
     schema: z.object({
       where: whereSchema.describe('Filter conditions'),
+      limit: z.number().optional().describe('Maximum records to delete'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_delete_many',
         input: {
           name: typeDef.name,
           where: params.where,
-        },
-        kind: 'delete',
-      };
+          limit: params.limit,
+        }
+      }, ctx);
     },
   });
 
@@ -318,24 +316,23 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
       select: z.array(
         z.object({
           function: z.enum(['count', 'sum', 'avg', 'min', 'max']),
-          field: z.enum(['*', ...typeDef.fields.map(f => f.name)] as [string, ...string[]]).optional(),
+          field: z.enum(typeDef.fields.map(f => f.name) as [string, ...string[]]).optional(),
           alias: z.string().optional(),
         })
       ).describe('Aggregation functions'),
     }),
-    call: async (params, refs, ctx): Promise<Operation> => {
-      return {
+    call: async (params, refs, ctx) => {
+      return await ctx.ops.handle({
         type: 'data_aggregate',
         input: {
           name: typeDef.name,
-          where: params.where || {},
-          having: params.having || {},
-          groupBy: params.groupBy || [],
-          orderBy: params.orderBy || [],
-          select: params.select || [],
-        },
-        kind: 'read',
-      };
+          where: params.where,
+          having: params.having,
+          groupBy: params.groupBy,
+          orderBy: params.orderBy,
+          select: params.select,
+        }
+      }, ctx);
     },
   });
 
@@ -360,31 +357,25 @@ export function createDBAAgent(ai: CletusAI) {
     description: 'Identify which data type the user wants to operate on',
     content: `Based on the user's request, identify which data type they want to work with.
 
-Available types:
-{{#each types}}
-- {{this.name}}: {{this.friendlyName}}{{#if this.description}} - {{this.description}}{{/if}}
-{{/each}}
-
-User request: {{request}}
+<userInformation>
+{{userPrompt}}
+</userInformation>
 
 Respond with just the type name.`,
     schema: z.object({
       typeName: z.string().describe('The data type name'),
     }),
-    input: (input, ctx) => ({
-      types: ctx.config.getData().types,
-      request: input?.request || '',
-    }),
+    input: (input, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
-    
+
   const dbaAgent = ai.agent({
     name: 'dba',
     description: 'Database administrator agent for data operations',
     refs: [typeIdentifier],
     call: async (input: { request: string }, [typeIdentifier], ctx) => {
       // Get the type name
-      const result = await typeIdentifier.run({ request: input.request }, ctx);
-      const typeDef = ctx.config.types.find((t) => t.name === result.typeName);
+      const result = await typeIdentifier.get({}, 'result', ctx);
+      const typeDef = ctx.config.getData().types.find((t) => t.name === result.typeName);
 
       if (!typeDef) {
         throw new Error(`Type not found: ${result.typeName}`);

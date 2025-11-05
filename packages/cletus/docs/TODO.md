@@ -32,10 +32,11 @@
 - [ ] data operations update knowledge
 - [x] cd command
 - [ ] operation custom rendering
-- [ ] token recording
+- [x] token recording
 - [x] add in user locale, timezone, and current time into chat prompt
 - [ ] add netizen/spiderman/spider agent & tools
     - web search using tavily if key is provided at setup
     - get page content (html | text) optionally do regex search (like text search)
 - [ ] update clerk so they see text files as lines - can search by lines
 - [ ] add offset to summarization inputs
+- [ ] add semantic data search (search through knowledge & score, find matching record)

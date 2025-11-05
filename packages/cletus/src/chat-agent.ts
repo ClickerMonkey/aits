@@ -16,13 +16,13 @@ export function createChatAgent(ai: CletusAI) {
     description: 'Delegate work to a specialized sub-agent',
     instructions: `Use this tool to route requests to specialized agents:
 
-- **planner**: Todo management, task planning, breaking down complex requests
-- **librarian**: Knowledge search, semantic search, managing memories and embeddings
-- **clerk**: File operations (search, read, create, edit, delete files and directories)
+- **planner**: Todo management, breaking down complex requests
+- **librarian**: Knowledge search, semantic search, managing knowledge
+- **clerk**: File operations (text search, semantic search, read, create, edit, delete, move, copy, info, summarization, indexing)
 - **secretary**: User memory, assistant personas, switching assistants
 - **architect**: Type definitions, creating/modifying data schemas
 - **artist**: Image generation, editing, analysis, and search
-- **dba**: Data operations (CRUD, queries, aggregations on custom data types)
+- **dba**: Data operations (create, update, delete, select, update many, delete many, aggregate)
 
 Choose the appropriate agent based on what the user needs to do.`,
     schema: z.object({
@@ -67,75 +67,15 @@ Choose the appropriate agent based on what the user needs to do.`,
     description: 'Main Cletus chat interface',
     content: `You are Cletus, a powerful CLI assistant that helps users manage tasks, files, data, and knowledge.
 
-Current Date & Time: {{currentDateTime}}
-Locale: {{locale}}
-Time Zone: {{timeZone}}
-
-{{#if user}}
-User: {{user.name}}{{#if user.pronouns}} ({{user.pronouns}}){{/if}}
-{{#if user.memory.length}}
-
-User Memories:
-{{#each user.memory}}
-- {{this.text}}
-{{/each}}
-{{/if}}
-{{/if}}
-
-{{#if assistant}}
-Assistant Persona: {{assistant.name}}
-{{assistant.prompt}}
-{{/if}}
-
-{{#if currentTodo}}
-Current Todo: {{currentTodo.name}}
-{{/if}}
-
-{{#if todos.length}}
-Active Todos:
-{{#each todos}}
-{{@index}}. [{{#if this.done}}✓{{else}} {{/if}}] {{this.name}}
-{{/each}}
-{{/if}}
-
-Chat Mode: {{mode}}
-- none: All AI operations require user approval
-- read: Read operations involving AI are automatic, others require approval
-- create: Read & create operations are automatic, others require approval
-- update: Read, create, & update operations are automatic, delete requires approval
-- delete: All operations are automatic
-
-{{#if types.length}}
-Available Data Types:
-{{#each types}}
-- {{this.name}}: {{this.friendlyName}}{{#if this.description}} - {{this.description}}{{/if}}
-{{/each}}
-{{/if}}
+<userInformation>
+{{userPrompt}}
+</userInformation>
 
 You have access to specialized agents via the 'delegate' tool. When the user asks for something, determine which agent can best handle it and delegate the work. You can delegate to multiple agents if needed.`,
     tools: [routeTool],
     toolExecution: 'parallel',
     schema: false,
-    input: (input: {}, ctx) => {
-      const config = ctx.config.getData();
-      const chat = ctx.chat;
-
-      const now = new Date();
-      const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      return {
-        currentDateTime: now.toLocaleString(locale, { timeZone }),
-        locale,
-        timeZone,
-        user: config.user,
-        assistant: config.assistants.find((a) => a.name === chat?.assistant),
-        mode: chat?.mode || 'none',
-        currentTodo: chat?.todos.find((t) => !t.done),
-        todos: chat?.todos || [],
-        types: config.types,
-      };
-    },
+    input: (input: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 
   return chatPrompt;
