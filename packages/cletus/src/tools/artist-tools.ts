@@ -69,5 +69,11 @@ export function createArtistTools(ai: CletusAI) {
     imageAnalyze,
     imageDescribe,
     imageFind,
-  ] as const;
+  ] as [
+    typeof imageGenerate,
+    typeof imageEdit,
+    typeof imageAnalyze,
+    typeof imageDescribe,
+    typeof imageFind,
+  ];
 }

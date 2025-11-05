@@ -80,5 +80,9 @@ Provide an update object with the changes to make.`,
     typeInfo,
     typeUpdate,
     typeCreate,
-  ] as const;
+  ] as [
+    typeof typeInfo,
+    typeof typeUpdate,
+    typeof typeCreate,
+  ];
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { CletusAI } from './ai.js';
-import { createSubAgents } from './agents/sub-agents.js';
-import { ChatMode } from './schemas.js';
+import type { CletusAI } from '../ai.js';
+import { createSubAgents } from './sub-agents.js';
+import { ChatMode } from '../schemas.js';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -29,16 +29,8 @@ Choose the appropriate agent based on what the user needs to do.`,
       agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
       request: z.string().describe('The request to send to the sub-agent'),
     }),
-    refs: [
-      subAgents.planner,
-      subAgents.librarian,
-      subAgents.clerk,
-      subAgents.secretary,
-      subAgents.architect,
-      subAgents.artist,
-      subAgents.dba,
-    ],
-    call: async (params, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
+    refs: subAgents,
+    call: (params, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       // Route to the appropriate sub-agent
       switch (params.agent) {
         case 'planner':
@@ -73,8 +65,17 @@ Choose the appropriate agent based on what the user needs to do.`,
 
 You have access to specialized agents via the 'delegate' tool. When the user asks for something, determine which agent can best handle it and delegate the work. You can delegate to multiple agents if needed.`,
     tools: [routeTool],
-    toolExecution: 'parallel',
-    schema: false,
+    toolExecution: 'sequential',
+    config: {
+      cacheKey: 'cletus_chat',
+      toolsOneAtATime: true,
+    },
+    metadata: {
+      weights: {
+        speed: 0.7,
+        accuracy: 0.3,
+      },
+    },
     input: (input: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
 import type { TypeDefinition, TypeField } from '../schemas.js';
+import { FieldCondition, WhereClause } from '../operations/where-helpers.js';
 
 /**
  * Build a Zod schema from a TypeField definition
@@ -22,7 +23,7 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
       schema = z.enum(field.enumOptions as [string, ...string[]]);
       break;
     case 'date':
-      schema = z.string().datetime();
+      schema = z.iso.date();
       break;
     default:
       schema = z.string();
@@ -55,7 +56,7 @@ function buildFieldsSchema(typeDef: TypeDefinition) {
  * Build a where clause schema that supports field equality, and/or logic
  */
 function buildWhereSchema(typeDef: TypeDefinition) {
-  const fieldConditions: Record<string, z.ZodTypeAny> = {};
+  const fieldConditions: Record<string, z.ZodType<FieldCondition | undefined>> = {};
 
   // Each field can be matched by value
   for (const field of typeDef.fields) {
@@ -89,10 +90,10 @@ function buildWhereSchema(typeDef: TypeDefinition) {
         break;
       case 'date':
         fieldConditions[field.name] = z.object({
-          equals: z.string().datetime().optional(),
-          before: z.string().datetime().optional(),
-          after: z.string().datetime().optional(),
-          oneOf: z.array(z.string().datetime()).optional(),
+          equals: z.iso.date().optional(),
+          before: z.iso.date().optional(),
+          after: z.iso.date().optional(),
+          oneOf: z.array(z.iso.date()).optional(),
           isEmpty: z.boolean().optional(),
         }).optional();
         break;
@@ -129,27 +130,6 @@ function buildWhereSchema(typeDef: TypeDefinition) {
 }
 
 /**
- * Where clause type definition
- */
-type WhereClause = {
-  and?: WhereClause[];
-  or?: WhereClause[];
-  not?: WhereClause;
-  [key: string]: {
-    equals?: string | number | boolean;
-    contains?: string;
-    startsWith?: string;
-    endsWith?: string;
-    lt?: number;
-    lte?: number;
-    gt?: number;
-    gte?: number;
-    oneOf?: (string | number | boolean)[];
-    isEmpty?: boolean;
-  } | WhereClause | WhereClause[] | undefined ;
-};
-
-/**
  * Create DBA tools for a specific data type
  * This is called dynamically after the type is identified
  */
@@ -165,15 +145,7 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
     schema: z.object({
       fields: fieldsSchema.describe('Field values for the new record'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_create',
-        input: {
-          name: typeDef.name,
-          fields: params.fields,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: typeDef.name, fields: input.fields } }, ctx),
   });
 
   const dataUpdate = ai.tool({
@@ -184,16 +156,7 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
       id: z.string().describe('Record ID'),
       fields: partialFieldsSchema.describe('Fields to update'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_update',
-        input: {
-          name: typeDef.name,
-          id: params.id,
-          fields: params.fields,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: typeDef.name, id: input.id, fields: input.fields } }, ctx),
   });
 
   const dataDelete = ai.tool({
@@ -203,15 +166,7 @@ export function createDBAToolsForType(ai: CletusAI, typeDef: TypeDefinition) {
     schema: z.object({
       id: z.string().describe('Record ID'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_delete',
-        input: {
-          name: typeDef.name,
-          id: params.id,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: typeDef.name, id: input.id } }, ctx),
   });
 
   const dataSelect = ai.tool({
@@ -234,18 +189,7 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
         })
       ).optional().describe('Sort order'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_select',
-        input: {
-          name: typeDef.name,
-          where: params.where,
-          offset: params.offset,
-          limit: params.limit,
-          orderBy: params.orderBy,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: typeDef.name, ...input } }, ctx),
   });
 
   const dataUpdateMany = ai.tool({
@@ -257,17 +201,7 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
       where: whereSchema.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to update'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_update_many',
-        input: {
-          name: typeDef.name,
-          set: params.set,
-          where: params.where,
-          limit: params.limit,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: typeDef.name, ...input } }, ctx),
   });
 
   const dataDeleteMany = ai.tool({
@@ -278,16 +212,7 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
       where: whereSchema.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_delete_many',
-        input: {
-          name: typeDef.name,
-          where: params.where,
-          limit: params.limit,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: typeDef.name, ...input } }, ctx),
   });
 
   const dataAggregate = ai.tool({
@@ -321,19 +246,7 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
         })
       ).describe('Aggregation functions'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'data_aggregate',
-        input: {
-          name: typeDef.name,
-          where: params.where,
-          having: params.having,
-          groupBy: params.groupBy,
-          orderBy: params.orderBy,
-          select: params.select,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: typeDef.name, ...input } }, ctx),
   });
 
   return [
@@ -344,7 +257,15 @@ Available fields: ${typeDef.fields.map(f => `${f.name} (${f.type})`).join(', ')}
     dataUpdateMany,
     dataDeleteMany,
     dataAggregate,
-  ] as const;
+  ] as [
+    typeof dataCreate,
+    typeof dataUpdate,
+    typeof dataDelete,
+    typeof dataSelect,
+    typeof dataUpdateMany,
+    typeof dataDeleteMany,
+    typeof dataAggregate,
+  ];
 }
 
 /**
@@ -372,7 +293,7 @@ Respond with just the type name.`,
     name: 'dba',
     description: 'Database administrator agent for data operations',
     refs: [typeIdentifier],
-    call: async (input: { request: string }, [typeIdentifier], ctx) => {
+    call: async function* (input: { request: string }, [typeIdentifier], ctx) {
       // Get the type name
       const result = await typeIdentifier.get({}, 'result', ctx);
       const typeDef = ctx.config.getData().types.find((t) => t.name === result.typeName);
@@ -390,24 +311,25 @@ Respond with just the type name.`,
         description: `Perform data operation on ${typeDef.friendlyName}`,
         content: `You are working with ${typeDef.friendlyName} data. ${typeDef.description || ''}
 
+<userInformation>
+{{userPrompt}}
+</userInformation>
+
 Fields:
 {{#each fields}}
 - {{this.friendlyName}} ({{this.name}}): {{this.type}}{{#if this.required}} [required]{{/if}}{{#if this.default}} [default: {{this.default}}]{{/if}}
 {{/each}}
 
-User request: {{request}}
-
 Use the available tools to complete the data operation.`,
-        tools: tools,
-        schema: false,
+        tools,
         input: (input, ctx) => ({
           fields: typeDef.fields,
-          request: input?.request || '',
+          userPrompt: ctx.userPrompt,
         }),
       });
 
       // Execute the prompt with type-specific tools
-      await dataPrompt.run({ request: input.request }, ctx);
+      yield* dataPrompt.run({ request: input.request }, ctx);
 
       return { completed: true, type: typeDef.name };
     },

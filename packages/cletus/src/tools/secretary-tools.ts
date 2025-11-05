@@ -12,14 +12,7 @@ export function createSecretaryTools(ai: CletusAI) {
     schema: z.object({
       name: z.string().describe('Assistant name'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'assistant_switch',
-        input: {
-          name: params.name,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_switch', input }, ctx),
   });
 
   const assistantUpdate = ai.tool({
@@ -30,15 +23,7 @@ export function createSecretaryTools(ai: CletusAI) {
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('New system prompt'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'assistant_update',
-        input: {
-          name: params.name,
-          prompt: params.prompt,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_update', input }, ctx),
   });
 
   const assistantAdd = ai.tool({
@@ -49,15 +34,7 @@ export function createSecretaryTools(ai: CletusAI) {
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('System prompt for the assistant'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'assistant_add',
-        input: {
-          name: params.name,
-          prompt: params.prompt,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_add', input }, ctx),
   });
 
   const memoryList = ai.tool({
@@ -65,12 +42,7 @@ export function createSecretaryTools(ai: CletusAI) {
     description: 'List all user memories',
     instructions: 'Use this to see what the user has asked to remember.',
     schema: z.object({}),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'memory_list',
-        input: {}
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_list', input }, ctx),
   });
 
   const memoryUpdate = ai.tool({
@@ -80,14 +52,7 @@ export function createSecretaryTools(ai: CletusAI) {
     schema: z.object({
       content: z.string().describe('Memory content to add or update'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'memory_update',
-        input: {
-          content: params.content,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_update', input }, ctx),
   });
 
   return [
@@ -96,5 +61,11 @@ export function createSecretaryTools(ai: CletusAI) {
     assistantAdd,
     memoryList,
     memoryUpdate,
-  ] as const;
+  ] as [
+    typeof assistantSwitch,
+    typeof assistantUpdate,
+    typeof assistantAdd,
+    typeof memoryList,
+    typeof memoryUpdate,
+  ];
 }

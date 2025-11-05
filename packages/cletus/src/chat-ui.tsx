@@ -12,7 +12,7 @@ import { Message as AIMessage, MessageContent } from '@aits/core';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
-import { createChatAgent } from './chat-agent.js';
+import { createChatAgent } from './agents/chat-agent.js';
 import { fileIsDirectory } from './operations/file-helper.js';
 import { OperationManager } from './operations/types.js';
 

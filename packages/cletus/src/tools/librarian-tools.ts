@@ -14,16 +14,7 @@ export function createLibrarianTools(ai: CletusAI) {
       limit: z.number().optional().describe('Maximum results (default: 10)'),
       sourcePrefix: z.string().optional().describe('Filter by source prefix (e.g., "user", "task:", "file@{path}:")'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'knowledge_search',
-        input: {
-          query: params.query,
-          limit: params.limit,
-          sourcePrefix: params.sourcePrefix,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_search', input }, ctx),
   });
 
   const knowledgeSources = ai.tool({
@@ -31,12 +22,7 @@ export function createLibrarianTools(ai: CletusAI) {
     description: 'List all unique source prefixes in knowledge base',
     instructions: 'Use this to see what types of knowledge are available. Sources are prefixed like "user", "task:", "file@{path}:".',
     schema: z.object({}),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'knowledge_sources',
-        input: {}
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_sources', input }, ctx),
   });
 
   const knowledgeAdd = ai.tool({
@@ -46,14 +32,7 @@ export function createLibrarianTools(ai: CletusAI) {
     schema: z.object({
       text: z.string().describe('The memory text to add'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'knowledge_add',
-        input: {
-          text: params.text,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_add', input }, ctx),
   });
 
   const knowledgeDelete = ai.tool({
@@ -63,14 +42,7 @@ export function createLibrarianTools(ai: CletusAI) {
     schema: z.object({
       sourcePrefix: z.string().describe('Source prefix to delete (e.g., "task:123", "user", "file@somefile.txt:")'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'knowledge_delete',
-        input: {
-          sourcePrefix: params.sourcePrefix,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_delete', input }, ctx),
   });
 
   return [
@@ -78,5 +50,10 @@ export function createLibrarianTools(ai: CletusAI) {
     knowledgeSources,
     knowledgeAdd,
     knowledgeDelete,
-  ] as const;
+  ] as [
+    typeof knowledgeSearch,
+    typeof knowledgeSources,
+    typeof knowledgeAdd,
+    typeof knowledgeDelete,
+  ];
 }

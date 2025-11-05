@@ -29,18 +29,7 @@ export function createClerkTools(ai: CletusAI) {
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_summary',
-        input: {
-          path: params.path,
-          characterLimit: params.characterLimit,
-          describeImages: params.describeImages,
-          extractImages: params.extractImages,
-          transcribeImages: params.transcribeImages,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_summary', input }, ctx),
   });
 
   const fileIndex = ai.tool({
@@ -54,18 +43,7 @@ export function createClerkTools(ai: CletusAI) {
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_index',
-        input: {
-          glob: params.glob,
-          index: params.index,
-          describeImages: params.describeImages,
-          extractImages: params.extractImages,
-          transcribeImages: params.transcribeImages,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_index', input }, ctx),
   });
 
   const fileCreate = ai.tool({
@@ -76,15 +54,7 @@ export function createClerkTools(ai: CletusAI) {
       path: z.string().describe('Relative file path'),
       content: z.string().describe('File content'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_create',
-        input: {
-          path: params.path,
-          content: params.content,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_create', input }, ctx),
   });
 
   const fileCopy = ai.tool({
@@ -95,15 +65,7 @@ export function createClerkTools(ai: CletusAI) {
       glob: z.string().describe('Glob pattern for files to copy'),
       target: z.string().describe('Destination file path or directory'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_copy',
-        input: {
-          glob: params.glob,
-          target: params.target,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_copy', input }, ctx),
   });
 
   const fileMove = ai.tool({
@@ -114,15 +76,7 @@ export function createClerkTools(ai: CletusAI) {
       glob: z.string().describe('Glob pattern for files to move'),
       target: z.string().describe('Destination directory or file'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_move',
-        input: {
-          glob: params.glob,
-          target: params.target,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_move', input }, ctx),
   });
 
   const fileStats = ai.tool({
@@ -132,14 +86,7 @@ export function createClerkTools(ai: CletusAI) {
     schema: z.object({
       path: z.string().describe('Relative file path'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_stats',
-        input: {
-          path: params.path,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_stats', input }, ctx),
   });
 
   const fileDelete = ai.tool({
@@ -149,14 +96,7 @@ export function createClerkTools(ai: CletusAI) {
     schema: z.object({
       path: z.string().describe('Relative file path'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_delete',
-        input: {
-          path: params.path,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_delete', input }, ctx),
   });
 
   const fileRead = ai.tool({
@@ -170,18 +110,7 @@ export function createClerkTools(ai: CletusAI) {
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'file_read',
-        input: {
-          path: params.path,
-          characterLimit: params.characterLimit,
-          describeImages: params.describeImages,
-          extractImages: params.extractImages,
-          transcribeImages: params.transcribeImages,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_read', input }, ctx),
   });
 
   const textSearch = ai.tool({
@@ -194,17 +123,7 @@ export function createClerkTools(ai: CletusAI) {
       surrounding: z.number().optional().describe('Lines of context around match (default: 0)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images before searching (default: false)'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'text_search',
-        input: {
-          glob: params.glob,
-          regex: params.regex,
-          surrounding: params.surrounding,
-          transcribeImages: params.transcribeImages,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'text_search', input }, ctx),
   });
 
   const dirCreate = ai.tool({
@@ -214,14 +133,7 @@ export function createClerkTools(ai: CletusAI) {
     schema: z.object({
       path: z.string().describe('Relative directory path'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({
-        type: 'dir_create',
-        input: {
-          path: params.path,
-        }
-      }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_create', input }, ctx),
   });
 
   return [
@@ -236,5 +148,17 @@ export function createClerkTools(ai: CletusAI) {
     fileRead,
     textSearch,
     dirCreate,
-  ] as const;
+  ] as [
+    typeof fileSearch,
+    typeof fileSummary,
+    typeof fileIndex,
+    typeof fileCreate,
+    typeof fileCopy,
+    typeof fileMove,
+    typeof fileStats,
+    typeof fileDelete,
+    typeof fileRead,
+    typeof textSearch,
+    typeof dirCreate,
+  ];
 }

@@ -10,9 +10,7 @@ export function createPlannerTools(ai: CletusAI) {
     description: 'Clears all todos from the current chat',
     instructions: 'Use this to clear all todos when starting fresh or when all tasks are complete.',
     schema: z.object({}),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_clear', input: {} }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_clear', input }, ctx),
   });
 
   const todosList = ai.tool({
@@ -20,9 +18,7 @@ export function createPlannerTools(ai: CletusAI) {
     description: 'Lists all current todos',
     instructions: 'Use this to see what tasks are pending or completed.',
     schema: z.object({}),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_list', input: {} }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_list', input }, ctx),
   });
 
   const todosAdd = ai.tool({
@@ -32,9 +28,7 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       name: z.string().describe('The todo name/description'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_add', input: { name: params.name } }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_add', input }, ctx),
   });
 
   const todosDone = ai.tool({
@@ -44,9 +38,7 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID to mark as done'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_done', input: { id: params.id } }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_done', input }, ctx),
   });
 
   const todosGet = ai.tool({
@@ -56,9 +48,7 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_get', input: { id: params.id } }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_get', input }, ctx),
   });
 
   const todosRemove = ai.tool({
@@ -68,9 +58,7 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('The todo ID to remove'),
     }),
-    call: async (params, refs, ctx) => {
-      return await ctx.ops.handle({ type: 'todos_remove', input: { id: params.id } }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_remove', input }, ctx),
   });
 
   const todosReplace = ai.tool({
@@ -86,14 +74,16 @@ export function createPlannerTools(ai: CletusAI) {
         })
       ).describe('Array of new todos'),
     }),
-    call: async (params, refs, ctx) => {
-      const todos = params.todos.map((t) => ({
-        id: t.id || Math.random().toString(36).substring(7),
-        name: t.name,
-        done: t.done || false,
-      }));
-      return await ctx.ops.handle({ type: 'todos_replace', input: { todos } }, ctx);
-    },
+    call: async (input, _, ctx) => ctx.ops.handle({
+      type: 'todos_replace',
+      input: {
+        todos: input.todos.map((t) => ({
+          id: t.id || Math.random().toString(36).substring(7),
+          name: t.name,
+          done: t.done || false,
+        }))
+      }
+    }, ctx),
   });
 
   return [
@@ -104,5 +94,13 @@ export function createPlannerTools(ai: CletusAI) {
     todosGet,
     todosRemove,
     todosReplace,
-  ] as const;
+  ] as [
+    typeof todosClear,
+    typeof todosList,
+    typeof todosAdd,
+    typeof todosDone,
+    typeof todosGet,
+    typeof todosRemove,
+    typeof todosReplace,
+  ];
 }

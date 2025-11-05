@@ -53,14 +53,14 @@ export function createCletusAI(configFile: ConfigFile) {
         if (ctx.userPrompt) {
           return ctx;
         }
+
         const config = ctx.config!.getData();
         const chat = ctx.chat;
         const now = new Date();
-        const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
 
-        const data = {
-          currentDateTime: now.toLocaleString(locale, { timeZone }),
+        const userPromptData = {
+          currentDateTime: now.toLocaleString(locale, { timeZone}),
           locale,
           timeZone,
           user: config.user,
@@ -70,7 +70,7 @@ export function createCletusAI(configFile: ConfigFile) {
           todos: chat?.todos || [],
           types: config.types,
         };
-        const userPrompt = USER_PROMPT(data);
+        const userPrompt = USER_PROMPT(userPromptData);
         
         return { ...ctx, userPrompt };
       },
