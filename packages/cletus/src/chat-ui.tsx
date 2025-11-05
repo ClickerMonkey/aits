@@ -14,6 +14,7 @@ import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './chat-agent.js';
 import { fileIsDirectory } from './operations/file-helper.js';
+import { OperationManager } from './operations/types.js';
 
 
 interface ChatUIProps {
@@ -624,6 +625,29 @@ After installation and the SoX executable is in the path, restart Cletus and try
       }
     }, 100);
 
+    let tokens = 0;
+    let outputTokens = 0, reasoningTokens = 0, discardedTokens = 0;
+    const tokenInterval = setInterval(() => {
+      if (!controller.signal.aborted) {
+        setTokenCount(tokens);
+      }
+    }, 100);
+    const setOutputTokens = (count: number) => { 
+      outputTokens = count;
+      updateTokenCount();
+    };
+    const setReasoningTokens = (count: number) => { 
+      reasoningTokens = count;
+      updateTokenCount();
+    };
+    const addDiscardedTokens = (count: number) => { 
+      discardedTokens += count;
+      updateTokenCount();
+    };
+    const updateTokenCount = () => {
+      tokens = outputTokens + reasoningTokens + discardedTokens;
+    };
+
     const convertContent = (content: MessageContent): MessageContent => {
       return {
         type: content.type,
@@ -643,7 +667,10 @@ After installation and the SoX executable is in the path, restart Cletus and try
     try {
       log('request starting');
 
+      const ops = new OperationManager(chatMeta.mode);
+
       const chatResponse = chatAgent.run({}, {
+        ops,
         chat: chatMeta,
         chatData: chatFileRef.current,
         config: config,
@@ -663,6 +690,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
         switch (chunk.type) {
           case 'textPartial':
             pending.content[0].content += chunk.content;
+            setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
             setPendingMessage({ ...pending });
             break;;
           case 'textComplete':
@@ -671,16 +699,46 @@ After installation and the SoX executable is in the path, restart Cletus and try
             break;
           case 'textReset':
             pending.content[0].content = '';
+            addDiscardedTokens(outputTokens);
+            setOutputTokens(0);
             setPendingMessage({ ...pending });
+            break;
+          case 'requestTokens':
+            // TODO set user message tokens
+            // pending.tokens = chunk.tokens;
+            break;
+          case 'responseTokens':
+            setOutputTokens(chunk.tokens);
+            pending.tokens = chunk.tokens;
+            break;
+          case 'reason':
+            setReasoningTokens(Math.ceil(chunk.content.length / 4));
+            break;
+          case 'toolStart':
+            addDiscardedTokens(Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4));
+            break;
+          case 'usage':
+            discardedTokens = 0;
+            setReasoningTokens(chunk.usage.reasoningTokens || 0);
+            setOutputTokens(chunk.usage.totalTokens || 0);
             break;
         }
         log(chunk);
       }
 
+      if (ops.operations.length > 0) {
+        pending.operations = ops.operations;
+
+        const done = ops.operations.filter((op) => op.output).length;
+        const needApproval = ops.operations.filter((op) => !op.error && !op.output && op.analysis).length;
+        const undoable = ops.operations.filter((op) => !op.doable && !op.output).length;
+        const errors = ops.operations.filter((op) => op.error).length;
+        addSystemMessage(`⚙️ ${ops.operations.length} operations ${JSON.stringify({ done, needApproval, undoable, errors })}`);
+      }
+
       log('response complete');
 
     } catch (error: any) { 
-      clearInterval(timerInterval);
       if (error.message !== 'Aborted') {
         addSystemMessage(`❌ Error: ${error.message}`);
       }
@@ -690,10 +748,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
       log(`error: ${error.message} ${error.stack}`);
     } finally {
       clearInterval(timerInterval);
+      clearInterval(tokenInterval);
+
       setIsWaitingForResponse(false);
-      abortControllerRef.current = null;
       addMessage(pending);
       setPendingMessage(null);
+
+      abortControllerRef.current = null;
     }
     
     /*
@@ -906,7 +967,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
           {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           Mode: {chatMeta.mode} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length} todo{chatMeta.todos.length !== 1 ? 's' : ''}
-          {isWaitingForResponse && (
+          {isWaitingForResponse ? (
             <>
               {' │ '}
               <Text color="cyan">
@@ -914,11 +975,15 @@ After installation and the SoX executable is in the path, restart Cletus and try
               </Text>
               {' │ '}
               <Text color="green">
-                ~{tokenCount} tokens
+                ~{tokenCount >= 1000 ? (tokenCount/1000).toFixed(1) + 'k' : tokenCount.toFixed(0)} tokens
               </Text>
+              {' | ESC: interrupt '}
+            </>
+          ): (
+            <>
+              {' | Ctrl+C: exit │ ESC: interrupt │ Alt+T: transcribe'}
             </>
           )}
-          {' | Ctrl+C: exit │ ESC: interrupt │ Alt+T: transcribe'}
         </Text>
       </Box>
     </Box>
