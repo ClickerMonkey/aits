@@ -154,7 +154,7 @@ export const file_index = operationOf<
       
       const getSource = input.index === 'content'
         ? (sectionIndex: number) => `file@${file.file}:chunk[${sectionIndex}]`
-        : (sectionIndex: number) => `file@${file.file}:summary`;
+        : (_: number) => `file@${file.file}:summary`;
       const chunkables = input.index === 'content' 
         ? parsed.sections 
         : [parsed.description || ''];

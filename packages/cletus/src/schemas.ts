@@ -13,6 +13,7 @@ export const UserSchema = z.object({
   name: z.string(),
   pronouns: z.string().optional(),
   memory: z.array(UserMemorySchema).default([]),
+  debug: z.boolean().default(true),
   models: z.object({
     chat: z.string().optional(),
     imageGenerate: z.string().optional(),
@@ -179,12 +180,66 @@ export const KnowledgeSchema = z.object({
 // Operation Schema
 // ============================================================================
 
+export const OperationStatusSchema = z.enum(['created', 'analyzed', 'analyzeError', 'analyzedBlocked', 'analyzing', 'doing', 'done', 'doneError']);
+
+export const OperationKindSchema = z.enum([
+  // architect
+  'type_info',
+  'type_create',
+  'type_update',
+  // artist
+  'image_generate',
+  'image_edit',
+  'image_analyze',
+  'image_describe',
+  'image_find',
+  // clerk
+  'file_search',
+  'file_summary',
+  'file_index',
+  'file_create',
+  'file_copy',
+  'file_move',
+  'file_stats',
+  'file_delete',
+  'file_read',
+  'text_search',
+  'dir_create',
+  // dba
+  'data_create',
+  'data_update',
+  'data_delete',
+  'data_select',
+  'data_update_many',
+  'data_delete_many',
+  'data_aggregate',
+  // librarian
+  'knowledge_search',
+  'knowledge_sources',
+  'knowledge_add',
+  'knowledge_delete',
+  // planner
+  'todos_clear',
+  'todos_list',
+  'todos_add',
+  'todos_done',
+  'todos_get',
+  'todos_remove',
+  'todos_replace',
+  // secretary
+  'assistant_switch',
+  'assistant_update',
+  'assistant_add',
+  'memory_list',
+  'memory_update',
+]);
+
 export const OperationSchema = z.object({
-  type: z.string(),
+  type: OperationKindSchema,
+  status: OperationStatusSchema,
   input: z.any(),
   output: z.any().optional(),
   analysis: z.string().optional(),
-  doable: z.boolean().optional(),
   start: z.number(),
   end: z.number().optional(),
   error: z.string().optional(),
@@ -251,6 +306,8 @@ export type TypeDefinition = z.infer<typeof TypeDefinitionSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type KnowledgeEntry = z.infer<typeof KnowledgeEntrySchema>;
 export type Knowledge = z.infer<typeof KnowledgeSchema>;
+export type OperationStatus = z.infer<typeof OperationStatusSchema>;
+export type OperationKind = z.infer<typeof OperationKindSchema>;
 export type Operation = z.infer<typeof OperationSchema>;
 export type MessageContent = z.infer<typeof MessageContentSchema>;
 export type Message = z.infer<typeof MessageSchema>;

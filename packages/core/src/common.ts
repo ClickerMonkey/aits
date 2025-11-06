@@ -1,4 +1,4 @@
-import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage } from "./types";
+import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage, Events } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -166,7 +166,7 @@ export async function* yieldAll<T>(
  */
 export async function resolve(input: any): Promise<any> {
   if (isPromise(input)) {
-    return await input;
+    return resolve(await input);
   } else if (isAsyncGenerator(input)) {
     let result = await input.next();
     while (!result.done) {

@@ -41,6 +41,7 @@ const DEFAULT_TYPES: TypeDefinition[] = [
     name: 'task',
     friendlyName: 'Task',
     description: 'A task you would like to keep track of to complete',
+    knowledgeTemplate: "Task {{name}}{{#if details}}\nDetails: {{details}}{{/if}}{{#if createdAt}}\nCreated At: {{createdAt}}{{/if}}{{#if dueAt}}\nDue At: {{dueAt}}{{/if}}{{#if doneAt}}\nDone At: {{doneAt}}{{/if}}{{#if cancelledAt}}\nCancelled At: {{cancelledAt}}{{/if}}",
     fields: [
       {
         name: 'name',
@@ -89,6 +90,7 @@ export class ConfigFile extends JsonFile<Config> {
         name: '',
         pronouns: '',
         memory: [],
+        debug: false,
       },
       providers: {
         openai: null,

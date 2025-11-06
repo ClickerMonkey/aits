@@ -29,23 +29,6 @@ export async function launchChatInterface(
   await chatFile.load();
   const chatMessages = chatFile.getMessages();
 
-  // Convert to display format
-  const messages: Message[] = chatMessages.flatMap((msg) => {
-    // Only handle text content for now
-    const textContent = msg.content
-      .filter((c) => c.type === 'text')
-      .map((c) => c.content)
-      .join('\n');
-
-    if (!textContent) return [];
-
-    return [{
-      role: msg.role as 'user' | 'assistant',
-      name: msg.name,
-      content: textContent,
-    }];
-  });
-
   return new Promise<void>((resolve) => {
     const handleChatUpdate = async (updates: Partial<ChatMeta>) => {
       await config.updateChat(chatId, updates);
@@ -57,7 +40,7 @@ export async function launchChatInterface(
       <ChatUI
         chat={chat}
         config={config}
-        messages={messages}
+        messages={chatMessages}
         onExit={() => {
           if (!hasExited) {
             hasExited = true;

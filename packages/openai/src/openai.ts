@@ -411,6 +411,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     if (typeof x === 'string') {
       return x;
     }
+    if (!Array.isArray(x)) {
+      console.warn(`[OpenAIProvider] convertContentText: Unsupported content type from ${name}.`);
+      return [];
+    }
 
     return x.map((part): OpenAI.Chat.Completions.ChatCompletionContentPartText => {
       if (part.type === 'text') {

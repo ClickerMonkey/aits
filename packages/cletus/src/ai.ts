@@ -8,6 +8,7 @@ import { ConfigFile } from './config';
 import { ChatFile } from './chat';
 import { ChatMeta } from './schemas';
 import { OperationManager } from './operations/manager';
+import { logger } from './logger';
 
 /**
  * Cletus AI Context
@@ -19,6 +20,8 @@ export interface CletusContext {
   chatData?: ChatFile;
   chat?: ChatMeta;
   cwd: string;
+  cache: Record<string, any>;
+  log: (msg: any) => void;
 }
 
 /**
@@ -49,6 +52,7 @@ export function createCletusAI(configFile: ConfigFile) {
         config: configFile,
         cwd: process.cwd(),
         ops: new OperationManager('none'),
+        log: logger.log.bind(logger),
       },
       providedContext: async (ctx) => {
         if (ctx.userPrompt) {
@@ -74,7 +78,7 @@ export function createCletusAI(configFile: ConfigFile) {
         };
         const userPrompt = USER_PROMPT(userPromptData);
         
-        return { ...ctx, userPrompt };
+        return { ...ctx, userPrompt, cache: {} };
       },
       models,
     });
@@ -131,6 +135,7 @@ const USER_PROMPT = Handlebars.compile(
 Locale: {{locale}}
 Time Zone: {{timeZone}}
 
+<user>
 {{#if user}}
 User: {{user.name}}{{#if user.pronouns}} ({{user.pronouns}}){{/if}}
 {{#if user.memory.length}}
@@ -143,6 +148,7 @@ User Memories:
 No user memories.
 {{/if}}
 {{/if}}
+</user>
 
 {{#if assistant}}
 Assistant Persona: {{assistant.name}}
@@ -151,10 +157,10 @@ Assistant Persona: {{assistant.name}}
 No assistant persona selected.
 {{/if}}
 
+<todos>
 {{#if currentTodo}}
 Current Todo: {{currentTodo.name}}
 {{/if}}
-
 {{#if todos.length}}
 Active Todos:
 {{#each todos}}
@@ -163,7 +169,9 @@ Active Todos:
 {{else}}
 No Todos.
 {{/if}}
+</todos>
 
+<chat>
 Chat Mode: {{mode}}
 - none: All AI operations require user approval
 - read: Read operations involving AI are automatic, others require approval
@@ -172,10 +180,11 @@ Chat Mode: {{mode}}
 - delete: All operations are automatic
 
 {{#if chatPrompt}}
-Chat Prompt:
-{{chatPrompt}}
+Prompt: {{chatPrompt}}
 {{/if}}
+</chat>
 
+<types>
 {{#if types.length}}
 Available Data Types:
 {{#each types}}
@@ -184,11 +193,15 @@ Available Data Types:
 {{else}}
 No custom data types defined.
 {{/if}}
+</types>
 
-IMPORTANT:
+<IMPORTANT>
 - Do not offer any functionality or options you cannot perform based on the tools available.
 - Base your responses in what you know based on the context or what tool results you have.
 - If your response is not based on tool results or context, clearly state that you are not basing it on any known information.
+- Do not assume anything about a data type based on it's name - always use the architect to understand the schema first.
+- Todos are mainly managed by the planner agent; only reference them if specifically asked about them. Do not misinterpret anything else as todos - they are explicitly referred to as "todos". They simply have a name and a done status. Todos are meant for cletus, not the user.
+</IMPORTANT>
 `);
 
 const DESCRIBE_PROMPT = `Analyze this image in detail and describe its key elements, context, and any notable aspects.`;

@@ -27,8 +27,12 @@ export interface ToolInput<
   name: TName;
   /** Brief description of the tool's purpose (passed to the AI model) */
   description: string;
+  /** Optional function that returns the tool's description based on the context. The description is required for AI components but this allows the description to be refined before execution based on the context. */
+  descriptionFn?: Fn<string, [Context<TContext, TMetadata>]>;
   /** Instructions on how to use the tool, written in Handlebars format */
-  instructions: string;
+  instructions?: string;
+  /** Optional function that returns the tool's instructions based on the context */
+  instructionsFn?: Fn<string, [Context<TContext, TMetadata>]>;
   /** Optional function that returns variables for the instructions Handlebars template */
   input?: Fn<Record<string, any>, [Context<TContext, TMetadata>]>;
   /** Zod schema defining the tool's input parameters */
@@ -111,9 +115,11 @@ export class Tool<
    */
   constructor(
     public input: ToolInput<TContext, TMetadata, TName, TParams, TOutput, TRefs>,
-    private instructions = Tool.compileInstructions(input.instructions, !!input.input),
+    private instructions = input.instructions ? Tool.compileInstructions(input.instructions, !!input.input) : undefined,
     private schema = resolveFn(input.schema),
     private translate = resolveFn(input.input),
+    private descriptionFn = resolveFn(input.descriptionFn),
+    private instructionsFn = resolveFn(input.instructionsFn, (r) => r ? Tool.compileInstructions(r, !!input.input) : undefined),
   ) {
   }
 
@@ -173,19 +179,28 @@ export class Tool<
       return undefined;
     }
 
-    // Get template variables if input function is provided
-    const templateVars = await this.translate(ctx);
-    const instructions = this.instructions(templateVars || {});
+    // Get instructions template
+    const instructionsTemplate = this.input.instructionsFn
+      ? await this.instructionsFn(ctx) 
+      : this.instructions;
 
-    if (!instructions) {
+    // If no instructions function/template, return undefined
+    if (!instructionsTemplate) {
       return undefined;
     }
+
+    // Get template variables if input function is provided
+    const templateVars = await this.translate(ctx) || {};
+    const instructions = instructionsTemplate(templateVars)
+    
+    // Get dynamic description if function is provided
+    const description = await this.descriptionFn(ctx) || this.input.description;
 
     return [
       instructions,
       {
         name: this.input.name,
-        description: this.input.description,
+        description,
         parameters: schema,
       },
     ] as const;

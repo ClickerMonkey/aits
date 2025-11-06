@@ -9,6 +9,7 @@ import type { Providers } from '../schemas.js';
 import fs from 'fs/promises';
 import { getChatPath, getDataPath } from '../file-manager.js';
 import { ModelCapability } from '@aits/ai';
+import { logger } from '../logger.js';
 
 type SettingsView =
   | 'menu'
@@ -682,6 +683,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   }
 
   // Main Menu
+  const debugEnabled = config.getData().user.debug;
   const menuItems = [
     { label: '✏️ Change name', value: 'change-name' },
     { label: '✏️ Change pronouns', value: 'change-pronouns' },
@@ -693,6 +695,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     { label: '🗑️ Delete a data type', value: 'delete-type' },
     { label: '🔌 Manage providers', value: 'manage-providers' },
     { label: '🤖 Manage models', value: 'manage-models' },
+    { label: `🐛 Debug logging ${debugEnabled ? '✅' : '❌'}`, value: 'toggle-debug' },
     { label: '← Back to main menu', value: '__back__' },
   ];
 
@@ -712,9 +715,18 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
       <SelectInput
         items={menuItems}
-        onSelect={(item) => {
+        onSelect={async (item) => {
           if (item.value === '__back__') {
             onExit();
+            return;
+          }
+          if (item.value === 'toggle-debug') {
+            await config.save((cfg) => {
+              cfg.user.debug = !cfg.user.debug;
+            });
+            const enabled = config.getData().user.debug;
+            logger.setDebug(enabled);
+            setMessage(`✓ Debug logging ${enabled ? 'enabled' : 'disabled'}`);
             return;
           }
           setView(item.value as SettingsView);

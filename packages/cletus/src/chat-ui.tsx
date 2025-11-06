@@ -14,7 +14,8 @@ import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent.js';
 import { fileIsDirectory } from './operations/file-helper.js';
-import { OperationManager } from './operations/manager.js';
+import { runChatOrchestrator } from './agents/chat-orchestrator.js';
+import { logger } from './logger.js';
 
 
 interface ChatUIProps {
@@ -38,7 +39,8 @@ type CommandType =
   | '/done'
   | '/do'
   | '/transcribe'
-  | '/cd';
+  | '/cd'
+  | '/debug';
 
 
 interface Command {
@@ -62,6 +64,7 @@ const COMMANDS: Command[] = [
   { name: '/reset', description: 'Clear all todos', takesInput: false },
   { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
   { name: '/cd', description: 'Change current working directory', takesInput: true, placeholder: 'directory path' },
+  { name: '/debug', description: 'Toggle debug logging', takesInput: false },
 ];
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
@@ -103,7 +106,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         setChatMessages(chatFile.getMessages());
       } catch (error) {
         // File doesn't exist yet or is empty, that's ok
-        log('No existing messages to load');
+        logger.log('No existing messages to load');
       }
     };
 
@@ -402,6 +405,15 @@ TIP: Type '/' to see all available commands with descriptions!`,
         }
         break;
 
+      case '/debug':
+        await config.save((cfg) => {
+          cfg.user.debug = !cfg.user.debug;
+        });
+        const debugEnabled = config.getData().user.debug;
+        logger.setDebug(debugEnabled);
+        addSystemMessage(`✓ Debug logging ${debugEnabled ? 'enabled' : 'disabled'}`);
+        break;
+
       default:
         addSystemMessage(`❌ Unknown command: ${cmd}`);
     }
@@ -459,28 +471,28 @@ After installation and the SoX executable is in the path, restart Cletus and try
       micInputStream.on('data', function(data: Buffer) {
         if (!controller.signal.aborted) {
           audioChunks.push(data);
-          log(`Received audio chunk: ${data.length} bytes`);
+          logger.log(`Received audio chunk: ${data.length} bytes`);
         }
       });
 
       micInputStream.on('error', function(err: any) {
-        log(`Microphone error: ${err}`);
+        logger.log(`Microphone error: ${err}`);
       });
 
       micInputStream.on('silence', function() {
-        log('Silence detected - stopping recording');
+        logger.log('Silence detected - stopping recording');
         micInstance.stop();
       });
 
       // Wait for recording to complete (either ESC or silence)
       const recordingComplete = new Promise<void>((resolve) => {
         micInputStream.on('stopComplete', function() {
-          log('Recording stopped');
+          logger.log('Recording stopped');
           resolve();
         });
 
         controller.signal.addEventListener('abort', () => {
-          log('Recording aborted by user');
+          logger.log('Recording aborted by user');
           micInstance.stop();
         });
       });
@@ -503,7 +515,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
       // Combine all audio chunks
       const audioBuffer = Buffer.concat(audioChunks);
-      log(`Total audio data: ${audioBuffer.length} bytes`);
+      logger.log(`Total audio data: ${audioBuffer.length} bytes`);
 
       // Create WAV file in memory
       const wavWriter = new Writer({
@@ -531,7 +543,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       await wavWriterPromise;
 
       const wavBuffer = await wavComplete;
-      log(`WAV buffer size: ${wavBuffer.length} bytes`);
+      logger.log(`WAV buffer size: ${wavBuffer.length} bytes`);
 
       addSystemMessage('🔄 Transcribing audio...');
 
@@ -543,7 +555,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       let transcribedText = '';
 
       for await (const chunk of stream) {
-        log(chunk);
+        logger.log(chunk);
 
         if (chunk.text) {
           transcribedText += chunk.text;
@@ -552,11 +564,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
       }
 
       addSystemMessage('✓ Transcription complete');
-      log(`Final transcription: ${transcribedText}`);
+      logger.log(`Final transcription: ${transcribedText}`);
 
     } catch (error: any) {
       addSystemMessage(`❌ Transcription error: ${error.message}`);
-      log(`Transcription error: ${error.message} ${error.stack}`);
+      logger.log(`Transcription error: ${error.message} ${error.stack}`);
     } finally {
       setIsTranscribing(false);
       transcriptionAbortRef.current = null;
@@ -593,21 +605,21 @@ After installation and the SoX executable is in the path, restart Cletus and try
       return;
     }
 
-    const pending: Message = {
-      role: 'assistant',
-      name: chatMeta.assistant,
-      content: [{ type: 'text', content: '' }],
-      created: Date.now(),
-    };
-
-    addMessage({
+    // Add user message
+    const userMessage: Message = {
       role: 'user',
       name: config.getData().user.name,
       content: [{ type: 'text', content: inputValue }],
       created: Date.now(),
-    });
+    };
+    addMessage(userMessage);
     setInputValue('');
-    setPendingMessage(pending);
+
+    // Save user message to chat file
+    await chatFileRef.current.save((chat) => {
+      chat.messages.push(userMessage);
+    });
+
     setIsWaitingForResponse(true);
     setElapsedTime(0);
     setTokenCount(0);
@@ -617,141 +629,73 @@ After installation and the SoX executable is in the path, restart Cletus and try
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Start elapsed time counter
-    const timerInterval = setInterval(() => {
-      if (!controller.signal.aborted) {
-        const elapsed = Date.now() - requestStartTimeRef.current;
-        setElapsedTime(elapsed);
-      }
-    }, 100);
-
     let tokens = 0;
-    let outputTokens = 0, reasoningTokens = 0, discardedTokens = 0;
     const tokenInterval = setInterval(() => {
       if (!controller.signal.aborted) {
         setTokenCount(tokens);
       }
     }, 100);
-    const setOutputTokens = (count: number) => { 
-      outputTokens = count;
-      updateTokenCount();
-    };
-    const setReasoningTokens = (count: number) => { 
-      reasoningTokens = count;
-      updateTokenCount();
-    };
-    const addDiscardedTokens = (count: number) => { 
-      discardedTokens += count;
-      updateTokenCount();
-    };
-    const updateTokenCount = () => {
-      tokens = outputTokens + reasoningTokens + discardedTokens;
-    };
-
-    const convertContent = (content: MessageContent): MessageContent => {
-      return {
-        type: content.type,
-        content: typeof content.content === 'string' && /^(file|https?):\/\//.test(content.content)
-          ? new URL(content.content)
-          : content.content,
-      };
-    };
-
-    const messages: AIMessage[] = chatMessages
-      .filter((msg) => msg.role !== 'system')
-      .map((msg) => ({
-        ...msg,
-        content: msg.content.map(convertContent),
-      }));
 
     try {
-      log('request starting');
+      logger.log('request starting');
 
-      const ops = new OperationManager(chatMeta.mode);
-
-      const chatResponse = chatAgent.run({}, {
-        ops,
-        chat: chatMeta,
-        chatData: chatFileRef.current,
-        config: config,
-        signal: controller.signal,
-        messages,
-        metadata: {
-          model: chatMeta.model ?? config.getData().user.models?.chat,
+      await runChatOrchestrator(
+        {
+          chatAgent,
+          messages: chatMessages,
+          chatMeta,
+          config,
+          chatData: chatFileRef.current,
+          signal: controller.signal,
         },
-      });
+        (event) => {
+          if (event.type !== 'elapsed' && event.type !== 'tokens'&& event.type !== 'pendingUpdate') {
+            logger.log(event);
+          }
 
-      log('request streaming');
+          switch (event.type) {
+            case 'pendingUpdate':
+              setPendingMessage({ ...event.message });
+              break;
 
-      for await (const chunk of chatResponse) {
-        if (controller.signal.aborted) {
-          break;
+            case 'tokens':
+              tokens = event.output + event.reasoning + event.discarded;
+              break;
+
+            case 'elapsed':
+              setElapsedTime(event.ms);
+              break;
+
+            case 'operations':
+              addSystemMessage(event.summary);
+              break;
+
+            case 'complete':
+              // addMessage(event.message);
+              setPendingMessage(null);
+              break;
+
+            case 'error':
+              addSystemMessage(`❌ Error: ${event.error}`);
+              break;
+          }
         }
-        switch (chunk.type) {
-          case 'textPartial':
-            pending.content[0].content += chunk.content;
-            setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
-            setPendingMessage({ ...pending });
-            break;;
-          case 'textComplete':
-            pending.content[0].content = chunk.content;
-            setPendingMessage({ ...pending });
-            break;
-          case 'textReset':
-            pending.content[0].content = '';
-            addDiscardedTokens(outputTokens);
-            setOutputTokens(0);
-            setPendingMessage({ ...pending });
-            break;
-          case 'requestTokens':
-            // TODO set user message tokens
-            // pending.tokens = chunk.tokens;
-            break;
-          case 'responseTokens':
-            setOutputTokens(chunk.tokens);
-            pending.tokens = chunk.tokens;
-            break;
-          case 'reason':
-            setReasoningTokens(Math.ceil(chunk.content.length / 4));
-            break;
-          case 'toolStart':
-            addDiscardedTokens(Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4));
-            break;
-          case 'usage':
-            discardedTokens = 0;
-            setReasoningTokens(chunk.usage.reasoningTokens || 0);
-            setOutputTokens(chunk.usage.totalTokens || 0);
-            break;
-        }
-        log(chunk);
-      }
+      );
 
-      if (ops.operations.length > 0) {
-        pending.operations = ops.operations;
+      logger.log('response complete');
 
-        const done = ops.operations.filter((op) => op.output).length;
-        const needApproval = ops.operations.filter((op) => !op.error && !op.output && op.analysis).length;
-        const undoable = ops.operations.filter((op) => !op.doable && !op.output).length;
-        const errors = ops.operations.filter((op) => op.error).length;
-        addSystemMessage(`⚙️ ${ops.operations.length} operations ${JSON.stringify({ done, needApproval, undoable, errors })}`);
-      }
-
-      log('response complete');
-
-    } catch (error: any) { 
+    } catch (error: any) {
       if (error.message !== 'Aborted') {
         addSystemMessage(`❌ Error: ${error.message}`);
       }
 
       console.error('Chat request error:', error);
 
-      log(`error: ${error.message} ${error.stack}`);
+      logger.log(`error: ${error.message} ${error.stack}`);
     } finally {
-      clearInterval(timerInterval);
       clearInterval(tokenInterval);
 
       setIsWaitingForResponse(false);
-      addMessage(pending);
       setPendingMessage(null);
 
       abortControllerRef.current = null;
@@ -989,39 +933,3 @@ After installation and the SoX executable is in the path, restart Cletus and try
     </Box>
   );
 };
-
-let lastLogTime = 0;
-const logFile = './cletus.log';
-let logStream: fs.WriteStream | null = null;
-let logLastPromise: Promise<void> = Promise.resolve();
-
-async function prepareLog() {
-  if (logStream) {
-    return;
-  }
-  logStream = fs.createWriteStream(logFile, { flags: 'a' });
-  logStream.setMaxListeners(100);
-}
-
-async function log(msg: any) {
-  const now = performance.now();
-  const elapsed = now - (lastLogTime || now);
-  lastLogTime = now;
-  
-  const text = typeof msg === 'string' ? msg : JSON.stringify(msg);
-  const fullText = `(+${elapsed.toFixed(2).padStart(7, ' ')}ms) ${text}\n`;
-
-  logQueue(fullText);
-}
-
-async function logQueue(text: string) {
-  await prepareLog();
-  await logLastPromise;
-  logLastPromise = new Promise<void>((resolve) => {
-      if (!logStream?.write(text)) {
-          logStream?.once('drain', resolve);
-      } else {
-          resolve();
-      }
-  });
-}

@@ -66,6 +66,11 @@ export type {
 export type StrictPartial<T> = Partial<T>;
 
 /**
+ * T plus any extra properties.
+ */
+export type Plus<T> = T & { [P in PropertyKey]: P extends keyof T ? T[P] : any };
+
+/**
  * Relaxes required properties of T that are present in U, making them optional.
  * This is used to compute which context/metadata fields must be provided by the caller,
  * after accounting for fields satisfied by default or provided context.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { render } from 'ink';
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';

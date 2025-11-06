@@ -1,5 +1,5 @@
 import { CletusCoreContext } from "../ai";
-import { ChatMode, Operation } from "../schemas";
+import { ChatMode, Operation, OperationKind } from "../schemas";
 
 import * as planner from './planner';
 import * as librarian from './librarian';
@@ -8,6 +8,7 @@ import * as secretary from './secretary';
 import * as architect from './architect';
 import * as dba from './dba';
 import * as artist from './artist';
+import { Plus } from "@aits/ai";
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -67,7 +68,7 @@ export type OperationDefinition<TInput, TOutput> = {
 export type OperationDefinitionFor<K extends OperationKind> = OperationDefinition<OperationInputFor<K>, OperationOutputFor<K>>;
 
 // Helper to define an operation
-export function operationOf<TInput, TOutput>(def: OperationDefinition<TInput, TOutput> & { [K in string]: K extends keyof OperationDefinition<TInput, TOutput> ? never : any }): OperationDefinition<TInput, TOutput> {
+export function operationOf<TInput, TOutput>(def: Plus<OperationDefinition<TInput, TOutput>>): OperationDefinition<TInput, TOutput> {
   return def;
 }
 
@@ -81,9 +82,6 @@ export const Operations = {
   ...dba,
   ...artist,
 } as const;
-
-// A supported operation kind
-export type OperationKind = keyof typeof Operations;
 
 // Operation type for a specific operation kind
 export type OperationFor<K extends OperationKind> = typeof Operations[K];

@@ -310,7 +310,7 @@ export class Prompt<
     Promise<PromptToolOutput<TTools>[] | TOutput | undefined> |
     AsyncGenerator<PromptEvent<TOutput, TTools> | PromptToolOutput<TTools> | string, TOutput | undefined, unknown>
   {
-    const stream = this.stream(input, mode.startsWith('stream'), undefined, ctx);
+    const stream = this.stream(input, mode.startsWith('stream'), mode === 'tools', undefined, ctx);
 
     switch (mode) {
     case 'result':
@@ -385,8 +385,8 @@ export class Prompt<
 
     return ctx.runner
       // @ts-ignore
-      ? ctx.runner(prompt, input, ctx, (innerCtx, events) => this.stream(input, true, events, innerCtx))
-      : this.stream(input, true, undefined, ctx);
+      ? ctx.runner(prompt, input, ctx, (innerCtx, events) => this.stream(input, true, false, events, innerCtx))
+      : this.stream(input, true, false, undefined, ctx);
   }
 
   /**
@@ -425,9 +425,11 @@ export class Prompt<
    * @returns An async generator yielding prompt events and ultimately the final output.
    */
   async* stream(
-    ...[inputMaybe, preferStream = true, eventsMaybe, contextMaybe]: OptionalParams<[
+    ...[inputMaybe, preferStream = true, toolsOnly = false, eventsMaybe, contextMaybe]: OptionalParams<[
       TInput,
       boolean,
+      boolean,
+      // @ts-ignore
       Events<Component<TContext, TMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>> | undefined,
       Context<TContext, TMetadata>, 
     ]>
@@ -457,16 +459,23 @@ export class Prompt<
       toolObjects?.map(({ tool, definition }) => [tool.name, { tool, definition }] as any) || []
     );
 
+    const onlyTools = toolsOnly || this.input.toolsOnly;
+
     const request: Request = {
       name: this.name,
       ...config,
       maxTokens: config?.maxTokens ?? ctx.maxOutputTokens,
+      toolChoice: onlyTools ? 'required': config?.toolChoice,
       messages: [
         { role: 'system', content },
       ],
       tools,
       responseFormat,
     };
+
+    if (request.toolChoice === 'required' && (!tools || tools.length === 0)) {
+      throw new Error(`Prompt ${this.input.name} is configured to require tools, but no tools are available.`);
+    }
 
     if (!this.input.excludeMessages && ctx.messages) {
       request.messages = request.messages.concat(ctx.messages);
@@ -510,6 +519,7 @@ export class Prompt<
       const toolCalls: ToolExecution<PromptTools<TTools>>[] = [];
       const toolCallMap = new Map<string, ToolExecution<PromptTools<TTools>>>();
       const toolErrorsPrevious = (toolCallErrors + toolParseErrors);
+      const toolParseErrorsPrevious = toolParseErrors;
 
       let finishReason: FinishReason | undefined = undefined;
       let refusal = '';
@@ -572,9 +582,6 @@ export class Prompt<
           toolCall.toolCall = chunk.toolCallArguments;
   
           yield emit({ type: 'toolParseArguments', tool: toolCall.tool!, args: chunk.toolCallArguments.arguments, request });
-
-          // Start parsing arguments immediately (but not right now)
-          setImmediate(toolCall.parse);
         }
 
         if (chunk.toolCall) {
@@ -711,13 +718,12 @@ export class Prompt<
         }
 
         for (const toolCall of toolCalls) {
-          if (toolCall.result !== undefined || toolCall.error !== undefined) {
-            request.messages.push({
-              role: 'tool',
-              content: toolCall.error || JSON.stringify(toolCall.result),
-              toolCallId: toolCall.toolCall.id,
-            });
-          }
+          request.messages.push({
+            role: 'tool',
+            content: toolCall.error || toolCall.result || '',
+            toolCallId: toolCall.toolCall.id,
+          });
+
           if (toolCall.status === 'invalid') {
             toolParseErrors++;
           } else if (toolCall.status === 'error') {
@@ -737,7 +743,8 @@ export class Prompt<
       }
 
       // The only want tool calls, no further response.
-      if (this.input.toolsOnly && toolSuccesses > 0) {
+      // We want an iteration with no parse errors and some successes.
+      if (onlyTools && toolSuccesses > 0 && toolParseErrorsPrevious === toolParseErrors) {
         // got what we needed!
         lastError = undefined;
         break;
@@ -747,6 +754,12 @@ export class Prompt<
       if (this.input.toolsMax && toolSuccesses >= this.input.toolsMax) {
         // No more tools for you!
         disableTools = true;
+
+        if (onlyTools) {
+          // got what we needed!
+          lastError = undefined;
+          break;
+        }
       }
 
       // If we are finished, parse the output
@@ -881,7 +894,7 @@ export class Prompt<
     yield emit({ type: 'usage', usage: accumulatedUsage, request });
 
     // We don't emit complete without a valid result unless toolsOnly is set
-    if (result === undefined && !this.input.toolsOnly) {
+    if (result === undefined && !onlyTools) {
       if (!lastError && iterations === maxIterations) {
         lastError = `Maximum iterations (${maxIterations}) reached without a valid response.`;
       }
@@ -1167,7 +1180,7 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
         start.ready = true;
       } catch (e: any) {
         execution.status = 'invalid';
-        execution.error = `Error parsing tool arguments: ${e.message}`;
+        execution.error = `Error parsing tool arguments: ${e.message}, args: ${toolCall.arguments}`;
         error.ready = true;
       }
 
@@ -1185,7 +1198,7 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
         output.ready = true;
       } catch (e: any) {
         execution.status = 'error';
-        execution.error = `Error executing tool: ${e.message}`;
+        execution.error = `Error executing tool: ${e.message}, args: ${JSON.stringify(execution.args)}`;
         error.ready = true;
       }
 

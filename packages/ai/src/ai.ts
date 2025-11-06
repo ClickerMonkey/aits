@@ -461,7 +461,7 @@ export class AI<T extends AIBaseTypes> {
 
     if (typeof message.content === 'string') {
       addText(message.content);
-    } else {
+    } else if (Array.isArray(message.content)) {
       for (const content of message.content) {
         addText(content.type);
 
@@ -680,6 +680,7 @@ export class AI<T extends AIBaseTypes> {
     prompt.stream = async function* (
       input: TInput, 
       preferStream: boolean, 
+      toolsOnly: boolean,
       // @ts-ignore
       events: Events<any>, 
       ctxRequired: CoreContext<AIContextRequired<T>, AIMetadataRequired<T>>
@@ -688,7 +689,7 @@ export class AI<T extends AIBaseTypes> {
       const coreContext = await ai.buildCoreContext(ctxRequired);
       coreContext.metadata = ai.mergeMetadata(prompt.input.metadata, coreContext.metadata) as any;
 
-      yield* originalStream(input, preferStream, events, coreContext as any);
+      yield* originalStream(input, preferStream, toolsOnly, events, coreContext as any);
     };
 
     this.components.push(prompt as ComponentFor<T>);
@@ -736,6 +737,12 @@ export class AI<T extends AIBaseTypes> {
       TRefs
     >({
       ...rest,
+      instructionsFn: hydrateFn(rest.instructionsFn, (r) => (async (ctxPartial) => {
+        return r(await getContext(ctxPartial));
+      })),
+      descriptionFn: hydrateFn(rest.descriptionFn, (r) => (async (ctxPartial) => {
+        return r(await getContext(ctxPartial));
+      })),
       input: hydrateFn(input, (r) => (async (ctxPartial) => {
         return r(await getContext(ctxPartial));
       })),

@@ -1,38 +1,40 @@
+import { get } from "http";
+import { ConfigFile } from "../config";
 import { DataManager } from "../data";
+import { TypeDefinition } from "../schemas";
 import { operationOf } from "./types";
 import { WhereClause, countByWhere, filterByWhere } from "./where-helpers";
+
+
+function getType(config: ConfigFile, typeName: string): TypeDefinition {
+  const type = config.getData().types.find((t) => t.name === typeName);
+  if (!type) {
+    throw new Error(`Data type not found: ${typeName}`);
+  }
+  return type;
+}
+
 
 export const data_create = operationOf<
   { name: string; fields: Record<string, any> },
   { id: string; name: string }
 >({
   mode: 'create',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const fieldNames = Object.keys(input.fields);
+  analyze: async ({ name, fields }, { config })=> {
+    const type = getType(config, name);
+    const fieldNames = Object.keys(fields);
     return {
       analysis: `This will create a new ${type.friendlyName} record with fields: ${fieldNames.join(', ')}.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, fields }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
-    const id = await dataManager.create(input.fields);
+    const id = await dataManager.create(fields);
 
-    return { id, name: input.name };
+    return { id, name: type.name };
   },
 });
 
@@ -41,43 +43,32 @@ export const data_update = operationOf<
   { id: string; updated: boolean }
 >({
   mode: 'update',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, id, fields }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(type.name);
     await dataManager.load();
-    const record = dataManager.getById(input.id);
+    const record = dataManager.getById(id);
 
     if (!record) {
       return {
-        analysis: `This would fail - ${type.friendlyName} record "${input.id}" not found.`,
+        analysis: `This would fail - ${type.friendlyName} record "${id}" not found.`,
         doable: false,
       };
     }
 
-    const fieldNames = Object.keys(input.fields);
+    const fieldNames = Object.keys(fields);
     return {
-      analysis: `This will update ${type.friendlyName} record "${input.id}" with fields: ${fieldNames.join(', ')}.`,
+      analysis: `This will update ${type.friendlyName} record "${id}" with fields: ${fieldNames.join(', ')}.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, id, fields }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
-    await dataManager.update(input.id, input.fields);
+    await dataManager.update(id, fields);
 
-    return { id: input.id, updated: true };
+    return { id, updated: true };
   },
 });
 
@@ -86,42 +77,31 @@ export const data_delete = operationOf<
   { id: string; deleted: boolean }
 >({
   mode: 'delete',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, id }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
-    const record = dataManager.getById(input.id);
+    const record = dataManager.getById(id);
 
     if (!record) {
       return {
-        analysis: `This would fail - ${type.friendlyName} record "${input.id}" not found.`,
+        analysis: `This would fail - ${type.friendlyName} record "${id}" not found.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will delete ${type.friendlyName} record "${input.id}".`,
+      analysis: `This will delete ${type.friendlyName} record "${id}".`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, id }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(type.name);
     await dataManager.load();
-    await dataManager.delete(input.id);
+    await dataManager.delete(id);
 
-    return { id: input.id, deleted: true };
+    return { id, deleted: true };
   },
 });
 
@@ -130,51 +110,39 @@ export const data_select = operationOf<
   { count: number; results: any[] }
 >({
   mode: 'local',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, where, offset, limit, orderBy }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
     let records = dataManager.getAll();
-    if (input.where) {
-      records = filterByWhere(records, input.where);
+    if (where) {
+      records = filterByWhere(records, where);
     }
 
-    const limit = input.limit || records.length;
-    const offset = input.offset || 0;
+    const recordOffset = offset || 0;
+    const recordLimit = limit || (records.length - recordOffset);
 
     return {
-      analysis: `This will query ${type.friendlyName} records: ${records.length} matching records, returning ${Math.min(limit, Math.max(0, records.length - offset))} (limit: ${limit}, offset: ${offset}).`,
+      analysis: `This will query ${type.friendlyName} records: ${records.length} matching records, returning ${Math.min(recordLimit, Math.max(0, records.length - recordOffset))} (limit: ${recordLimit}, offset: ${recordOffset}).`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, where, offset, limit, orderBy }) => {
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
     let results = dataManager.getAll();
 
     // Apply where clause
-    if (input.where) {
-      results = filterByWhere(results, input.where);
+    if (where) {
+      results = filterByWhere(results, where);
     }
 
     // Apply ordering
-    if (input.orderBy && input.orderBy.length > 0) {
+    if (orderBy?.length) {
       results.sort((a, b) => {
-        for (const order of input.orderBy!) {
+        for (const order of orderBy!) {
           const aVal = a.fields[order.field];
           const bVal = b.fields[order.field];
 
@@ -185,12 +153,12 @@ export const data_select = operationOf<
       });
     }
 
-    const offset = input.offset || 0;
-    const limit = input.limit || (results.length - offset);
+    const recordOffset = offset || 0;
+    const recordLimit = limit || (results.length - recordOffset);
 
     return {
       count: results.length,
-      results: results.slice(offset, offset + limit),
+      results: results.slice(recordOffset, recordOffset + recordLimit),
     };
   },
 });
@@ -200,47 +168,35 @@ export const data_update_many = operationOf<
   { updated: number }
 >({
   mode: 'update',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, limit, set, where }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
-    const matchingCount = countByWhere(dataManager.getAll(), input.where);
-    const actualCount = input.limit ? Math.min(matchingCount, input.limit) : matchingCount;
+    const matchingCount = countByWhere(dataManager.getAll(), where);
+    const actualCount = limit ? Math.min(matchingCount, limit) : matchingCount;
 
-    const setFields = Object.keys(input.set);
-    const limitText = input.limit ? ` (limited to ${input.limit})` : '';
+    const setFields = Object.keys(set);
+    const limitText = limit ? ` (limited to ${limit})` : '';
     return {
       analysis: `This will bulk update ${actualCount} ${type.friendlyName} record(s) matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, limit, set, where }) => {
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
-    let matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+    let matchingRecords = filterByWhere(dataManager.getAll(), where);
 
     // Apply limit if specified
-    if (input.limit) {
-      matchingRecords = matchingRecords.slice(0, input.limit);
+    if (limit) {
+      matchingRecords = matchingRecords.slice(0, limit);
     }
 
     // Update all matching records
     await Promise.all(matchingRecords.map((record) =>
-      dataManager.update(record.id, input.set)
+      dataManager.update(record.id, set)
     ));
 
     return { updated: matchingRecords.length };
@@ -252,41 +208,30 @@ export const data_delete_many = operationOf<
   { deleted: number }
 >({
   mode: 'delete',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, where, limit }, { config }) => {
+    const type = getType(config, name);
+    
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
-    const matchingCount = countByWhere(dataManager.getAll(), input.where);
-    const actualCount = input.limit ? Math.min(matchingCount, input.limit) : matchingCount;
+    const matchingCount = countByWhere(dataManager.getAll(), where);
+    const actualCount = limit ? Math.min(matchingCount, limit) : matchingCount;
 
-    const limitText = input.limit ? ` (limited to ${input.limit})` : '';
+    const limitText = limit ? ` (limited to ${limit})` : '';
     return {
       analysis: `This will bulk delete ${actualCount} ${type.friendlyName} record(s) matching the specified criteria${limitText}.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, where, limit }) => {
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
-    let matchingRecords = filterByWhere(dataManager.getAll(), input.where);
+    let matchingRecords = filterByWhere(dataManager.getAll(), where);
 
     // Apply limit if specified
-    if (input.limit) {
-      matchingRecords = matchingRecords.slice(0, input.limit);
+    if (limit) {
+      matchingRecords = matchingRecords.slice(0, limit);
     }
 
     // Delete all matching records
@@ -310,50 +255,40 @@ export const data_aggregate = operationOf<
   { results: any[] }
 >({
   mode: 'local',
-  analyze: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      return {
-        analysis: `This would fail - data type "${input.name}" not found.`,
-        doable: false,
-      };
-    }
-
-    const dataManager = new DataManager(input.name);
+  analyze: async ({ name, where }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
     let records = dataManager.getAll();
-    if (input.where) {
-      records = filterByWhere(records, input.where);
+    if (where) {
+      records = filterByWhere(records, where);
     }
+
+    // TODO better summarize the input
 
     return {
       analysis: `This will perform an aggregation query on ${records.length} ${type.friendlyName} record(s).`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
-    const type = config.getData().types.find((t) => t.name === input.name);
-    if (!type) {
-      throw new Error(`Data type not found: ${input.name}`);
-    }
-
-    const dataManager = new DataManager(input.name);
+  do: async ({ name, where, having, groupBy, select, orderBy }) => {
+    const dataManager = new DataManager(name);
     await dataManager.load();
 
     let records = dataManager.getAll();
 
     // Apply where clause
-    if (input.where) {
-      records = filterByWhere(records, input.where);
+    if (where) {
+      records = filterByWhere(records, where);
     }
 
     // Group records if groupBy is specified
     const groups: Map<string, any[]> = new Map();
 
-    if (input.groupBy && input.groupBy.length > 0) {
+    if (groupBy?.length) {
       for (const record of records) {
-        const key = input.groupBy.map((field) => record.fields[field]).join('|||');
+        const key = groupBy.map((field) => record.fields[field]).join('|||');
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -370,15 +305,15 @@ export const data_aggregate = operationOf<
       const result: any = {};
 
       // Add group by fields
-      if (input.groupBy && input.groupBy.length > 0) {
+      if (groupBy?.length) {
         const keyParts = key.split('|||');
-        input.groupBy.forEach((field, i) => {
+        groupBy.forEach((field, i) => {
           result[field] = keyParts[i];
         });
       }
 
       // Compute aggregation functions
-      for (const agg of input.select) {
+      for (const agg of select) {
         const alias = agg.alias || `${agg.function}_${agg.field || '*'}`;
         const numbers = groupRecords
           .map((r) => agg.field ? r.fields[agg.field] : null)
@@ -422,14 +357,12 @@ export const data_aggregate = operationOf<
       results.push(result);
     }
 
-    // Apply having clause (post-aggregation filter)
-    // Note: This would require evaluating the where clause on the aggregated results
-    // For simplicity, skipping this for now
+    // TODO having
 
     // Apply ordering
-    if (input.orderBy && input.orderBy.length > 0) {
+    if (orderBy?.length) {
       results.sort((a, b) => {
-        for (const order of input.orderBy!) {
+        for (const order of orderBy) {
           const aVal = a[order.field];
           const bVal = b[order.field];
 

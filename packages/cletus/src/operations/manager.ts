@@ -1,6 +1,7 @@
+import { Plus } from "@aits/ai";
 import { CletusCoreContext } from "../ai";
-import { ChatMode, Operation } from "../schemas";
-import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationKind, OperationMode, Operations } from "./types";
+import { ChatMode, Operation, OperationKind } from "../schemas";
+import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
 
 /**
@@ -44,8 +45,8 @@ export class OperationManager {
     const op: Operation = {
       type: operation.type,
       input: operation.input,
-      start: 0,
-      doable: true,
+      status: 'created',
+      start: performance.now(),
     };
 
     this.operations.push(op);
@@ -62,37 +63,47 @@ export class OperationManager {
    * @returns Result message
    */
   public async execute(op: Operation, doit: boolean, ctx: CletusCoreContext): Promise<string> {
-    const def = Operations[op.type as OperationKind] as OperationDefinition<any, any>;
+    const def = Operations[op.type] as OperationDefinition<any, any>;
 
-    if (!op.doable && doit) {
-      throw new Error(`Operation ${op.type} is not doable`);
+    if (doit && op.status !== 'created' && op.status !== 'analyzed') {
+      throw new Error(`Operation ${op.type} is not in a doable state. Current status: ${op.status}`);
     }
+    if (!doit && op.status !== 'created') {
+      throw new Error(`Operation ${op.type} has already been analyzed. Current status: ${op.status}`);
+    }
+
+    ctx.log(`op start: ${op.type} input=${JSON.stringify(op.input)}`);
 
     op.start = performance.now();
     try {
       if (doit) {
+        op.status = 'doing';
         op.output = await def.do(op.input, ctx);
+        op.status = 'done';
       } else {
+        op.status = 'analyzing';
         const analysisResult = await def.analyze(op.input, ctx);
         op.analysis = analysisResult.analysis;
-        op.doable = analysisResult.doable;
+        op.status = analysisResult.doable ? 'analyzed' : 'analyzedBlocked';
       }
     } catch (e: any) {
       op.error = e.message || String(e);
-      op.doable = false;
+      op.status = doit ? 'doneError' : 'analyzeError';
     } finally {
       op.end = performance.now();
     }
 
     const inputDetails = `<input>\n${JSON.stringify(op.input, undefined, 2)}\n</input>`
 
-    op.message = op.error
+    op.message = op.status === 'doneError' || op.status === 'analyzeError'
       ? `Operation ${op.type} failed: ${op.error}\n\n${inputDetails}`
-      : op.output
-        ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${JSON.stringify(op.output), undefined, 2}\n</output>`
-        : op.doable
+      : op.status === 'done'
+        ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${JSON.stringify(op.output, undefined, 2)}\n</output>`
+        : op.status === 'analyzed'
           ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
           : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
+
+    ctx.log(op);
 
     return op.message;
   }
