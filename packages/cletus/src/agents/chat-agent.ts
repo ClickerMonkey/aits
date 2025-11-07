@@ -39,7 +39,7 @@ Choose the appropriate agent based on what the user needs to do.`,
       if (agent === 'dba') {
         const type = typeName ? types.find(t => t.name === typeName) : undefined;
         if (!type) {
-          throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (dbaTypeName || '(null))'));
+          throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
         }
         
         return dba.get({}, 'tools', { ...ctx, type });

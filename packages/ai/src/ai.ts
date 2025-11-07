@@ -677,13 +677,13 @@ export class AI<T extends AIBaseTypes> {
     const ai = this;
     // @ts-ignore
     const originalStream = prompt.stream.bind(prompt);
-    prompt.stream = async function* (
+    prompt.stream = async function* <TRuntimeContext extends AIContextRequired<T>, TRuntimeMetadata extends AIMetadataRequired<T>>(
       input: TInput, 
       preferStream: boolean, 
       toolsOnly: boolean,
       // @ts-ignore
       events: Events<any>, 
-      ctxRequired: CoreContext<AIContextRequired<T>, AIMetadataRequired<T>>
+      ctxRequired: CoreContext<TRuntimeContext, TRuntimeMetadata>
     ): AsyncGenerator<any, any, any> {
       // Build core context with executor/streamer
       const coreContext = await ai.buildCoreContext(ctxRequired);
@@ -692,7 +692,7 @@ export class AI<T extends AIBaseTypes> {
       yield* originalStream(input, preferStream, toolsOnly, events, coreContext as any);
     };
 
-    this.components.push(prompt as ComponentFor<T>);
+    this.components.push(prompt);
 
     return prompt;
   }

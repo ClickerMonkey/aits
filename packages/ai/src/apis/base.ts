@@ -48,7 +48,7 @@ export abstract class BaseAPI<
    * @param ctx - The AI context
    * @returns 
    */
-  async getModelFor(request: TRequest, ctx: AIContext<T>, forStreaming: boolean): Promise<SelectedModelFor<T> | null> {
+  async getModelFor<TContext extends AIContext<T>>(request: TRequest, ctx: TContext, forStreaming: boolean): Promise<SelectedModelFor<T> | null> {
     const { hooks, registry } = this.ai;
 
     // Check if model is already specified
@@ -125,9 +125,9 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async get(
+  async get<TRuntimeContext extends AIContextOptional<T>>(
     request: TRequest,
-    ...[ctx]: AIContextOptional<T>
+    ...[ctx]: TRuntimeContext
   ): Promise<TResponse> {
     const { hooks, registry } = this.ai;
 
@@ -192,9 +192,9 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async *stream(
+  async *stream<TRuntimeContext extends AIContextOptional<T>>(
     request: TRequest,
-    ...[ctx]: AIContextOptional<T>
+    ...[ctx]: TRuntimeContext
   ): AsyncIterable<TChunk> {
     const { hooks, registry } = this.ai;
 
@@ -298,10 +298,10 @@ export abstract class BaseAPI<
    * @param selected - The selected model and provider
    * @param ctx - The execution context
    */
-  protected abstract executeRequest(
+  protected abstract executeRequest<TRuntimeContext extends AIContext<T>>(
     request: TRequest,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>
+    ctx: TRuntimeContext
   ): Promise<TResponse>;
 
   /**
@@ -311,10 +311,10 @@ export abstract class BaseAPI<
    * @param selected - The selected model and provider
    * @param ctx - The execution context
    */
-  protected abstract executeStreamRequest(
+  protected abstract executeStreamRequest<TRuntimeContext extends AIContext<T>>(
     request: TRequest,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>
+    ctx: TRuntimeContext
   ): AsyncIterable<TChunk>;
 
   /**
@@ -345,17 +345,17 @@ export abstract class BaseAPI<
    * Get the appropriate handler get method for this API
    * Subclasses can override to specify which handler method to use
    */
-  protected abstract getHandlerGetMethod(
+  protected abstract getHandlerGetMethod<TRuntimeContext extends AIContext<T>>(
     handler?: ModelHandlerFor<T>
-  ): ((request: TRequest, ctx: AIContext<T>) => Promise<TResponse>) | undefined;
+  ): ((request: TRequest, ctx: TRuntimeContext) => Promise<TResponse>) | undefined;
 
   /**
    * Get the appropriate handler stream method for this API
    * Subclasses can override to specify which handler method to use
    */
-  protected abstract getHandlerStreamMethod(
+  protected abstract getHandlerStreamMethod<TRuntimeContext extends AIContext<T>>(
     handler?: ModelHandlerFor<T>
-  ): ((request: TRequest, ctx: AIContext<T>) => AsyncIterable<TChunk>) | undefined;
+  ): ((request: TRequest, ctx: TRuntimeContext) => AsyncIterable<TChunk>) | undefined;
 
   // ============================================================================
   // OPTIONAL OVERRIDES (default implementations provided)
@@ -467,10 +467,10 @@ export abstract class BaseAPI<
    * 3. Try executeRequest() (provider method)
    * 4. Try streamer-to-executor conversion if provider has streamer
    */
-  protected async executeRequestWithFallback(
+  protected async executeRequestWithFallback<TRuntimeContext extends AIContext<T>>(
     request: TRequest,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>,
+    ctx: TRuntimeContext,
     handler?: ModelHandlerFor<T>
   ): Promise<TResponse> {
     // Try handler first
@@ -515,10 +515,10 @@ export abstract class BaseAPI<
    * 3. Try executeStreamRequest() (provider streaming method)
    * 4. Try executor-to-streamer conversion if provider has executor
    */
-  protected async *streamRequestWithFallback(
+  protected async *streamRequestWithFallback<TRuntimeContext extends AIContext<T>>(
     request: TRequest,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>,
+    ctx: TRuntimeContext,
     handler?: ModelHandlerFor<T>
   ): AsyncIterable<TChunk> {
     // Try handler first

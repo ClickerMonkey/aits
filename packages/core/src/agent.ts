@@ -103,7 +103,10 @@ export class Agent<
    * @param ctx - The execution context.
    * @returns The output of the agent's operation.
    */
-  run(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, Context<TContext, TMetadata>]>): TOutput {
+  run<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, Context<TRuntimeContext, TRuntimeMetadata>]>): TOutput {
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const agent = this as Component<TContext, TMetadata, TName, TInput, TOutput, TRefs>;
@@ -120,7 +123,10 @@ export class Agent<
    * @param ctx - The context to check applicability against.
    * @returns A promise that resolves to true if the agent is applicable, false otherwise.
    */
-  async applicable(...[contextMaybe]: OptionalParams<[Context<TContext, TMetadata>]>): Promise<boolean> {
+  async applicable<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[contextMaybe]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<boolean> {
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 
     if (this.input.applicable) {

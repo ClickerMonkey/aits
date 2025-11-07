@@ -66,11 +66,6 @@ export type {
 export type StrictPartial<T> = Partial<T>;
 
 /**
- * T plus any extra properties.
- */
-export type Plus<T> = T & { [P in PropertyKey]: P extends keyof T ? T[P] : any };
-
-/**
  * Relaxes required properties of T that are present in U, making them optional.
  * This is used to compute which context/metadata fields must be provided by the caller,
  * after accounting for fields satisfied by default or provided context.
@@ -793,36 +788,36 @@ export interface ModelHandler<TContext extends AIContextAny = AIContextAny> {
   models: string[];
 
   chat?: {
-    get?: (request: Request, ctx: TContext) => Promise<Response>;
-    stream?: (request: Request, ctx: TContext) => AsyncIterable<Chunk>;
+    get?: <TRuntimeContext extends TContext>(request: Request, ctx: TRuntimeContext) => Promise<Response>;
+    stream?: <TRuntimeContext extends TContext>(request: Request, ctx: TRuntimeContext) => AsyncIterable<Chunk>;
   };
 
   imageGenerate?: {
-    get?: (request: ImageGenerationRequest, ctx: TContext) => Promise<ImageGenerationResponse>;
-    stream?: (request: ImageGenerationRequest, ctx: TContext) => AsyncIterable<ImageGenerationChunk>;
+    get?: <TRuntimeContext extends TContext>(request: ImageGenerationRequest, ctx: TRuntimeContext) => Promise<ImageGenerationResponse>;
+    stream?: <TRuntimeContext extends TContext>(request: ImageGenerationRequest, ctx: TRuntimeContext) => AsyncIterable<ImageGenerationChunk>;
   };
 
   imageEdit?: {
-    get?: (request: ImageEditRequest, ctx: TContext) => Promise<ImageGenerationResponse>;
-    stream?: (request: ImageEditRequest, ctx: TContext) => AsyncIterable<ImageGenerationChunk>;
+    get?: <TRuntimeContext extends TContext>(request: ImageEditRequest, ctx: TRuntimeContext) => Promise<ImageGenerationResponse>;
+    stream?: <TRuntimeContext extends TContext>(request: ImageEditRequest, ctx: TRuntimeContext) => AsyncIterable<ImageGenerationChunk>;
   };
 
   imageAnalyze?: {
-    get?: (request: ImageAnalyzeRequest, ctx: TContext) => Promise<Response>;
-    streem?: (request: ImageAnalyzeRequest, ctx: TContext) => AsyncIterable<Chunk>;
+    get?: <TRuntimeContext extends TContext>(request: ImageAnalyzeRequest, ctx: TRuntimeContext) => Promise<Response>;
+    streem?: <TRuntimeContext extends TContext>(request: ImageAnalyzeRequest, ctx: TRuntimeContext) => AsyncIterable<Chunk>;
   };
 
   transcribe?: {
-    get?: (request: TranscriptionRequest, ctx: TContext) => Promise<TranscriptionResponse>;
-    stream?: (request: TranscriptionRequest, ctx: TContext) => AsyncIterable<TranscriptionChunk>;
+    get?: <TRuntimeContext extends TContext>(request: TranscriptionRequest, ctx: TRuntimeContext) => Promise<TranscriptionResponse>;
+    stream?: <TRuntimeContext extends TContext>(request: TranscriptionRequest, ctx: TRuntimeContext) => AsyncIterable<TranscriptionChunk>;
   };
 
   speech?: {
-    get?: (request: SpeechRequest, ctx: TContext) => Promise<SpeechResponse>;
+    get?: <TRuntimeContext extends TContext>(request: SpeechRequest, ctx: TRuntimeContext) => Promise<SpeechResponse>;
   };
 
   embed?: {
-    get?: (request: EmbeddingRequest, ctx: TContext) => Promise<EmbeddingResponse>;
+    get?: <TRuntimeContext extends TContext>(request: EmbeddingRequest, ctx: TRuntimeContext) => Promise<EmbeddingResponse>;
   };
 }
 
@@ -1173,7 +1168,7 @@ export interface AIConfig<
   defaultContext?: StrictPartial<TContext>;
   // Async context provider (e.g., fetch from database)
   providedContext?: (ctx: StrictPartial<TContext>) => Promise<StrictPartial<TContext>>;
-
+  
   // Default metadata values
   defaultMetadata?: StrictPartial<Omit<TMetadata, keyof AIMetadataAny> & AIBaseMetadata<TProviders>>;
   // Async metadata provider

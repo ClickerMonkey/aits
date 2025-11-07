@@ -184,10 +184,10 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     return this.ai.estimateRequestTokens(request);
   }
 
-  protected async executeRequest(
+  protected async executeRequest<TRuntimeContext extends AIContext<T>>(
     request: Request,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>
+    ctx: TRuntimeContext
   ): Promise<Response> {
     if (!selected.provider.createExecutor) {
       throw new Error(`Provider ${selected.provider.name} does not support chat requests`);
@@ -197,10 +197,10 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     return await executor(request, ctx, ctx.metadata);
   }
 
-  protected async *executeStreamRequest(
+  protected async *executeStreamRequest<TRuntimeContext extends AIContext<T>>(
     request: Request,
     selected: SelectedModelFor<T>,
-    ctx: AIContext<T>
+    ctx: TRuntimeContext
   ): AsyncIterable<Chunk> {
     if (!selected.provider.createStreamer) {
       throw new Error(`Provider ${selected.provider.name} does not support chat streaming`);
@@ -220,13 +220,13 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
 
   protected getHandlerGetMethod(
     handler?: ModelHandlerFor<T>
-  ): ((request: Request, ctx: AIContext<T>) => Promise<Response>) | undefined {
+  ): (<TRuntimeContext extends AIContext<T>>(request: Request, ctx: TRuntimeContext) => Promise<Response>) | undefined {
     return handler?.chat?.get;
   }
 
   protected getHandlerStreamMethod(
     handler?: ModelHandlerFor<T>
-  ): ((request: Request, ctx: AIContext<T>) => AsyncIterable<Chunk>) | undefined {
+  ): (<TRuntimeContext extends AIContext<T>>(request: Request, ctx: TRuntimeContext) => AsyncIterable<Chunk>) | undefined {
     return handler?.chat?.stream;
   }
 
@@ -246,11 +246,14 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
    * @returns Executor function
    * @internal
    */
-  createExecutor(): Executor<AIContextRequired<T>, AIMetadataRequired<T>> {
+  createExecutor<
+    TRuntimeContext extends AIContextRequired<T>,
+    TRuntimeMetadata extends AIMetadataRequired<T>
+  >(): Executor<TRuntimeContext, TRuntimeMetadata> {
     return async (
       request: Request,
-      ctx: AIContextRequired<T>,
-      metadata?: AIMetadataRequired<T>,
+      ctx: TRuntimeContext,
+      metadata?: TRuntimeMetadata,
       signal?: AbortSignal
     ): Promise<Response> => {
       return await this.get(request, { ...ctx, metadata, signal });
@@ -265,12 +268,15 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
    * @returns Streamer function
    * @internal
    */
-  createStreamer(): Streamer<AIContextRequired<T>, AIMetadataRequired<T>> {
+  createStreamer<
+    TRuntimeContext extends AIContextRequired<T>,
+    TRuntimeMetadata extends AIMetadataRequired<T>
+  >(): Streamer<TRuntimeContext, TRuntimeMetadata> {
     const chatAPI = this;
     return async function* (
       request: Request,
-      ctx: AIContextRequired<T>,
-      metadata?: AIMetadataRequired<T>,
+      ctx: TRuntimeContext,
+      metadata?: TRuntimeMetadata,
       signal?: AbortSignal
     ): AsyncGenerator<Chunk, Response> {
       const chunks: Chunk[] = [];

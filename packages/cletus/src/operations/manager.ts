@@ -1,4 +1,4 @@
-import { Plus } from "@aits/ai";
+
 import { CletusCoreContext } from "../ai";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
@@ -34,7 +34,10 @@ export class OperationManager {
    * @param ctx - Cletus core context
    * @returns Result message
    */
-  public async handle<K extends OperationKind>(operation: OperationInput<K>, ctx: CletusCoreContext): Promise<string> {
+  public async handle<
+    K extends OperationKind,
+    C extends CletusCoreContext
+  >(operation: OperationInput<K>, ctx: C): Promise<string> {
     const def = Operations[operation.type] as unknown as OperationDefinitionFor<K>;
     if (!def) {
       throw new Error(`Unknown operation type: ${operation.type}`);

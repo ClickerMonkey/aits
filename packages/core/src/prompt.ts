@@ -297,11 +297,30 @@ export class Prompt<
   public get(): RequiredKeys<TInput> extends never ? RequiredKeys<TContext> extends never ? Promise<TOutput> : never : never;
   public get(input: TInput): RequiredKeys<TContext> extends never ? Promise<TOutput> : never;
   public get(input: TInput, mode: 'result'): RequiredKeys<TContext> extends never ? Promise<TOutput> : never;
-  public get(input: TInput, mode: 'result', context: Context<TContext, TMetadata>): Promise<TOutput>;
-  public get(input: TInput, mode: 'tools', ...[context]: OptionalParams<[Context<TContext, TMetadata>]>): Promise<PromptToolOutput<TTools>[] | undefined>
-  public get(input: TInput, mode: 'stream', ...[context]: OptionalParams<[Context<TContext, TMetadata>]>): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>
-  public get(input: TInput, mode: 'streamTools', ...[context]: OptionalParams<[Context<TContext, TMetadata>]>): AsyncGenerator<PromptToolOutput<TTools>, TOutput | undefined, unknown>
-  public get(input: TInput, mode: 'streamContent', ...[context]: OptionalParams<[Context<TContext, TMetadata>]>): AsyncGenerator<string, TOutput | undefined, unknown>
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'result', context: Context<TRuntimeContext, TRuntimeMetadata>): Promise<TOutput>;
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'tools', ...[context]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<PromptToolOutput<TTools>[] | undefined>
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'stream', ...[context]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'streamTools', ...[context]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): AsyncGenerator<PromptToolOutput<TTools>, TOutput | undefined, unknown>
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'streamContent', ...[context]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): AsyncGenerator<string, TOutput | undefined, unknown>
+  public get<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(input: TInput, mode: 'result' | 'tools' | 'stream' | 'streamTools' | 'streamContent', ...[context]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<PromptToolOutput<TTools>[] | TOutput | undefined> | AsyncGenerator<PromptEvent<TOutput, TTools> | PromptToolOutput<TTools> | string, TOutput | undefined, unknown>
   public get(
     input: TInput = {} as TInput,
     mode: 'result' | 'tools' | 'stream' | 'streamTools' | 'streamContent' = 'result',
@@ -378,7 +397,10 @@ export class Prompt<
    * @param input - The input parameters for the prompt.
    * @returns An async generator yielding prompt events and ultimately the final output.
    */
-  run(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, Context<TContext, TMetadata>]>): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown> {
+  run<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, Context<TRuntimeContext, TRuntimeMetadata>]>): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown> {
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const prompt = this as Component<TContext, TMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>;
@@ -396,7 +418,10 @@ export class Prompt<
    * @param ctx - The context to check applicability against.
    * @returns Whether the prompt is applicable.
    */
-  async applicable(...[contextMaybe]: OptionalParams<[Context<TContext, TMetadata>]>): Promise<boolean> {
+  async applicable<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[contextMaybe]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<boolean> {
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 
     if (this.input.applicable) {
@@ -424,14 +449,17 @@ export class Prompt<
    * @param ctx - The context for the prompt's operation.
    * @returns An async generator yielding prompt events and ultimately the final output.
    */
-  async* stream(
+  async* stream<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(
     ...[inputMaybe, preferStream = true, toolsOnly = false, eventsMaybe, contextMaybe]: OptionalParams<[
       TInput,
       boolean,
       boolean,
       // @ts-ignore
-      Events<Component<TContext, TMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>> | undefined,
-      Context<TContext, TMetadata>, 
+      Events<Component<TRuntimeContext, TRuntimeMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>> | undefined,
+      Context<TRuntimeContext, TRuntimeMetadata>, 
     ]>
   ): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown> {
     const input = (inputMaybe || {}) as TInput;

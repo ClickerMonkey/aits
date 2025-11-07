@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
 import type { TypeDefinition, TypeField } from '../schemas.js';
 import { FieldCondition, WhereClause } from '../operations/where-helpers.js';
+import { AI, AITypes } from '@aits/ai';
 
 /**
  * Build a Zod schema from a TypeField definition
@@ -225,7 +226,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: ctx.type.name, ...input } }, ctx),
   });
-  
+
   const dataDeleteMany = aiTyped.tool({
     name: 'data_delete_many',
     description: `Delete multiple records`,

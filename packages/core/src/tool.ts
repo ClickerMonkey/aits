@@ -44,7 +44,10 @@ export interface ToolInput<
   /** Optional post-validation hook that runs after Zod parsing succeeds. Can throw to trigger re-prompting. */
   validate?: (input: TParams, ctx: Context<TContext, TMetadata>) => void | Promise<void>;
   /** Optional function to determine if the component is applicable in the given context */
-  applicable?: (ctx: Context<TContext, TMetadata>) => boolean | Promise<boolean>;
+  applicable?: <
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(ctx: Context<TRuntimeContext, TRuntimeMetadata>) => boolean | Promise<boolean>;
   /** Optional way to explicitly declare the types used in this component */
   types?: {
     params?: TParams;
@@ -214,7 +217,10 @@ export class Tool<
    * @param ctx - The execution context.
    * @returns The output of the tool's execution.
    */
-  run(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, Context<TContext, TMetadata>]>): TOutput {
+  run<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, Context<TRuntimeContext, TRuntimeMetadata>]>): TOutput {
     const input = (inputMaybe || {}) as TParams;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const tool = this as Component<TContext, TMetadata, TName, TParams, TOutput, TRefs>;
@@ -231,7 +237,10 @@ export class Tool<
    * @param ctx - The context to check applicability against.
    * @returns A promise that resolves to true if the tool is applicable, false otherwise.
    */
-  async applicable(...[contextMaybe]: OptionalParams<[Context<TContext, TMetadata>]>): Promise<boolean> {
+  async applicable<
+    TRuntimeContext extends TContext, 
+    TRuntimeMetadata extends TMetadata
+  >(...[contextMaybe]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<boolean> {
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 
     if (this.input.applicable) {

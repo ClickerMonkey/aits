@@ -10,6 +10,11 @@ import { AnyPrompt, PromptEvent } from "./prompt";
 export type Tuple<T> = [] | [T, ...T[]];
 
 /**
+ * T plus any extra properties.
+ */
+export type Extends<T> = T & Record<PropertyKey, any>;
+
+/**
  * Extracts the required keys from an object type.
  *
  * @template T - The object type to extract required keys from.
@@ -52,7 +57,7 @@ export interface Component<
   TName extends string = string,
   TInput extends object = {},
   TOutput = string,
-  TRefs extends Tuple<Component<TContext, TMetadata, any, any, any, any>> = [],
+  TRefs extends Tuple<ComponentCompatible<TContext, TMetadata>> = [],
 > {
 
   /**
@@ -86,20 +91,21 @@ export interface Component<
   * @param input - The input for the component.
   * @returns A promise that resolves to the output of the component.
   */
-  run(...[input, ctx]: OptionalParams<[TInput, Context<TContext, TMetadata>]>): TOutput;
+  run(...[input, ctx]: OptionalParams<[TInput, Extends<Context<Extends<TContext>, Extends<TMetadata>>>]>): TOutput;
 
   /**
    * Determines if the component is applicable in the given context.
    * 
    * @param ctx - The context to check applicability against.
    */
-  applicable(...[ctx]: OptionalParams<[Context<TContext, TMetadata>]>): Promise<boolean>;
+  applicable(...[ctx]: OptionalParams<[Extends<Context<Extends<TContext>, Extends<TMetadata>>>]>): Promise<boolean>;
 }
 
 /**
  * A type representing any AI component that is compatible with the given context and metadata.
  */
-export type ComponentCompatible<TContext, TMetadata> = Component<TContext, TMetadata, any, any, any, any>;
+export type ComponentCompatible<TContext, TMetadata> = 
+  Component<Extends<TContext>, Extends<TMetadata>, any, any, any, any>;
 
 /**
  * A type representing any AI component.
@@ -191,12 +197,12 @@ export type Context<TContext, TMetadata> = TContext &
   /**
   * Executor and Streamer for this context
   */
-  execute?: Executor<TContext, TMetadata>;
+  execute?: Executor<Extends<TContext>, Extends<TMetadata>>;
   
   /**
   * Streamer for this context
   */
-  stream?: Streamer<TContext, TMetadata>;
+  stream?: Streamer<Extends<TContext>, Extends<TMetadata>>;
 
   /**
    * An optional AbortSignal to cancel operations.
