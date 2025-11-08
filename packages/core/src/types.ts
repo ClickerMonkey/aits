@@ -1,6 +1,7 @@
 import z from "zod";
 import { Resolved } from "./common";
 import { AnyPrompt, PromptEvent } from "./prompt";
+import { extend } from "zod/mini";
 
 /**
  * Utility type for representing tuples (arrays with at least zero elements).
@@ -123,10 +124,28 @@ export interface Component<
 }
 
 /**
+ * A type representing a tuple of AI components that are all compatible with the given context and metadata.
+ */
+export type ComponentTuple<TContext, TMetadata, TComponents extends Tuple<AnyComponent>> = TComponents & {
+  [K in keyof TComponents]: TComponents[K] extends Component<infer U, infer V, any, any, any, any>
+    ? TContext extends U
+      ? TMetadata extends V
+        ? TComponents[K]
+        : never
+      : never
+    : never
+};
+
+/**
  * A type representing any AI component that is compatible with the given context and metadata.
  */
-export type ComponentCompatible<TContext, TMetadata> = 
-  Component<TContext, TMetadata, any, any, any, any>;
+export type ComponentCompatible<TContext, TMetadata> = AnyComponent extends infer R
+  ? R extends Component<infer U extends TContext, infer V extends TMetadata, any, any, any, any>
+    ? Component<U, V, any, any, any, any>
+    : never
+  : never;
+
+// Component<TContext, TMetadata, any, any, any, any>;
 
 /**
  * A type representing any AI component.

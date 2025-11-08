@@ -2,7 +2,7 @@ import Handlebars from 'handlebars';
 import { ZodType } from 'zod';
 
 import { Fn, resolveFn } from './common';
-import { AnyComponent, Component, ComponentCompatible, Context, OptionalParams, ToolDefinition, Tuple } from './types';
+import { AnyComponent, Component, ComponentCompatible, ComponentTuple, Context, OptionalParams, ToolDefinition, Tuple } from './types';
     
 /**
  * Configuration for creating a Tool component.
@@ -21,7 +21,7 @@ export interface ToolInput<
   TName extends string,
   TParams extends object,
   TOutput,
-  TRefs extends Tuple<AnyComponent>,
+  TRefs extends Tuple<ComponentCompatible<TContext, TMetadata>>,
 > {
   /** The unique name of the tool */
   name: TName;

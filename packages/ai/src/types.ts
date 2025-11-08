@@ -383,11 +383,6 @@ export type AITypes<
 };
 
 /**
- * AIBaseTypes with any types (least type safety)
- */
-export type AITypesAny = AITypes<any, any, any, any, any, any, Providers>;
-
-/**
  * Infer AIBaseTypes from AIConfig
  */
 export type AITypesInfer<
@@ -473,7 +468,7 @@ export type AIBaseContext<T extends AIBaseTypes> = {
 /**
  * Base context with any types - for providers & handlers.
  */
-export type AIContextAny = AIBaseContext<AITypesAny>// & { [custom: string | number | symbol]: any };
+export type AIContextAny = AIBaseContext<AIBaseTypes>// & { [custom: string | number | symbol]: any };
 
 /**
  * The type of user context that can be provided by the caller.
@@ -508,7 +503,7 @@ export type AIContextFor<
  * This relaxes properties that are satisfied by defaults or providers
  */
 export type AIContextRequired<T extends AIBaseTypes> = Simplify<
-  Partial<AIBaseContext<T>> &
+  Partial<Omit<AIBaseContext<T>, 'ai'>> &
   Omit<Relax<T['Context'], T['DefaultContext'] & T['ProvidedContext']>, keyof AIContextAny>
 >;
 

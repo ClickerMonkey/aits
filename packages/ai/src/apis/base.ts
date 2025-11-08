@@ -18,6 +18,7 @@ import type {
   ModelCapability,
   ModelHandlerFor,
   ModelParameter,
+  OptionalParams,
   SelectedModelFor,
   Usage
 } from '../types';
@@ -125,9 +126,9 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async get<TRuntimeContext extends AIContextOptional<T>>(
+  async get<TRuntimeContext extends AIContextRequired<T> = AIContextRequired<T>>(
     request: TRequest,
-    ...[ctx]: TRuntimeContext
+    ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): Promise<TResponse> {
     const { hooks, registry } = this.ai;
 
@@ -192,9 +193,9 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async *stream<TRuntimeContext extends AIContextOptional<T>>(
+  async *stream<TRuntimeContext extends AIContextRequired<T> = AIContextRequired<T>>(
     request: TRequest,
-    ...[ctx]: TRuntimeContext
+    ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): AsyncIterable<TChunk> {
     const { hooks, registry } = this.ai;
 
