@@ -1,4 +1,4 @@
-import { Component, ComponentCompatible, Context, OptionalParams, Tuple } from "./types";
+import { AnyComponent, Component, ComponentCompatible, Context, OptionalParams, Tuple } from "./types";
 
 /**
  * Configuration for creating an Agent component.
@@ -17,7 +17,7 @@ export interface AgentInput<
   TName extends string = string,
   TInput extends object = {},
   TOutput = string,
-  TRefs extends Tuple<ComponentCompatible<TContext, TMetadata>> = [],
+  TRefs extends Tuple<AnyComponent> = [],
 > {
   /** The unique name of the agent */
   name: TName;
@@ -105,8 +105,9 @@ export class Agent<
    */
   run<
     TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata
-  >(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, Context<TRuntimeContext, TRuntimeMetadata>]>): TOutput {
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, TCoreContext]>): TOutput {
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const agent = this as Component<TContext, TMetadata, TName, TInput, TOutput, TRefs>;
@@ -125,8 +126,9 @@ export class Agent<
    */
   async applicable<
     TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata
-  >(...[contextMaybe]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<boolean> {
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[contextMaybe]: OptionalParams<[TCoreContext]>): Promise<boolean> {
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 
     if (this.input.applicable) {

@@ -48,7 +48,7 @@ export abstract class BaseAPI<
    * @param ctx - The AI context
    * @returns 
    */
-  async getModelFor<TContext extends AIContext<T>>(request: TRequest, ctx: TContext, forStreaming: boolean): Promise<SelectedModelFor<T> | null> {
+  async getModelFor<TRuntimeContext extends AIContext<T>>(request: TRequest, ctx: TRuntimeContext, forStreaming: boolean): Promise<SelectedModelFor<T> | null> {
     const { hooks, registry } = this.ai;
 
     // Check if model is already specified

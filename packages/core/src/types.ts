@@ -1,5 +1,5 @@
 import z from "zod";
-import { resolve, Resolved } from "./common";
+import { Resolved } from "./common";
 import { AnyPrompt, PromptEvent } from "./prompt";
 
 /**
@@ -10,9 +10,20 @@ import { AnyPrompt, PromptEvent } from "./prompt";
 export type Tuple<T> = [] | [T, ...T[]];
 
 /**
- * T plus any extra properties.
+ * Simplifies complex intersection types into a flat, readable type.
+ * Useful for improving TypeScript hints and error messages.
+ *
+ * @template T - The type to simplify
  */
-export type Extends<T> = T & Record<PropertyKey, any>;
+export type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+/**
+ * Overrides properties in TBase with those from TOverride.
+ *
+ * @template TBase - The base type.
+ * @template TOverride - The type with properties to override.
+ */
+export type Extend<TBase, TOverride> = TBase & TOverride; // Simplify<TBase & Omit<TOverride, keyof TBase>>;
 
 /**
  * Extracts the required keys from an object type.
@@ -31,7 +42,8 @@ export type RequiredKeys<T> = {
  * @example
  * function<A, B, C>(...[a, b, c]: OptionalParams<[A, B, C]>): void
  */
-export type OptionalParams<P> =
+export type OptionalParams<P> = P
+/*
   P extends []
     ? []
     : P extends [infer F]
@@ -41,6 +53,7 @@ export type OptionalParams<P> =
           ? [...OptionalParams<F>, param?: R]
           : [...F, R]
         : never;
+*/
 
 /**
 * The base interface for AI components.
@@ -91,21 +104,29 @@ export interface Component<
   * @param input - The input for the component.
   * @returns A promise that resolves to the output of the component.
   */
-  run(...[input, ctx]: OptionalParams<[TInput, Extends<Context<Extends<TContext>, Extends<TMetadata>>>]>): TOutput;
+  run<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[input, ctx]: OptionalParams<[TInput, TCoreContext]>): TOutput;
 
   /**
    * Determines if the component is applicable in the given context.
    * 
    * @param ctx - The context to check applicability against.
    */
-  applicable(...[ctx]: OptionalParams<[Extends<Context<Extends<TContext>, Extends<TMetadata>>>]>): Promise<boolean>;
+  applicable<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[ctx]: OptionalParams<[TCoreContext]>): Promise<boolean>;
 }
 
 /**
  * A type representing any AI component that is compatible with the given context and metadata.
  */
 export type ComponentCompatible<TContext, TMetadata> = 
-  Component<Extends<TContext>, Extends<TMetadata>, any, any, any, any>;
+  Component<TContext, TMetadata, any, any, any, any>;
 
 /**
  * A type representing any AI component.
@@ -166,7 +187,7 @@ export type Names<T extends Tuple<AnyComponent>> =
 export type Executor<
   TContext,
   TMetadata
-> = (request: Request, context: TContext, metadata?: TMetadata, signal?: AbortSignal) => Promise<Response>;
+> = <TRuntimeContext extends TContext, TRuntimeMetadata extends TMetadata>(request: Request, context: TRuntimeContext, metadata?: TRuntimeMetadata, signal?: AbortSignal) => Promise<Response>;
 
 /**
  * Function type for executing AI requests with streaming support.
@@ -182,7 +203,7 @@ export type Executor<
 export type Streamer<
   TContext,
   TMetadata
-> = (request: Request, context: TContext, metadata?: TMetadata, signal?: AbortSignal) => AsyncGenerator<Chunk, Response>;
+> = <TRuntimeContext extends TContext, TRuntimeMetadata extends TMetadata>(request: Request, context: TRuntimeContext, metadata?: TRuntimeMetadata, signal?: AbortSignal) => AsyncGenerator<Chunk, Response>;
 
 /**
 * The context type for AI components, combining TContext and the inputs this AI system requires to operate.
@@ -197,12 +218,12 @@ export type Context<TContext, TMetadata> = TContext &
   /**
   * Executor and Streamer for this context
   */
-  execute?: Executor<Extends<TContext>, Extends<TMetadata>>;
+  execute?: Executor<TContext, TMetadata>;
   
   /**
   * Streamer for this context
   */
-  stream?: Streamer<Extends<TContext>, Extends<TMetadata>>;
+  stream?: Streamer<TContext, TMetadata>;
 
   /**
    * An optional AbortSignal to cancel operations.
@@ -264,13 +285,18 @@ export type Context<TContext, TMetadata> = TContext &
  * @param getOutput - A function that returns the output of the component.
  * @returns 
  */
-export type Runner = <C extends AnyComponent>(
-  component: C, 
-  input: ComponentInput<C>, 
-  ctx: Context<ComponentContext<C>, ComponentMetadata<C>>, 
+export type Runner = <
+  TComponent extends AnyComponent,
+  TContext extends ComponentContext<TComponent>,
+  TMetadata extends ComponentMetadata<TComponent>,
+  TCoreContext extends Context<TContext, TMetadata>,
+  >(
+  component: TComponent, 
+  input: ComponentInput<TComponent>, 
+  ctx: TCoreContext, 
   // @ts-ignore
-  getOutput: (ctx: Context<ComponentContext<C>, ComponentMetadata<C>>, events?: Events<C>) => ComponentOutput<C>
-) => ComponentOutput<C>
+  getOutput: (ctx: TCoreContext, events?: Events<TComponent>) => ComponentOutput<TComponent>
+) => ComponentOutput<TComponent>
 
 /**
  * The role of a message in a conversation with an AI system.

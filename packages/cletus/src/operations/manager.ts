@@ -36,7 +36,7 @@ export class OperationManager {
    */
   public async handle<
     K extends OperationKind,
-    C extends CletusCoreContext
+    C extends CletusCoreContext,
   >(operation: OperationInput<K>, ctx: C): Promise<string> {
     const def = Operations[operation.type] as unknown as OperationDefinitionFor<K>;
     if (!def) {

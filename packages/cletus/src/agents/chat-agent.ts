@@ -79,6 +79,9 @@ You MUST use the 'delegate' tool to perform any actions; do not attempt to do an
 If you don't find the information you need, try to get it from another agent.`,
     tools: [routeTool],
     toolsMax: 3,
+    config: {
+      toolChoice: 'required',
+    },
     metadata: {
       weights: {
         speed: 0.7,

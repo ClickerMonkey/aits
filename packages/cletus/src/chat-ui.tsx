@@ -1,21 +1,19 @@
-import fs from 'fs';
-import path from 'path';
-import { Box, Text, useApp, useInput, Static } from 'ink';
+import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useRef, useState, useEffect } from 'react';
-import type { ChatMeta, Message } from './schemas.js';
-import { ConfigFile } from './config.js';
+import path from 'path';
+import React, { useEffect, useRef, useState } from 'react';
+import { createCletusAI } from './ai.js';
 import { ChatFile } from './chat.js';
 import { ModelSelector } from './components/ModelSelector.js';
-import { createCletusAI } from './ai.js';
-import { Message as AIMessage, MessageContent } from '@aits/core';
+import { ConfigFile } from './config.js';
+import type { ChatMeta, Message } from './schemas.js';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent.js';
-import { fileIsDirectory } from './operations/file-helper.js';
 import { runChatOrchestrator } from './agents/chat-orchestrator.js';
 import { logger } from './logger.js';
+import { fileIsDirectory } from './operations/file-helper.js';
 
 
 interface ChatUIProps {

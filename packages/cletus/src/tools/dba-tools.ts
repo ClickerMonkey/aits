@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI, CletusAIContext } from '../ai.js';
 import type { TypeDefinition, TypeField } from '../schemas.js';
 import { FieldCondition, WhereClause } from '../operations/where-helpers.js';
-import { AI, AITypes } from '@aits/ai';
+import { AI, AIContextInfer, AITypes, ContextInfer } from '@aits/ai';
 
 /**
  * Build a Zod schema from a TypeField definition
@@ -130,31 +130,41 @@ function buildWhereSchema(typeDef: TypeDefinition) {
   return whereSchema;
 }
 
+
+function getSchemas(type: TypeDefinition, cache: Record<string, any> = {}): Record<string, any> {
+  const cacheKey = `${type.name}Schemas`;
+  let schemas: {
+    fields: ReturnType<typeof buildFieldsSchema>;
+    where: ReturnType<typeof buildWhereSchema>;
+    fieldNames: z.ZodEnum<Record<string, string>>;
+  } = cache[cacheKey];
+
+  if (!schemas) {
+    schemas = {
+      fields: buildFieldsSchema(type),
+      fieldNames: z.enum(type.fields.map(f => f.name) as [string, ...string[]]),
+      where: buildWhereSchema(type),
+    };
+    cache[cacheKey] = schemas;
+  }
+
+  return schemas;
+};
+
 /**
  * Create the DBA agent that identifies the type first, then creates specific tools.
  */
 export function createDBAAgent(ai: CletusAI) {
   const aiTyped = ai.extend<{ type: TypeDefinition }>();
 
-  const getSchemas = (type: TypeDefinition, cache: Record<string, any> = {}): Record<string, any> => {
-    const cacheKey = `${type.name}Schemas`;
-    let schemas: {
-      fields: ReturnType<typeof buildFieldsSchema>;
-      where: ReturnType<typeof buildWhereSchema>;
-      fieldNames: z.ZodEnum<Record<string, string>>;
-    } = cache[cacheKey];
+  type A = ContextInfer<typeof ai>;
+  type B = AIContextInfer<typeof ai>;
+  type X = ContextInfer<typeof aiTyped>;
+  type Y = AIContextInfer<typeof aiTyped>;
+  type C = X extends A ? true : false;
 
-    if (!schemas) {
-      schemas = {
-        fields: buildFieldsSchema(type),
-        fieldNames: z.enum(type.fields.map(f => f.name) as [string, ...string[]]),
-        where: buildWhereSchema(type),
-      };
-      cache[cacheKey] = schemas;
-    }
-
-    return schemas;
-  };
+  type Z<T extends A> = true
+  type W = Z<X>;
 
   const dataCreate = aiTyped.tool({
     name: 'data_create',

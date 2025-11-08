@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { Agent, Events, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
+import { Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';
@@ -677,20 +677,24 @@ export class AI<T extends AIBaseTypes> {
     const ai = this;
     // @ts-ignore
     const originalStream = prompt.stream.bind(prompt);
-    prompt.stream = async function* <TRuntimeContext extends AIContextRequired<T>, TRuntimeMetadata extends AIMetadataRequired<T>>(
+    prompt.stream = async function* <
+      TRuntimeContext extends AIContextRequired<T>, 
+      TRuntimeMetadata extends AIMetadataRequired<T>,
+      TCoreContext extends CoreContext<TRuntimeContext, TRuntimeMetadata>,
+    >(
       input: TInput, 
       preferStream: boolean, 
       toolsOnly: boolean,
       // @ts-ignore
       events: Events<any>, 
-      ctxRequired: CoreContext<TRuntimeContext, TRuntimeMetadata>
+      ctxRequired: TCoreContext
     ): AsyncGenerator<any, any, any> {
       // Build core context with executor/streamer
       const coreContext = await ai.buildCoreContext(ctxRequired);
       coreContext.metadata = ai.mergeMetadata(prompt.input.metadata, coreContext.metadata) as any;
 
       yield* originalStream(input, preferStream, toolsOnly, events, coreContext as any);
-    };
+    } as typeof prompt.stream;
 
     this.components.push(prompt);
 
@@ -760,7 +764,7 @@ export class AI<T extends AIBaseTypes> {
       })),
     });
 
-    this.components.push(tool as ComponentFor<T>);
+    this.components.push(tool);
 
     return tool;
   }
@@ -813,7 +817,7 @@ export class AI<T extends AIBaseTypes> {
       })),
     });
 
-    this.components.push(agent as ComponentFor<T>);
+    this.components.push(agent);
 
     return agent;
   }
@@ -838,14 +842,14 @@ export class AI<T extends AIBaseTypes> {
     TExtendedMetadata extends object = {},
   >(
     config?: Partial<AIConfig<
-      T['Context'] & TExtendedContext,
-      T['Metadata'] & TExtendedMetadata,
+      Extend<T['Context'], TExtendedContext>,
+      Extend<T['Metadata'], TExtendedMetadata>,
       AIProviders<T>
     >>
   ) {
     type TConfig = typeof config & {};
-    type TContext = T['Context'] & TExtendedContext;
-    type TMetadata = T['Metadata'] & TExtendedMetadata;
+    type TContext = Extend<T['Context'], TExtendedContext>;
+    type TMetadata = Extend<T['Metadata'], TExtendedMetadata>;
     type TProviders = AIProviders<T>;
 
     return new AI<AITypesInfer<

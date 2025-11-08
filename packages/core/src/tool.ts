@@ -2,7 +2,7 @@ import Handlebars from 'handlebars';
 import { ZodType } from 'zod';
 
 import { Fn, resolveFn } from './common';
-import { Component, ComponentCompatible, Context, OptionalParams, ToolDefinition, Tuple } from './types';
+import { AnyComponent, Component, ComponentCompatible, Context, OptionalParams, ToolDefinition, Tuple } from './types';
     
 /**
  * Configuration for creating a Tool component.
@@ -21,7 +21,7 @@ export interface ToolInput<
   TName extends string,
   TParams extends object,
   TOutput,
-  TRefs extends Tuple<ComponentCompatible<TContext, TMetadata>>,
+  TRefs extends Tuple<AnyComponent>,
 > {
   /** The unique name of the tool */
   name: TName;
@@ -219,8 +219,9 @@ export class Tool<
    */
   run<
     TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata
-  >(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, Context<TRuntimeContext, TRuntimeMetadata>]>): TOutput {
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, TCoreContext]>): TOutput {
     const input = (inputMaybe || {}) as TParams;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const tool = this as Component<TContext, TMetadata, TName, TParams, TOutput, TRefs>;
@@ -239,8 +240,9 @@ export class Tool<
    */
   async applicable<
     TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata
-  >(...[contextMaybe]: OptionalParams<[Context<TRuntimeContext, TRuntimeMetadata>]>): Promise<boolean> {
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(...[contextMaybe]: OptionalParams<[TCoreContext]>): Promise<boolean> {
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 
     if (this.input.applicable) {

@@ -26,6 +26,7 @@ import type {
   BaseRequest,
   ModelInput,
   Model,
+  Simplify,
 } from '@aits/core';
 import type { PromptInput } from '@aits/core';
 import type { ToolInput } from '@aits/core';
@@ -75,13 +76,6 @@ export type StrictPartial<T> = Partial<T>;
  */
 export type Relax<T, U extends Partial<T>> = Omit<T, keyof U> & Partial<Pick<T, keyof U & keyof T>>;
 
-/**
- * Simplifies complex intersection types into a flat, readable type.
- * Useful for improving TypeScript hints and error messages.
- *
- * @template T - The type to simplify
- */
-export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 // ============================================================================
 // Provider Types
