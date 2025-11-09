@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
     "scrape": "tsx scripts/scrape.ts",
     "scrape:openrouter": "tsx scripts/scrapers/openrouter.ts",
     "scrape:openai": "tsx scripts/scrapers/openai.ts",

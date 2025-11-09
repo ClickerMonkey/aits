@@ -548,7 +548,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       // Stream transcription from buffer
       const stream = ai.transcribe.stream({
         audio: new File([wavBuffer], 'audio.wav', { type: 'audio/wav' }),
-      }, {});
+      });
 
       let transcribedText = '';
 

@@ -27,6 +27,11 @@ export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 export type Extend<TBase, TOverride> = TBase & TOverride; // Simplify<TBase & Omit<TOverride, keyof TBase>>;
 
 /**
+ * T plus any extra properties.
+ */
+export type Plus<T> = T & { [P in PropertyKey]: P extends keyof T ? T[P] : any };
+
+/**
  * Extracts the required keys from an object type.
  *
  * @template T - The object type to extract required keys from.
@@ -43,8 +48,7 @@ export type RequiredKeys<T> = {
  * @example
  * function<A, B, C>(...[a, b, c]: OptionalParams<[A, B, C]>): void
  */
-export type OptionalParams<P> = P
-/*
+export type OptionalParams<P> = 
   P extends []
     ? []
     : P extends [infer F]
@@ -54,7 +58,6 @@ export type OptionalParams<P> = P
           ? [...OptionalParams<F>, param?: R]
           : [...F, R]
         : never;
-*/
 
 /**
 * The base interface for AI components.

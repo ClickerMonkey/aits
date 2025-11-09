@@ -6,7 +6,7 @@ import { ReplicateProvider } from '@aits/replicate';
 import { models } from '@aits/models';
 import { ConfigFile } from './config';
 import { ChatFile } from './chat';
-import { ChatMeta } from './schemas';
+import { ChatMeta, TypeDefinition } from './schemas';
 import { OperationManager } from './operations/manager';
 import { logger } from './logger';
 
@@ -86,9 +86,15 @@ export function createCletusAI(configFile: ConfigFile) {
   return ai;
 }
 
+export function createCletusTypeAI(ai: CletusAI) {
+  return ai.extend<{ type: TypeDefinition }>();
+}
+
 export type CletusAI = ReturnType<typeof createCletusAI>;
-export type CletusAIContext = AIContextInfer<CletusAI>;
-export type CletusCoreContext = ContextInfer<CletusAI>;
+export type CletusAIContext = ContextInfer<CletusAI>;
+
+export type CletusTypeAI = ReturnType<typeof createCletusTypeAI>;
+export type CletusTypeAIContext = ContextInfer<CletusTypeAI>;
 
 /**
  * Summarize text using the AI

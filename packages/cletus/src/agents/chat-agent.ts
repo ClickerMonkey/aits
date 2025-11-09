@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai.js';
 import { createSubAgents } from './sub-agents.js';
+import { ComponentInput } from '@aits/core';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -42,7 +43,7 @@ Choose the appropriate agent based on what the user needs to do.`,
           throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
         }
         
-        return dba.get({}, 'tools', { ...ctx, type });
+        return dba.get('tools', {}, { ...ctx, type });
       } else {
         const subAgent = {
           planner,
@@ -57,7 +58,7 @@ Choose the appropriate agent based on what the user needs to do.`,
           throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
         }
 
-        return subAgent.get({}, 'tools', ctx);
+        return subAgent.get('tools', {}, ctx);
       }
     },
   });

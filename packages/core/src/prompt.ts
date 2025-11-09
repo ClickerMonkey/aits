@@ -190,6 +190,26 @@ export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
 export type AnyPrompt = Prompt<any, any, any, any, any, any>;
 
 /**
+ * The different modes for retrieving prompt output from the convenience get() method.
+ */
+export type PromptGetType = 'result' | 'tools' | 'stream' | 'streamTools' | 'streamContent';
+
+/**
+ * The result type of the prompt get() method based on the selected mode.
+ */
+export type PromptGet<
+  TGetType extends PromptGetType,
+  TOutput,
+  TTools extends Tuple<AnyTool>,
+> = {
+  result: Promise<TOutput | undefined>;
+  tools: Promise<PromptToolOutput<TTools>[] | undefined>;
+  stream: AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>;
+  streamTools: AsyncGenerator<PromptToolOutput<TTools>, TOutput | undefined, unknown>;
+  streamContent: AsyncGenerator<string, TOutput | undefined, unknown>;
+}[TGetType];
+
+/**
  * A Prompt component that generates AI responses based on input, context, and available tools.
  * Prompts orchestrate interactions with AI models, handle tool calls, and manage streaming responses.
  *
@@ -278,63 +298,29 @@ export class Prompt<
    * - `streamTools`: Streams only tool output events
    * - `streamContent`: Streams only text content events
    *
-   * @param input - The input parameters for the prompt.
    * @param mode - The mode of output to retrieve. Defaults to 'result'.
+   * @param input - The input parameters for the prompt.
    * @param ctx - The context for the prompt's operation.
    * @returns The prompt output based on the specified mode.
    * @example
    * // Get final result
-   * const result = await prompt.get({ text: 'hello' });
+   * const result = await prompt.get();
    *
    * // Stream content
-   * for await (const chunk of prompt.get({ text: 'hello' }, 'streamContent')) {
+   * for await (const chunk of prompt.get('streamContent', { text: 'hello' })) {
    *   console.log(chunk);
    * }
    */
-  // public async get(input: TInput): Promise<TOutput> 
-  // public async get(...[input, mode, context]: OptionalParams<[TInput, 'result' | undefined, Context<TContext, TMetadata>]>): Promise<TOutput>
-
-  public get(): RequiredKeys<TInput> extends never ? RequiredKeys<TContext> extends never ? Promise<TOutput> : never : never;
-  public get(input: TInput): RequiredKeys<TContext> extends never ? Promise<TOutput> : never;
-  public get(input: TInput, mode: 'result'): RequiredKeys<TContext> extends never ? Promise<TOutput> : never;
   public get<
-    TRuntimeContext extends TContext, 
+    TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'result', context: TCoreContext): Promise<TOutput>;
-  public get<
-    TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata,
-    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'tools', ...[context]: OptionalParams<[TCoreContext]>): Promise<PromptToolOutput<TTools>[] | undefined>
-  public get<
-    TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata,
-    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'stream', ...[context]: OptionalParams<[TCoreContext]>): AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>
-  public get<
-    TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata,
-    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'streamTools', ...[context]: OptionalParams<[TCoreContext]>): AsyncGenerator<PromptToolOutput<TTools>, TOutput | undefined, unknown>
-  public get<
-    TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata,
-    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'streamContent', ...[context]: OptionalParams<[TCoreContext]>): AsyncGenerator<string, TOutput | undefined, unknown>
-  public get<
-    TRuntimeContext extends TContext, 
-    TRuntimeMetadata extends TMetadata,
-    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input: TInput, mode: 'result' | 'tools' | 'stream' | 'streamTools' | 'streamContent', ...[context]: OptionalParams<[TCoreContext]>): Promise<PromptToolOutput<TTools>[] | TOutput | undefined> | AsyncGenerator<PromptEvent<TOutput, TTools> | PromptToolOutput<TTools> | string, TOutput | undefined, unknown>
-  public get(
-    input: TInput = {} as TInput,
-    mode: 'result' | 'tools' | 'stream' | 'streamTools' | 'streamContent' = 'result',
-    ctx: Context<TContext, TMetadata> = {} as Context<TContext, TMetadata>,
-  ): 
-    Promise<PromptToolOutput<TTools>[] | TOutput | undefined> |
-    AsyncGenerator<PromptEvent<TOutput, TTools> | PromptToolOutput<TTools> | string, TOutput | undefined, unknown>
-  {
+  >(
+    ...[modeMaybe = 'result', inputMaybe, contextMaybe]: OptionalParams<[PromptGetType | undefined, TInput, TCoreContext]>
+  ): PromptGet<typeof modeMaybe & PromptGetType, TOutput, TTools> {
+    const mode = (modeMaybe || 'result') as PromptGetType;
+    const input = (inputMaybe || {}) as TInput;
+    const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const stream = this.stream(input, mode.startsWith('stream'), mode === 'tools', undefined, ctx);
 
     switch (mode) {

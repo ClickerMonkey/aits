@@ -468,7 +468,7 @@ export type AIBaseContext<T extends AIBaseTypes> = {
 /**
  * Base context with any types - for providers & handlers.
  */
-export type AIContextAny = AIBaseContext<AIBaseTypes>// & { [custom: string | number | symbol]: any };
+export type AIContextAny = Partial<AIBaseContext<AIBaseTypes>>// & { [custom: string | number | symbol]: any };
 
 /**
  * The type of user context that can be provided by the caller.

@@ -9,10 +9,10 @@
     "cletus": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build",
     "dev": "tsx watch src/index.tsx",
     "start": "tsx --conditions=source src/index.tsx",
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },

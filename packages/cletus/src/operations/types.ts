@@ -1,14 +1,14 @@
-import { CletusCoreContext } from "../ai";
-import { ChatMode, Operation, OperationKind } from "../schemas";
+import { CletusAIContext } from "../ai";
+import { ChatMode, OperationKind } from "../schemas";
 
-import * as planner from './planner';
-import * as librarian from './librarian';
-import * as clerk from './clerk';
-import * as secretary from './secretary';
+import { Plus } from "@aits/core";
 import * as architect from './architect';
-import * as dba from './dba';
 import * as artist from './artist';
-import { Plus } from "@aits/ai";
+import * as clerk from './clerk';
+import * as dba from './dba';
+import * as librarian from './librarian';
+import * as planner from './planner';
+import * as secretary from './secretary';
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -42,7 +42,7 @@ export type OperationDefinition<TInput, TOutput> = {
   /**
    * Operation mode required to perform this operation.
    */
-  mode: OperationMode | ((input: TInput, context: CletusCoreContext) => OperationMode);
+  mode: OperationMode | ((input: TInput, context: CletusAIContext) => OperationMode);
 
   /**
    * Analyze the operation input and return a description and doability status.
@@ -52,7 +52,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param context - Cletus core context
    * @returns Analysis result with description and doability
    */
-  analyze: (input: TInput, context: CletusCoreContext) => Promise<OperationAnalysis>;
+  analyze: (input: TInput, context: CletusAIContext) => Promise<OperationAnalysis>;
 
   /**
    * Run the operation and return the output.
@@ -61,7 +61,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param context - Cletus core context
    * @returns - Operation output
    */
-  do: (input: TInput, context: CletusCoreContext) => Promise<TOutput>;
+  do: (input: TInput, context: CletusAIContext) => Promise<TOutput>;
 };
 
 // Operation definition for a specific operation kind

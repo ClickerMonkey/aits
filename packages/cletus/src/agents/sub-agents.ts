@@ -32,7 +32,7 @@ export function createSubAgents(ai: CletusAI) {
 Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.`,
     tools: plannerTools,
     toolsOnly: true,
-    input: (_, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 
   // Librarian sub-agent
@@ -54,7 +54,7 @@ Knowledge sources can be formatted as:
 Your role is to help search, add, and manage knowledge entries for semantic search and context retrieval.`,
     tools: librarianTools,
     toolsOnly: true,
-    input: (_, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 
   // Clerk sub-agent
@@ -73,7 +73,7 @@ You do not have access outside of it. You can only operate on text-based files.
 Your role is to help search, read, create, modify, and organize files within the project directory.`,
     tools: clerkTools,
     toolsOnly: true,
-    input: (_, ctx) => ({
+    input: (_: {}, ctx) => ({
       cwd: ctx.cwd,
       userPrompt: ctx.userPrompt,
     }),
@@ -94,7 +94,7 @@ Available Assistants: {{assistants}}
 Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.`,
     tools: secretaryTools,
     toolsOnly: true,
-    input: (_, ctx) => {
+    input: (_: {}, ctx) => {
       const config = ctx.config.getData();
       const chat = ctx.chat;
 
@@ -123,7 +123,7 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 Your role is to help create and modify type definitions while maintaining data integrity.`,
     tools: architectTools,
     toolsOnly: true,
-    input: (_, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 
   // Artist sub-agent
@@ -142,7 +142,7 @@ You can generate new images, edit existing ones, analyze images, describe them, 
 Your role is to help with all image-related requests including creation, modification, and understanding visual content.`,
     tools: artistTools,
     toolsOnly: true,
-    input: (_, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 
   return [

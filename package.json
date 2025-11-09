@@ -4,7 +4,14 @@
   "private": true,
   "description": "@aits - AI TypeScript library collection",
   "workspaces": [
-    "packages/*"
+    "packages/core",
+    "packages/ai",
+    "packages/openai",
+    "packages/openrouter",
+    "packages/replicate",
+    "packages/models",
+    "packages/cletus",
+    "packages/test-integration"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -32,6 +39,7 @@
     "url": "https://github.com/ClickerMonkey/aits.git"
   },
   "devDependencies": {
+    "rimraf": "^6.1.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   }

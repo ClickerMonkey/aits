@@ -157,15 +157,6 @@ function getSchemas(type: TypeDefinition, cache: Record<string, any> = {}): Reco
 export function createDBAAgent(ai: CletusAI) {
   const aiTyped = ai.extend<{ type: TypeDefinition }>();
 
-  type A = ContextInfer<typeof ai>;
-  type B = AIContextInfer<typeof ai>;
-  type X = ContextInfer<typeof aiTyped>;
-  type Y = AIContextInfer<typeof aiTyped>;
-  type C = X extends A ? true : false;
-
-  type Z<T extends A> = true
-  type W = Z<X>;
-
   const dataCreate = aiTyped.tool({
     name: 'data_create',
     description: `Create a new record`,
@@ -174,7 +165,7 @@ export function createDBAAgent(ai: CletusAI) {
     schema: ({ type, cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: ctx.type.name, fields: input.fields } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: ctx.type.name, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
 
   const dataUpdate = aiTyped.tool({
@@ -186,7 +177,7 @@ export function createDBAAgent(ai: CletusAI) {
       id: z.string().describe('Record ID'),
       fields: getSchemas(type, cache).fields.partial().describe('Fields to update'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: ctx.type.name, id: input.id, fields: input.fields } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: ctx.type.name, id: input.id, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
 
   const dataDelete = aiTyped.tool({
@@ -197,7 +188,7 @@ export function createDBAAgent(ai: CletusAI) {
     schema: z.object({
       id: z.string().describe('Record ID'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: ctx.type.name, id: input.id } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: ctx.type.name, id: input.id } }, ctx as unknown as CletusAIContext),
   });
 
   const dataSelect = aiTyped.tool({
@@ -221,7 +212,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
         })
       ).optional().describe('Sort order'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: ctx.type.name, ...input } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataUpdateMany = aiTyped.tool({
@@ -234,7 +225,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to update'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: ctx.type.name, ...input } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataDeleteMany = aiTyped.tool({
@@ -246,7 +237,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
       where: getSchemas(type, cache).where.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: ctx.type.name, ...input } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataAggregate = aiTyped.tool({
@@ -279,7 +270,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
         })
       ).describe('Aggregation functions'),
     }),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: ctx.type.name, ...input } }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dba = aiTyped.prompt({

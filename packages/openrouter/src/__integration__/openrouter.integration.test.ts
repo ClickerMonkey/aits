@@ -238,23 +238,23 @@ describeIntegration('OpenRouter Integration', () => {
       const models = await provider.listModels!();
 
       const paidModels = models.filter(m =>
-        m.pricing.inputTokensPer1M > 0 || m.pricing.outputTokensPer1M > 0
+        (m.pricing.text?.input || 0) > 0 || (m.pricing.text?.output || 0) > 0
       );
 
       if (paidModels.length > 0) {
         // Find cheapest and most expensive
         paidModels.sort((a, b) =>
-          (a.pricing.inputTokensPer1M + a.pricing.outputTokensPer1M) -
-          (b.pricing.inputTokensPer1M + b.pricing.outputTokensPer1M)
+          ((a.pricing.text?.input || 0) + (a.pricing.text?.output || 0)) -
+          ((b.pricing.text?.input || 0) + (b.pricing.text?.output || 0))
         );
 
         const cheapest = paidModels[0];
         const mostExpensive = paidModels[paidModels.length - 1];
 
         console.log(`  Cheapest: ${cheapest.id}`);
-        console.log(`    $${cheapest.pricing.inputTokensPer1M}/M input, $${cheapest.pricing.outputTokensPer1M}/M output`);
+        console.log(`    $${cheapest.pricing.text?.input}/M input, $${cheapest.pricing.text?.output}/M output`);
         console.log(`  Most expensive: ${mostExpensive.id}`);
-        console.log(`    $${mostExpensive.pricing.inputTokensPer1M}/M input, $${mostExpensive.pricing.outputTokensPer1M}/M output`);
+        console.log(`    $${mostExpensive.pricing.text?.input}/M input, $${mostExpensive.pricing.text?.output}/M output`);
 
         expect(paidModels.length).toBeGreaterThan(0);
       }

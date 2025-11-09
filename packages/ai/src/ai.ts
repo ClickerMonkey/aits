@@ -696,7 +696,7 @@ export class AI<T extends AIBaseTypes> {
       yield* originalStream(input, preferStream, toolsOnly, events, coreContext as any);
     } as typeof prompt.stream;
 
-    this.components.push(prompt);
+    this.components.push(prompt as unknown as ComponentFor<T>);
 
     return prompt;
   }
@@ -764,7 +764,7 @@ export class AI<T extends AIBaseTypes> {
       })),
     });
 
-    this.components.push(tool);
+    this.components.push(tool as unknown as ComponentFor<T>);
 
     return tool;
   }
@@ -817,7 +817,7 @@ export class AI<T extends AIBaseTypes> {
       })),
     });
 
-    this.components.push(agent);
+    this.components.push(agent as unknown as ComponentFor<T>);
 
     return agent;
   }

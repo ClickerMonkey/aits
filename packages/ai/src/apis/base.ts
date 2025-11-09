@@ -126,7 +126,7 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async get<TRuntimeContext extends AIContextRequired<T> = AIContextRequired<T>>(
+  async get<TRuntimeContext extends AIContextRequired<T>>(
     request: TRequest,
     ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): Promise<TResponse> {
@@ -193,7 +193,7 @@ export abstract class BaseAPI<
    *
    * Single optional context parameter pattern
    */
-  async *stream<TRuntimeContext extends AIContextRequired<T> = AIContextRequired<T>>(
+  async *stream<TRuntimeContext extends AIContextRequired<T>>(
     request: TRequest,
     ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): AsyncIterable<TChunk> {

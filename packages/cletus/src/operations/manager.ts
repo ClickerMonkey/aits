@@ -1,5 +1,5 @@
 
-import { CletusCoreContext } from "../ai";
+import { CletusAIContext } from "../ai";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
@@ -36,7 +36,7 @@ export class OperationManager {
    */
   public async handle<
     K extends OperationKind,
-    C extends CletusCoreContext,
+    C extends CletusAIContext,
   >(operation: OperationInput<K>, ctx: C): Promise<string> {
     const def = Operations[operation.type] as unknown as OperationDefinitionFor<K>;
     if (!def) {
@@ -65,7 +65,7 @@ export class OperationManager {
    * @param ctx - Cletus core context
    * @returns Result message
    */
-  public async execute(op: Operation, doit: boolean, ctx: CletusCoreContext): Promise<string> {
+  public async execute(op: Operation, doit: boolean, ctx: CletusAIContext): Promise<string> {
     const def = Operations[op.type] as OperationDefinition<any, any>;
 
     if (doit && op.status !== 'created' && op.status !== 'analyzed') {
