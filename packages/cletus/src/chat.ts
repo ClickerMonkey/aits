@@ -1,5 +1,5 @@
-import { JsonFile, getChatPath } from './file-manager.js';
-import { ChatMessagesSchema, type ChatMessages, type Message } from './schemas.js';
+import { JsonFile, getChatPath } from './file-manager';
+import { ChatMessagesSchema, type ChatMessages, type Message } from './schemas';
 
 /**
  * Chat messages file manager

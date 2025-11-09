@@ -446,8 +446,10 @@ export class AI<T extends AIBaseTypes> {
 
     let tokens = 0;
 
-    let addText = (text: string) => {
-      tokens += Math.ceil(text.length / this.tokens.text.divisor);
+    let addText = (text: string | undefined) => {
+      if (text) {
+        tokens += Math.ceil(text.length / this.tokens.text.divisor);
+      }
     };
 
     addText(message.role);
@@ -465,7 +467,7 @@ export class AI<T extends AIBaseTypes> {
       for (const content of message.content) {
         addText(content.type);
 
-        const metrics = this.tokens[content.type];
+        const metrics = this.tokens[content.type || 'text'];
 
         if (typeof content.content === 'string') {
           if (content.content.startsWith('data:')) {
@@ -629,7 +631,7 @@ export class AI<T extends AIBaseTypes> {
       TTools
     >, 'types'>
   ) {
-    const { input, schema, config, reconfig, retool, validate, applicable, ...rest } = options;
+    const { input, schema, config, reconfig, retool, validate, applicable, metadataFn, ...rest } = options;
 
     const hydrateFn = <S, TResult>(optionWithInjection: S, getOptionWithoutInjection: (resolved: FnResolved<Exclude<S, undefined>>) => TResult) => {
       return typeof optionWithInjection === 'function'
@@ -664,6 +666,9 @@ export class AI<T extends AIBaseTypes> {
       })),
       retool: hydrateFn(retool, (r) => (async (newTools, ctxPartial) => {
         return r(newTools, await getContext(ctxPartial));
+      })),
+      metadataFn: hydrateFn(metadataFn, (r) => (async (input, ctxPartial) => {
+        return r(input, await getContext(ctxPartial));
       })),
       validate: hydrateFn(validate, (r) => (async (output, ctxPartial) => {
         return r(output, await getContext(ctxPartial));

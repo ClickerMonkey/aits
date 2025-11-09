@@ -78,9 +78,10 @@ export const image_generate = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd }) => {
+  do: async (input, { ai, cwd, config }) => {
     // Generate images
     const response = await ai.image.generate.get({
+      model: config.getData().user.models?.imageGenerate,
       prompt: input.prompt,
       n: input.n || 1,
     });
@@ -117,11 +118,12 @@ export const image_edit = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd }) => {
+  do: async (input, { ai, cwd, config }) => {
     const image = await loadImageAsDataUrl(cwd, input.imagePath);
 
     // Edit image
     const response = await ai.image.edit.get({
+      model: config.getData().user.models?.imageEdit,
       prompt: input.prompt,
       image,
     });
@@ -140,7 +142,7 @@ export const image_analyze = operationOf<
   { prompt: string; imagePaths: string[]; maxCharacters?: number },
   { prompt: string; imagePaths: string[]; analysis: string }
 >({
-  mode: 'local',
+  mode: 'read',
   analyze: async (input, { cwd }) => {
     const maxChars = input.maxCharacters || 2084;
     const imageCount = input.imagePaths.length;
@@ -164,13 +166,14 @@ export const image_analyze = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd }) => {
+  do: async (input, { ai, cwd, config }) => {
     const imageUrls = await Promise.all(input.imagePaths.map(async (imagePath) => {
       return loadImageAsDataUrl(cwd, imagePath);
     }));
 
     // Analyze images
     const response = await ai.image.analyze.get({
+      model: config.getData().user.models?.imageAnalyze,
       prompt: input.prompt,
       images: imageUrls,
       maxTokens: Math.floor((input.maxCharacters || 2084) / 4),
@@ -188,7 +191,7 @@ export const image_describe = operationOf<
   { imagePath: string },
   { imagePath: string; description: string }
 >({
-  mode: 'local',
+  mode: 'read',
   analyze: async (input, { cwd }) => {
     const fullPath = resolveImage(cwd, input.imagePath);
 
@@ -204,11 +207,12 @@ export const image_describe = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd }) => {
+  do: async (input, { ai, cwd, config }) => {
     const image = await loadImageAsDataUrl(cwd, input.imagePath);
  
     // Describe image
     const response = await ai.image.analyze.get({
+      model: config.getData().user.models?.imageAnalyze,
       prompt: 'Describe this image in detail.',
       images: [image],
     });
@@ -225,7 +229,7 @@ export const image_find = operationOf<
   { prompt: string; glob: string; maxImages?: number; n?: number },
   { prompt: string; searched: number; results: Array<{ path: string; score: number }> }
 >({
-  mode: 'local',
+  mode: 'read',
   analyze: async (input, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
@@ -249,7 +253,7 @@ export const image_find = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd }) => {
+  do: async (input, { ai, cwd, config }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
 
@@ -278,6 +282,7 @@ export const image_find = operationOf<
         const dataUrl = `data:${mimeType};base64,${base64}`;
 
         const response = await ai.image.analyze.get({
+          model: config.getData().user.models?.imageAnalyze,
           prompt: 'Describe this image briefly in 1-2 sentences.',
           images: [dataUrl],
         });

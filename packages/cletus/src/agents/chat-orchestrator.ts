@@ -1,10 +1,10 @@
 import { Message as AIMessage, MessageContent as AIMessageContent, withEvents } from '@aits/core';
-import type { ChatFile } from '../chat.js';
-import type { ConfigFile } from '../config.js';
-import { OperationManager } from '../operations/manager.js';
-import type { ChatMeta, Message, MessageContent, Operation } from '../schemas.js';
-import { createChatAgent } from './chat-agent.js';
-import { logger } from '../logger.js';
+import type { ChatFile } from '../chat';
+import type { ConfigFile } from '../config';
+import { OperationManager } from '../operations/manager';
+import type { ChatMeta, Message, MessageContent, Operation } from '../schemas';
+import { createChatAgent } from './chat-agent';
+import { logger } from '../logger';
 
 /**
  * Options for running the chat orchestrator
@@ -35,7 +35,7 @@ export type OrchestratorEvent =
  */
 function convertContent(content: MessageContent): AIMessageContent {
   return {
-    type: content.type,
+    type: content.type || 'text',
     content: typeof content.content === 'string' && /^(file|https?):\/\//.test(content.content)
       ? new URL(content.content)
       : content.content,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI } from '../ai';
 
 /**
  * Create secretary tools for assistant and memory management

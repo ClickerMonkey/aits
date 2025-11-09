@@ -585,16 +585,6 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   if (view === 'manage-models') {
     const currentModels = config.getData().user.models || {};
 
-    const modelTypeLabels: Record<ModelType, string> = {
-      chat: 'Chat',
-      imageGenerate: 'Image Generation',
-      imageEdit: 'Image Editing',
-      imageAnalyze: 'Image Analysis',
-      transcription: 'Transcription',
-      speech: 'Text-to-Speech',
-      embedding: 'Embeddings',
-    };
-
     const items = [
       { label: `💬 Chat: ${currentModels.chat || '(none)'}`, value: 'chat' },
       { label: `🎨 Image Generation: ${currentModels.imageGenerate || '(none)'}`, value: 'imageGenerate' },

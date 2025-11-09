@@ -1,14 +1,15 @@
-import Handlebars from 'handlebars';
-import { AI, AIContextInfer, ContextInfer } from '@aits/ai';
+import { AI, ContextInfer } from '@aits/ai';
+import { models } from '@aits/models';
 import { OpenAIProvider } from '@aits/openai';
 import { OpenRouterProvider } from '@aits/openrouter';
 import { ReplicateProvider } from '@aits/replicate';
-import { models } from '@aits/models';
-import { ConfigFile } from './config';
+import Handlebars from 'handlebars';
 import { ChatFile } from './chat';
-import { ChatMeta, TypeDefinition } from './schemas';
-import { OperationManager } from './operations/manager';
+import { ConfigFile } from './config';
 import { logger } from './logger';
+import { OperationManager } from './operations/manager';
+import { ChatMeta, TypeDefinition } from './schemas';
+import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 
 /**
  * Cletus AI Context
@@ -37,10 +38,31 @@ export interface CletusMetadata {
 export function createCletusAI(configFile: ConfigFile) {
   const config = configFile.getData();
 
+  const retryEvents: RetryEvents = {
+    onRetry: (attempt: number, error: Error, delay: number, context: RetryContext) =>{
+      logger.log(`Retry Attempt ${attempt} after ${delay}ms - ${error.message}: ${error.stack}`);
+    },
+    onTimeout: (attempt: number, context: RetryContext) => {
+      logger.log(`Timeout on Attempt ${attempt}`);
+    },
+    onMaxRetriesExceeded: (attempt: number, error: Error, context: RetryContext) => {
+      logger.log(`Max Retries Exceeded on Attempt ${attempt} - ${error.message}: ${error.stack}`);
+    },
+    onSuccess: (attempt: number, duration: number, context: RetryContext) => {
+      logger.log(`Successful Request on Attempt ${attempt} after ${duration}ms`);
+    },
+  };
+
   // Initialize providers based on config
   const providers = {
-    ...(config.providers.openai ? { openai: new OpenAIProvider(config.providers.openai) } : {}),
-    ...(config.providers.openrouter ? { openrouter: new OpenRouterProvider(config.providers.openrouter) } : {}),
+    ...(config.providers.openai ? { openai: new OpenAIProvider({
+      ...config.providers.openai,
+      retryEvents,
+    }) } : {}),
+    ...(config.providers.openrouter ? { openrouter: new OpenRouterProvider({
+      ...config.providers.openrouter,
+      retryEvents,
+    }) } : {}),
     ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),
   } as const;
 
@@ -81,6 +103,16 @@ export function createCletusAI(configFile: ConfigFile) {
         return { ...ctx, userPrompt, cache: {} };
       },
       models,
+    }).withHooks({
+      beforeRequest: async (ctx, request, selected, tokens, cost) => {
+        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}: ${JSON.stringify(request)}`);
+      },
+      afterRequest: async (ctx, request, selected, usage, cost) => {
+        logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}`);
+      },
+      onError: async (type, message, error, ctx, request) => {
+        logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack} request=${JSON.stringify(request)}`);
+      }
     });
 
   return ai;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI } from '../ai';
 
 /**
  * Create architect tools for type definition management

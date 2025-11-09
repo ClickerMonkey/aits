@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI } from '../ai';
 
 /**
  * Create planner tools for todo management
@@ -68,7 +68,6 @@ export function createPlannerTools(ai: CletusAI) {
     schema: z.object({
       todos: z.array(
         z.object({
-          id: z.string().optional(),
           name: z.string(),
           done: z.boolean().optional(),
         })
@@ -78,7 +77,7 @@ export function createPlannerTools(ai: CletusAI) {
       type: 'todos_replace',
       input: {
         todos: input.todos.map((t) => ({
-          id: t.id || Math.random().toString(36).substring(7),
+          id: crypto.randomUUID(),
           name: t.name,
           done: t.done || false,
         }))

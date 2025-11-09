@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI } from '../ai';
 
 /**
  * Create librarian tools for knowledge management

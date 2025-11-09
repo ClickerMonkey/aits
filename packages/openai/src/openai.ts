@@ -897,7 +897,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         completion = await retry(async (signal) => {
           const inner = await client.chat.completions.create(params, { signal });
 
-          const choice = completion.choices[0];
+          const choice = inner.choices[0];
           if (!choice) {
             throw new ProviderError(this.name, 'No choices in response');
           }

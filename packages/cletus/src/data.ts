@@ -1,5 +1,5 @@
-import { JsonFile, getDataPath } from './file-manager.js';
-import { DataFileSchema, type DataFile, type DataRecord } from './schemas.js';
+import { JsonFile, getDataPath } from './file-manager';
+import { DataFileSchema, type DataFile, type DataRecord } from './schemas';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

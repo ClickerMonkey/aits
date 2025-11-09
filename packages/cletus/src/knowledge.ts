@@ -1,5 +1,5 @@
-import { JsonFile, getKnowledgePath } from './file-manager.js';
-import { KnowledgeSchema, type Knowledge, type KnowledgeEntry } from './schemas.js';
+import { JsonFile, getKnowledgePath } from './file-manager';
+import { KnowledgeSchema, type Knowledge, type KnowledgeEntry } from './schemas';
 
 /**
  * Knowledge file manager for storing embeddings

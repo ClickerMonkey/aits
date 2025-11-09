@@ -1,6 +1,6 @@
-import { operationOf } from "./types";
-import { KnowledgeFile } from "../knowledge";
 import { getModel } from "@aits/core";
+import { KnowledgeFile } from "../knowledge";
+import { operationOf } from "./types";
 
 export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },

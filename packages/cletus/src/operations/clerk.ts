@@ -448,7 +448,7 @@ export const file_read = operationOf<
   { path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
   { path: string; content: string; truncated: boolean }
 >({
-  mode: 'local',
+  mode: 'read',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
@@ -505,7 +505,7 @@ export const text_search = operationOf<
   { glob: string; regex: string; surrounding?: number, transcribeImages?: boolean },
   { pattern: string; count: number; results: Array<{ file: string; matches: string[] }> }
 >({
-  mode: 'local',
+  mode: (input) => input.transcribeImages ? 'read' : 'local',
   analyze: async (input, { cwd }) => {
     const surrounding = input.surrounding || 0;
     const files = await searchFiles(cwd, input.glob);

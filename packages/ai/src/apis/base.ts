@@ -108,7 +108,7 @@ export abstract class BaseAPI<
 
       // Run beforeModelSelection hook to affect which model might be selected (like restricting providers, zdr, etc)
       const enrichedMetadata = hooks.beforeModelSelection
-        ? await hooks.beforeModelSelection(ctx, metadata)
+        ? await hooks.beforeModelSelection(ctx, request, metadata)
         : metadata;
 
       // Select model
@@ -131,10 +131,12 @@ export abstract class BaseAPI<
     ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): Promise<TResponse> {
     const { hooks, registry } = this.ai;
+    let latestCtx: TRuntimeContext | AIContext<T> | undefined = ctx;
 
     try {
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
+      latestCtx = fullCtx;
 
       // Get model for request
       const selected = await this.getModelFor(request, fullCtx, false);
@@ -149,14 +151,14 @@ export abstract class BaseAPI<
       } as typeof fullCtx.metadata;
 
       // Run onModelSelected hook
-      const finalSelected = (await hooks.onModelSelected?.(fullCtx, selected)) || selected;
+      const finalSelected = (await hooks.onModelSelected?.(fullCtx, request, selected)) || selected;
 
       // Estimate tokens
       const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
       const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
 
       // Run beforeRequest hook (hook can override provider config)
-      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens, estimatedCost);
+      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedTokens, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -174,7 +176,7 @@ export abstract class BaseAPI<
       const cost = this.calculateResponseCost(response, finalSelected, estimatedTokens);
 
       // Run afterRequest hook
-      await hooks.afterRequest?.(fullCtx, finalSelected, usage, cost);
+      await hooks.afterRequest?.(fullCtx, request, finalSelected, usage, cost);
 
       return response;
     } catch (error) {
@@ -182,7 +184,8 @@ export abstract class BaseAPI<
         this.getErrorType('request'),
         this.getErrorMessage('request'),
         error instanceof Error ? error : undefined,
-        undefined
+        latestCtx,
+        request,
       );
       throw error;
     }
@@ -198,10 +201,12 @@ export abstract class BaseAPI<
     ...[ctx]: OptionalParams<[TRuntimeContext]>
   ): AsyncIterable<TChunk> {
     const { hooks, registry } = this.ai;
+    let latestCtx: TRuntimeContext | AIContext<T> | undefined = ctx;
 
     try {
       // Build full context
       const fullCtx = await this.ai.buildContext(ctx || {} as AIContextRequired<T>);
+      latestCtx = fullCtx;
 
       // Get model for request
       const selected = await this.getModelFor(request, fullCtx, true);
@@ -217,7 +222,7 @@ export abstract class BaseAPI<
 
       // Run onModelSelected hook
       const finalSelected = hooks.onModelSelected
-        ? (await hooks.onModelSelected(fullCtx, selected)) || selected
+        ? (await hooks.onModelSelected(fullCtx, request, selected)) || selected
         : selected;
 
       // Estimate tokens
@@ -225,7 +230,7 @@ export abstract class BaseAPI<
       const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
 
       // Run beforeRequest hook
-      await hooks.beforeRequest?.(fullCtx, finalSelected, estimatedTokens, estimatedCost);
+      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedTokens, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -245,13 +250,14 @@ export abstract class BaseAPI<
       const cost = this.calculateStreamCost(accumulatedUsage, finalSelected);
 
       // Run afterRequest hook
-      await hooks.afterRequest?.(fullCtx, finalSelected, accumulatedUsage, cost);
+      await hooks.afterRequest?.(fullCtx, request, finalSelected, accumulatedUsage, cost);
     } catch (error) {
       hooks.onError?.(
         this.getErrorType('stream'),
         this.getErrorMessage('stream'),
         error instanceof Error ? error : undefined,
-        undefined
+        latestCtx,
+        request,
       );
       throw error;
     }

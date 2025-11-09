@@ -102,6 +102,8 @@ export interface PromptInput<
   retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
   metadata?: TMetadata;
+  // A function/promise that returns metadata about the prompt to be passed during execution/streaming.
+  metadataFn?: (input: TInput, ctx: Context<TContext, TMetadata>) => TMetadata | Promise<TMetadata>;
   // If messages on the context should be excluded when rendering the prompt.
   excludeMessages?: boolean;
   // Optional post-validation hook that runs after Zod parsing succeeds on the final output. Can throw to trigger re-prompting.
@@ -270,6 +272,7 @@ export class Prompt<
     private config = resolveFn(input.config),
     private translate = resolveFn(input.input),
     private content = Prompt.compileContent(input.content, !!input.tools?.length),
+    private metadata = resolveFn(input.metadataFn),
   ) {
   }
 
@@ -555,7 +558,12 @@ export class Prompt<
 
       ctx.signal?.addEventListener('abort', streamAbort);
 
-      const stream = streamer(request, ctx, this.input.metadata, streamController.signal);
+      const metadata: TMetadata = {
+        ...(this.input.metadata || {} as TMetadata),
+        ...(await this.metadata(input, ctx) || {}),
+      };
+
+      const stream = streamer(request, ctx, metadata, streamController.signal);
 
       for await (const chunk of stream) {
         if (streamController.signal.aborted) {
@@ -783,6 +791,11 @@ export class Prompt<
           lastError = undefined;
           break;
         }
+      }
+
+      // If we want content after a required tool call, and we had some successes and no new parse errors, remove tool requirement
+      if (!onlyTools && (request.toolChoice || 'none') !== 'none' && toolSuccesses > 0 && toolParseErrorsPrevious === toolParseErrors) {
+        delete request.toolChoice;
       }
 
       // If we are finished, parse the output

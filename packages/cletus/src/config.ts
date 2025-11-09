@@ -1,11 +1,11 @@
-import { JsonFile, getConfigPath } from './file-manager.js';
+import { JsonFile, getConfigPath } from './file-manager';
 import {
   ConfigSchema,
   type Config,
   type Assistant,
   type ChatMeta,
   type TypeDefinition,
-} from './schemas.js';
+} from './schemas';
 
 /**
  * Default assistants created during initialization

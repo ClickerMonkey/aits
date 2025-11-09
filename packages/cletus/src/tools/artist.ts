@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai.js';
+import type { CletusAI } from '../ai';
 
 /**
  * Create artist tools for image operations

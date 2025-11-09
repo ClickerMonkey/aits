@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { CletusAI, CletusAIContext } from '../ai.js';
-import type { TypeDefinition, TypeField } from '../schemas.js';
-import { FieldCondition, WhereClause } from '../operations/where-helpers.js';
+import type { CletusAI, CletusAIContext } from '../ai';
+import type { TypeDefinition, TypeField } from '../schemas';
+import { FieldCondition, WhereClause } from '../operations/where-helpers';
 import { AI, AIContextInfer, AITypes, ContextInfer } from '@aits/ai';
 
 /**
@@ -299,6 +299,9 @@ Use the available tools to complete the data operation requested in the conversa
       dataDeleteMany,
       dataAggregate,
     ],
+    metadataFn: (_, { config }) => ({
+      model: config.getData().user.models?.chat,
+    }),
     input: (_: {}, { userPrompt, type }) => ({ userPrompt, type }),
   });
 

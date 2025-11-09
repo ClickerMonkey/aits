@@ -138,7 +138,7 @@ export const memory_update = operationOf<
   { content: string },
   { content: string; added: boolean }
 >({
-  mode: 'create',
+  mode: 'update',
   analyze: async (input, { config }) => {
     const preview = input.content.length > 50
       ? input.content.substring(0, 50) + '...'

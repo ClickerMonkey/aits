@@ -1057,6 +1057,7 @@ export interface AIHooks<T extends AIBaseTypes> {
    */
   beforeModelSelection?: (
     ctx: AIContext<T>,
+    request: BaseRequest,
     metadata: AIMetadata<T>
   ) => Promise<AIMetadata<T>> | AIMetadata<T>;
 
@@ -1066,6 +1067,7 @@ export interface AIHooks<T extends AIBaseTypes> {
    */
   onModelSelected?: (
     ctx: AIContext<T>,
+    request: BaseRequest,
     selected: SelectedModelFor<T>
   ) => Promise<SelectedModelFor<T> | void> | SelectedModelFor<T> | void;
 
@@ -1076,6 +1078,7 @@ export interface AIHooks<T extends AIBaseTypes> {
    */
   beforeRequest?: (
     ctx: AIContext<T>,
+    request: BaseRequest,
     selected: SelectedModelFor<T>,
     estimatedTokens: number,
     estimatedCost: number
@@ -1087,6 +1090,7 @@ export interface AIHooks<T extends AIBaseTypes> {
    */
   afterRequest?: (
     ctx: AIContext<T>,
+    request: BaseRequest,
     selected: SelectedModelFor<T>,
     usage: Usage,
     cost: number
@@ -1100,7 +1104,8 @@ export interface AIHooks<T extends AIBaseTypes> {
     errorType: string,
     message: string,
     error?: Error,
-    ctx?: AIContext<T>
+    ctx?: AIContext<T> | AIContextRequired<T>,
+    request?: BaseRequest,
   ) => void;
 }
 
