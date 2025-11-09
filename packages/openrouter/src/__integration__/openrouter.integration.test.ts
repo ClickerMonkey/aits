@@ -22,7 +22,9 @@ describeIntegration('OpenRouter Integration', () => {
 
   describe('Model Listing', () => {
     it('should list real models from OpenRouter', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       expect(models.length).toBeGreaterThan(0);
 
@@ -31,7 +33,9 @@ describeIntegration('OpenRouter Integration', () => {
     }, 30000);
 
     it('should include models from multiple providers', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       // OpenRouter aggregates models from multiple providers
       const providers = new Set(models.map(m => m.id.split('/')[0]));
@@ -42,10 +46,12 @@ describeIntegration('OpenRouter Integration', () => {
     }, 30000);
 
     it('should include model pricing', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       const modelsWithPricing = models.filter(m =>
-        m.pricing.inputTokensPer1M > 0 || m.pricing.outputTokensPer1M > 0
+        (m.pricing.text?.input || 0) > 0 || (m.pricing.text?.output || 0) > 0
       );
 
       expect(modelsWithPricing.length).toBeGreaterThan(0);
@@ -171,10 +177,12 @@ describeIntegration('OpenRouter Integration', () => {
 
   describe('Model Selection', () => {
     it('should find free models', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       const freeModels = models.filter(m =>
-        m.pricing.inputTokensPer1M === 0 && m.pricing.outputTokensPer1M === 0
+        m.pricing.text?.input! && !m.pricing.text?.output
       );
 
       expect(freeModels.length).toBeGreaterThan(0);
@@ -184,7 +192,9 @@ describeIntegration('OpenRouter Integration', () => {
     }, 30000);
 
     it('should find models with vision capability', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       const visionModels = models.filter(m => m.capabilities.has('vision'));
 
@@ -235,7 +245,9 @@ describeIntegration('OpenRouter Integration', () => {
 
   describe('Cost Comparison', () => {
     it('should show cost range across available models', async () => {
-      const models = await provider.listModels!();
+      const models = await provider.listModels!({
+        apiKey: getAPIKey()
+      });
 
       const paidModels = models.filter(m =>
         (m.pricing.text?.input || 0) > 0 || (m.pricing.text?.output || 0) > 0

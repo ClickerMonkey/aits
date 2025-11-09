@@ -316,9 +316,9 @@ export class Prompt<
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
   >(
-    ...[modeMaybe = 'result', inputMaybe, contextMaybe]: OptionalParams<[PromptGetType | undefined, TInput, TCoreContext]>
-  ): PromptGet<typeof modeMaybe & PromptGetType, TOutput, TTools> {
-    const mode = (modeMaybe || 'result') as PromptGetType;
+    mode: PromptGetType = 'result',
+    ...[inputMaybe, contextMaybe]: OptionalParams<[TInput, TCoreContext]>
+  ): PromptGet<typeof mode & PromptGetType, TOutput, TTools> {
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
     const stream = this.stream(input, mode.startsWith('stream'), mode === 'tools', undefined, ctx);
