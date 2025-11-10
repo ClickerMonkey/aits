@@ -8,7 +8,10 @@ export function createLibrarianTools(ai: CletusAI) {
   const knowledgeSearch = ai.tool({
     name: 'knowledge_search',
     description: 'Search knowledge base by semantic similarity',
-    instructions: 'Use this to find relevant information from the knowledge base using semantic search. Provide a query and optionally filter by source prefix (e.g., "user", "file@path:", "task:id").',
+    instructions: `Use this to find relevant information from the knowledge base using semantic search. Provide a query and optionally filter by source prefix (e.g., "user", "file@path:", "task:id").
+
+Example: Search for user preferences:
+{ "query": "user's preferred programming languages", "limit": 5, "sourcePrefix": "user" }`,
     schema: z.object({
       query: z.string().describe('Search query text'),
       limit: z.number().optional().describe('Maximum results (default: 10)'),
@@ -20,7 +23,10 @@ export function createLibrarianTools(ai: CletusAI) {
   const knowledgeSources = ai.tool({
     name: 'knowledge_sources',
     description: 'List all unique source prefixes in knowledge base',
-    instructions: 'Use this to see what types of knowledge are available. Sources are prefixed like "user", "task:", "file@{path}:".',
+    instructions: `Use this to see what types of knowledge are available. Sources are prefixed like "user", "task:", "file@{path}:".
+
+Example: Simply call with no parameters:
+{}`,
     schema: z.object({}),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_sources', input }, ctx),
   });
@@ -28,7 +34,10 @@ export function createLibrarianTools(ai: CletusAI) {
   const knowledgeAdd = ai.tool({
     name: 'knowledge_add',
     description: 'Add user memory to knowledge base',
-    instructions: 'Use this to store important information the user wants to remember. This will be embedded and made searchable via semantic search.',
+    instructions: `Use this to store important information the user wants to remember. This will be embedded and made searchable via semantic search.
+
+Example: Store a project detail:
+{ "text": "The authentication service uses JWT tokens with a 24-hour expiration" }`,
     schema: z.object({
       text: z.string().describe('The memory text to add'),
     }),
@@ -38,7 +47,10 @@ export function createLibrarianTools(ai: CletusAI) {
   const knowledgeDelete = ai.tool({
     name: 'knowledge_delete',
     description: 'Delete all knowledge entries matching a source prefix',
-    instructions: 'Use this to remove knowledge entries. Provide a source prefix to delete all matching entries (e.g., "task:123" or "file@{path}:summary"). Be careful as this is permanent.',
+    instructions: `Use this to remove knowledge entries. Provide a source prefix to delete all matching entries (e.g., "task:123" or "file@{path}:summary"). Be careful as this is permanent.
+
+Example: Delete all knowledge from a specific file:
+{ "sourcePrefix": "file@docs/old-guide.md:" }`,
     schema: z.object({
       sourcePrefix: z.string().describe('Source prefix to delete (e.g., "task:123", "user", "file@somefile.txt:")'),
     }),

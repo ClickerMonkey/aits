@@ -15,18 +15,66 @@ export function createChatAgent(ai: CletusAI) {
   const typeEnum = z.enum(types.map(t => t.name) as [string, ...string[]]);
 
   // Create the routing tool that decides which sub-agent to use
-  const routeTool = ai.tool({
+  const delegate = ai.tool({
     name: 'delegate',
     description: 'Delegate work to a specialized sub-agent',
     instructions: `Use this tool to route requests to specialized agents:
 
 - **planner**: The user will make requests and when a request takes multiple steps to complete, you should use the planner agent to create and manage todos for Cletus to perform. These are only to keep track of Cletus's own work and should not be presented to the user unless explicitly asked for.
+  - todos_clear()
+  - todos_list()
+  - todos_add(name: string)
+  - todos_done(id: string)
+  - todos_get(id: string)
+  - todos_remove(id: string)
+  - todos_replace(todos: Array<{name: string, done?: boolean}>)
+
 - **librarian**: Knowledge search, semantic search, managing knowledge. Knowledge is built from custom data, indexed files, and explicitly created by the user. It's text that can be retrieved with semantic search.
+  - knowledge_search(query: string, limit?: number, sourcePrefix?: string)
+  - knowledge_sources()
+  - knowledge_add(text: string)
+  - knowledge_delete(sourcePrefix: string)
+
 - **clerk**: File operations (text search, semantic search, read, create, edit, delete, move, copy, info, summarization, indexing)
+  - file_search(glob: string, limit?: number, offset?: number)
+  - file_summary(path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
+  - file_index(glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
+  - file_create(path: string, content: string)
+  - file_copy(glob: string, target: string)
+  - file_move(glob: string, target: string)
+  - file_stats(path: string)
+  - file_delete(path: string)
+  - file_read(path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
+  - text_search(glob: string, regex: string, surrounding?: number, transcribeImages?: boolean)
+  - dir_create(path: string)
+
 - **secretary**: User memory, assistant personas, switching assistants
+  - assistant_switch(name: string)
+  - assistant_update(name: string, prompt: string)
+  - assistant_add(name: string, prompt: string)
+  - memory_list()
+  - memory_update(content: string)
+
 - **architect**: Type definitions, creating/modifying data schemas
+  - type_info(name: string)
+  - type_update(name: string, update: {friendlyName?: string, description?: string, knowledgeTemplate?: string, fields?: Record<string, object | null>})
+  - type_create(name: string, friendlyName: string, description?: string, knowledgeTemplate: string, fields: Array<{name: string, friendlyName: string, type: string, default?: any, required?: boolean, enumOptions?: string[]}>)
+
 - **artist**: Image generation, editing, analysis, and search
+  - image_generate(prompt: string, n?: number)
+  - image_edit(prompt: string, imagePath: string)
+  - image_analyze(prompt: string, imagePaths: string[], maxCharacters?: number)
+  - image_describe(imagePath: string)
+  - image_find(prompt: string, glob: string, maxImages?: number, n?: number)
+
 - **dba**: Data operations (create, update, delete, select, update many, delete many, aggregate) - when using this agent, you MUST specify the type of data to operate on using the 'type' parameter
+  - data_create(fields: object)
+  - data_update(id: string, fields: object)
+  - data_delete(id: string)
+  - data_select(where?: object, offset?: number, limit?: number, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
+  - data_update_many(set: object, where?: object, limit?: number)
+  - data_delete_many(where: object, limit?: number)
+  - data_aggregate(groupBy?: string[], where?: object, having?: object, select: Array<{function: string, field?: string, alias?: string}>, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
 
 Choose the appropriate agent based on what the user wants done.
 
@@ -46,7 +94,7 @@ Choose the appropriate agent based on what the user wants done.
       typeName: typeEnum.nullable().describe('The type of data to operate on (required for dba agent)'),
     }),
     refs: subAgents,
-    call: ({ agent, typeName }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
+    call: async ({ agent, typeName }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent);
 
       if (agent === 'dba') {
@@ -55,7 +103,10 @@ Choose the appropriate agent based on what the user wants done.
           throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
         }
         
-        return dba.get('tools', {}, { ...ctx, type });
+        const tools = await dba.get('tools', {}, { ...ctx, type });
+
+        ctx.log(`Using dba tools for ${type.name}: ${tools?.map(t => t.tool).join(', ')}`);
+        return tools;
       } else {
         const subAgent = {
           planner,
@@ -70,7 +121,7 @@ Choose the appropriate agent based on what the user wants done.
           throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
         }
 
-        return subAgent.get('tools', {}, ctx);
+        return await subAgent.get('tools', {}, ctx);
       }
     },
   });
@@ -92,17 +143,17 @@ You MUST use the 'delegate' tool to perform any actions; do not attempt to do an
 Only do explicitly what the user asks you to do. If the user request is unclear, ask for clarification.
 
 If you don't find the information you need, try to get it from another agent.`,
-    tools: [routeTool],
-    toolsMax: 3,
-    config: {
-      toolChoice: 'required',
-    },
+    tools: [delegate],
+    toolsMax: 5,
     metadata: {
       weights: {
         speed: 0.7,
         accuracy: 0.3,
       },
     },
+    metadataFn: (_, { config }) => ({
+      model: config.getData().user.models?.chat,
+    }),
     input: (input: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });
 

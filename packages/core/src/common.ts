@@ -1,4 +1,4 @@
-import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage, Events } from "./types";
+import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage, Events, ComponentOutput } from "./types";
 
 /**
  * A flexible function type that can be:
@@ -172,9 +172,11 @@ export async function resolve(input: any): Promise<any> {
     while (!result.done) {
       result = await input.next();
     }
-    return result.value;
+    return resolve(result.value);
+  } else if (typeof input === 'function') {  
+    return resolve(input());
   } else {
-    return Promise.resolve(input);
+    return input;
   }
 }
 
@@ -341,6 +343,11 @@ export function withEvents<TRoot extends AnyComponent>(events: Events<TRoot>): R
       status: 'pending',
     };
 
+    if (instanceContext.instance) {
+      instanceContext.instance.children = instanceContext.instance.children || [];
+      instanceContext.instance.children.push(instance);
+    }
+
     instanceContext.instance = instance;
 
     if (instance.parent) {
@@ -355,16 +362,18 @@ export function withEvents<TRoot extends AnyComponent>(events: Events<TRoot>): R
     instance.started = Date.now();
 
     const output = getOutput(instanceContext, events);
-    const resolved = resolve(output);
 
-    resolved.then((result) => {
+    // Helper to update instance status on completion
+    const markCompleted = (result: any) => {
       instance.status = 'completed';
       instance.completed = Date.now();
       instance.output = result;
-
       // @ts-ignore
       events.onStatus?.(instance);
-    }, (error) => {
+    };
+
+    // Helper to update instance status on error
+    const markFailed = (error: any) => {
       if (instanceContext.signal?.aborted) {
         instance.status = 'interrupted';
       } else {
@@ -372,12 +381,61 @@ export function withEvents<TRoot extends AnyComponent>(events: Events<TRoot>): R
       }
       instance.completed = Date.now();
       instance.error = error;
-
       // @ts-ignore
       events.onStatus?.(instance);
-    });
+    };
 
-    return output;
+    // Helper to wrap an async generator with status tracking
+    const wrapGenerator = async function*(generator: AsyncGenerator<any, any, any>) {
+      try {
+        // Yield all events from the original generator
+        for await (const event of generator) {
+          yield event;
+        }
+        // Capture the return value (generator is now exhausted)
+        const lastResult = await generator.next();
+        const finalResult = lastResult.value;
+
+        markCompleted(finalResult);
+        return finalResult;
+      } catch (error) {
+        markFailed(error);
+        throw error;
+      }
+    };
+
+    // Handle async generators differently - wrap them instead of consuming
+    if (isAsyncGenerator(output)) {
+      return wrapGenerator(output as AsyncGenerator<any, any, any>) as ComponentOutput<C>;
+    } else if (isPromise(output)) {
+      // Check if the promise resolves to an async generator
+      const wrappedGenerator = async function*() {
+        try {
+          const resolved = await output;
+
+          if (isAsyncGenerator(resolved)) {
+            // It's a Promise<AsyncGenerator>, wrap and forward
+            return yield* wrapGenerator(resolved as AsyncGenerator<any, any, any>);
+          } else {
+            // It's a Promise<value>, just complete
+            markCompleted(resolved);
+            return resolved;
+          }
+        } catch (error) {
+          markFailed(error);
+          throw error;
+        }
+      }();
+
+      return wrappedGenerator as ComponentOutput<C>;
+    } else {
+      // Original logic for non-generators, non-promises (raw values)
+      const resolved = resolve(output);
+
+      resolved.then(markCompleted, markFailed);
+
+      return output;
+    }
   };
 
   return runner;

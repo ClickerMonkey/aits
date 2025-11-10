@@ -79,6 +79,7 @@ const CONTEXT_WINDOW_PATTERNS = [
   /(?:prompt|input|message).*too.*(?:long|large)/i,
   /token.*limit.*exceeded/i,
   /context.*capacity/i,
+  /request\s+too\s+large/i,
 ];
 
 /**
@@ -101,7 +102,7 @@ export function isContextWindowError(error: any): boolean {
   if (!error) return false;
 
   const status = error.status || error.statusCode;
-  if (status !== 413) return false;
+  if (status !== 413 && status !== 429) return false;
 
   const message = error.message || '';
   return CONTEXT_WINDOW_PATTERNS.some((pattern) => pattern.test(message));
@@ -124,6 +125,7 @@ export function parseContextWindowError(error: any): ContextWindowInfo | null {
     /(?:maximum|max).*context.*(?:length|window|size).*?(?:is|of)?\s*(\d+)/i,
     /context.*(?:length|window|size).*?(?:is|of)?\s*(\d+)/i,
     /(\d+).*token.*(?:limit|maximum|max)/i,
+    /limit\s+(\d+)/i,
   ];
 
   let contextWindow: number | undefined;

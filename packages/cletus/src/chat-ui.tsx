@@ -665,11 +665,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
               break;
 
             case 'operations':
-              addSystemMessage(event.summary);
+              // addSystemMessage(event.summary);
               break;
 
             case 'complete':
-              // addMessage(event.message);
+              addMessage(event.message);
               setPendingMessage(null);
               break;
 

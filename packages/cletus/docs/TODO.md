@@ -40,3 +40,15 @@
 - [ ] update clerk so they see text files as lines - can search by lines
 - [ ] add offset to summarization inputs
 - [ ] add semantic data search (search through knowledge & score, find matching record)
+- [ ] add image_attach
+- [ ] on Ctrl+C in chat, ask if they want to exit to main menu, quit, or cancel
+- [ ] add chatStatus(status: string) context
+- [ ] add chatMessage to context so operations can be added to the pending message
+- [ ] add it so each chat definition has a function to convert the input into a human friendly "tool" call string
+- [ ] update chat-ui to render messages differently (extend message content to add operation type with kind?). chat-ui should habe a agent / user message component render
+- [ ] show system messages toggle (only show ones within X minutes). Keep track of message created?
+- [ ] implement UI that looks at last message to see if there are operations that need to be approved and lets the user approve each one
+- [ ] while deleting chat - stay in list instead of going back to settings
+- [ ] add case insensitive option to regex inputs
+- [ ] add limit & offset or count only options to text_search (sort files)
+- [ ] duplicate message issue

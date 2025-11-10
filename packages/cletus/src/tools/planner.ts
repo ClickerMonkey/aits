@@ -8,7 +8,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosClear = ai.tool({
     name: 'todos_clear',
     description: 'Clears all todos from the current chat',
-    instructions: 'Use this to clear all todos when starting fresh or when all tasks are complete.',
+    instructions: `Use this to clear all todos when starting fresh or when all tasks are complete.
+
+Example: Simply call with no parameters:
+{}`,
     schema: z.object({}),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_clear', input }, ctx),
   });
@@ -16,7 +19,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosList = ai.tool({
     name: 'todos_list',
     description: 'Lists all current todos',
-    instructions: 'Use this to see what tasks are pending or completed.',
+    instructions: `Use this to see what tasks are pending or completed.
+
+Example: Simply call with no parameters:
+{}`,
     schema: z.object({}),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_list', input }, ctx),
   });
@@ -24,7 +30,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosAdd = ai.tool({
     name: 'todos_add',
     description: 'Adds a new todo to the list',
-    instructions: 'Use this when breaking down a complex task into smaller steps. Provide a clear, concise name for the todo.',
+    instructions: `Use this when breaking down a complex task into smaller steps. Provide a clear, concise name for the todo.
+
+Example: Add a task to implement a feature:
+{ "name": "Implement user authentication with OAuth" }`,
     schema: z.object({
       name: z.string().describe('The todo name/description'),
     }),
@@ -34,7 +43,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosDone = ai.tool({
     name: 'todos_done',
     description: 'Marks a todo as completed',
-    instructions: 'Use this when a task has been successfully completed. Provide the todo ID.',
+    instructions: `Use this when a task has been successfully completed. Provide the todo ID.
+
+Example: Mark a todo as done:
+{ "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID to mark as done'),
     }),
@@ -44,7 +56,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosGet = ai.tool({
     name: 'todos_get',
     description: 'Gets details for a specific todo',
-    instructions: 'Use this to check the status and details of a particular todo.',
+    instructions: `Use this to check the status and details of a particular todo.
+
+Example: Get details for a specific todo:
+{ "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID'),
     }),
@@ -54,7 +69,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosRemove = ai.tool({
     name: 'todos_remove',
     description: 'Removes a todo from the list',
-    instructions: 'Use this to delete a todo that is no longer relevant or was added by mistake.',
+    instructions: `Use this to delete a todo that is no longer relevant or was added by mistake.
+
+Example: Remove a todo:
+{ "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID to remove'),
     }),
@@ -64,7 +82,10 @@ export function createPlannerTools(ai: CletusAI) {
   const todosReplace = ai.tool({
     name: 'todos_replace',
     description: 'Replaces all todos with a new set',
-    instructions: 'Use this to completely reorganize the todo list with a new plan. All existing todos will be replaced.',
+    instructions: `Use this to completely reorganize the todo list with a new plan. All existing todos will be replaced.
+
+Example: Replace with a new project plan:
+{ "todos": [{ "name": "Set up project structure", "done": false }, { "name": "Implement core features", "done": false }, { "name": "Write tests", "done": false }] }`,
     schema: z.object({
       todos: z.array(
         z.object({

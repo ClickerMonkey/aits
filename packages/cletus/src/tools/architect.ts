@@ -13,7 +13,10 @@ export function createArchitectTools(ai: CletusAI) {
   const typeInfo = ai.tool({
     name: 'type_info',
     description: 'Get all information about a type definition',
-    instructions: 'Use this to see the full schema of a custom data type including all fields and their properties.',
+    instructions: `Use this to see the full schema of a custom data type including all fields and their properties.
+
+Example: Get information about a type:
+{ "name": "task" }`,
     schema: z.object({
       name: z.string().describe('Type name'),
     }),
@@ -28,7 +31,13 @@ export function createArchitectTools(ai: CletusAI) {
 - Never remove required fields (breaking change)
 - Never make optional fields required without a default value (breaking change)
 - You CAN add new fields (if required, must have default), update descriptions, update knowledgeTemplate, or delete optional fields
-Provide an update object with the changes to make.`,
+Provide an update object with the changes to make.
+
+Example 1: Add a new optional field:
+{ "name": "task", "update": { "fields": { "priority": { "friendlyName": "Priority", "type": "number", "required": false } } } }
+
+Example 2: Update description:
+{ "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }`,
     schema: z.object({
       name: z.string().describe('Type name'),
       update: z.object({
@@ -56,7 +65,10 @@ Provide an update object with the changes to make.`,
   const typeCreate = ai.tool({
     name: 'type_create',
     description: 'Create a new type definition',
-    instructions: 'Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value.',
+    instructions: `Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value.
+
+Example: Create a project tracking type:
+{ "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }`,
     schema: z.object({
       name: z.string().describe('Type name (lowercase, no spaces)'),
       friendlyName: z.string().describe('Display name'),

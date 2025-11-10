@@ -315,16 +315,23 @@ export class Prompt<
    * }
    */
   public get<
+    TGetType extends PromptGetType,
     TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
   >(
-    mode: PromptGetType = 'result',
+    mode: TGetType = 'result' as TGetType,
     ...[inputMaybe, contextMaybe]: OptionalParams<[TInput, TCoreContext]>
-  ): PromptGet<typeof mode & PromptGetType, TOutput, TTools> {
+  ): PromptGet<TGetType, TOutput, TTools> {
+    const prompt = this as Component<TContext, TMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>;
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
-    const stream = this.stream(input, mode.startsWith('stream'), mode === 'tools', undefined, ctx);
+    const preferStream = mode.startsWith('stream');
+    const toolsOnly = mode === 'tools';
+    const stream = ctx.runner
+      // @ts-ignore
+      ? ctx.runner(prompt, input, ctx, (innerCtx, events) => this.stream(input, preferStream, toolsOnly, events, innerCtx))
+      : this.stream(input, preferStream, toolsOnly, undefined, ctx);
 
     switch (mode) {
     case 'result':
@@ -334,7 +341,7 @@ export class Prompt<
             return event.output;
           }
         }
-      })();
+      })() as PromptGet<TGetType, TOutput, TTools>;
     case 'tools':
       return (async function() {
         const tools: PromptToolOutput<TTools>[] = [];
@@ -344,7 +351,7 @@ export class Prompt<
           }
         }
         return tools;
-      })();
+      })() as PromptGet<TGetType, TOutput, TTools>;
     case 'stream':
       return (async function*() {
         let output: TOutput | undefined = undefined;
@@ -355,7 +362,7 @@ export class Prompt<
           }
         }
         return output;
-      })();
+      })() as PromptGet<TGetType, TOutput, TTools>;
     case 'streamTools':
       return (async function*() {
         let output: TOutput | undefined = undefined;
@@ -368,7 +375,7 @@ export class Prompt<
           }
         }
         return output;
-      })();
+      })() as PromptGet<TGetType, TOutput, TTools>;
     case 'streamContent':
       return (async function*() {
         let output: TOutput | undefined = undefined;
@@ -381,7 +388,7 @@ export class Prompt<
           }
         }
         return output;
-      })();
+      })() as PromptGet<TGetType, TOutput, TTools>;
     }
   }
 
@@ -491,7 +498,6 @@ export class Prompt<
       name: this.name,
       ...config,
       maxTokens: config?.maxTokens ?? ctx.maxOutputTokens,
-      toolChoice: onlyTools ? 'required': config?.toolChoice,
       messages: [
         { role: 'system', content },
       ],
@@ -499,7 +505,9 @@ export class Prompt<
       responseFormat,
     };
 
-    if (request.toolChoice === 'required' && (!tools || tools.length === 0)) {
+    const fixedToolChoice = request.toolChoice && (request.toolChoice === 'required' || typeof request.toolChoice === 'object');
+
+    if (fixedToolChoice && (!tools || tools.length === 0)) {
       throw new Error(`Prompt ${this.input.name} is configured to require tools, but no tools are available.`);
     }
 
@@ -749,9 +757,17 @@ export class Prompt<
         }
 
         for (const toolCall of toolCalls) {
+          const content = toolCall.error
+            ? toolCall.error
+            : toolCall.result
+              ? typeof toolCall.result === 'string'
+                ? toolCall.result
+                : JSON.stringify(toolCall.result)
+              : '';
+
           request.messages.push({
             role: 'tool',
-            content: toolCall.error || toolCall.result || '',
+            content,
             toolCallId: toolCall.toolCall.id,
           });
 
@@ -773,29 +789,31 @@ export class Prompt<
         }
       }
 
-      // The only want tool calls, no further response.
-      // We want an iteration with no parse errors and some successes.
-      if (onlyTools && toolSuccesses > 0 && toolParseErrorsPrevious === toolParseErrors) {
-        // got what we needed!
-        lastError = undefined;
-        break;
-      }
+      const hadToolErrors = toolParseErrorsPrevious !== toolParseErrors;
+      const hitMax = this.input.toolsMax && toolSuccesses >= this.input.toolsMax;
 
-      // If we met our max tool calls, remove the tools from the request
-      if (this.input.toolsMax && toolSuccesses >= this.input.toolsMax) {
-        // No more tools for you!
-        disableTools = true;
+      // If if there are only tool calls wanted...
+      if (onlyTools) {
+        const successWithoutNewErrors = toolSuccesses > 0 && !hadToolErrors;
+        const noTools = toolCalls.length === 0;
 
-        if (onlyTools) {
+        // If we met our max tool calls, or had some successes with no new errors, or there are no more tools to call, end it.
+        if (hitMax || successWithoutNewErrors || noTools) {
           // got what we needed!
           lastError = undefined;
           break;
         }
-      }
+      } else {
+        // We don't only want tools, but if we had some successes and no new parse errors, remove tool requirement
+        if (fixedToolChoice && toolSuccesses > 0 && !hadToolErrors) {
+          delete request.toolChoice;
+        }
 
-      // If we want content after a required tool call, and we had some successes and no new parse errors, remove tool requirement
-      if (!onlyTools && (request.toolChoice || 'none') !== 'none' && toolSuccesses > 0 && toolParseErrorsPrevious === toolParseErrors) {
-        delete request.toolChoice;
+        // If we met our max tool calls, remove the tools from the request
+        if (hitMax) {
+          // No more tools for you!
+          disableTools = true;
+        }
       }
 
       // If we are finished, parse the output
@@ -1158,7 +1176,7 @@ type ToolExecution<T> = {
   parse: () => Promise<ToolExecution<T>>;
   run: () => Promise<ToolExecution<T>>;
   args?: any;
-  result?: string;
+  result?: any;
   error?: string;
 }
 

@@ -9,7 +9,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileSearch = ai.tool({
     name: 'file_search',
     description: 'Search for files using glob patterns',
-    instructions: 'Use this to find files by pattern. Supports glob syntax like "**/*.ts", "src/**/*.json". Returns up to the specified limit with optional offset for pagination.',
+    instructions: `Use this to find files by pattern. Supports glob syntax like "**/*.ts", "src/**/*.json". Returns up to the specified limit with optional offset for pagination.
+
+Example: Find all TypeScript files in src directory:
+{ "glob": "src/**/*.ts", "limit": 10 }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern (e.g., "**/*.ts", "src/**/*.json")'),
       limit: z.number().optional().describe('Maximum results (default: 50)'),
@@ -21,7 +24,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileSummary = ai.tool({
     name: 'file_summary',
     description: 'Generate AI summary of a file',
-    instructions: 'Use this to get a high-level summary of a file without reading the full content. Supports text files, PDFs, Office docs, and images (with description/transcription).',
+    instructions: `Use this to get a high-level summary of a file without reading the full content. Supports text files, PDFs, Office docs, and images (with description/transcription).
+
+Example: Summarize a PDF document:
+{ "path": "docs/report.pdf", "characterLimit": 32000 }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       characterLimit: z.number().optional().describe('Max characters to process (default: 64000)'),
@@ -35,7 +41,13 @@ export function createClerkTools(ai: CletusAI) {
   const fileIndex = ai.tool({
     name: 'file_index',
     description: 'Index files for semantic search by content or summary',
-    instructions: 'Use this to index files for semantic search. Choose "content" to embed the full text in chunks, or "summary" to embed an AI-generated summary. Supports image description and OCR.',
+    instructions: `Use this to index files for semantic search. Choose "content" to embed the full text in chunks, or "summary" to embed an AI-generated summary. Supports image description and OCR.
+
+Example 1: Index all markdown files by content:
+{ "glob": "**/*.md", "index": "content" }
+
+Example 2: Index images with descriptions:
+{ "glob": "images/**/*.jpg", "index": "summary", "describeImages": true }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to index'),
       index: z.enum(['content', 'summary']).describe('Index mode: "content" embeds full text in chunks, "summary" embeds AI summary'),
@@ -49,7 +61,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileCreate = ai.tool({
     name: 'file_create',
     description: 'Create a new file with content',
-    instructions: 'Use this to create a new file. Fails if file already exists. Parent directories will be created automatically if needed.',
+    instructions: `Use this to create a new file. Fails if file already exists. Parent directories will be created automatically if needed.
+
+Example: Create a new configuration file:
+{ "path": "config/settings.json", "content": "{\\"theme\\": \\"dark\\", \\"fontSize\\": 14}" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       content: z.string().describe('File content'),
@@ -60,7 +75,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileCopy = ai.tool({
     name: 'file_copy',
     description: 'Copy files matching glob pattern to target location',
-    instructions: 'Use this to duplicate one or more files. If copying multiple files, target must be a directory. Target directories will be created if needed.',
+    instructions: `Use this to duplicate one or more files. If copying multiple files, target must be a directory. Target directories will be created if needed.
+
+Example: Copy all config files to backup directory:
+{ "glob": "config/*.json", "target": "backup/config/" }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to copy'),
       target: z.string().describe('Destination file path or directory'),
@@ -71,7 +89,13 @@ export function createClerkTools(ai: CletusAI) {
   const fileMove = ai.tool({
     name: 'file_move',
     description: 'Move files matching glob pattern to target',
-    instructions: 'Use this to move one or more files. Can move to a directory or rename a single file. If moving multiple files, target must be a directory.',
+    instructions: `Use this to move one or more files. Can move to a directory or rename a single file. If moving multiple files, target must be a directory.
+
+Example 1: Rename a single file:
+{ "glob": "old-name.ts", "target": "new-name.ts" }
+
+Example 2: Move multiple files into a directory:
+{ "glob": "temp/*.log", "target": "archive/" }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to move'),
       target: z.string().describe('Destination directory or file'),
@@ -82,7 +106,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileStats = ai.tool({
     name: 'file_stats',
     description: 'Get file statistics and metadata',
-    instructions: 'Use this to get metadata about a file (size, timestamps, type, line/character counts for text files).',
+    instructions: `Use this to get metadata about a file (size, timestamps, type, line/character counts for text files).
+
+Example: Get stats for a source file:
+{ "path": "src/index.ts" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
     }),
@@ -92,7 +119,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileDelete = ai.tool({
     name: 'file_delete',
     description: 'Delete a file',
-    instructions: 'Use this to permanently delete a file. This cannot be undone.',
+    instructions: `Use this to permanently delete a file. This cannot be undone.
+
+Example: Delete a temporary file:
+{ "path": "temp/cache.tmp" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
     }),
@@ -102,7 +132,10 @@ export function createClerkTools(ai: CletusAI) {
   const fileRead = ai.tool({
     name: 'file_read',
     description: 'Read file content',
-    instructions: 'Use this to read a file into context. Supports text files, PDFs, Office docs, and images (with description/transcription). Large files can be truncated using characterLimit.',
+    instructions: `Use this to read a file into context. Supports text files, PDFs, Office docs, and images (with description/transcription). Large files can be truncated using characterLimit.
+
+Example: Read a source file:
+{ "path": "src/main.ts" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       characterLimit: z.number().optional().describe('Max characters to read (default: 64000)'),
@@ -116,20 +149,33 @@ export function createClerkTools(ai: CletusAI) {
   const textSearch = ai.tool({
     name: 'text_search',
     description: 'Search for regex pattern in files',
-    instructions: 'Use this to find text patterns across multiple files. Returns matches with surrounding context lines. Supports OCR for images.',
+    instructions: `Use this to find text patterns across multiple files. Returns matches with surrounding context lines. Supports OCR for images.
+
+Example: Find all function declarations in TypeScript files:
+{ "glob": "src/**/*.ts", "regex": "function \\\\w+\\\\(", "surrounding": 2 }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to search'),
-      regex: z.string().describe('Regular expression pattern'),
+      regex: z.string().describe('Regular expression pattern, EMCA syntax'),
       surrounding: z.number().optional().describe('Lines of context around match (default: 0)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images before searching (default: false)'),
     }),
+    validate: (input) => {
+      try {
+        new RegExp(input.regex);
+      } catch (error: any) {
+        throw new Error(`Invalid regular expression: ${input.regex}`, { cause: error });
+      }
+    },
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'text_search', input }, ctx),
   });
 
   const dirCreate = ai.tool({
     name: 'dir_create',
     description: 'Create a directory',
-    instructions: 'Use this to create a directory. Fails if directory already exists. Parent directories will be created automatically.',
+    instructions: `Use this to create a directory. Fails if directory already exists. Parent directories will be created automatically.
+
+Example: Create a new feature directory:
+{ "path": "src/features/auth" }`,
     schema: z.object({
       path: z.string().describe('Relative directory path'),
     }),

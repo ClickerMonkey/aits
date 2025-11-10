@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 
-import { render } from 'ink';
+import { render, Text } from 'ink';
 import React, { useState } from 'react';
-import { Box, Text } from 'ink';
-import { ConfigFile } from './config.js';
+import { InkChatView } from './components/InkChatView.js';
 import { InkInitWizard } from './components/InkInitWizard.js';
 import { InkMainMenu } from './components/InkMainMenu.js';
-import { InkChatView } from './components/InkChatView.js';
+import { ConfigFile } from './config.js';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 

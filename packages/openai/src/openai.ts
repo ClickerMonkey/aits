@@ -30,7 +30,7 @@ import OpenAI, { Uploadable } from 'openai';
 import { Stream } from 'openai/core/streaming';
 import z from 'zod';
 import { isContextWindowError, parseContextWindowError, type RetryConfig, RetryContext, type RetryEvents, withRetry } from './retry';
-import { ContextWindowError, ProviderError, RateLimitError } from './types';
+import { ContextWindowError, ProviderError } from './types';
 
 // ============================================================================
 // OpenAI Provider Configuration

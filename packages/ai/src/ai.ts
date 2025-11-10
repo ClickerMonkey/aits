@@ -698,7 +698,14 @@ export class AI<T extends AIBaseTypes> {
       const coreContext = await ai.buildCoreContext(ctxRequired);
       coreContext.metadata = ai.mergeMetadata(prompt.input.metadata, coreContext.metadata) as any;
 
-      yield* originalStream(input, preferStream, toolsOnly, events, coreContext as any);
+      const stream = originalStream(input, preferStream, toolsOnly, events, coreContext as any);
+      let result = await stream.next();
+      while (!result.done) {
+        yield result.value;
+        result = await stream.next();
+      }
+      return result.value;
+
     } as typeof prompt.stream;
 
     this.components.push(prompt as unknown as ComponentFor<T>);

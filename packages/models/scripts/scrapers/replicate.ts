@@ -74,6 +74,7 @@ function detectCapabilities(model: ReplicateModelData): Set<ModelCapability> {
     lowerName.includes('midjourney') ||
     lowerName.includes('dalle') ||
     lowerDesc.includes('image generation') ||
+    lowerDesc.includes('image edit') ||
     lowerDesc.includes('text-to-image')
   ) {
     capabilities.add('image');
@@ -84,7 +85,8 @@ function detectCapabilities(model: ReplicateModelData): Set<ModelCapability> {
     lowerName.includes('vision') ||
     lowerName.includes('image-to-text') ||
     lowerDesc.includes('image analysis') ||
-    lowerDesc.includes('image understanding')
+    lowerDesc.includes('image understanding') ||
+    lowerDesc.includes('image edit')
   ) {
     capabilities.add('vision');
   }

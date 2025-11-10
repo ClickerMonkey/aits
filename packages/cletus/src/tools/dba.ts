@@ -5,6 +5,58 @@ import { FieldCondition, WhereClause } from '../operations/where-helpers';
 import { AI, AIContextInfer, AITypes, ContextInfer } from '@aits/ai';
 
 /**
+ * Generate example field values based on field type
+ */
+function getExampleValue(field: TypeField): string {
+  switch (field.type) {
+    case 'string':
+      return field.enumOptions ? `"${field.enumOptions[0]}"` : '"Example text"';
+    case 'number':
+      return '42';
+    case 'boolean':
+      return 'true';
+    case 'enum':
+      return `"${field.enumOptions?.[0] || 'option1'}"`;
+    case 'date':
+      return '"2024-01-15"';
+    default:
+      return '"ref-id-123"';
+  }
+}
+
+/**
+ * Generate example fields object for documentation
+ */
+function generateExampleFields(fields: TypeField[], includeAll: boolean = false): string {
+  const exampleFields = fields
+    .filter(f => includeAll || f.required || Math.random() > 0.5)
+    .slice(0, 3)
+    .map(f => `"${f.name}": ${getExampleValue(f)}`)
+    .join(', ');
+  return `{ ${exampleFields} }`;
+}
+
+/**
+ * Generate example where clause for a type
+ */
+function generateExampleWhere(field: TypeField): string {
+  switch (field.type) {
+    case 'string':
+      return `{ "${field.name}": { "equals": "example" } }`;
+    case 'number':
+      return `{ "${field.name}": { "gte": 5 } }`;
+    case 'boolean':
+      return `{ "${field.name}": { "equals": true } }`;
+    case 'enum':
+      return `{ "${field.name}": { "equals": "${field.enumOptions?.[0] || 'option1'}" } }`;
+    case 'date':
+      return `{ "${field.name}": { "after": "2024-01-01" } }`;
+    default:
+      return `{ "${field.name}": { "equals": "id-123" } }`;
+  }
+}
+
+/**
  * Build a Zod schema from a TypeField definition
  */
 function buildFieldSchema(field: TypeField): z.ZodTypeAny {
@@ -161,7 +213,7 @@ export function createDBAAgent(ai: CletusAI) {
     name: 'data_create',
     description: `Create a new record`,
     descriptionFn: ({ type }) => `Create a new ${type.friendlyName} record`,
-    instructionsFn: ({ type }) => `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}`,
+    instructionsFn: ({ type }) => `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }`,
     schema: ({ type, cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
     }),
@@ -172,7 +224,7 @@ export function createDBAAgent(ai: CletusAI) {
     name: 'data_update',
     description: `Update a record by ID`,
     descriptionFn: ({ type }) => `Update a ${type.friendlyName} record by ID`,
-    instructionsFn: ({ type }) => `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.`,
+    instructionsFn: ({ type }) => `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }`,
     schema: ({ type, cache }) => z.object({
       id: z.string().describe('Record ID'),
       fields: getSchemas(type, cache).fields.partial().describe('Fields to update'),
@@ -184,7 +236,7 @@ export function createDBAAgent(ai: CletusAI) {
     name: 'data_delete',
     description: `Delete a record by ID`,
     descriptionFn: ({ type }) => `Delete a ${type.friendlyName} record by ID`,
-    instructionsFn: ({ type }) => `Use this to permanently delete a ${type.friendlyName}.`,
+    instructionsFn: ({ type }) => `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }`,
     schema: z.object({
       id: z.string().describe('Record ID'),
     }),
@@ -195,12 +247,22 @@ export function createDBAAgent(ai: CletusAI) {
     name: 'data_select',
     description: `Query records`,
     descriptionFn: ({ type }) => `Query ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => `Use this to search and retrieve ${type.friendlyName} records. Supports:
+    instructionsFn: ({ type }) => {
+      const firstField = type.fields[0];
+      const sortField = type.fields.find(f => f.type === 'number' || f.type === 'date') || firstField;
+      return `Use this to search and retrieve ${type.friendlyName} records. Supports:
 - where: Filter by field values with and/or logic
 - offset/limit: Pagination
 - orderBy: Sort by field(s)
 
-Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
+Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}
+
+Example 1: Find records with filter:
+{ "where": ${generateExampleWhere(firstField)}, "limit": 10 }
+
+Example 2: Query with sorting:
+{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }`;
+    },
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Filter conditions with and/or logic'),
       offset: z.number().optional().default(0).describe('Starting position'),
@@ -219,7 +281,11 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
     name: 'data_update_many',
     description: `Update multiple records`,
     descriptionFn: ({ type }) => `Update multiple ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => `Use this to bulk update ${type.friendlyName} records that match a where clause.`,
+    instructionsFn: ({ type }) => {
+      const firstField = type.fields[0];
+      const updateField = type.fields[1] || firstField;
+      return `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }`;
+    },
     schema: ({ type, cache }) => z.object({
       set: getSchemas(type, cache).fields.partial().describe('Fields to set on matching records'),
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
@@ -232,7 +298,7 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
     name: 'data_delete_many',
     description: `Delete multiple records`,
     descriptionFn: ({ type }) => `Delete multiple ${type.friendlyName} records`,
-    instructionsFn: ({ type }) =>  `Use this to bulk delete ${type.friendlyName} records that match a where clause.`,
+    instructionsFn: ({ type }) => `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
@@ -244,14 +310,25 @@ Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
     name: 'data_aggregate',
     description: `Perform aggregation queries`,
     descriptionFn: ({ type }) => `Perform aggregation queries on ${type.friendlyName}`,
-    instructionsFn: ({ type }) => `Use this for analytics and reporting on ${type.friendlyName} data:
+    instructionsFn: ({ type }) => {
+      const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
+      const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
+      const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
+      return `Use this for analytics and reporting on ${type.friendlyName} data:
 - groupBy: Group by field(s)
 - where: Filter before aggregation
 - having: Filter after aggregation
 - select: Aggregation functions (count, sum, avg, min, max)
 - orderBy: Sort results
 
-Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}`,
+Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}
+
+Example 1: Count records by field:
+{ "groupBy": ["${groupField.name}"], "select": [{ "function": "count", "alias": "total" }] }
+
+Example 2: Aggregate with filter:
+{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }`;
+    },
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Pre-aggregation filter'),
       having: getSchemas(type, cache).where.optional().describe('Post-aggregation filter'),

@@ -184,7 +184,7 @@ export type ComponentRefs<C extends AnyComponent> = C extends Component<infer t0
  * All components referenced directly or indirectly by a given component.
  */
 export type ComponentsAll<C extends AnyComponent> = C extends Component<infer t0, infer t1, infer t2, infer t3, infer t4, infer TRefs>
-  ? TRefs[number] | ComponentsAll<TRefs[number]>
+  ? C | TRefs[number] | ComponentsAll<TRefs[number]>
   : never;
 
 /**

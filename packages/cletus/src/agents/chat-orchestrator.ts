@@ -138,6 +138,8 @@ export async function runChatOrchestrator(
 
       logger.log('orchestrator: running chat agent');
 
+      let stackTrace: any;
+
       // Run chat agent
       const chatResponse = chatAgent.run({}, {
         ops,
@@ -149,12 +151,18 @@ export async function runChatOrchestrator(
         metadata: {
           model: chatMeta.model ?? config.getData().user.models?.chat,
         },
+        /*
         // @ts-ignore
         runner: withEvents<typeof chatAgent>({
           onStatus: (node) => {
             const { id, status, error, input, output, component: { name, kind }, parent } = node;
             const parentId = parent ? `${parent.component.name} (${parent.component.kind})` : '';
             logger.log(`orchestrator! ${name} (${kind}) [${id}]: ${status} ${parentId ? `parent:{${parentId}}` : ``} ${error ? ` - ${error}` : ''}${status === 'pending' ? ` - input: ${JSON.stringify(input)}` : ''}${status === 'completed' ? ` - output: ${JSON.stringify(output)}` : ''}`);
+
+            if (node.status !== 'pending' && node.status !== 'running' && node.component.name === 'cletus_chat') {
+              // @ts-ignore
+              stackTrace = node;
+            }
           },
           onPromptEvent: (instance, event) => {
             // @ts-ignore
@@ -172,6 +180,7 @@ export async function runChatOrchestrator(
             }
           }
         })
+          */
       });
 
       logger.log('orchestrator: processing response');
@@ -191,6 +200,11 @@ export async function runChatOrchestrator(
 
           case 'textComplete':
             pending.content[0].content = chunk.content;
+            onEvent({ type: 'pendingUpdate', message: { ...pending } });
+            break;
+
+          case 'complete':
+            pending.content[0].content = chunk.output;
             onEvent({ type: 'pendingUpdate', message: { ...pending } });
             break;
 
@@ -238,6 +252,23 @@ export async function runChatOrchestrator(
         }
       }
 
+      await chatResponse.return?.(undefined);
+
+      logger.log(`Cletus trace: ${JSON.stringify(stackTrace, (k, v) => {
+        if (k === 'context' || k === 'parent') {
+          return undefined
+        }
+        if (k === 'component') {
+          return v.name;
+        }
+        if ((k === 'started' || k === 'completed') && typeof v === 'number') {
+          return new Date(v).toISOString();
+        }
+        return v;
+      }, 2)}`);
+
+      let doMore = false;
+
       // Save operations if any
       if (ops.operations.length > 0) {
         pending.operations = ops.operations;
@@ -282,7 +313,7 @@ export async function runChatOrchestrator(
           discardedTokens = 0;
 
           // Continue loop
-          continue;
+          doMore = true; // continue;
         }
       }
 
@@ -294,7 +325,10 @@ export async function runChatOrchestrator(
       });
 
       onEvent({ type: 'complete', message: pending });
-      break;
+
+      if (!doMore) {
+        break;
+      }
     }
   } catch (error: any) {
     if (error.message !== 'Aborted') {

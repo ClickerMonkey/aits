@@ -541,7 +541,7 @@ export const text_search = operationOf<
     const pattern = new RegExp(input.regex, 'g');
     const surrounding = input.surrounding || 0;
 
-    const results = await Promise.all(readable.map(async (file) => {
+    const allResults = await Promise.all(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
         assetPath: await getAssetPath(true),
@@ -622,6 +622,8 @@ export const text_search = operationOf<
         }),
       };
     }));
+
+    const results = allResults.filter(r => r.matches.length > 0);
 
     return { pattern: input.regex, count: results.length, results };
   },
