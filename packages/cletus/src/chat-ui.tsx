@@ -93,6 +93,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [exitOptionIndex, setExitOptionIndex] = useState(0);
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [savedInput, setSavedInput] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -193,6 +195,59 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
       if (inputValue === '') {
         setInputValue('');
+      }
+      return;
+    }
+
+    // Alt+Up to navigate backwards through message history
+    if (key.meta && key.upArrow && !isWaitingForResponse && !showCommandMenu && !showHelpMenu && !showExitPrompt) {
+      // Extract user messages with text content
+      const userMessages = chatMessages
+        .filter(msg => msg.role === 'user')
+        .map(msg => {
+          const textContent = msg.content.find(c => c.type === 'text');
+          return textContent?.content || '';
+        })
+        .filter(content => content.length > 0);
+
+      if (userMessages.length === 0) return;
+
+      // Save current input if we're at the bottom of history
+      if (historyIndex === -1) {
+        setSavedInput(inputValue);
+      }
+
+      // Navigate backwards
+      const newIndex = historyIndex === -1 ? userMessages.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(newIndex);
+      setInputValue(userMessages[newIndex]);
+      return;
+    }
+
+    // Alt+Down to navigate forwards through message history
+    if (key.meta && key.downArrow && !isWaitingForResponse && !showCommandMenu && !showHelpMenu && !showExitPrompt) {
+      if (historyIndex === -1) return; // Already at bottom
+
+      // Extract user messages with text content
+      const userMessages = chatMessages
+        .filter(msg => msg.role === 'user')
+        .map(msg => {
+          const textContent = msg.content.find(c => c.type === 'text');
+          return textContent?.content || '';
+        })
+        .filter(content => content.length > 0);
+
+      // Navigate forwards
+      const newIndex = historyIndex + 1;
+
+      if (newIndex >= userMessages.length) {
+        // Restore saved input and reset to bottom
+        setInputValue(savedInput);
+        setHistoryIndex(-1);
+        setSavedInput('');
+      } else {
+        setHistoryIndex(newIndex);
+        setInputValue(userMessages[newIndex]);
       }
       return;
     }
@@ -327,6 +382,7 @@ KEYBOARD SHORTCUTS:
 • Ctrl+C      - Exit chat
 • ESC         - Interrupt AI response or stop transcription
 • Alt+T       - Start/stop voice transcription
+• Alt+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
 
@@ -672,6 +728,10 @@ After installation and the SoX executable is in the path, restart Cletus and try
       created: Date.now(),
     };
     addMessage(userMessage);
+
+    // Reset history navigation
+    setHistoryIndex(-1);
+    setSavedInput('');
     setInputValue('');
 
     // Save user message to chat file
@@ -973,10 +1033,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>Enter: send</Text>
                 <Text dimColor>Shift+Enter: newline</Text>
                 <Text dimColor>Ctrl+C: exit</Text>
+                <Text dimColor>ESC: interrupt</Text>
               </Box>
               <Box flexDirection="column" marginLeft={2}>
-                <Text dimColor>ESC: interrupt</Text>
                 <Text dimColor>Alt+T: transcribe</Text>
+                <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>
             </Box>
