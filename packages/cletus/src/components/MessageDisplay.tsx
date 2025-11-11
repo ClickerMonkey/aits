@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { Message } from '../schemas.js';
+import type { Message } from '../schemas';
 
 interface MessageDisplayProps {
   message: Message;
@@ -27,9 +27,9 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
         {prefix}:
       </Text>
       {isUser ? (
-        <Box borderStyle={'round'} flexDirection="column" width="100%">
+        <Box borderStyle={'round'} flexDirection="column" paddingX={1} flexGrow={1} width={"100%"}>
           {message.content.map((part, i) => (
-            <Text key={i}> &gt; {part.content}</Text>
+            <Text key={i}>&gt; {part.content}</Text>
           ))}
         </Box>
       ) : (

@@ -176,7 +176,7 @@ export abstract class BaseAPI<
       const cost = this.calculateResponseCost(response, finalSelected, estimatedTokens);
 
       // Run afterRequest hook
-      await hooks.afterRequest?.(fullCtx, request, finalSelected, usage, cost);
+      await hooks.afterRequest?.(fullCtx, request, response, true, finalSelected, usage, cost);
 
       return response;
     } catch (error) {
@@ -236,21 +236,31 @@ export abstract class BaseAPI<
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
 
       // Stream request and accumulate usage
-      let accumulatedUsage: Usage = {};
+      const accumulatedUsage: Usage = {};
+      const chunks: TChunk[] = [];
+      let finished = false;
 
-      for await (const chunk of this.streamRequestWithFallback(request, finalSelected, fullCtx, handler)) {
-        const usage = chunk.usage;
-        if (usage) {
-          accumulateUsage(accumulatedUsage, usage);
+      try {
+        for await (const chunk of this.streamRequestWithFallback(request, finalSelected, fullCtx, handler)) {
+          const usage = chunk.usage;
+          if (usage) {
+            accumulateUsage(accumulatedUsage, usage);
+          }
+          chunks.push(chunk);
+          yield chunk;
         }
-        yield chunk;
+        
+        finished = true
+      } finally {
+          // Calculate cost
+        const cost = this.calculateStreamCost(accumulatedUsage, finalSelected);
+
+        // Build response from chunks
+        const response = this.chunksToResponse(chunks, finalSelected.model.id);
+
+        // Run afterRequest hook
+        await hooks.afterRequest?.(fullCtx, request, response, finished, finalSelected, accumulatedUsage, cost);
       }
-
-      // Calculate cost
-      const cost = this.calculateStreamCost(accumulatedUsage, finalSelected);
-
-      // Run afterRequest hook
-      await hooks.afterRequest?.(fullCtx, request, finalSelected, accumulatedUsage, cost);
     } catch (error) {
       hooks.onError?.(
         this.getErrorType('stream'),

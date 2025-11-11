@@ -118,7 +118,9 @@ export async function runChatOrchestrator(
     const aiMessages: AIMessage[] = messages
       .filter((msg) => msg.role !== 'system')
       .map((msg) => ({
-        ...msg,
+        role: msg.role,
+        name: msg.name,
+        tokens: msg.tokens,
         content: [
           ...(msg.operations 
             ? msg.operations.map((op): AIMessageContent => ({ type: 'text', content: op.message || op.analysis || 'pending...' })) 

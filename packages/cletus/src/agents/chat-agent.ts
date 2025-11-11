@@ -100,7 +100,7 @@ The agent will be fed the conversation and you need to provide a 'request' that 
     call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
 
-      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${request.substring(0, 32)}...`);
+      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${request.substring(0, 50)}...`);
 
       if (agent === 'dba') {
         const type = typeName ? types.find(t => t.name === typeName) : undefined;

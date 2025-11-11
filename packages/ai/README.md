@@ -794,7 +794,7 @@ const ai = AI.with<AppContext, AppMetadata>()
       }
     },
 
-    beforeRequest: async (ctx, selected, estimatedTokens) => {
+    beforeRequest: async (ctx, request, selected, estimatedTokens, estimatedCost) => {
       const estimatedCost = estimatedTokens / 1_000_000 *
         (selected.model.pricing.inputTokensPer1M + selected.model.pricing.outputTokensPer1M) / 2;
 
@@ -813,7 +813,7 @@ const ai = AI.with<AppContext, AppMetadata>()
       });
     },
 
-    afterRequest: async (ctx, selected, usage, cost) => {
+    afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
       // Track actual usage
       await db.users.update(ctx.user.id, {
         tokensUsed: usage.totalTokens,
@@ -1176,13 +1176,13 @@ export const ai = AI.with<AppContext, AppMetadata>()
     }
   })
   .withHooks({
-    beforeRequest: async (ctx, selected, tokens) => {
+    beforeRequest: async (ctx, request, selected, estimatedTokens, estimatedCost) => {
       const cost = estimateCost(tokens, selected.model);
       if (cost > ctx.user.remainingBudget) {
         throw new Error('Insufficient budget');
       }
     },
-    afterRequest: async (ctx, selected, usage, cost) => {
+    afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
       await trackUsage(ctx.user.id, usage, cost);
     },
     onError: (type, message, error, ctx) => {

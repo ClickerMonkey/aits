@@ -10,6 +10,10 @@ const DEFAULT_COLORS: Array<[number, number, number]> = [
   [255, 255, 255],  // white
 ];
 
+// Animated icon frames using box-drawing characters
+// const ICON_FRAMES = ['┌', '┬', '┐', '┤', '┘', '┴', '└', '├'];
+const ICON_FRAMES = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'].reverse();
+
 interface InkAnimatedTextProps {
   text: string;
   colors?: Array<[number, number, number]>;
@@ -32,6 +36,7 @@ export const InkAnimatedText: React.FC<InkAnimatedTextProps> = ({
   wrap = true,
 }) => {
   const [litIndex, setLitIndex] = useState(0);
+  const [iconFrame, setIconFrame] = useState(0);
   const [baseColor, setBaseColor] = useState<[number, number, number]>(colors[0]);
 
   // Pick random color when text changes
@@ -39,8 +44,22 @@ export const InkAnimatedText: React.FC<InkAnimatedTextProps> = ({
     if (text) {
       setBaseColor(colors[Math.floor(Math.random() * colors.length)]);
       setLitIndex(0);
+      setIconFrame(0);
     }
   }, [text, colors]);
+
+  // Animate icon
+  useEffect(() => {
+    if (!text) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setIconFrame((prev) => (prev + 1) % ICON_FRAMES.length);
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, [text]);
 
   // Animate lit letter moving across text
   useEffect(() => {
@@ -59,8 +78,11 @@ export const InkAnimatedText: React.FC<InkAnimatedTextProps> = ({
     return null;
   }
 
+  const [r, g, b] = baseColor;
+
   return (
     <>
+      <Text color={`rgb(${r},${g},${b})` as any}>{ICON_FRAMES[iconFrame]} </Text>
       {text.split('').map((char, index) => {
         const litLength = text.length + distance;
         const normalizedLitIndex = litIndex % litLength;
@@ -78,7 +100,6 @@ export const InkAnimatedText: React.FC<InkAnimatedTextProps> = ({
             ? min
             : max - ((max - min) * calcDistance / distance);
 
-        const [r, g, b] = baseColor;
         const colorStr = `rgb(${Math.round(r * brightness)},${Math.round(g * brightness)},${Math.round(b * brightness)})`;
 
         return (

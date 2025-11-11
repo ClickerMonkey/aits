@@ -1091,6 +1091,8 @@ export interface AIHooks<T extends AIBaseTypes> {
   afterRequest?: (
     ctx: AIContext<T>,
     request: BaseRequest,
+    response: BaseResponse,
+    responseComplete: boolean,
     selected: SelectedModelFor<T>,
     usage: Usage,
     cost: number

@@ -330,11 +330,11 @@ const ai = AI.with()
   .providers({ openai })
   .create({
     hooks: {
-      beforeRequest: async (ctx, selected, estimatedTokens) => {
+      beforeRequest: async (ctx, request, selected, estimatedTokens, estimatedCost) => {
         console.log(`Using model: ${selected.model.id}`);
         console.log(`Estimated tokens: ${estimatedTokens}`);
       },
-      afterRequest: async (ctx, selected, usage, cost) => {
+      afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
         console.log(`Tokens used: ${usage.totalTokens}`);
         console.log(`Cost: $${cost}`);
       },

@@ -180,7 +180,7 @@ export const KnowledgeSchema = z.object({
 // Operation Schema
 // ============================================================================
 
-export const OperationStatusSchema = z.enum(['created', 'analyzed', 'analyzeError', 'analyzedBlocked', 'analyzing', 'doing', 'done', 'doneError']);
+export const OperationStatusSchema = z.enum(['created', 'analyzed', 'analyzeError', 'analyzedBlocked', 'analyzing', 'doing', 'done', 'doneError', 'rejected']);
 
 export const OperationKindSchema = z.enum([
   // architect

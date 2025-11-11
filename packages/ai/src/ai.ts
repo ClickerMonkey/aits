@@ -62,10 +62,10 @@ import type {
  *     defaultContext: { baseURL: 'https://api.example.com' },
  *     providedContext: async (ctx) => ({ db, user }),
  *     hooks: {
- *       beforeRequest: async (ctx, selected, tokens) => {
+ *       beforeRequest: async (ctx, request, selected, estimatedTokens, estimatedCost) => {
  *         // Check budget
  *       },
- *       afterRequest: async (ctx, selected, usage, cost) => {
+ *       afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
  *         // Track usage
  *       }
  *     }

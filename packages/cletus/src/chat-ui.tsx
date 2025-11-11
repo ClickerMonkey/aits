@@ -7,6 +7,7 @@ import { ChatFile } from './chat.js';
 import { InkAnimatedText } from './components/InkAnimatedText.js';
 import { MessageDisplay } from './components/MessageDisplay.js';
 import { ModelSelector } from './components/ModelSelector.js';
+import { OperationApprovalMenu } from './components/OperationApprovalMenu.js';
 import { ConfigFile } from './config.js';
 import type { ChatMeta, ChatMode, Message } from './schemas.js';
 // @ts-ignore
@@ -95,6 +96,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedInput, setSavedInput] = useState('');
+  const [showApprovalMenu, setShowApprovalMenu] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -162,8 +164,30 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     return () => clearTimeout(saveTimeout);
   }, [chatMessages]);
 
+  // Check if we need to show the approval menu
+  useEffect(() => {
+    if (!isWaitingForResponse && !pendingMessage) {
+      // Find the last assistant message
+      const lastAssistantMessage = [...chatMessages].reverse().find((msg) => msg.role === 'assistant');
+
+      if (lastAssistantMessage && lastAssistantMessage.operations) {
+        const hasApprovalNeeded = lastAssistantMessage.operations.some((op) => op.status === 'analyzed');
+        setShowApprovalMenu(hasApprovalNeeded);
+      } else {
+        setShowApprovalMenu(false);
+      }
+    } else {
+      setShowApprovalMenu(false);
+    }
+  }, [chatMessages, isWaitingForResponse, pendingMessage]);
+
   // Handle keyboard shortcuts
   useInput((input, key) => {
+    // Don't handle input when approval menu is showing
+    if (showApprovalMenu) {
+      return;
+    }
+
     if (key.ctrl && input === 'c') {
       if (showExitPrompt) {
         // Cancel the exit prompt if they press Ctrl+C again
@@ -769,7 +793,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
           signal: controller.signal,
         },
         (event) => {
-          if (event.type !== 'elapsed' && event.type !== 'tokens'&& event.type !== 'pendingUpdate') {
+          if (event.type !== 'elapsed' && event.type !== 'tokens'&& event.type !== 'pendingUpdate' && event.type !== 'status') {
             logger.log(event);
           }
 
@@ -1067,10 +1091,29 @@ After installation and the SoX executable is in the path, restart Cletus and try
         </Box>
       )}
 
+      {/* Operation Approval Menu */}
+      {showApprovalMenu && (() => {
+        const lastAssistantMessage = [...chatMessages].reverse().find((msg) => msg.role === 'assistant');
+        return lastAssistantMessage ? (
+          <OperationApprovalMenu
+            message={lastAssistantMessage}
+            chatFile={chatFileRef.current}
+            ai={ai}
+            onComplete={() => {
+              setShowApprovalMenu(false);
+              // Reload messages from file to get updated operations
+              chatFileRef.current.load().then(() => {
+                setChatMessages(chatFileRef.current.getMessages());
+              });
+            }}
+          />
+        ) : null;
+      })()}
+
       {/* Input Area */}
       <Box
         borderStyle="round"
-        borderColor={isTranscribing ? 'blue' : isWaitingForResponse ? 'gray' : 'green'}
+        borderColor={isTranscribing ? 'blue' : isWaitingForResponse ? 'gray' : showApprovalMenu ? 'gray' : 'green'}
         paddingX={1}
       >
         <Box width="100%">
@@ -1090,8 +1133,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 ? 'Press ESC to interrupt...'
                 : 'Type / for commands or your message...'
             }
-            showCursor={!isWaitingForResponse}
-            focus={!showExitPrompt}
+            showCursor={!isWaitingForResponse && !showApprovalMenu}
+            focus={!showExitPrompt && !showApprovalMenu}
           />
         </Box>
       </Box>

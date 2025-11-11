@@ -227,9 +227,6 @@ export const type_create = operationOf<
       if (field.type === 'enum' && (!field.enumOptions || field.enumOptions.length === 0)) {
         return `Enum field "${field.name}" must have enumOptions`;
       }
-      if (field.required && !field.default) {
-        return `Required field "${field.name}" must have a default value`;
-      }
     }
 
     // Validate knowledgeTemplate
