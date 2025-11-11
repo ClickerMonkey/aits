@@ -54,3 +54,4 @@
 - [x] duplicate message issue
 - [ ] async generators need try/finally
 - [ ] Alt+Up/Down goes through past user messages. When you go back all the way down the original text they entered before they were going into old messages is restored.
+- [ ] on error, add error message to content of assistant message

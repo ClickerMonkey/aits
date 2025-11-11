@@ -87,6 +87,7 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - If the user wants to create something and it sounds like a record or data entry, use the 'dba' agent - if they mention a concept that doesn't exist confirm if necessary and use the 'architect'.
 - If the user explicitly asks to memories, or assistants - use the 'secretary' agent.
 - If the user says something and it sounds important to remember for all future conversations, use the 'secretary' agent to add a memory.
+- All file operations are done within the current working directory - not outside. All files are relative.
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
 </rules>
 `,
@@ -166,8 +167,8 @@ If you don't find the information you need, try to get it from another agent.`,
         accuracy: 0.3,
       },
     },
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: (input: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
   });

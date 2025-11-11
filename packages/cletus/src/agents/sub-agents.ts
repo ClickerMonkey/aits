@@ -37,8 +37,8 @@ You have been given the following request to perform by the chat agent, the conv
 </userRequest>
 `,
     tools: plannerTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
@@ -67,8 +67,8 @@ Knowledge sources can be formatted as:
 - user - User-provided memories
 `,
     tools: librarianTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
@@ -94,8 +94,8 @@ IMPORTANT: All file operations are relative to the current working directory: {{
 You do not have access outside of it. You can only operate on text-based files.
 `,
     tools: clerkTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
   });
@@ -120,8 +120,8 @@ You have been given the following request to perform by Cletus, the conversation
 Available Assistants: {{assistants}}
 `,
     tools: secretaryTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { config, userPrompt }) => {
       const configData = config.getData();
@@ -157,8 +157,8 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 - Only add new fields, update descriptions, or make fields more flexible
 `,
     tools: architectTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
@@ -184,8 +184,8 @@ Generated images are saved to .cletus/images/ and linked in chat messages via fi
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
 `,
     tools: artistTools,
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });

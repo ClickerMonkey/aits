@@ -5,9 +5,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai.js';
 import { ChatFile } from './chat.js';
 import { InkAnimatedText } from './components/InkAnimatedText.js';
+import { MessageDisplay } from './components/MessageDisplay.js';
 import { ModelSelector } from './components/ModelSelector.js';
 import { ConfigFile } from './config.js';
-import type { ChatMeta, Message } from './schemas.js';
+import type { ChatMeta, ChatMode, Message } from './schemas.js';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
@@ -65,6 +66,15 @@ const COMMANDS: Command[] = [
   { name: '/cd', description: 'Change current working directory', takesInput: true, placeholder: 'directory path' },
   { name: '/debug', description: 'Toggle debug logging', takesInput: false },
 ];
+
+const MODETEXT: Record<ChatMode, string> = {
+  none: 'local allowed',
+  read: 'read allowed',
+  create: 'create allowed',
+  update: 'update allowed',
+  delete: 'delete allowed',
+};
+
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
   const [inputValue, setInputValue] = useState('');
@@ -259,6 +269,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
     }
   });
+
+  const showPendingMessage = pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length);
 
   const handleCommand = async (command: string) => {
     const parts = command.split(' ');
@@ -856,41 +868,12 @@ After installation and the SoX executable is in the path, restart Cletus and try
         ) : (
           <>
             <Static items={visibleMessages}>
-              {(msg, index) => {
-                const color =
-                  msg.role === 'user' ? 'green' : msg.role === 'system' ? 'yellow' : 'blue';
-                const prefix =
-                  msg.role === 'user'
-                    ? '👤 You'
-                    : msg.role === 'system'
-                    ? '⚙️ System'
-                    : `🤖 ${chat.assistant ?? 'Assistant'}`;
-
-                return (
-                  <Box key={index} flexDirection="column" marginBottom={1}>
-                    <Text bold color={color}>
-                      {prefix}:
-                    </Text>
-                    <Box paddingLeft={3}>
-                      {msg.content.map((part, i) => (
-                        <Text key={i}>{part.content}</Text>
-                      ))}
-                    </Box>
-                  </Box>
-                );
-              }}
+              {(msg, index) => (
+                <MessageDisplay key={index} message={msg} />
+              )}
             </Static>
-            {pendingMessage && (
-              <Box flexDirection="column" marginBottom={1}>
-                <Text bold color="blue">
-                  {`🤖 ${chat.assistant ?? 'Assistant'}`}:
-                </Text>
-                <Box paddingLeft={3}>
-                  {pendingMessage.content.map((part, i) => (
-                    <Text key={i}>{part.content || <Text dimColor>Thinking...</Text>}</Text>
-                  ))}
-                </Box>
-              </Box>
+            {showPendingMessage && (
+              <MessageDisplay message={pendingMessage} />
             )}
           </>
         )}
@@ -991,8 +974,9 @@ After installation and the SoX executable is in the path, restart Cletus and try
       <Box marginTop={1}>
         <Text dimColor>
           {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
-          Mode: {chatMeta.mode} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
-          {chatMeta.todos.length} todo{chatMeta.todos.length !== 1 ? 's' : ''}
+          {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
+          {MODETEXT[chatMeta.mode]} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
+          {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
           {isWaitingForResponse ? (
             <>
               {' │ '}
@@ -1007,7 +991,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
             </>
           ): (
             <>
-              {' | Ctrl+C: exit │ ESC: interrupt │ Alt+T: transcribe'}
+              {' | Ctrl+C: exit │ ESC: interrupt'}
             </>
           )}
         </Text>

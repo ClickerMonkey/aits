@@ -382,8 +382,8 @@ You have been given the following request to perform by the chat agent, the conv
       dataDeleteMany,
       dataAggregate,
     ],
-    metadataFn: (_, { config }) => ({
-      model: config.getData().user.models?.chat,
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
     }),
     input: ({ request }: { request: string }, { userPrompt, type }) => ({ userPrompt, request, type }),
   });
