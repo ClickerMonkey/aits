@@ -41,7 +41,7 @@
 - [ ] add offset to summarization inputs
 - [ ] add semantic data search (search through knowledge & score, find matching record)
 - [ ] add image_attach
-- [ ] on Ctrl+C in chat, ask if they want to exit to main menu, quit, or cancel
+- [x] on Ctrl+C in chat, ask if they want to exit to main menu, quit, or cancel
 - [ ] add chatStatus(status: string) context
 - [ ] add chatMessage to context so operations can be added to the pending message
 - [ ] add it so each chat definition has a function to convert the input into a human friendly "tool" call string

@@ -78,6 +78,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [tokenCount, setTokenCount] = useState(0);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showExitPrompt, setShowExitPrompt] = useState(false);
+  const [exitOptionIndex, setExitOptionIndex] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -148,7 +150,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   // Handle keyboard shortcuts
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
-      onExit();
+      if (showExitPrompt) {
+        // Cancel the exit prompt if they press Ctrl+C again
+        setShowExitPrompt(false);
+        setExitOptionIndex(0);
+      } else {
+        // Show exit prompt
+        setShowExitPrompt(true);
+        setExitOptionIndex(0);
+      }
+      return;
     }
 
     // Shift+Enter to add newline
@@ -184,6 +195,31 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         setIsTranscribing(false);
         addSystemMessage('⚠️ Transcription aborted');
       }
+    }
+
+    // Handle exit prompt navigation
+    if (showExitPrompt) {
+      if (key.upArrow) {
+        setExitOptionIndex((prev) => (prev > 0 ? prev - 1 : 2));
+      } else if (key.downArrow) {
+        setExitOptionIndex((prev) => (prev < 2 ? prev + 1 : 0));
+      } else if (key.return) {
+        setShowExitPrompt(false);
+        setExitOptionIndex(0);
+        if (exitOptionIndex === 0) {
+          // Exit to main menu
+          onExit();
+        } else if (exitOptionIndex === 1) {
+          // Quit application
+          process.exit(0);
+        }
+        // else: Cancel (index 2) - just close the prompt
+      } else if (key.escape) {
+        // ESC also cancels
+        setShowExitPrompt(false);
+        setExitOptionIndex(0);
+      }
+      return;
     }
 
     // Arrow keys to navigate command menu
@@ -850,6 +886,36 @@ After installation and the SoX executable is in the path, restart Cletus and try
         )}
       </Box>
 
+      {/* Exit Prompt */}
+      {showExitPrompt && (
+        <Box
+          borderStyle="round"
+          borderColor="yellow"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="yellow">
+            Exit Options (↑↓ to navigate, Enter to select):
+          </Text>
+          <Box>
+            <Text color={exitOptionIndex === 0 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 0 ? '▶ ' : '  '}Exit to main menu
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 1 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 1 ? '▶ ' : '  '}Quit application
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 2 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 2 ? '▶ ' : '  '}Cancel
+            </Text>
+          </Box>
+        </Box>
+      )}
+
       {/* Command Menu */}
       {showCommandMenu && filteredCommands.length > 0 && (
         <Box
@@ -899,6 +965,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 : 'Type / for commands or your message...'
             }
             showCursor={!isWaitingForResponse}
+            focus={!showExitPrompt}
           />
         </Box>
       </Box>

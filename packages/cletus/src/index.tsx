@@ -81,7 +81,9 @@ async function main() {
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  const { waitUntilExit } = render(React.createElement(App));
+  const { waitUntilExit } = render(React.createElement(App), {
+    exitOnCtrlC: false,
+  });
   await waitUntilExit();
 }
 

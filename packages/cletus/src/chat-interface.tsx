@@ -36,6 +36,9 @@ export async function launchChatInterface(
 
     let hasExited = false;
 
+    // Disable default Ctrl+C handling so Ink can handle it
+    process.removeAllListeners('SIGINT');
+
     const { waitUntilExit, unmount } = render(
       <ChatUI
         chat={chat}
@@ -49,7 +52,11 @@ export async function launchChatInterface(
           }
         }}
         onChatUpdate={handleChatUpdate}
-      />
+      />,
+      {
+        // Prevent Ink from exiting on Ctrl+C
+        exitOnCtrlC: false,
+      }
     );
 
     waitUntilExit().then(() => {
