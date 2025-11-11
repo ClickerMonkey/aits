@@ -22,8 +22,8 @@
 - [ ] Detect claude/aws creds and offer connecting to AWS Bedrock
 - [ ] pass down withEvents to capture all prompt events and count tokens
 - [ ] add settings to pause Cletus after X minutes of continuous automatic work. it's a configurable user settings- [ ] add chat model selection which is used for operations that are applicable (tool call, summary, etc)
-- [ ] update prompts to match operations
-- [ ] update context to include `ops: OperationManager` and calls do `ops.handle({})`
+- [x] update prompts to match operations
+- [x] update context to include `ops: OperationManager` and calls do `ops.handle({})`
 - [x] add limit to update & delete
 - [ ] improve image search
 - [x] change knowledge source syntax
@@ -42,7 +42,7 @@
 - [ ] add semantic data search (search through knowledge & score, find matching record)
 - [ ] add image_attach
 - [x] on Ctrl+C in chat, ask if they want to exit to main menu, quit, or cancel
-- [ ] add chatStatus(status: string) context
+- [x] add chatStatus(status: string) context
 - [ ] add chatMessage to context so operations can be added to the pending message
 - [ ] add it so each chat definition has a function to convert the input into a human friendly "tool" call string
 - [ ] update chat-ui to render messages differently (extend message content to add operation type with kind?). chat-ui should habe a agent / user message component render
@@ -53,3 +53,4 @@
 - [x] add limit & offset or count only options to text_search (sort files)
 - [x] duplicate message issue
 - [ ] async generators need try/finally
+- [ ] Alt+Up/Down goes through past user messages. When you go back all the way down the original text they entered before they were going into old messages is restored.

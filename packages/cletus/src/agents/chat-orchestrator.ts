@@ -227,6 +227,7 @@ export async function runChatOrchestrator(
             pending.content[0].content += chunk.content;
             setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
             onEvent({ type: 'pendingUpdate', message: { ...pending } });
+            onEvent({ type: 'status', status: '' });
             break;
 
           case 'textComplete':

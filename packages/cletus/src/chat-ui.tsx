@@ -4,6 +4,7 @@ import path from 'path';
 import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai.js';
 import { ChatFile } from './chat.js';
+import { InkAnimatedText } from './components/InkAnimatedText.js';
 import { ModelSelector } from './components/ModelSelector.js';
 import { ConfigFile } from './config.js';
 import type { ChatMeta, Message } from './schemas.js';
@@ -953,7 +954,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       {/* Status Display */}
       {currentStatus && (
         <Box>
-          <Text color="cyan">{currentStatus}</Text>
+          <InkAnimatedText text={currentStatus} />
         </Box>
       )}
 
