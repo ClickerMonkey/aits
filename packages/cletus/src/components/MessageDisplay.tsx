@@ -27,7 +27,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
         {prefix}:
       </Text>
       {isUser ? (
-        <Box borderStyle={'round'} flexDirection="column" flexGrow={1}>
+        <Box borderStyle={'round'} flexDirection="column" width="100%">
           {message.content.map((part, i) => (
             <Text key={i}> &gt; {part.content}</Text>
           ))}

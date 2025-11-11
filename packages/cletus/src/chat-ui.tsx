@@ -92,6 +92,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showExitPrompt, setShowExitPrompt] = useState(false);
   const [exitOptionIndex, setExitOptionIndex] = useState(0);
   const [currentStatus, setCurrentStatus] = useState<string>('');
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -196,9 +197,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       return;
     }
 
-    // ESC to interrupt AI or transcription
+    // ESC to interrupt AI or transcription or close help menu
     if (key.escape) {
-      if (isWaitingForResponse && abortControllerRef.current) {
+      if (showHelpMenu) {
+        setShowHelpMenu(false);
+        setInputValue('');
+      } else if (isWaitingForResponse && abortControllerRef.current) {
         abortControllerRef.current.abort();
         setIsWaitingForResponse(false);
         addSystemMessage('⚠️ Response interrupted by user');
@@ -626,6 +630,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
   const handleSubmit = async () => {
     if (!inputValue.trim() || isWaitingForResponse) return;
 
+    // Don't submit if help menu is showing
+    if (showHelpMenu) {
+      setShowHelpMenu(false);
+      setInputValue('');
+      return;
+    }
+
     // Check if it's a command
     if (inputValue.startsWith('/')) {
       const parts = inputValue.split(' ');
@@ -812,6 +823,15 @@ After installation and the SoX executable is in the path, restart Cletus and try
     setInputValue(value);
     setCursorOffset(value.length);
 
+    // Show help menu when typing ?
+    if (value === '?') {
+      setShowHelpMenu(true);
+      setShowCommandMenu(false);
+      return;
+    } else {
+      setShowHelpMenu(false);
+    }
+
     // Show command menu when typing /
     if (value === '/' || (value.startsWith('/') && !value.includes(' ', 1))) {
       setShowCommandMenu(true);
@@ -823,7 +843,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
   };
 
   // Calculate visible area (show last N messages to fit screen)
-  const maxVisibleMessages = showCommandMenu ? 10 : 15;
+  const maxVisibleMessages = 15;
   const visibleMessages = chatMessages.slice(-maxVisibleMessages);
 
   // Filter commands based on input
@@ -868,8 +888,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
         ) : (
           <>
             <Static items={visibleMessages}>
-              {(msg, index) => (
-                <MessageDisplay key={index} message={msg} />
+              {(msg) => (
+                <MessageDisplay key={msg.created} message={msg} />
               )}
             </Static>
             {showPendingMessage && (
@@ -931,6 +951,51 @@ After installation and the SoX executable is in the path, restart Cletus and try
               <Text dimColor> - {cmd.description}</Text>
             </Box>
           ))}
+        </Box>
+      )}
+
+      {/* Help Menu */}
+      {showHelpMenu && (
+        <Box
+          borderStyle="round"
+          borderColor="cyan"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="cyan">
+            Quick Help (ESC to close):
+          </Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">Shortcuts:</Text>
+            <Box flexDirection="row" gap={2}>
+              <Box flexDirection="column">
+                <Text dimColor>Enter: send</Text>
+                <Text dimColor>Shift+Enter: newline</Text>
+                <Text dimColor>Ctrl+C: exit</Text>
+              </Box>
+              <Box flexDirection="column" marginLeft={2}>
+                <Text dimColor>ESC: interrupt</Text>
+                <Text dimColor>Alt+T: transcribe</Text>
+                <Text dimColor>/: commands  ?: help</Text>
+              </Box>
+            </Box>
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">Modes:</Text>
+            <Box flexDirection="row" gap={2}>
+              <Box flexDirection="column">
+                <Text dimColor>none: local only</Text>
+                <Text dimColor>read: +read ops</Text>
+                <Text dimColor>create: +create ops</Text>
+              </Box>
+              <Box flexDirection="column" marginLeft={2}>
+                <Text dimColor>update: +update ops</Text>
+                <Text dimColor>delete: +all ops</Text>
+                <Text dimColor>(use /mode to change)</Text>
+              </Box>
+            </Box>
+          </Box>
         </Box>
       )}
 
