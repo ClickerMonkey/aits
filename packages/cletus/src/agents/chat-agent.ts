@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { createSubAgents } from './sub-agents';
-import { ComponentInput } from '@aits/core';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -45,7 +44,7 @@ export function createChatAgent(ai: CletusAI) {
   - file_stats(path: string)
   - file_delete(path: string)
   - file_read(path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
-  - text_search(glob: string, regex: string, surrounding?: number, transcribeImages?: boolean)
+  - text_search(glob: string, regex: string, surrounding?: number, caseInsensitive?: boolean, output?: 'file-count' | 'files' | 'match-count' | 'matches', offset?: number, limit?: number, transcribeImages?: boolean)
   - dir_create(path: string)
 
 - **secretary**: User memory, assistant personas, switching assistants
@@ -77,6 +76,7 @@ export function createChatAgent(ai: CletusAI) {
   - data_aggregate(groupBy?: string[], where?: object, having?: object, select: Array<{function: string, field?: string, alias?: string}>, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
 
 Choose the appropriate agent based on what the user wants done.
+The agent will be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task.
 
 <rules>
 - If the user requests an action around data types defined that can be accomplished with a database query like tool call - use the 'dba'.
@@ -91,11 +91,12 @@ Choose the appropriate agent based on what the user wants done.
 `,
     schema: z.object({
       agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
+      request: z.string().describe('The user request to pass along to the sub-agent'),
       typeName: typeEnum.nullable().describe('The type of data to operate on (required for dba agent)'),
     }),
     refs: subAgents,
-    call: async ({ agent, typeName }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
-      ctx.log('Routing to sub-agent: ' + agent);
+    call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
+      ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
 
       if (agent === 'dba') {
         const type = typeName ? types.find(t => t.name === typeName) : undefined;
@@ -103,10 +104,7 @@ Choose the appropriate agent based on what the user wants done.
           throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
         }
         
-        const tools = await dba.get('tools', {}, { ...ctx, type });
-
-        ctx.log(`Using dba tools for ${type.name}: ${tools?.map(t => t.tool).join(', ')}`);
-        return tools;
+        return await dba.get('tools', { request }, { ...ctx, type });
       } else {
         const subAgent = {
           planner,
@@ -121,7 +119,7 @@ Choose the appropriate agent based on what the user wants done.
           throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
         }
 
-        return await subAgent.get('tools', {}, ctx);
+        return await subAgent.get('tools', { request }, ctx);
       }
     },
   });

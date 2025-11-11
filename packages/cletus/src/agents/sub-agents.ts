@@ -29,12 +29,18 @@ export function createSubAgents(ai: CletusAI) {
 {{userPrompt}}
 </userInformation>
 
-Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.`,
+Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: plannerTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
   // Librarian sub-agent
@@ -53,12 +59,18 @@ Knowledge sources can be formatted as:
 - file@{path}:chunk[{index}] - Specific file sections
 - user - User-provided memories
 
-Your role is to help search, add, and manage knowledge entries for semantic search and context retrieval.`,
+Your role is to help search, add, and manage knowledge entries for semantic search and context retrieval.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: librarianTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
   // Clerk sub-agent
@@ -74,15 +86,18 @@ Your role is to help search, add, and manage knowledge entries for semantic sear
 IMPORTANT: All file operations are relative to the current working directory: {{cwd}}
 You do not have access outside of it. You can only operate on text-based files.
 
-Your role is to help search, read, create, modify, and organize files within the project directory.`,
+Your role is to help search, read, create, modify, and organize files within the project directory.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: clerkTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => ({
-      cwd: ctx.cwd,
-      userPrompt: ctx.userPrompt,
-    }),
+    input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
   });
 
   // Secretary sub-agent
@@ -97,18 +112,24 @@ Your role is to help search, read, create, modify, and organize files within the
 
 Available Assistants: {{assistants}}
 
-Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.`,
+Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: secretaryTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => {
-      const config = ctx.config.getData();
-      const chat = ctx.chat;
-
+    input: ({ request }: { request: string }, { config, userPrompt, chat }) => {
+      const configData = config.getData();
+      
       return {
-        assistant: config.assistants.find((a) => a.name === chat?.assistant),
-        userPrompt: ctx.userPrompt,
+        assistant: configData.assistants.find((a) => a.name === chat?.assistant),
+        userPrompt: userPrompt,
+        request,
       };
     },
   });
@@ -128,12 +149,18 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 - Never change a field from optional to required if data exists
 - Only add new fields, update descriptions, or make fields more flexible
 
-Your role is to help create and modify type definitions while maintaining data integrity.`,
+Your role is to help create and modify type definitions while maintaining data integrity.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: architectTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
   });
 
   // Artist sub-agent
@@ -149,12 +176,18 @@ Your role is to help create and modify type definitions while maintaining data i
 Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
 
-Your role is to help with all image-related requests including creation, modification, and understanding visual content.`,
+Your role is to help with all image-related requests including creation, modification, and understanding visual content.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: artistTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, ctx) => ({ userPrompt: ctx.userPrompt }),
+    input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
   });
 
   return [

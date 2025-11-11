@@ -11,7 +11,7 @@ import { operationOf } from "./types";
 
 
 export async function searchFiles(cwd: string, pattern: string) {
-  const filePaths = await glob(pattern, { cwd });
+  const filePaths = await glob(pattern, { cwd, nocase: true });
   const files = await Promise.all(filePaths.map(async (file) => ({
     file,
     fileType: await categorizeFile(path.join(cwd, file)).catch(() => 'unreadable') as FileType | 'unreadable',
@@ -370,7 +370,7 @@ export const file_move = operationOf<
 
 export const file_stats = operationOf<
   { path: string },
-  { path: string; size: number; created: number; modified: number; isDirectory: boolean, type: string, lines?: number, characters?: number }
+  { path: string; size: number; created: string; modified: string; isDirectory: boolean, type: string, lines?: number, characters?: number }
 >({
   mode: 'local',
   analyze: async (input, { cwd }) => {
@@ -406,8 +406,8 @@ export const file_stats = operationOf<
     return {
       path: input.path,
       size: stats.size,
-      created: stats.birthtime.getTime(),
-      modified: stats.mtime.getTime(),
+      created: stats.birthtime.toISOString(),
+      modified: stats.mtime.toISOString(),
       isDirectory: stats.isDirectory(),
       type,
       lines,
@@ -502,8 +502,8 @@ export const file_read = operationOf<
 });
 
 export const text_search = operationOf<
-  { glob: string; regex: string; surrounding?: number, transcribeImages?: boolean },
-  { pattern: string; count: number; results: Array<{ file: string; matches: string[] }> }
+  { glob: string; regex: string; surrounding?: number, transcribeImages?: boolean, caseInsensitive?: boolean, output?: 'file-count' | 'files' | 'match-count' | 'matches', offset?: number, limit?: number },
+  { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> }
 >({
   mode: (input) => input.transcribeImages ? 'read' : 'local',
   analyze: async (input, { cwd }) => {
@@ -525,8 +525,10 @@ export const text_search = operationOf<
       }
     }
 
+    // TODO update analysis to reflect case insensitivity, limit, & offset
+
     return {
-      analysis: `This will search ${supported.length} file(s)${files.length !== supported.length ? ` (of ${files.length} total files)` : ``} matching "${input.glob}" for pattern "${input.regex}" with ${surrounding} surrounding lines.`,
+      analysis: `This will search ${supported.length} file(s)${files.length !== supported.length ? ` (of ${files.length} total files)` : ``} for ${input.output || 'matches'} matching "${input.glob}" for pattern "${input.regex}" with ${surrounding} surrounding lines.`,
       doable: true,
     };
   },
@@ -535,13 +537,18 @@ export const text_search = operationOf<
     const readable = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
     if (readable.length === 0) {
-      return { pattern: input.regex, count: 0, results: [] };
+      return { searched: 0 };
     }
 
-    const pattern = new RegExp(input.regex, 'g');
+    readable.sort((a, b) => a.file.localeCompare(b.file));
+
+    const output = input.output || 'matches';
+    const limit = input.limit || 0;
+    const offset = input.offset || 0;
+    const pattern = new RegExp(input.regex, input.caseInsensitive !== false ? 'gi' : 'g');
     const surrounding = input.surrounding || 0;
 
-    const allResults = await Promise.all(readable.map(async (file) => {
+    const results = await Promise.all(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
         assetPath: await getAssetPath(true),
@@ -568,7 +575,19 @@ export const text_search = operationOf<
           const start = Math.max(0, i - surrounding);
           const end = Math.min(lines.length, i + surrounding + 1);
           sections.push({ start, end, lines: new Map<number, number>([[i, 1]]) });
+
+          if (output === 'file-count') {
+            break;
+          }
         }
+      }
+
+      if (output !== 'matches') {
+        return {
+          file: file.file,
+          matchCount: sections.length,
+          matches: [],
+        };
       }
 
       const joinedSections: Section[] = [];
@@ -587,6 +606,7 @@ export const text_search = operationOf<
 
       return {
         file: file.file,
+        matchCount: sections.length,
         matches: joinedSections.map(sec => {
           const lineCountSpaces = (sec.end + 1).toString().length;
           const sectionLines = lines.slice(sec.start, sec.end);
@@ -623,9 +643,20 @@ export const text_search = operationOf<
       };
     }));
 
-    const results = allResults.filter(r => r.matches.length > 0);
+    const withMatches = results.filter(r => r.matchCount > 0);
 
-    return { pattern: input.regex, count: results.length, results };
+    switch (output) {
+      case 'file-count':
+        return { searched: results.length, fileCount: withMatches.length };
+      case 'files':
+        return { searched: results.length, files: withMatches.map(r => ({ file: r.file, matches: r.matchCount })) };
+      case 'match-count':
+        return { searched: results.length, matchCount: withMatches.reduce((acc, r) => acc + r.matchCount, 0) };
+      case 'matches':
+      default:
+        const pagedResults = limit > 0 ? withMatches.slice(offset, offset + limit) : withMatches.slice(offset);
+        return { searched: results.length, matches: pagedResults.map(r => ({ file: r.file, matches: r.matches })) };
+    }
   },
 });
 

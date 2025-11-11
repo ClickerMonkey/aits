@@ -366,7 +366,13 @@ Fields:
 {{/each}}
 </typeInformation>
 
-Use the available tools to complete the data operation requested in the conversation.`,
+Use the available tools to complete the data operation requested in the conversation.
+
+You have been given the following request to perform by the chat agent, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+`,
     tools: [
       dataCreate,
       dataUpdate,
@@ -379,7 +385,7 @@ Use the available tools to complete the data operation requested in the conversa
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: (_: {}, { userPrompt, type }) => ({ userPrompt, type }),
+    input: ({ request }: { request: string }, { userPrompt, type }) => ({ userPrompt, request, type }),
   });
 
   return dba;

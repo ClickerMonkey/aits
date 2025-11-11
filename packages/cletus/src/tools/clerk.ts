@@ -151,13 +151,28 @@ Example: Read a source file:
     description: 'Search for regex pattern in files',
     instructions: `Use this to find text patterns across multiple files. Returns matches with surrounding context lines. Supports OCR for images.
 
+The output can be customized to return different formats:
+- "file-count": Number of files with matches
+- "files": List of files and match count per file
+- "match-count": Total number of matches found
+- "matches": Detailed match information with context per file
+
+The output can also be paged using the offset parameter. 
+That way if an initial file search determines too many files that match the glob, the text search can be called repeatedly with increasing offsets to get all matches. 
+It may also be useful if the user doesn't want a comprehensive list of matches, but rather just a sample or to know any exist.
+The offset & limit are at the file level assuming the files are sorted by name.
+
 Example: Find all function declarations in TypeScript files:
-{ "glob": "src/**/*.ts", "regex": "function \\\\w+\\\\(", "surrounding": 2 }`,
+{ "glob": "src/**/*.ts", "regex": "function \\\\w+\\\\(", "caseInsensitive": true, "output": "matches", "surrounding": 2 }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to search'),
       regex: z.string().describe('Regular expression pattern, EMCA syntax'),
+      caseInsensitive: z.boolean().optional().describe('Case insensitive search (default: true)'),
+      output: z.enum(['file-count', 'files', 'match-count', 'matches']).optional().describe('Output format (default: "matches")'),
       surrounding: z.number().optional().describe('Lines of context around match (default: 0)'),
-      transcribeImages: z.boolean().optional().describe('OCR text from images before searching (default: false)'),
+      transcribeImages: z.boolean().optional().describe('OCR text from images before searching (default: false). This may be slow and costly so the user should be prompted for permission if not done so yet.'),
+      offset: z.number().optional().describe('Starting position for results (default: 0)'),
+      limit: z.number().optional().describe('Maximum results (default: 0 = unlimited)'),
     }),
     validate: (input) => {
       try {

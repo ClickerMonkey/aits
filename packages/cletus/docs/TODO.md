@@ -49,6 +49,7 @@
 - [ ] show system messages toggle (only show ones within X minutes). Keep track of message created?
 - [ ] implement UI that looks at last message to see if there are operations that need to be approved and lets the user approve each one
 - [ ] while deleting chat - stay in list instead of going back to settings
-- [ ] add case insensitive option to regex inputs
-- [ ] add limit & offset or count only options to text_search (sort files)
+- [x] add case insensitive option to regex inputs
+- [x] add limit & offset or count only options to text_search (sort files)
 - [ ] duplicate message issue
+- [ ] async generators need try/finally
