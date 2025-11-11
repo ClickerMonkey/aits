@@ -53,6 +53,10 @@ export class OperationManager {
     };
 
     this.operations.push(op);
+    
+    // Update status with operation description
+    const statusMsg = def.status ? def.status(op.input) : `Processing operation: ${op.type}`;
+    ctx.chatStatus(statusMsg);
 
     return this.execute(op, doNow, ctx);
   }

@@ -27,6 +27,7 @@ export type OrchestratorEvent =
   | { type: 'tokens'; output: number; reasoning: number; discarded: number }
   | { type: 'elapsed'; ms: number }
   | { type: 'operations'; operations: Operation[]; summary: string }
+  | { type: 'status'; status: string }
   | { type: 'complete'; message: Message }
   | { type: 'error'; error: string };
 
@@ -41,6 +42,30 @@ function convertContent(content: MessageContent): AIMessageContent {
       : content.content,
   } as AIMessageContent;
 }
+
+// Silly verbs for status messages
+const sillyVerbs = [
+  'Conflabulating', 'Perambulating', 'Cogitating', 'Ruminating', 'Pontificating',
+  'Extrapolating', 'Prognosticating', 'Hypothesizing', 'Theorizing', 'Speculating',
+  'Deliberating', 'Contemplating', 'Meditating', 'Cerebrating', 'Lucubrating',
+  'Ratiocinating', 'Excogitating', 'Noodling', 'Brainstorming', 'Puzzling',
+  'Mulling', 'Ruminating', 'Brooding', 'Chewing', 'Digesting',
+  'Processing', 'Computing', 'Calculating', 'Analyzing', 'Synthesizing',
+  'Aggregating', 'Collating', 'Compiling', 'Assembling', 'Orchestrating',
+  'Configuring', 'Optimizing', 'Recalibrating', 'Adjusting', 'Tuning',
+  'Harmonizing', 'Balancing', 'Aligning', 'Synchronizing', 'Coordinating',
+  'Triangulating', 'Interpolating', 'Extrapolating', 'Approximating', 'Estimating',
+  'Evaluating', 'Assessing', 'Appraising', 'Gauging', 'Measuring',
+  'Quantifying', 'Tabulating', 'Enumerating', 'Counting', 'Tallying',
+  'Indexing', 'Cataloging', 'Classifying', 'Categorizing', 'Sorting',
+  'Parsing', 'Decoding', 'Deciphering', 'Translating', 'Interpreting',
+  'Scrutinizing', 'Examining', 'Inspecting', 'Investigating', 'Probing',
+  'Exploring', 'Surveying', 'Scanning', 'Scouring', 'Perusing',
+  'Reviewing', 'Studying', 'Researching', 'Discovering', 'Uncovering',
+  'Revealing', 'Exposing', 'Unveiling', 'Disclosing', 'Divulging',
+  'Manifesting', 'Materializing', 'Actualizing', 'Realizing', 'Implementing',
+  'Executing', 'Performing', 'Accomplishing', 'Achieving', 'Fulfilling'
+];
 
 /**
  * Run the chat orchestrator
@@ -138,6 +163,11 @@ export async function runChatOrchestrator(
 
       logger.log('orchestrator: running chat agent');
 
+
+      // Select random silly verb and emit status
+      const randomVerb = sillyVerbs[Math.floor(Math.random() * sillyVerbs.length)];
+      onEvent({ type: 'status', status: `${randomVerb}...` });
+
       let stackTrace: any;
 
       // Run chat agent
@@ -148,6 +178,7 @@ export async function runChatOrchestrator(
         config,
         signal,
         messages: currentMessages,
+        chatStatus: (status: string) => onEvent({ type: 'status', status }),
         metadata: {
           model: chatMeta.model ?? config.getData().user.models?.chat,
         },

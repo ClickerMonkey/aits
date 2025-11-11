@@ -23,6 +23,7 @@ export interface CletusContext {
   cwd: string;
   cache: Record<string, any>;
   log: (msg: any) => void;
+  chatStatus: (status: string) => void;
 }
 
 /**
@@ -80,6 +81,7 @@ export function createCletusAI(configFile: ConfigFile) {
         cwd: process.cwd(),
         ops: new OperationManager('none'),
         log: logger.log.bind(logger),
+        chatStatus: () => {},
       },
       providedContext: async (ctx) => {
         if (ctx.userPrompt) {

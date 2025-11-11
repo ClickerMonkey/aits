@@ -70,6 +70,7 @@ export const image_generate = operationOf<
   { prompt: string; count: number; images: string[] }
 >({
   mode: 'create',
+  status: (input) => `Generating image: ${input.prompt.slice(0, 35)}...`,
   analyze: async (input, ctx) => {
     const count = input.n || 1;
 
@@ -103,6 +104,7 @@ export const image_edit = operationOf<
   { prompt: string; originalPath: string; editedPath: string }
 >({
   mode: 'update',
+  status: (input) => `Editing image: ${path.basename(input.imagePath)}`,
   analyze: async (input, { cwd }) => {
     const fullImagePath = resolveImage(cwd, input.imagePath);
     
@@ -143,6 +145,7 @@ export const image_analyze = operationOf<
   { prompt: string; imagePaths: string[]; analysis: string }
 >({
   mode: 'read',
+  status: (input) => `Analyzing ${input.imagePaths.length} image(s)`,
   analyze: async (input, { cwd }) => {
     const maxChars = input.maxCharacters || 2084;
     const imageCount = input.imagePaths.length;
@@ -192,6 +195,7 @@ export const image_describe = operationOf<
   { imagePath: string; description: string }
 >({
   mode: 'read',
+  status: (input) => `Describing image: ${path.basename(input.imagePath)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = resolveImage(cwd, input.imagePath);
 
@@ -230,6 +234,7 @@ export const image_find = operationOf<
   { prompt: string; searched: number; results: Array<{ path: string; score: number }> }
 >({
   mode: 'read',
+  status: (input) => `Finding images: ${input.prompt.slice(0, 35)}...`,
   analyze: async (input, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;

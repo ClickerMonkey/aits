@@ -45,6 +45,12 @@ export type OperationDefinition<TInput, TOutput> = {
   mode: OperationMode | ((input: TInput, context: CletusAIContext) => OperationMode);
 
   /**
+   * Human-readable status message for this operation (max 64 chars recommended).
+   * Should be concise and helpful without excessive input details.
+   */
+  status?: (input: TInput) => string;
+
+  /**
    * Analyze the operation input and return a description and doability status.
    * This is used when the current chat mode does not allow automatic execution.
    *

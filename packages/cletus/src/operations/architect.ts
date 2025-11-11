@@ -35,6 +35,7 @@ export const type_info = operationOf<
   { type: TypeDefinition | null }
 >({
   mode: 'local',
+  status: (input) => `Getting type info: ${input.name}`,
   analyze: async (input, { config }) => {
     return {
       analysis: `This will get information about data type "${input.name}".`,
@@ -55,6 +56,7 @@ export const type_update = operationOf<
   { name: string; updated: boolean }
 >({
   mode: 'update',
+  status: (input) => `Updating type: ${input.name}`,
   validate(input: TypeUpdate, config: ConfigFile): string {
     const existing = config.getData().types.find((t) => t.name === input.name);
     if (!existing) {
@@ -198,6 +200,7 @@ export const type_create = operationOf<
   { type: TypeDefinition; created: boolean }
 >({
   mode: 'create',
+  status: (input) => `Creating type: ${input.name}`,
   validate(input: TypeDefinition, config: ConfigFile): string {
     const existing = config.getData().types.find((t) => t.name === input.name);
     if (existing) {

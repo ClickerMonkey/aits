@@ -5,6 +5,7 @@ export const assistant_switch = operationOf<
   { assistant: string }
 >({
   mode: 'update',
+  status: (input) => `Switching to assistant: ${input.name}`,
   analyze: async (input, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
@@ -38,6 +39,7 @@ export const assistant_update = operationOf<
   { name: string; updated: boolean }
 >({
   mode: 'update',
+  status: (input) => `Updating assistant: ${input.name}`,
   analyze: async (input, { config }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
@@ -80,6 +82,7 @@ export const assistant_add = operationOf<
   { name: string; created: boolean }
 >({
   mode: 'create',
+  status: (input) => `Adding assistant: ${input.name}`,
   analyze: async (input, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
     if (existing) {
@@ -118,6 +121,7 @@ export const memory_list = operationOf<
   { memories: { text: string; created: string }[] }
 >({
   mode: 'local',
+  status: () => 'Listing user memories',
   analyze: async (input, { config }) => {
     const memoryCount = config.getData().user.memory.length;
     return {
@@ -139,6 +143,7 @@ export const memory_update = operationOf<
   { content: string; added: boolean }
 >({
   mode: 'update',
+  status: (input) => `Adding memory: ${input.content.slice(0, 35)}...`,
   analyze: async (input, { config }) => {
     const preview = input.content.length > 50
       ? input.content.substring(0, 50) + '...'

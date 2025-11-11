@@ -20,6 +20,7 @@ export const data_create = operationOf<
   { id: string; name: string }
 >({
   mode: 'create',
+  status: ({ name }) => `Creating ${name} record`,
   analyze: async ({ name, fields }, { config })=> {
     const type = getType(config, name);
     const fieldNames = Object.keys(fields);
@@ -43,6 +44,7 @@ export const data_update = operationOf<
   { id: string; updated: boolean }
 >({
   mode: 'update',
+  status: ({ name, id }) => `Updating ${name}: ${id.slice(0, 8)}`,
   analyze: async ({ name, id, fields }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(type.name);
@@ -77,6 +79,7 @@ export const data_delete = operationOf<
   { id: string; deleted: boolean }
 >({
   mode: 'delete',
+  status: ({ name, id }) => `Deleting ${name}: ${id.slice(0, 8)}`,
   analyze: async ({ name, id }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
@@ -110,6 +113,7 @@ export const data_select = operationOf<
   { count: number; results: any[] }
 >({
   mode: 'local',
+  status: ({ name }) => `Selecting ${name} records`,
   analyze: async ({ name, where, offset, limit, orderBy }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
@@ -168,6 +172,7 @@ export const data_update_many = operationOf<
   { updated: number }
 >({
   mode: 'update',
+  status: ({ name }) => `Updating multiple ${name} records`,
   analyze: async ({ name, limit, set, where }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
@@ -208,6 +213,7 @@ export const data_delete_many = operationOf<
   { deleted: number }
 >({
   mode: 'delete',
+  status: ({ name }) => `Deleting multiple ${name} records`,
   analyze: async ({ name, where, limit }, { config }) => {
     const type = getType(config, name);
     
@@ -255,6 +261,7 @@ export const data_aggregate = operationOf<
   { results: any[] }
 >({
   mode: 'local',
+  status: ({ name }) => `Aggregating ${name} records`,
   analyze: async ({ name, where }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);

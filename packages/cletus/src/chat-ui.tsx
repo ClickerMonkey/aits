@@ -80,6 +80,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showExitPrompt, setShowExitPrompt] = useState(false);
   const [exitOptionIndex, setExitOptionIndex] = useState(0);
+  const [currentStatus, setCurrentStatus] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -657,6 +658,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
     setIsWaitingForResponse(true);
     setElapsedTime(0);
     setTokenCount(0);
+    setCurrentStatus('');
     requestStartTimeRef.current = Date.now();
 
     // Create abort controller for this request
@@ -704,13 +706,19 @@ After installation and the SoX executable is in the path, restart Cletus and try
               // addSystemMessage(event.summary);
               break;
 
+            case 'status':
+              setCurrentStatus(event.status);
+              break;
+
             case 'complete':
               addMessage(event.message);
               setPendingMessage(null);
+              setCurrentStatus('');
               break;
 
             case 'error':
               addSystemMessage(`❌ Error: ${event.error}`);
+              setCurrentStatus('');
               break;
           }
         }
@@ -731,6 +739,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
       setIsWaitingForResponse(false);
       setPendingMessage(null);
+      setCurrentStatus('');
 
       abortControllerRef.current = null;
     }
@@ -938,6 +947,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
               <Text dimColor> - {cmd.description}</Text>
             </Box>
           ))}
+        </Box>
+      )}
+
+      {/* Status Display */}
+      {currentStatus && (
+        <Box>
+          <Text color="cyan">{currentStatus}</Text>
         </Box>
       )}
 

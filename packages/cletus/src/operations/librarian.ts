@@ -7,6 +7,7 @@ export const knowledge_search = operationOf<
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
   mode: 'read',
+  status: (input) => `Searching knowledge: ${input.query.slice(0, 35)}...`,
   analyze: async (input, ctx) => {
     const limit = input.limit || 10;
     const prefix = input.sourcePrefix ? ` with source prefix "${input.sourcePrefix}"` : '';
@@ -50,6 +51,7 @@ export const knowledge_search = operationOf<
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
   mode: 'local',
+  status: () => 'Listing knowledge sources',
   analyze: async (input, ctx) => {
     return {
       analysis: 'This will list all unique source prefixes in the knowledge base.',
@@ -79,6 +81,7 @@ export const knowledge_add = operationOf<
   { source: string; added: boolean }
 >({
   mode: 'create',
+  status: (input) => `Adding knowledge: ${input.text.slice(0, 40)}...`,
   analyze: async (input, ctx) => {
     const preview = input.text.length > 50 ? input.text.substring(0, 50) + '...' : input.text;
     return {
@@ -113,6 +116,7 @@ export const knowledge_delete = operationOf<
   { sourcePrefix: string; deletedCount: number }
 >({
   mode: 'delete',
+  status: (input) => `Deleting knowledge: ${input.sourcePrefix}`,
   analyze: async (input, ctx) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();

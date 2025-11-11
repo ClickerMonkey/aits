@@ -36,6 +36,7 @@ export const file_search = operationOf<
   { glob: string; count: number; files: string[] }
 >({
   mode: 'local',
+  status: (input) => `Searching files: ${input.glob}`,
   async analyze(input, { cwd }) { return { analysis: `N/A`, doable: true }; },
   async do(input, { cwd }) {
     const limit = input.limit || 50;
@@ -53,6 +54,7 @@ export const file_summary = operationOf<
   { path: string; size: number; truncated: boolean; summary: string; }
 >({
   mode: 'read',
+  status: (input) => `Summarizing: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
@@ -109,6 +111,7 @@ export const file_index = operationOf<
   { glob: string; files: string[], knowledge: number }
 >({
   mode: 'create',
+  status: (input) => `Indexing files: ${input.glob}`,
   async analyze(input, { cwd }) {
     const files = await searchFiles(cwd, input.glob);
 
@@ -193,6 +196,7 @@ export const file_create = operationOf<
   { path: string; size: number, lines: number }
 >({
   mode: 'create',
+  status: (input) => `Creating file: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const exists = await fileIsReadable(fullPath);
@@ -228,6 +232,7 @@ export const file_copy = operationOf<
   { source: string[]; target: string }
 >({
   mode: 'create',
+  status: (input) => `Copying: ${input.glob} → ${path.basename(input.target)}`,
   analyze: async (input, { cwd }) => {
     const source = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
@@ -293,6 +298,7 @@ export const file_move = operationOf<
   { count: number; target: string; files: string[] }
 >({
   mode: 'update',
+  status: (input) => `Moving: ${input.glob} → ${path.basename(input.target)}`,
   analyze: async (input, { cwd }) => {
     const files = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
@@ -372,6 +378,7 @@ export const file_stats = operationOf<
   { path: string },
   { path: string; size: number; created: string; modified: string; isDirectory: boolean, type: string, lines?: number, characters?: number }
 >({
+  status: (input) => `Getting stats: ${path.basename(input.path)}`,
   mode: 'local',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -421,6 +428,7 @@ export const file_delete = operationOf<
   { path: string; deleted: boolean }
 >({
   mode: 'delete',
+  status: (input) => `Deleting: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
 
@@ -449,6 +457,7 @@ export const file_read = operationOf<
   { path: string; content: string; truncated: boolean }
 >({
   mode: 'read',
+  status: (input) => `Reading: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
@@ -506,6 +515,7 @@ export const text_search = operationOf<
   { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> }
 >({
   mode: (input) => input.transcribeImages ? 'read' : 'local',
+  status: (input) => `Searching text: ${input.regex.slice(0, 35)}...`,
   analyze: async (input, { cwd }) => {
     const surrounding = input.surrounding || 0;
     const files = await searchFiles(cwd, input.glob);
@@ -665,6 +675,7 @@ export const dir_create = operationOf<
   { path: string; created: boolean }
 >({
   mode: 'create',
+  status: (input) => `Creating directory: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const { exists, isDirectory } = await fileIsDirectory(fullPath);

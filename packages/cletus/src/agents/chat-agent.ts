@@ -98,6 +98,8 @@ The agent will be fed the conversation and you need to provide a 'request' that 
     refs: subAgents,
     call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
+      
+      ctx.chatStatus(`Delegating to ${agent}${typeName ? ` for ${typeName}` : ''}: ${request.substring(0, 32)}...`);
 
       if (agent === 'dba') {
         const type = typeName ? types.find(t => t.name === typeName) : undefined;
@@ -111,6 +113,8 @@ The agent will be fed the conversation and you need to provide a 'request' that 
         if (tools.length === 0) {
           throw new Error('No dba tools matched the request, try a different agent: ' + request);
         }
+        
+        ctx.chatStatus('');
 
         return tools;
       } else {
@@ -133,6 +137,8 @@ The agent will be fed the conversation and you need to provide a 'request' that 
         if (tools.length === 0) {
           throw new Error(`No ${agent} tools matched the request, try a different agent: ` + request);
         }
+
+        ctx.chatStatus('');
 
         return tools;
       }
