@@ -163,7 +163,7 @@ It may also be useful if the user doesn't want a comprehensive list of matches, 
 The offset & limit are at the file level assuming the files are sorted by name.
 
 Example: Find all function declarations in TypeScript files:
-{ "glob": "src/**/*.ts", "regex": "function \\\\w+\\\\(", "caseInsensitive": true, "output": "matches", "surrounding": 2 }`,
+{ "glob": "src/**/*.ts", "regex": "function \\w+\\(", "caseInsensitive": true, "output": "matches", "surrounding": 2 }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to search'),
       regex: z.string().describe('Regular expression pattern, EMCA syntax'),

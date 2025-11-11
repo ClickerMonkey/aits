@@ -62,6 +62,11 @@ export function createCletusAI(configFile: ConfigFile) {
     ...(config.providers.openrouter ? { openrouter: new OpenRouterProvider({
       ...config.providers.openrouter,
       retryEvents,
+      defaultParams: {
+        ...config.providers.openrouter.defaultParams,
+        appName: 'cletus',
+        siteUrl: 'https://github.com/ClickerMonkey/aits',
+      },
     }) } : {}),
     ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),
   } as const;
@@ -196,6 +201,8 @@ No assistant persona selected.
 {{/if}}
 
 <todos>
+Todos are managed by Cletus internally to track user requests. 
+The are exclusively referred to as "todos" - nothing else.
 {{#if currentTodo}}
 Current Todo: {{currentTodo.name}}
 {{/if}}
@@ -223,6 +230,8 @@ Prompt: {{chatPrompt}}
 </chat>
 
 <types>
+Data types are user defined schemas representing structured information.
+The schemas are managed by the 'architect' sub-agent and the data is managed by the 'dba'.
 {{#if types.length}}
 Available Data Types:
 {{#each types}}

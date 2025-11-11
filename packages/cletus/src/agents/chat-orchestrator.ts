@@ -320,9 +320,9 @@ export async function runChatOrchestrator(
       logger.log('orchestrator: completing');
 
       // Save final assistant message
-      await chatData.save((chat) => {
-        chat.messages.push(pending);
-      });
+      // await chatData.save((chat) => {
+      //   chat.messages.push(pending);
+      // });
 
       onEvent({ type: 'complete', message: pending });
 

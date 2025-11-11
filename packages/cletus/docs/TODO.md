@@ -51,5 +51,5 @@
 - [ ] while deleting chat - stay in list instead of going back to settings
 - [x] add case insensitive option to regex inputs
 - [x] add limit & offset or count only options to text_search (sort files)
-- [ ] duplicate message issue
+- [x] duplicate message issue
 - [ ] async generators need try/finally

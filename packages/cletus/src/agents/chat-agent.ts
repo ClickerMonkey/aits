@@ -84,6 +84,7 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - If the user requests anything that would involve making multiple steps or tracking progress over time, use the 'planner' agent.
 - If the user requests anything related to file operations, use the 'clerk' agent.
 - If the user requests anything to a perceived data type that they don't have yet - confirm they want to create a new type with the 'architect' agent.
+- If the user wants to create something and it sounds like a record or data entry, use the 'dba' agent - if they mention a concept that doesn't exist confirm if necessary and use the 'architect'.
 - If the user explicitly asks to memories, or assistants - use the 'secretary' agent.
 - If the user says something and it sounds important to remember for all future conversations, use the 'secretary' agent to add a memory.
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
@@ -104,7 +105,14 @@ The agent will be fed the conversation and you need to provide a 'request' that 
           throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
         }
         
-        return await dba.get('tools', { request }, { ...ctx, type });
+        const tools = await dba.get('tools', { request }, { ...ctx, type });
+
+        // @ts-ignore
+        if (tools.length === 0) {
+          throw new Error('No dba tools matched the request, try a different agent: ' + request);
+        }
+
+        return tools;
       } else {
         const subAgent = {
           planner,
@@ -119,7 +127,14 @@ The agent will be fed the conversation and you need to provide a 'request' that 
           throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
         }
 
-        return await subAgent.get('tools', { request }, ctx);
+        const tools = await subAgent.get('tools', { request }, ctx);
+
+        // @ts-ignore
+        if (tools.length === 0) {
+          throw new Error(`No ${agent} tools matched the request, try a different agent: ` + request);
+        }
+
+        return tools;
       }
     },
   });

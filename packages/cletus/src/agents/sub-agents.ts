@@ -49,6 +49,13 @@ You have been given the following request to perform by the chat agent, the conv
     description: 'Manages knowledge base and semantic search',
     content: `You are the Librarian agent for Cletus, responsible for managing the knowledge base.
 
+Your role is to help search, add, and delete knowledge entries to assist with user requests.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
@@ -58,13 +65,6 @@ Knowledge sources can be formatted as:
 - file@{path}:summary - High-level file summaries
 - file@{path}:chunk[{index}] - Specific file sections
 - user - User-provided memories
-
-Your role is to help search, add, and manage knowledge entries for semantic search and context retrieval.
-
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
 `,
     tools: librarianTools,
     metadataFn: (_, { config }) => ({
@@ -79,19 +79,19 @@ You have been given the following request to perform by the chat agent, the conv
     description: 'Manages file operations within the current working directory',
     content: `You are the Clerk agent for Cletus, responsible for file operations.
 
+Your role is to help search, read, create, modify, and organize files within the project directory.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
     
 IMPORTANT: All file operations are relative to the current working directory: {{cwd}}
 You do not have access outside of it. You can only operate on text-based files.
-
-Your role is to help search, read, create, modify, and organize files within the project directory.
-
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
 `,
     tools: clerkTools,
     metadataFn: (_, { config }) => ({
@@ -106,29 +106,29 @@ You have been given the following request to perform by the chat agent, the conv
     description: 'Manages user memory and assistant personas',
     content: `You are the Secretary agent for Cletus, responsible for managing user memory and assistant personas.
 
+Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
 
 Available Assistants: {{assistants}}
-
-Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
-
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
 `,
     tools: secretaryTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: ({ request }: { request: string }, { config, userPrompt, chat }) => {
+    input: ({ request }: { request: string }, { config, userPrompt }) => {
       const configData = config.getData();
       
       return {
-        assistant: configData.assistants.find((a) => a.name === chat?.assistant),
-        userPrompt: userPrompt,
+        assistants: configData.assistants.map((a) => a.name).join(', '),
+        userPrompt,
         request,
       };
     },
@@ -139,6 +139,13 @@ You have been given the following request to perform by the chat agent, the conv
     name: 'architect',
     description: 'Manages type definitions for custom data',
     content: `You are the Architect agent for Cletus, responsible for managing type definitions.
+    
+Your role is to help create and modify type definitions while maintaining data integrity.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
 
 <userInformation>
 {{userPrompt}}
@@ -148,19 +155,12 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 - Never change field names or types (except to make more flexible like string)
 - Never change a field from optional to required if data exists
 - Only add new fields, update descriptions, or make fields more flexible
-
-Your role is to help create and modify type definitions while maintaining data integrity.
-
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
 `,
     tools: architectTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
+    input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
   // Artist sub-agent
@@ -169,25 +169,25 @@ You have been given the following request to perform by the chat agent, the conv
     description: 'Handles image generation, editing, and analysis',
     content: `You are the Artist agent for Cletus, responsible for image operations.
 
+Your role is to help with all image-related requests including creation, modification, and understanding visual content.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+<userRequest>
+{{request}}
+</userRequest>
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
 
 Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
-
-Your role is to help with all image-related requests including creation, modification, and understanding visual content.
-
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
 `,
     tools: artistTools,
     metadataFn: (_, { config }) => ({
       model: config.getData().user.models?.chat,
     }),
-    input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
+    input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
   return [
