@@ -1,4 +1,7 @@
+import React from "react";
 import { operationOf } from "./types";
+import { renderOperation } from "./render-helpers";
+import { abbreviate } from "../common";
 
 export const assistant_switch = operationOf<
   { name: string },
@@ -32,6 +35,16 @@ export const assistant_switch = operationOf<
     await config.updateChat(chat.id, { assistant: input.name });
     return { assistant: input.name };
   },
+  render: (op) => renderOperation(
+    op,
+    `AssistantSwitch("${op.input.name}")`,
+    (op) => {
+      if (op.output) {
+        return `Switched to assistant: ${op.output.assistant}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const assistant_update = operationOf<
@@ -49,12 +62,8 @@ export const assistant_update = operationOf<
       };
     }
 
-    const promptPreview = input.prompt.length > 50
-      ? input.prompt.substring(0, 50) + '...'
-      : input.prompt;
-
     return {
-      analysis: `This will update assistant "${input.name}" prompt to: "${promptPreview}"`,
+      analysis: `This will update assistant "${input.name}" prompt to: "${abbreviate(input.prompt, 50)}"`,
       doable: true,
     };
   },
@@ -75,6 +84,16 @@ export const assistant_update = operationOf<
 
     return { name: input.name, updated: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `AssistantUpdate("${op.input.name}")`,
+    (op) => {
+      if (op.output) {
+        return `Updated assistant: ${op.output.name}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const assistant_add = operationOf<
@@ -92,12 +111,8 @@ export const assistant_add = operationOf<
       };
     }
 
-    const promptPreview = input.prompt.length > 50
-      ? input.prompt.substring(0, 50) + '...'
-      : input.prompt;
-
     return {
-      analysis: `This will create a new assistant "${input.name}" with prompt: "${promptPreview}"`,
+      analysis: `This will create a new assistant "${input.name}" with prompt: "${abbreviate(input.prompt, 50)}"`,
       doable: true,
     };
   },
@@ -114,6 +129,16 @@ export const assistant_add = operationOf<
 
     return { name: input.name, created: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `AssistantAdd("${op.input.name}")`,
+    (op) => {
+      if (op.output) {
+        return `Created assistant: ${op.output.name}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const memory_list = operationOf<
@@ -136,6 +161,17 @@ export const memory_list = operationOf<
       created: new Date(m.created).toLocaleString(),
     }))};
   },
+  render: (op) => renderOperation(
+    op,
+    'MemoryList()',
+    (op) => {
+      if (op.output) {
+        const count = op.output.memories.length;
+        return `${count} memor${count !== 1 ? 'ies' : 'y'}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const memory_update = operationOf<
@@ -143,14 +179,10 @@ export const memory_update = operationOf<
   { content: string; added: boolean }
 >({
   mode: 'update',
-  status: (input) => `Adding memory: ${input.content.slice(0, 35)}...`,
+  status: (input) => `Adding memory: ${abbreviate(input.content, 35)}`,
   analyze: async (input, { config }) => {
-    const preview = input.content.length > 50
-      ? input.content.substring(0, 50) + '...'
-      : input.content;
-
     return {
-      analysis: `This will add a new user memory: "${preview}"`,
+      analysis: `This will add a new user memory: "${abbreviate(input.content, 50)}"`,
       doable: true,
     };
   },
@@ -158,4 +190,14 @@ export const memory_update = operationOf<
     await config.addMemory(input.content);
     return { content: input.content, added: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `MemoryUpdate("${abbreviate(op.input.content, 30)}")`,
+    (op) => {
+      if (op.output) {
+        return `Added: "${abbreviate(op.output.content, 50)}"`;
+      }
+      return null;
+    }
+  ),
 });

@@ -3,8 +3,10 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import sharp from "sharp";
+import { abbreviate, cosineSimilarity, pluralize } from "../common";
 import { getImagePath } from "../file-manager";
 import { fileIsReadable } from "./file-helper";
+import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 
 function resolveImage(cwd: string, imagePath: string): string {
@@ -70,7 +72,7 @@ export const image_generate = operationOf<
   { prompt: string; count: number; images: string[] }
 >({
   mode: 'create',
-  status: (input) => `Generating image: ${input.prompt.slice(0, 35)}...`,
+  status: (input) => `Generating image: ${abbreviate(input.prompt, 35)}`,
   analyze: async (input, ctx) => {
     const count = input.n || 1;
 
@@ -97,6 +99,17 @@ export const image_generate = operationOf<
       images: imagePaths,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `ImageGenerate("${abbreviate(op.input.prompt, 30)}", n=${op.input.n || 1})`,
+    (op) => {
+      if (op.output) {
+        const count = op.output.count;
+        return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const image_edit = operationOf<
@@ -107,7 +120,7 @@ export const image_edit = operationOf<
   status: (input) => `Editing image: ${path.basename(input.imagePath)}`,
   analyze: async (input, { cwd }) => {
     const fullImagePath = resolveImage(cwd, input.imagePath);
-    
+
     if (!await fileIsReadable(fullImagePath)) {
       return {
         analysis: `This would fail - image "${input.imagePath}" not found or not readable.`,
@@ -138,6 +151,17 @@ export const image_edit = operationOf<
       editedPath: `file://${edited[0]}`,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `ImageEdit("${path.basename(op.input.imagePath)}", "${abbreviate(op.input.prompt, 20)}")`,
+    (op) => {
+      if (op.output) {
+        const fileName = path.basename(op.output.editedPath.replace('file://', ''));
+        return `Edited image saved to ${fileName}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const image_analyze = operationOf<
@@ -188,6 +212,16 @@ export const image_analyze = operationOf<
       analysis: response.content,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `ImageAnalyze(${pluralize(op.input.imagePaths.length, 'image')}, "${abbreviate(op.input.prompt, 20)}")`,
+    (op) => {
+      if (op.output) {
+        return abbreviate(op.output.analysis, 60);
+      }
+      return null;
+    }
+  ),
 });
 
 export const image_describe = operationOf<
@@ -213,7 +247,7 @@ export const image_describe = operationOf<
   },
   do: async (input, { ai, cwd, config }) => {
     const image = await loadImageAsDataUrl(cwd, input.imagePath);
- 
+
     // Describe image
     const response = await ai.image.analyze.get({
       model: config.getData().user.models?.imageAnalyze,
@@ -226,6 +260,16 @@ export const image_describe = operationOf<
       description: response.content,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `ImageDescribe("${path.basename(op.input.imagePath)}")`,
+    (op) => {
+      if (op.output) {
+        return abbreviate(op.output.description, 60);
+      }
+      return null;
+    }
+  ),
 });
 
 // TODO phil this
@@ -234,7 +278,7 @@ export const image_find = operationOf<
   { prompt: string; searched: number; results: Array<{ path: string; score: number }> }
 >({
   mode: 'read',
-  status: (input) => `Finding images: ${input.prompt.slice(0, 35)}...`,
+  status: (input) => `Finding images: ${abbreviate(input.prompt, 35)}`,
   analyze: async (input, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
@@ -345,32 +389,17 @@ export const image_find = operationOf<
       results: topResults,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `ImageFind("${abbreviate(op.input.prompt, 25)}", "${op.input.glob}")`,
+    (op) => {
+      if (op.output) {
+        const resultCount = op.output.results.length;
+        const searched = op.output.searched;
+        return `Found ${resultCount} matching image${resultCount !== 1 ? 's' : ''} (searched ${searched})`;
+      }
+      return null;
+    }
+  ),
 });
 
-/**
- * Calculate cosine similarity between two vectors
- */
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) {
-    throw new Error('Vectors must have the same length');
-  }
-
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    magnitudeA += a[i] * a[i];
-    magnitudeB += b[i] * b[i];
-  }
-
-  magnitudeA = Math.sqrt(magnitudeA);
-  magnitudeB = Math.sqrt(magnitudeB);
-
-  if (magnitudeA === 0 || magnitudeB === 0) {
-    return 0;
-  }
-
-  return dotProduct / (magnitudeA * magnitudeB);
-}

@@ -1,5 +1,7 @@
 import { getModel } from "@aits/core";
+import { abbreviate } from "../common";
 import { KnowledgeFile } from "../knowledge";
+import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 
 export const knowledge_search = operationOf<
@@ -7,7 +9,7 @@ export const knowledge_search = operationOf<
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
   mode: 'read',
-  status: (input) => `Searching knowledge: ${input.query.slice(0, 35)}...`,
+  status: (input) => `Searching knowledge: ${abbreviate(input.query, 35)}`,
   analyze: async (input, ctx) => {
     const limit = input.limit || 10;
     const prefix = input.sourcePrefix ? ` with source prefix "${input.sourcePrefix}"` : '';
@@ -47,6 +49,17 @@ export const knowledge_search = operationOf<
       })),
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `KnowledgeSearch("${abbreviate(op.input.query, 25)}")`,
+    (op) => {
+      if (op.output) {
+        const count = op.output.results.length;
+        return `Found ${count} result${count !== 1 ? 's' : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
@@ -74,6 +87,17 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
 
     return { sources: Array.from(sources) };
   },
+  render: (op) => renderOperation(
+    op,
+    'KnowledgeSources()',
+    (op) => {
+      if (op.output) {
+        const count = op.output.sources.length;
+        return `Listed ${count} source${count !== 1 ? 's' : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const knowledge_add = operationOf<
@@ -81,11 +105,10 @@ export const knowledge_add = operationOf<
   { source: string; added: boolean }
 >({
   mode: 'create',
-  status: (input) => `Adding knowledge: ${input.text.slice(0, 40)}...`,
+  status: (input) => `Adding knowledge: ${abbreviate(input.text, 40)}`,
   analyze: async (input, ctx) => {
-    const preview = input.text.length > 50 ? input.text.substring(0, 50) + '...' : input.text;
     return {
-      analysis: `This will add user knowledge: "${preview}"`,
+      analysis: `This will add user knowledge: "${abbreviate(input.text, 50)}"`,
       doable: true,
     };
   },
@@ -109,6 +132,16 @@ export const knowledge_add = operationOf<
 
     return { source, added: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `KnowledgeAdd("${abbreviate(op.input.text, 30)}")`,
+    (op) => {
+      if (op.output) {
+        return `Added: "${abbreviate(op.input.text, 50)}"`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const knowledge_delete = operationOf<
@@ -161,4 +194,14 @@ export const knowledge_delete = operationOf<
 
     return { sourcePrefix: input.sourcePrefix, deletedCount: count };
   },
+  render: (op) => renderOperation(
+    op,
+    `KnowledgeDelete("${op.input.sourcePrefix}")`,
+    (op) => {
+      if (op.output) {
+        return `Deleted ${op.output.deletedCount} entr${op.output.deletedCount !== 1 ? 'ies' : 'y'}`;
+      }
+      return null;
+    }
+  ),
 });

@@ -3,10 +3,12 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import { describe, summarize, transcribe } from "../ai";
+import { abbreviate, chunkArray } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, FileType, processFile } from "./file-helper";
+import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 
 
@@ -18,14 +20,6 @@ export async function searchFiles(cwd: string, pattern: string) {
   })));
 
   return files;
-}
-
-function chunkArray<T>(array: T[], chunkSize: number = EMBED_CHUNK_SIZE): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    chunks.push(array.slice(i, i + chunkSize));
-  }
-  return chunks;
 }
 
 const EMBED_CHUNK_SIZE = 1000;
@@ -47,6 +41,16 @@ export const file_search = operationOf<
 
     return { glob: input.glob, count: files.length, files: files.slice(offset, limit) };
   },
+  render: (op) => renderOperation(
+    op,
+    `Files("${op.input.glob}")`,
+    (op) => {
+      if (op.output) {
+        return `Found ${op.output.count} file${op.output.count !== 1 ? 's' : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_summary = operationOf<
@@ -104,6 +108,16 @@ export const file_summary = operationOf<
       summary: summarized.description!,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `Summarize("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        return abbreviate(op.output.summary, 60);
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_index = operationOf<
@@ -133,12 +147,14 @@ export const file_index = operationOf<
       doable: indexable.length > 0,
     };
   },
-  async do(input, { cwd, ai }) {
+  async do(input, { cwd, ai, chatStatus }) {
     const files = await searchFiles(cwd, input.glob);
     const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
     const indexingPromises: Promise<any>[] = [];
     const knowledge: KnowledgeEntry[] = [];
     let embeddingModel: string = 'default';
+
+    // TODO chatStatus with progress that increases as files are processed and embeddings
 
     await Promise.allSettled(indexableFiles.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
@@ -162,7 +178,7 @@ export const file_index = operationOf<
         ? parsed.sections 
         : [parsed.description || ''];
 
-      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0));
+      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0), EMBED_CHUNK_SIZE);
       indexingPromises.push(...embedChunks.map(async (texts, textIndex) => {
         const offset = textIndex * EMBED_CHUNK_SIZE;
         const { embeddings, model } = await ai.embed.get({ texts });
@@ -189,6 +205,16 @@ export const file_index = operationOf<
       knowledge: indexingPromises.length,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `Index("${op.input.glob}", ${op.input.index})`,
+    (op) => {
+      if (op.output) {
+        return `Indexed ${op.output.files.length} file${op.output.files.length !== 1 ? 's' : ''}, ${op.output.knowledge} knowledge entries`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_create = operationOf<
@@ -225,6 +251,16 @@ export const file_create = operationOf<
 
     return { path: input.path, size: input.content.length, lines };
   },
+  render: (op) => renderOperation(
+    op,
+    `Write("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        return `Created file with ${op.output.size} characters, ${op.output.lines} lines`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_copy = operationOf<
@@ -291,6 +327,17 @@ export const file_copy = operationOf<
 
     return { source: source, target: input.target };
   },
+  render: (op) => renderOperation(
+    op,
+    `Copy("${op.input.glob}", "${path.basename(op.input.target)}")`,
+    (op) => {
+      if (op.output) {
+        const count = op.output.source.length;
+        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${path.basename(op.output.target)}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_move = operationOf<
@@ -372,6 +419,16 @@ export const file_move = operationOf<
 
     return { count: files.length, target: input.target, files };
   },
+  render: (op) => renderOperation(
+    op,
+    `Move("${op.input.glob}", "${path.basename(op.input.target)}")`,
+    (op) => {
+      if (op.output) {
+        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${path.basename(op.output.target)}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_stats = operationOf<
@@ -421,6 +478,17 @@ export const file_stats = operationOf<
       characters
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `FileStats("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        const sizeKB = (op.output.size / 1024).toFixed(1);
+        return `${op.output.type}, ${sizeKB} KB${op.output.lines ? `, ${op.output.lines} lines` : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_delete = operationOf<
@@ -450,6 +518,16 @@ export const file_delete = operationOf<
 
     return { path: input.path, deleted: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `Delete("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        return `Deleted ${path.basename(op.output.path)}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const file_read = operationOf<
@@ -508,6 +586,16 @@ export const file_read = operationOf<
       truncated: content.length > characters,
     };
   },
+  render: (op) => renderOperation(
+    op,
+    `Read("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        return `Read ${op.output.content.length} characters${op.output.truncated ? ' (truncated)' : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const text_search = operationOf<
@@ -515,7 +603,7 @@ export const text_search = operationOf<
   { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> }
 >({
   mode: (input) => input.transcribeImages ? 'read' : 'local',
-  status: (input) => `Searching text: ${input.regex.slice(0, 35)}...`,
+  status: (input) => `Searching text: ${abbreviate(input.regex, 35)}`,
   analyze: async (input, { cwd }) => {
     const surrounding = input.surrounding || 0;
     const files = await searchFiles(cwd, input.glob);
@@ -668,6 +756,25 @@ export const text_search = operationOf<
         return { searched: results.length, matches: pagedResults.map(r => ({ file: r.file, matches: r.matches })) };
     }
   },
+  render: (op) => renderOperation(
+    op,
+    `Search("${abbreviate(op.input.regex, 20)}", "${op.input.glob}")`,
+    (op) => {
+      if (op.output) {
+        const output = op.output;
+        if (output.fileCount !== undefined) {
+          return `Found ${output.fileCount} file${output.fileCount !== 1 ? 's' : ''} (searched ${output.searched})`;
+        } else if (output.matchCount !== undefined) {
+          return `Found ${output.matchCount} match${output.matchCount !== 1 ? 'es' : ''} (searched ${output.searched} files)`;
+        } else if (output.matches) {
+          return `Found matches in ${output.matches.length} file${output.matches.length !== 1 ? 's' : ''}`;
+        } else {
+          return `Searched ${output.searched} files`;
+        }
+      }
+      return null;
+    }
+  ),
 });
 
 export const dir_create = operationOf<
@@ -703,4 +810,14 @@ export const dir_create = operationOf<
     await fs.mkdir(fullPath, { recursive: true });
     return { path: input.path, created: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `Dir("${path.basename(op.input.path)}")`,
+    (op) => {
+      if (op.output) {
+        return `Created directory ${path.basename(op.output.path)}`;
+      }
+      return null;
+    }
+  ),
 });

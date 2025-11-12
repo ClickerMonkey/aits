@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { createSubAgents } from './sub-agents';
+import { abbreviate } from '../common';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -8,10 +9,6 @@ import { createSubAgents } from './sub-agents';
 export function createChatAgent(ai: CletusAI) {
   // Create all sub-agents
   const subAgents = createSubAgents(ai);
-
-  // Get the data types for the dba agent
-  const types = ai.config.defaultContext?.config?.getData().types || [];
-  const typeEnum = z.enum(types.map(t => t.name) as [string, ...string[]]);
 
   // Create the routing tool that decides which sub-agent to use
   const delegate = ai.tool({
@@ -91,18 +88,19 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
 </rules>
 `,
-    schema: z.object({
+    schema: ({ config }) => z.object({
       agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
       request: z.string().describe('The user request to pass along to the sub-agent'),
-      typeName: typeEnum.nullable().describe('The type of data to operate on (required for dba agent)'),
+      typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
     }),
     refs: subAgents,
     call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
 
-      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${request.substring(0, 50)}...`);
+      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 50)}`);
 
       if (agent === 'dba') {
+        const types = ctx.config.getData().types;
         const type = typeName ? types.find(t => t.name === typeName) : undefined;
         if (!type) {
           throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));

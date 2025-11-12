@@ -1,5 +1,7 @@
-import { operationOf } from "./types";
+import { abbreviate } from "../common";
 import type { TodoItem } from "../schemas";
+import { renderOperation } from "./render-helpers";
+import { operationOf } from "./types";
 
 export const todos_clear = operationOf<{}, { cleared: boolean }>({
   mode: 'update',
@@ -23,6 +25,16 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
 
     return { cleared: true };
   },
+  render: (op) => renderOperation(
+    op,
+    'TodosClear()',
+    (op) => {
+      if (op.output) {
+        return 'All todos cleared';
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
@@ -40,11 +52,22 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return { todos: chatObject?.todos || [] };
   },
+  render: (op) => renderOperation(
+    op,
+    'TodosList()',
+    (op) => {
+      if (op.output) {
+        const count = op.output.todos.length;
+        return `${count} todo${count !== 1 ? 's' : ''}`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_add = operationOf<{ name: string }, { id: string; name: string }>({
   mode: 'create',
-  status: (input) => `Adding todo: ${input.name.slice(0, 40)}${input.name.length > 40 ? '...' : ''}`,
+  status: (input) => `Adding todo: ${abbreviate(input.name, 40)}`,
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return {
@@ -66,6 +89,16 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
 
     return { id, name: input.name };
   },
+  render: (op) => renderOperation(
+    op,
+    `TodosAdd("${abbreviate(op.input.name, 30)}")`,
+    (op) => {
+      if (op.output) {
+        return `Added: "${op.output.name}"`;
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }>({
@@ -106,6 +139,16 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
 
     return { id: input.id, done: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `TodosDone(id: ${abbreviate(op.input.id, 8)})`,
+    (op) => {
+      if (op.output) {
+        return 'Marked todo as done';
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
@@ -123,6 +166,16 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
     const todo = chatObject?.todos.find((t) => t.id === input.id);
     return { todo: todo || null };
   },
+  render: (op) => renderOperation(
+    op,
+    `TodosGet(id: ${abbreviate(op.input.id, 8)})`,
+    (op) => {
+      if (op.output) {
+        return op.output.todo ? `Found: "${op.output.todo.name}"` : 'Todo not found';
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }>({
@@ -155,6 +208,16 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
 
     return { id: input.id, removed: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `TodosRemove(id: ${abbreviate(op.input.id, 8)})`,
+    (op) => {
+      if (op.output) {
+        return 'Removed todo';
+      }
+      return null;
+    }
+  ),
 });
 
 export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number }>({
@@ -180,4 +243,14 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
 
     return { count: input.todos.length };
   },
+  render: (op) => renderOperation(
+    op,
+    `TodosReplace(${op.input.todos.length} todos)`,
+    (op) => {
+      if (op.output) {
+        return `Replaced with ${op.output.count} todo${op.output.count !== 1 ? 's' : ''}`;
+      }
+      return null;
+    }
+  ),
 });

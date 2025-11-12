@@ -10,6 +10,7 @@ import * as dba from './dba';
 import * as librarian from './librarian';
 import * as planner from './planner';
 import * as secretary from './secretary';
+import { ConfigFile } from "../config";
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -85,7 +86,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param op - The operation to render
    * @returns - React component to display
    */
-  render?: (op: OperationOf<TInput, TOutput>) => React.ReactNode;
+  render?: (op: OperationOf<TInput, TOutput>, config: ConfigFile) => React.ReactNode;
 };
 
 // Operation definition for a specific operation kind

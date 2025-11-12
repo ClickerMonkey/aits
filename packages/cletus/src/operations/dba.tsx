@@ -1,13 +1,11 @@
-import React from "react";
-import { Box, Text } from "ink";
-import { get } from "http";
+import { after } from "node:test";
+import { formatName } from "../common";
 import { ConfigFile } from "../config";
 import { DataManager } from "../data";
 import { TypeDefinition } from "../schemas";
+import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
-import { WhereClause, countByWhere, filterByWhere } from "./where-helpers";
-import { COLORS } from "../constants";
-import { formatTime } from "../common";
+import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -40,6 +38,23 @@ export const data_create = operationOf<
     const id = await dataManager.create(fields);
 
     return { id, name: type.name };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const firstField = Object.keys(op.input.fields)[0];
+    const additionalCount = Object.keys(op.input.fields).length - 1;
+    const more = additionalCount > 0 ? `, +${additionalCount} more` : '';
+    
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Create("${op.input.fields[firstField]}"${more})`,
+      (op) => {
+        if (op.output) {
+          return `Created record ID: ${op.output.id}`;
+        }
+        return null;
+      }
+    );
   },
 });
 
@@ -76,6 +91,21 @@ export const data_update = operationOf<
 
     return { id, updated: true };
   },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const fields = type.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
+    
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Update(${fields.map(f => `"${f}"`).join(', ')})`,
+      (op) => {
+        if (op.output?.updated) {
+          return `Updated record ID: ${op.output.id}`;
+        }
+        return null;
+      }
+    );
+  },
 });
 
 export const data_delete = operationOf<
@@ -109,6 +139,20 @@ export const data_delete = operationOf<
     await dataManager.delete(id);
 
     return { id, deleted: true };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Delete("${op.input.id.slice(0, 8)}")`,
+      (op) => {
+        if (op.output?.deleted) {
+          return `Deleted record ID: ${op.output.id}`;
+        }
+        return null;
+      }
+    );
   },
 });
 
@@ -169,6 +213,25 @@ export const data_select = operationOf<
       results: results.slice(recordOffset, recordOffset + recordLimit),
     };
   },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
+    const limit = op.input.limit ? `limit=${op.input.limit}` : '';
+    const offset = op.input.offset ? `offset=${op.input.offset}` : '';
+    const orderBy = op.input.orderBy ? `orderBy=${op.input.orderBy.map(o => o.field).join(',')}` : '';
+    const params = [where, limit, offset, orderBy].filter(p => p).join(', ');
+
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Select(${params})`,
+      (op) => {
+        if (op.output) {
+          return `Returned ${op.output.results.length} of ${op.output.count} record(s)`;
+        }
+        return null;
+      }
+    );
+  },
 });
 
 export const data_update_many = operationOf<
@@ -210,6 +273,24 @@ export const data_update_many = operationOf<
 
     return { updated: matchingRecords.length };
   },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const set = 'set=' + Object.keys(op.input.set).join(',');
+    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
+    const limit = op.input.limit ? `limit=${op.input.limit}` : '';
+    const params = [set, where, limit].filter(p => p).join(', ');
+
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}UpdateMany(${params})`,
+      (op) => {
+        if (op.output) {
+          return `Updated ${op.output.updated} record(s)`;
+        }
+        return null;
+      }
+    );
+  },
 });
 
 export const data_delete_many = operationOf<
@@ -250,6 +331,23 @@ export const data_delete_many = operationOf<
     ));
 
     return { deleted: matchingRecords.length };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
+    const limit = op.input.limit ? `limit=${op.input.limit}` : '';
+    const params = [where, limit].filter(p => p).join(', ');
+
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}DeleteMany(${params})`,
+      (op) => {
+        if (op.output) {
+          return `Deleted ${op.output.deleted} record(s)`;
+        }
+        return null;
+      }
+    );
   },
 });
 
@@ -391,63 +489,79 @@ export const data_aggregate = operationOf<
 
     return { results };
   },
-  render: (op) => {
-    // Determine status color based on operation status
-    let statusColor: string;
-    let statusLabel: string;
-
-    switch (op.status) {
-      case 'done':
-        statusColor = COLORS.STATUS_DONE;
-        statusLabel = 'completed';
-        break;
-      case 'doing':
-        statusColor = COLORS.STATUS_IN_PROGRESS;
-        statusLabel = 'in progress';
-        break;
-      case 'analyzed':
-        statusColor = COLORS.STATUS_ANALYZED;
-        statusLabel = 'pending approval';
-        break;
-      case 'doneError':
-        statusColor = COLORS.ERROR_TEXT;
-        statusLabel = 'error';
-        break;
-      default:
-        statusColor = COLORS.DIM_TEXT;
-        statusLabel = op.status;
-    }
-
-    // Calculate elapsed time
-    const elapsed = op.start ? formatTime(op.end ? op.end - op.start : Date.now() - op.start) : '';
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
+    const having = op.input.having ? `having=${Object.keys(op.input.having).join(',')}` : ''
+    const groupBy = op.input.groupBy ? `groupBy=${op.input.groupBy.join(',')}` : ''
+    const orderBy = op.input.orderBy ? `orderBy=${op.input.orderBy.map(o => o.field).join(',')}` : ''
+    const select = 'select=' + op.input.select.map(s => s.function + (s.field ? `(${s.field})` : '')).join(',');
+    const params = [where, having, groupBy, orderBy, select].filter(p => p).join(', ');
     
-    // Generate summary line
-    let summary: string;
-    if (op.error) {
-      summary = op.error;
-    } else if (op.output?.results) {
-      const resultCount = op.output.results.length;
-      const aggregations = op.input.select?.map((s: any) => s.function).join(', ') || 'aggregation';
-      summary = `${resultCount} result${resultCount !== 1 ? 's' : ''} (${aggregations})`;
-    } else if (op.analysis) {
-      summary = op.analysis;
-    } else {
-      summary = 'Processing...';
-    }
-
-    return (
-      <Box flexDirection="column">
-        <Box>
-          <Text color={statusColor as any}>● </Text>
-          <Text>Aggregate({(op.input as any).name}) </Text>
-          <Text dimColor>[{statusLabel}] </Text>
-          <Text dimColor>({elapsed})</Text>
-        </Box>
-        <Box marginLeft={2}>
-          <Text>{' → '}</Text>
-          <Text color={op.error ? COLORS.ERROR_TEXT : undefined}>{summary}</Text>
-        </Box>
-      </Box>
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Aggregate(${params})`,
+      (op) => {
+        if (op.output?.results) {
+          const resultCount = op.output.results.length;
+          const aggregations = op.input.select?.map((s: any) => s.function).join(', ') || 'aggregation';
+          return `${resultCount} result${resultCount !== 1 ? 's' : ''} (${aggregations})`;
+        }
+        return null;
+      }
     );
   },
 });
+
+function valueString(value: FieldCondition[keyof FieldCondition]): string {
+  if (Array.isArray(value)) {
+    return `(${value.map(v => typeof v === 'string' ? `"${v}"` : `${v}`).join(', ')})`;
+  } else {
+    return typeof value === 'string' ? `"${value}"` : `${value}`;
+  }
+}
+
+function whereString(where: WhereClause | undefined): string {
+  if (!where) {
+    return '';
+  }
+
+  const conditions: string[] = [];
+  for (const [field, condition] of Object.entries(where)) {
+    switch (field) {
+      case 'and':
+      case 'or':
+        const subConditions = (condition as WhereClause[]).map(subWhere => whereString(subWhere));
+        conditions.push(`(${subConditions.join(` ${field.toUpperCase()} `)})`);
+        break;
+      case 'not':
+        conditions.push(`NOT (${whereString(condition as WhereClause)})`);
+        break;
+      default:
+        const fieldCondition = condition as FieldCondition;
+        for (const [op, value] of Object.entries(fieldCondition)) {
+          conditions.push(`${field} ${OPERATOR_MAP[op]} ${valueString(value)}`);
+        }
+        break;
+    }
+  }
+
+  return conditions.length > 1
+   ? `(${conditions.join(' AND ')})`
+   : conditions[0];
+}
+
+const OPERATOR_MAP: Record<string, string> = {
+  equals: "=",
+  contains: " CONTAINS ",
+  startsWith: " STARTS WITH ",
+  endsWith: "E NDS WITH ", 
+  lt: "<",
+  lte: "≤",
+  gt: ">",
+  gte: "≥",
+  before: "≤",
+  after: "≥",
+  oneOf: " one of ",
+  isEmpty: "IS EMPTY",
+};

@@ -981,14 +981,14 @@ After installation and the SoX executable is in the path, restart Cletus and try
           <>
             <Static items={visibleMessages}>
               {(msg: Message) => (
-                <MessageDisplay key={msg.created} message={msg} />
+                <MessageDisplay key={msg.created} message={msg} config={config}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay key={lastMessage.created} message={lastMessage} />
+              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} />
             )}
             {showPendingMessage && (
-              <MessageDisplay message={pendingMessage} />
+              <MessageDisplay message={pendingMessage} config={config} />
             )}
           </>
         )}

@@ -1,7 +1,9 @@
 import Handlebars from 'handlebars';
-import { operationOf } from "./types";
+import { formatName } from "../common";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
+import { renderOperation } from "./render-helpers";
+import { operationOf } from "./types";
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
@@ -47,6 +49,18 @@ export const type_info = operationOf<
     const type = types.find((t) => t.name === input.name);
     return { type: type || null };
   },
+  render: (op) => renderOperation(
+    op,
+    `${formatName(op.input.name)}Info()`,
+    (op) => {
+      if (op.output?.type) {
+        return `Found type: ${op.output.type.friendlyName}`;
+      } else if (op.output?.type === null) {
+        return `Type not found`;
+      }
+      return null;
+    }
+  ),
 });
 
 type TypeUpdate = { name: string; update: { friendlyName?: string; description?: string; knowledgeTemplate?: string; fields?: Record<string, Partial<TypeField> | null> } };
@@ -143,7 +157,7 @@ export const type_update = operationOf<
     if (validation) {
       throw new Error(`Type update failed - ${validation}`);
     }
-    
+
     await config.save((data) => {
       const dataType = data.types.find((t) => t.name === input.name);
       if (dataType) {
@@ -193,6 +207,11 @@ export const type_update = operationOf<
 
     return { name: input.name, updated: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `${formatName(op.input.name)}Update(${Object.keys(op.input.update).join(', ')})`,
+    (op) => op.output?.updated ? 'Updated type successfully' : null
+  ),
 });
 
 export const type_create = operationOf<
@@ -259,9 +278,14 @@ export const type_create = operationOf<
     if (validation) {
       throw new Error(`Type creation failed - ${validation}`);
     }
-    
+
     await config.addType(input);
 
     return { type: input, created: true };
   },
+  render: (op) => renderOperation(
+    op,
+    `${formatName(op.input.name)}Create(${op.input.fields.map(f => f.friendlyName).join(', ')})`,
+    (op) => op.output?.created ? `Created type: ${op.output.type.friendlyName}` : null
+  ),
 });

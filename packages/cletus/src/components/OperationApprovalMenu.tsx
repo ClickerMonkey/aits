@@ -199,8 +199,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         setSelectedIndex(0);
       }
     } else {
-      // Only one operation, approve it
-      await executeOperations([approvableOperations[0].idx]);
+      // Single operation - approve or reject based on selection
+      if (selectedIndex === 0) {
+        await executeOperations([approvableOperations[0].idx]);
+      } else {
+        await rejectOperations([approvableOperations[0].idx]);
+      }
     }
   };
 
@@ -309,7 +313,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
 
       if (menuState === 'main') {
         // Main menu navigation
-        const menuOptions = hasMultipleOperations ? 3 : 1;
+        const menuOptions = hasMultipleOperations ? 3 : 2;
 
         if (key.upArrow) {
           setSelectedIndex((prev) => (prev > 0 ? prev - 1 : menuOptions - 1));
@@ -426,11 +430,18 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
             </Box>
           </>
         ) : (
-          <Box>
-            <Text color={COLORS.APPROVAL_SELECTED}>
-              ▶ Approve
-            </Text>
-          </Box>
+          <>
+            <Box>
+              <Text color={selectedIndex === 0 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
+                {selectedIndex === 0 ? '▶ ' : '  '}Approve
+              </Text>
+            </Box>
+            <Box>
+              <Text color={selectedIndex === 1 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
+                {selectedIndex === 1 ? '▶ ' : '  '}Reject
+              </Text>
+            </Box>
+          </>
         )}
       </Box>
     );

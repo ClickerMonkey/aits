@@ -3,9 +3,11 @@ import React from 'react';
 import type { Message } from '../schemas';
 import { COLORS } from '../constants';
 import { Operations } from '../operations/types';
+import { ConfigFile } from '../config';
 
 interface MessageDisplayProps {
   message: Message;
+  config: ConfigFile;
 }
 
 /**
@@ -163,7 +165,7 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
 /**
  * Component for rendering a chat message with consistent styling
  */
-export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
+export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config }) => {
   const isUser = message.role === 'user';
   const color = message.role === 'user' 
     ? COLORS.USER
@@ -212,7 +214,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
               {message.operations.map((op, i) => {
                 const operationDef = Operations[op.type];
                 if (operationDef?.render) {
-                  return <React.Fragment key={i}>{operationDef.render(op)}</React.Fragment>;
+                  return <React.Fragment key={i}>{operationDef.render(op, config)}</React.Fragment>;
                 }
                 return (
                   <Text key={i} dimColor>

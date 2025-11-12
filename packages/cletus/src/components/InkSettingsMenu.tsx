@@ -10,6 +10,7 @@ import fs from 'fs/promises';
 import { getChatPath, getDataPath } from '../file-manager.js';
 import { ModelCapability } from '@aits/ai';
 import { logger } from '../logger.js';
+import { abbreviate } from '../common.js';
 
 type SettingsView =
   | 'menu'
@@ -264,7 +265,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
     const items = [
       ...memories.map((memory, index) => ({
-        label: memory.text.slice(0, 60) + (memory.text.length > 60 ? '...' : ''),
+        label: abbreviate(memory.text, 60),
         value: index.toString(),
       })),
       { label: '← Cancel', value: '__cancel__' },
