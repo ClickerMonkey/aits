@@ -101,6 +101,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
   const transcriptionAbortRef = useRef<AbortController | null>(null);
+  const firstMessageRef = useRef<number>(Math.max(0, chatMessages.length - 20));
   const [ai, _] = useState(() => createCletusAI(config));
   const [chatAgent, __] = useState(() => createChatAgent(ai));
 
@@ -168,7 +169,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   useEffect(() => {
     if (!isWaitingForResponse && !pendingMessage) {
       // Find the last assistant message
-      const lastAssistantMessage = [...chatMessages].reverse().find((msg) => msg.role === 'assistant');
+      const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
 
       if (lastAssistantMessage && lastAssistantMessage.operations) {
         const hasApprovalNeeded = lastAssistantMessage.operations.some((op) => op.status === 'analyzed');
@@ -753,15 +754,15 @@ After installation and the SoX executable is in the path, restart Cletus and try
     };
     addMessage(userMessage);
 
+    // Save user message to chat file even though it will be 
+    await chatFileRef.current.save((chat) => {
+      chat.messages.push(userMessage);
+    });
+
     // Reset history navigation
     setHistoryIndex(-1);
     setSavedInput('');
     setInputValue('');
-
-    // Save user message to chat file
-    await chatFileRef.current.save((chat) => {
-      chat.messages.push(userMessage);
-    });
 
     setIsWaitingForResponse(true);
     setElapsedTime(0);
@@ -786,7 +787,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       await runChatOrchestrator(
         {
           chatAgent,
-          messages: chatMessages,
+          messages: [...chatMessages, userMessage],
           chatMeta,
           config,
           chatData: chatFileRef.current,
@@ -927,9 +928,15 @@ After installation and the SoX executable is in the path, restart Cletus and try
   };
 
   // Calculate visible area (show last N messages to fit screen)
-  const maxVisibleMessages = 15;
-  const visibleMessages = chatMessages.slice(-maxVisibleMessages);
+  const visibleMessages = chatMessages.slice(firstMessageRef.current);
 
+  // Render all messages except pending normally
+  const lastMessage = visibleMessages.length > 0 
+      && visibleMessages[visibleMessages.length - 1].role === 'assistant' 
+      && visibleMessages[visibleMessages.length - 1].operations?.some((op) => op.status === 'analyzed')
+    ? visibleMessages.pop()
+    : null;
+  
   // Filter commands based on input
   const filteredCommands = inputValue.startsWith('/')
     ? COMMANDS.filter((cmd) => cmd.name.startsWith(inputValue))
@@ -972,10 +979,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
         ) : (
           <>
             <Static items={visibleMessages}>
-              {(msg) => (
+              {(msg: Message) => (
                 <MessageDisplay key={msg.created} message={msg} />
               )}
             </Static>
+            {lastMessage && (
+              <MessageDisplay key={lastMessage.created} message={lastMessage} />
+            )}
             {showPendingMessage && (
               <MessageDisplay message={pendingMessage} />
             )}
@@ -1093,18 +1103,22 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
       {/* Operation Approval Menu */}
       {showApprovalMenu && (() => {
-        const lastAssistantMessage = [...chatMessages].reverse().find((msg) => msg.role === 'assistant');
+        const lastAssistantMessageIndex = chatMessages.findLastIndex((msg) => msg.role === 'assistant');
+        const lastAssistantMessage = chatMessages[lastAssistantMessageIndex];
+        
         return lastAssistantMessage ? (
           <OperationApprovalMenu
             message={lastAssistantMessage}
-            chatFile={chatFileRef.current}
             ai={ai}
+            onMessageUpdate={(updatedMessage) => {
+              setChatMessages((prev) => {
+                const newMessages = prev.slice();
+                newMessages[lastAssistantMessageIndex] = updatedMessage;
+                return newMessages;
+              });
+            }}
             onComplete={() => {
               setShowApprovalMenu(false);
-              // Reload messages from file to get updated operations
-              chatFileRef.current.load().then(() => {
-                setChatMessages(chatFileRef.current.getMessages());
-              });
             }}
           />
         ) : null;

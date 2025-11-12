@@ -330,8 +330,13 @@ export const data_aggregate = operationOf<
 
         switch (agg.function) {
           case 'count':
-            const count = groupRecords.filter((r) => r.fields[agg.field!] !== null && r.fields[agg.field!] !== undefined).length;
-            result[alias] = count;
+            if (agg.field) {
+              // Count non-null values for specific field
+              result[alias] = groupRecords.filter((r) => r.fields[agg.field] !== null && r.fields[agg.field] !== undefined).length;
+            } else {
+              // Count all records in group (count(*))
+              result[alias] = groupRecords.length;
+            }
             break;
 
           case 'sum':

@@ -64,7 +64,10 @@ const sillyVerbs = [
   'Reviewing', 'Studying', 'Researching', 'Discovering', 'Uncovering',
   'Revealing', 'Exposing', 'Unveiling', 'Disclosing', 'Divulging',
   'Manifesting', 'Materializing', 'Actualizing', 'Realizing', 'Implementing',
-  'Executing', 'Performing', 'Accomplishing', 'Achieving', 'Fulfilling'
+  'Executing', 'Performing', 'Accomplishing', 'Achieving', 'Fulfilling',
+  'Cletusing', 'Cletusifying', 'Cletusating', 'Cletusizing', 'Cleting',
+  'Cletering', 'Cletusting', 'Cletcletcleting', 'Cletarating', 'Cletabeating',
+  'Cleticulating', 'Cletulating', 
 ];
 
 /**

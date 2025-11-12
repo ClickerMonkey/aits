@@ -4,11 +4,12 @@ import type { CletusAI } from '../ai';
 import type { ChatFile } from '../chat';
 import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
+import { on } from 'events';
 
 interface OperationApprovalMenuProps {
   message: Message;
-  chatFile: ChatFile;
   ai: CletusAI;
+  onMessageUpdate?: (message: Message) => void;
   onComplete: () => void;
 }
 
@@ -23,8 +24,8 @@ interface CompletionResult {
 
 export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   message,
-  chatFile,
   ai,
+  onMessageUpdate,
   onComplete,
 }) => {
   const [menuState, setMenuState] = useState<MenuState>('main');
@@ -68,6 +69,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     setIsProcessing(true);
     setMenuState('processing');
     setElapsedTime(0);
+    const startTime = Date.now();
 
     try {
       const operations = message.operations || [];
@@ -90,13 +92,27 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         }
       }
 
-      // Update the message with new operation states
-      await chatFile.save((chat) => {
-        const msgIndex = chat.messages.findIndex((m) => m.created === message.created);
-        if (msgIndex >= 0) {
-          chat.messages[msgIndex].operations = operations;
+      const elapsed = (Date.now() - startTime) / 1000;
+
+      // Generate summary message
+      let summaryText = '';
+      if (indices.length === 1) {
+        const op = operations[indices[0]];
+        if (failed > 0) {
+          summaryText = `Operation ${op.type} failed after ${formatTime(elapsed)}`;
+        } else {
+          summaryText = `Operation ${op.type} executed in ${formatTime(elapsed)}`;
         }
+      } else {
+        summaryText = `${indices.length} operations executed in ${formatTime(elapsed)}`;
+      }
+
+      // Update the message with new operation states and summary
+      message.content.push({
+        type: 'text',
+        content: `__${summaryText}__`,
       });
+      onMessageUpdate?.(message)
 
       setCompletionResult({
         success,
@@ -133,13 +149,17 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
       }
 
+      // Generate summary message
+      const summaryText = indices.length === 1
+        ? 'Operation rejected'
+        : `${indices.length} operations rejected`;
+
       // Update the message
-      await chatFile.save((chat) => {
-        const msgIndex = chat.messages.findIndex((m) => m.created === message.created);
-        if (msgIndex >= 0) {
-          chat.messages[msgIndex].operations = operations;
-        }
+      message.content.push({
+        type: 'text',
+        content: `__${summaryText}__`,
       });
+      onMessageUpdate?.(message)
 
       setCompletionResult({
         success: 0,
@@ -209,6 +229,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       setIsProcessing(true);
       setMenuState('processing');
       setElapsedTime(0);
+      const startTime = Date.now();
 
       try {
         const operations = message.operations || [];
@@ -235,13 +256,27 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
         }
 
+        const elapsed = (Date.now() - startTime) / 1000;
+
+        // Generate summary message
+        const parts: string[] = [];
+        if (success > 0) {
+          parts.push(`${success} executed`);
+        }
+        if (failed > 0) {
+          parts.push(`${failed} failed`);
+        }
+        if (rejected.length > 0) {
+          parts.push(`${rejected.length} rejected`);
+        }
+        const summaryText = `${parts.join(', ')} in ${formatTime(elapsed)}`;
+
         // Update the message
-        await chatFile.save((chat) => {
-          const msgIndex = chat.messages.findIndex((m) => m.created === message.created);
-          if (msgIndex >= 0) {
-            chat.messages[msgIndex].operations = operations;
-          }
+        message.content.push({
+          type: 'text',
+          content: `__${summaryText}__`,
         });
+        onMessageUpdate?.(message)
 
         setCompletionResult({
           success,
@@ -431,3 +466,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     </Box>
   );
 };
+
+
+function formatTime(ms: number): string {
+  if (ms < 1000) {
+    return `${ms.toFixed(0)}ms`;
+  } else {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+}

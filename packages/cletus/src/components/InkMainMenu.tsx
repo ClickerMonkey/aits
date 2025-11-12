@@ -2,7 +2,6 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import type { ConfigFile } from '../config.js';
 import { ChatFile } from '../chat.js';
 import type { ChatMeta } from '../schemas.js';
@@ -133,8 +132,17 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
               return;
             }
 
-            const chatId = uuidv4();
             const now = Date.now();
+            const date = new Date(now);
+
+            // Generate chat ID as yyyyMMdd-HHmmss
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            const chatId = `${year}${month}${day}-${hours}${minutes}${seconds}`;
 
             const title = selectedAssistant
               ? `Chat with ${selectedAssistant} on ${new Date().toLocaleDateString()}`

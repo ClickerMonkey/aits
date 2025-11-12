@@ -167,6 +167,9 @@ If you don't find the information you need, try to get it from another agent.`,
         accuracy: 0.3,
       },
     },
+    config: {
+      toolsOneAtATime: true,
+    },
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
