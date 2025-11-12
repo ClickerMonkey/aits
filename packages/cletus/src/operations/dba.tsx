@@ -1,9 +1,13 @@
+import React from "react";
+import { Box, Text } from "ink";
 import { get } from "http";
 import { ConfigFile } from "../config";
 import { DataManager } from "../data";
 import { TypeDefinition } from "../schemas";
 import { operationOf } from "./types";
 import { WhereClause, countByWhere, filterByWhere } from "./where-helpers";
+import { COLORS } from "../constants";
+import { formatTime } from "../common";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -332,7 +336,7 @@ export const data_aggregate = operationOf<
           case 'count':
             if (agg.field) {
               // Count non-null values for specific field
-              result[alias] = groupRecords.filter((r) => r.fields[agg.field] !== null && r.fields[agg.field] !== undefined).length;
+              result[alias] = groupRecords.filter((r) => r.fields[agg.field!] !== null && r.fields[agg.field!] !== undefined).length;
             } else {
               // Count all records in group (count(*))
               result[alias] = groupRecords.length;
@@ -386,5 +390,64 @@ export const data_aggregate = operationOf<
     }
 
     return { results };
+  },
+  render: (op) => {
+    // Determine status color based on operation status
+    let statusColor: string;
+    let statusLabel: string;
+
+    switch (op.status) {
+      case 'done':
+        statusColor = COLORS.STATUS_DONE;
+        statusLabel = 'completed';
+        break;
+      case 'doing':
+        statusColor = COLORS.STATUS_IN_PROGRESS;
+        statusLabel = 'in progress';
+        break;
+      case 'analyzed':
+        statusColor = COLORS.STATUS_ANALYZED;
+        statusLabel = 'pending approval';
+        break;
+      case 'doneError':
+        statusColor = COLORS.ERROR_TEXT;
+        statusLabel = 'error';
+        break;
+      default:
+        statusColor = COLORS.DIM_TEXT;
+        statusLabel = op.status;
+    }
+
+    // Calculate elapsed time
+    const elapsed = op.start ? formatTime(op.end ? op.end - op.start : Date.now() - op.start) : '';
+    
+    // Generate summary line
+    let summary: string;
+    if (op.error) {
+      summary = op.error;
+    } else if (op.output?.results) {
+      const resultCount = op.output.results.length;
+      const aggregations = op.input.select?.map((s: any) => s.function).join(', ') || 'aggregation';
+      summary = `${resultCount} result${resultCount !== 1 ? 's' : ''} (${aggregations})`;
+    } else if (op.analysis) {
+      summary = op.analysis;
+    } else {
+      summary = 'Processing...';
+    }
+
+    return (
+      <Box flexDirection="column">
+        <Box>
+          <Text color={statusColor as any}>● </Text>
+          <Text>Aggregate({(op.input as any).name}) </Text>
+          <Text dimColor>[{statusLabel}] </Text>
+          <Text dimColor>({elapsed})</Text>
+        </Box>
+        <Box marginLeft={2}>
+          <Text>{' → '}</Text>
+          <Text color={op.error ? COLORS.ERROR_TEXT : undefined}>{summary}</Text>
+        </Box>
+      </Box>
+    );
   },
 });

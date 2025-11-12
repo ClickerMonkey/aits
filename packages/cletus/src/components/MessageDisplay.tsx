@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import React from 'react';
 import type { Message } from '../schemas';
 import { COLORS } from '../constants';
+import { Operations } from '../operations/types';
 
 interface MessageDisplayProps {
   message: Message;
@@ -208,11 +209,17 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
         <Box flexDirection="column" marginLeft={1}>
           {message.operations && message.operations.length > 0 && (
             <Box flexDirection="column" marginBottom={1}>
-              {message.operations.map((op, i) => (
-                <Text key={i} dimColor>
-                  [{op.type}] - [{op.status}]
-                </Text>
-              ))}
+              {message.operations.map((op, i) => {
+                const operationDef = Operations[op.type];
+                if (operationDef?.render) {
+                  return <React.Fragment key={i}>{operationDef.render(op)}</React.Fragment>;
+                }
+                return (
+                  <Text key={i} dimColor>
+                    [{op.type}] - [{op.status}]
+                  </Text>
+                );
+              })}
             </Box>
           )}
           {message.content.map((part, i) => (

@@ -1,5 +1,6 @@
+import React from "react";
 import { CletusAIContext } from "../ai";
-import { ChatMode, OperationKind } from "../schemas";
+import { ChatMode, Operation, OperationKind } from "../schemas";
 
 import { Plus } from "@aits/core";
 import * as architect from './architect';
@@ -31,6 +32,14 @@ export type OperationAnalysis = {
    */
   doable: boolean;
 };
+
+/**
+ * Operation with typed input and output.
+ */
+export type OperationOf<TInput, TOutput> = Omit<Operation, 'input' | 'output'> & {
+  input: TInput;
+  output?: TOutput;
+}
 
 /**
  * Definition of an operation.
@@ -68,6 +77,15 @@ export type OperationDefinition<TInput, TOutput> = {
    * @returns - Operation output
    */
   do: (input: TInput, context: CletusAIContext) => Promise<TOutput>;
+
+  /**
+   * Optional custom renderer for displaying this operation in the UI.
+   * If provided, this will be used instead of the default operation display.
+   *
+   * @param op - The operation to render
+   * @returns - React component to display
+   */
+  render?: (op: OperationOf<TInput, TOutput>) => React.ReactNode;
 };
 
 // Operation definition for a specific operation kind
