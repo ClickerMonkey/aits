@@ -17,6 +17,7 @@ import { createChatAgent } from './agents/chat-agent.js';
 import { runChatOrchestrator } from './agents/chat-orchestrator.js';
 import { logger } from './logger.js';
 import { fileIsDirectory } from './operations/file-helper.js';
+import { COLORS } from './constants.js';
 
 
 interface ChatUIProps {
@@ -1127,16 +1128,16 @@ After installation and the SoX executable is in the path, restart Cletus and try
       {/* Input Area */}
       <Box
         borderStyle="round"
-        borderColor={isTranscribing ? 'blue' : isWaitingForResponse ? 'gray' : showApprovalMenu ? 'gray' : 'green'}
+        borderColor={isTranscribing ? COLORS.INPUT_TRANSCRIBING : isWaitingForResponse ? COLORS.INPUT_WAITING : showApprovalMenu ? COLORS.INPUT_APPROVAL_MENU : COLORS.USER_INPUT_BORDER}
         paddingX={1}
       >
         <Box width="100%">
           {isTranscribing ? (
-            <Text color="blue">🎤 </Text>
+            <Text color={COLORS.INPUT_TRANSCRIBING}>🎤 </Text>
           ) : isWaitingForResponse ? (
-            <Text color="gray">{'> '}</Text>
+            <Text color={COLORS.INPUT_WAITING}>{'> '}</Text>
           ) : (
-            <Text color="green">{'> '}</Text>
+            <Text color={COLORS.USER_INPUT_PROMPT}>{'> '}</Text>
           )}
           <TextInput
             value={inputValue}

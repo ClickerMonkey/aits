@@ -5,6 +5,7 @@ import type { ChatFile } from '../chat';
 import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
 import { on } from 'events';
+import { COLORS } from '../constants';
 
 interface OperationApprovalMenuProps {
   message: Message;
@@ -340,12 +341,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     return (
       <Box
         borderStyle="round"
-        borderColor="cyan"
+        borderColor={COLORS.PROCESSING_BORDER}
         paddingX={1}
         marginBottom={1}
         flexDirection="column"
       >
-        <Text color="cyan">
+        <Text color={COLORS.PROCESSING_TEXT}>
           Processing operations... {(elapsedTime / 1000).toFixed(1)}s
         </Text>
       </Box>
@@ -355,8 +356,8 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   // Completion state
   if (menuState === 'complete' && completionResult) {
     const { success, failed, rejected, hasErrors } = completionResult;
-    const borderColor = hasErrors ? 'red' : 'green';
-    const textColor = hasErrors ? 'red' : 'green';
+    const borderColor = hasErrors ? COLORS.ERROR_BORDER : COLORS.SUCCESS_BORDER;
+    const textColor = hasErrors ? COLORS.ERROR_TEXT : COLORS.SUCCESS_TEXT;
 
     let message = '';
     const parts: string[] = [];
@@ -396,36 +397,36 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     return (
       <Box
         borderStyle="round"
-        borderColor="yellow"
+        borderColor={COLORS.APPROVAL_BORDER}
         paddingX={1}
         marginBottom={1}
         flexDirection="column"
       >
-        <Text bold color="yellow">
+        <Text bold color={COLORS.APPROVAL_BORDER}>
           {approvableOperations.length} operation{approvableOperations.length !== 1 ? 's' : ''} require{approvableOperations.length === 1 ? 's' : ''} approval (↑↓ to navigate, Enter to select):
         </Text>
 
         {hasMultipleOperations ? (
           <>
             <Box>
-              <Text color={selectedIndex === 0 ? 'cyan' : 'white'}>
+              <Text color={selectedIndex === 0 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
                 {selectedIndex === 0 ? '▶ ' : '  '}Approve all
               </Text>
             </Box>
             <Box>
-              <Text color={selectedIndex === 1 ? 'cyan' : 'white'}>
+              <Text color={selectedIndex === 1 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
                 {selectedIndex === 1 ? '▶ ' : '  '}Reject all
               </Text>
             </Box>
             <Box>
-              <Text color={selectedIndex === 2 ? 'cyan' : 'white'}>
+              <Text color={selectedIndex === 2 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
                 {selectedIndex === 2 ? '▶ ' : '  '}Approve some
               </Text>
             </Box>
           </>
         ) : (
           <Box>
-            <Text color="cyan">
+            <Text color={COLORS.APPROVAL_SELECTED}>
               ▶ Approve
             </Text>
           </Box>
@@ -440,12 +441,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   return (
     <Box
       borderStyle="round"
-      borderColor="yellow"
+      borderColor={COLORS.APPROVAL_BORDER}
       paddingX={1}
       marginBottom={1}
       flexDirection="column"
     >
-      <Text bold color="yellow">
+      <Text bold color={COLORS.APPROVAL_BORDER}>
         Operation {currentOperationIndex + 1} of {approvableOperations.length}: {currentOp.op.type}
       </Text>
 
@@ -454,12 +455,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       </Box>
 
       <Box>
-        <Text color={selectedIndex === 0 ? 'cyan' : 'white'}>
+        <Text color={selectedIndex === 0 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
           {selectedIndex === 0 ? '▶ ' : '  '}Approve
         </Text>
       </Box>
       <Box>
-        <Text color={selectedIndex === 1 ? 'cyan' : 'white'}>
+        <Text color={selectedIndex === 1 ? COLORS.APPROVAL_SELECTED : COLORS.APPROVAL_UNSELECTED}>
           {selectedIndex === 1 ? '▶ ' : '  '}Reject
         </Text>
       </Box>

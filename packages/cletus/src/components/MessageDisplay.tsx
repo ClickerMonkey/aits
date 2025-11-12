@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink';
 import React from 'react';
 import type { Message } from '../schemas';
+import { COLORS } from '../constants';
 
 interface MessageDisplayProps {
   message: Message;
@@ -89,7 +90,7 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
       {lines.map((line, i) => {
         // Heading
         if (line.startsWith('# ')) {
-          return <Text key={i} bold color="cyan">{line.substring(2)}</Text>;
+          return <Text key={i} bold color={COLORS.MARKDOWN_HEADING}>{line.substring(2)}</Text>;
         }
         if (line.startsWith('## ')) {
           return <Text key={i} bold>{line.substring(3)}</Text>;
@@ -164,7 +165,7 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
 export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const color =
-    message.role === 'user' ? 'green' : message.role === 'system' ? 'yellow' : 'blue';
+    message.role === 'user' ? COLORS.USER : message.role === 'system' ? COLORS.SYSTEM : COLORS.ASSISTANT;
 
   const prefix =
     message.role === 'user'
@@ -173,11 +174,28 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
         ? 'System'
         : `${message.name ?? 'Assistant'}`;
 
+  // Determine circle icon color based on message state
+  let circleColor: string;
+  if (isUser) {
+    circleColor = COLORS.STATUS_USER; // Purple for user
+  } else if (!message.operations || message.operations.length === 0) {
+    circleColor = COLORS.STATUS_NO_OPS; // Gray for assistant with no operations
+  } else if (message.operations.every((op) => op.status === 'done')) {
+    circleColor = COLORS.STATUS_DONE; // Green if all operations are done
+  } else if (message.operations.some((op) => op.status === 'analyzed')) {
+    circleColor = COLORS.STATUS_ANALYZED; // Yellow if there are analyzed operations
+  } else {
+    circleColor = COLORS.STATUS_IN_PROGRESS; // Orange for everything else
+  }
+
   return (
     <Box flexDirection="column" marginBottom={1} width="100%">
-      <Text bold color={color}>
-        {prefix}:
-      </Text>
+      <Box>
+        <Text color={circleColor as any}>● </Text>
+        <Text bold color={color}>
+          {prefix}:
+        </Text>
+      </Box>
       {isUser ? (
         <Box borderStyle={'round'} flexDirection="column" paddingX={1} flexGrow={1} width={"100%"}>
           {message.content.map((part, i) => (
