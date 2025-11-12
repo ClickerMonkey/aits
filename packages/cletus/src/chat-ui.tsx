@@ -785,10 +785,15 @@ After installation and the SoX executable is in the path, restart Cletus and try
     try {
       logger.log('request starting');
 
+      // The user message might not have gotten in yet due to async state updates, ensure it's included
+      const messages = chatMessages[chatMessages.length - 1] === userMessage
+        ? chatMessages
+        : [...chatMessages, userMessage];
+
       await runChatOrchestrator(
         {
           chatAgent,
-          messages: [...chatMessages, userMessage],
+          messages,
           chatMeta,
           config,
           chatData: chatFileRef.current,

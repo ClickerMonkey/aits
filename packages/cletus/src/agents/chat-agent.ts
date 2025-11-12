@@ -73,7 +73,7 @@ export function createChatAgent(ai: CletusAI) {
   - data_aggregate(groupBy?: string[], where?: object, having?: object, select: Array<{function: string, field?: string, alias?: string}>, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
 
 Choose the appropriate agent based on what the user wants done.
-The agent will be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task.
+The agent will be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
 
 <rules>
 - If the user requests an action around data types defined that can be accomplished with a database query like tool call - use the 'dba'.
@@ -156,7 +156,27 @@ You MUST use the 'delegate' tool to perform any actions; do not attempt to do an
 
 Only do explicitly what the user asks you to do. If the user request is unclear, ask for clarification.
 
-If you don't find the information you need, try to get it from another agent.`,
+If you don't find the information you need, try to get it from another agent.
+
+<behavior>
+The user is going to make requests. 
+If you think it can be done in a few simple operations then proceed without todos.
+If the request is complex and will take multiple steps, you MUST use the planner agent to create todos for Cletus to complete the request step by step.
+
+The workflow will be:
+1. User makes a request
+2. Cletus determines whether to use planner first or not, if so generate todos
+3. Delegate to the appropriate sub-agent(s) to complete the request
+4. The user may have to approve it.
+5. A follow up call to Cletus - perhaps without a user message - will be made. If there are active todos should be checked and updated when it makes sense.
+6. Mark todos done when completed. If all are done and the user makes another request, clear the todos.
+7. If the user switches topics and there are unfinished todos, you can ask if they want to add the new request, clear todos, or rebuild the todos based on the new request.
+
+This will repeat to complete the user's requests efficiently and accurately.
+When operations are in a finished state you can provide a summary to the user of what was done. 
+When actively working on todos and presenting operations to the user to be accepted/rejected, keep the summaries concise with exactly what the user needs to see to make a good decision.
+</behavior>
+`,
     tools: [delegate],
     toolsMax: 5,
     metadata: {

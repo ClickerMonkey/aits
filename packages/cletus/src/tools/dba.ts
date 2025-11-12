@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI, CletusAIContext } from '../ai';
-import type { TypeDefinition, TypeField } from '../schemas';
 import { FieldCondition, WhereClause } from '../operations/where-helpers';
-import { AI, AIContextInfer, AITypes, ContextInfer } from '@aits/ai';
+import type { TypeDefinition, TypeField } from '../schemas';
 
 /**
  * Generate example field values based on field type
@@ -250,6 +249,7 @@ export function createDBAAgent(ai: CletusAI) {
     instructionsFn: ({ type }) => {
       const firstField = type.fields[0];
       const sortField = type.fields.find(f => f.type === 'number' || f.type === 'date') || firstField;
+
       return `Use this to search and retrieve ${type.friendlyName} records. Supports:
 - where: Filter by field values with and/or logic
 - offset/limit: Pagination
@@ -314,6 +314,7 @@ Example 2: Query with sorting:
       const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
       const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
       const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
+      
       return `Use this for analytics and reporting on ${type.friendlyName} data:
 - groupBy: Group by field(s)
 - where: Filter before aggregation

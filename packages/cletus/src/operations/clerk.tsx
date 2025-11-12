@@ -397,6 +397,8 @@ export const file_move = operationOf<
       throw new Error(`Target "${input.target}" must be a directory when moving multiple files.`);
     }
 
+    // TODO chatStatus with progress that increases as files are moved
+
     if (fileToFile) {
       const targetPathDirectory = path.dirname(targetPath);
       const targetFullPath = targetDirectory.isDirectory 
@@ -409,6 +411,7 @@ export const file_move = operationOf<
       if (!targetDirectory.isDirectory) {
         await fs.mkdir(targetPath, { recursive: true });
       }
+
       await Promise.all(files.map(async (file) => {
         const sourcePath = path.resolve(cwd, file);
         const destPath = path.join(targetPath, file);
@@ -645,6 +648,8 @@ export const text_search = operationOf<
     const offset = input.offset || 0;
     const pattern = new RegExp(input.regex, input.caseInsensitive !== false ? 'gi' : 'g');
     const surrounding = input.surrounding || 0;
+
+    // TODO chatStatus with progress that increases as files are processed
 
     const results = await Promise.all(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
