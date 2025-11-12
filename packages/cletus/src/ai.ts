@@ -8,7 +8,7 @@ import { ChatFile } from './chat';
 import { ConfigFile } from './config';
 import { logger } from './logger';
 import { OperationManager } from './operations/manager';
-import { ChatMeta, TypeDefinition } from './schemas';
+import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 
 /**
@@ -20,6 +20,7 @@ export interface CletusContext {
   userPrompt: string;
   chatData?: ChatFile;
   chat?: ChatMeta;
+  chatMessage?: Message;
   cwd: string;
   cache: Record<string, any>;
   log: (msg: any) => void;

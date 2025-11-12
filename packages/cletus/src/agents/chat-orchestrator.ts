@@ -158,6 +158,14 @@ export async function runChatOrchestrator(
         name: chatMeta.assistant,
         content: [{ type: 'text', content: '' }],
         created: Date.now(),
+        operations: [],
+      };
+
+      // Override push to emit updates
+      pending.operations!.push = function (...items: Operation[]) {
+        const result = Array.prototype.push.apply(this, items);
+        onEvent({ type: 'pendingUpdate', message: { ...pending } });
+        return result;
       };
 
       // Emit initial pending message
@@ -167,7 +175,6 @@ export async function runChatOrchestrator(
       const ops = new OperationManager(chatMeta.mode);
 
       logger.log('orchestrator: running chat agent');
-
 
       // Select random silly verb and emit status
       const randomVerb = sillyVerbs[Math.floor(Math.random() * sillyVerbs.length)];
@@ -180,6 +187,7 @@ export async function runChatOrchestrator(
         ops,
         chat: chatMeta,
         chatData,
+        chatMessage: pending,
         config,
         signal,
         messages: currentMessages,

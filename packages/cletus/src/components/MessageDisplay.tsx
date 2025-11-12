@@ -164,11 +164,13 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
  */
 export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
   const isUser = message.role === 'user';
-  const color =
-    message.role === 'user' ? COLORS.USER : message.role === 'system' ? COLORS.SYSTEM : COLORS.ASSISTANT;
+  const color = message.role === 'user' 
+    ? COLORS.USER
+    : message.role === 'system' 
+      ? COLORS.SYSTEM 
+      : COLORS.ASSISTANT;
 
-  const prefix =
-    message.role === 'user'
+  const prefix = message.role === 'user'
       ? `${message.name || 'You'}`
       : message.role === 'system'
         ? 'System'
@@ -217,7 +219,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message }) => {
             <React.Fragment key={i}>
               {i > 0 && (
                 <Box>
-                  <Text dimColor>{'─'.repeat(12)}</Text>
+                  <Text dimColor>{'─'.repeat(50)}</Text>
                 </Box>
               )}
               <MarkdownText>{part.content}</MarkdownText>

@@ -6,6 +6,7 @@ import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
 import { on } from 'events';
 import { COLORS } from '../constants';
+import { formatTime } from '../common';
 
 interface OperationApprovalMenuProps {
   message: Message;
@@ -467,12 +468,3 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     </Box>
   );
 };
-
-
-function formatTime(ms: number): string {
-  if (ms < 1000) {
-    return `${ms.toFixed(0)}ms`;
-  } else {
-    return `${(ms / 1000).toFixed(1)}s`;
-  }
-}

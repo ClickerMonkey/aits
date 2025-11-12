@@ -355,7 +355,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     }
   });
 
-  const showPendingMessage = pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length);
+  const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length));
 
   const handleCommand = async (command: string) => {
     const parts = command.split(' ');

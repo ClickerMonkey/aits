@@ -43,7 +43,7 @@
 - [ ] add image_attach
 - [x] on Ctrl+C in chat, ask if they want to exit to main menu, quit, or cancel
 - [x] add chatStatus(status: string) context
-- [ ] add chatMessage to context so operations can be added to the pending message
+- [x] add chatMessage to context so operations can be added to the pending message
 - [x] add it so each chat definition has a function to convert the input into a human friendly "tool" call string
 - [ ] update chat-ui to render messages differently (extend message content to add operation type with kind?). chat-ui should habe a agent / user message component render
 - [ ] show system messages toggle (only show ones within X minutes). Keep track of message created?
