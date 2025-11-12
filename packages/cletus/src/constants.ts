@@ -54,4 +54,5 @@ export type ColorValue = typeof COLORS[keyof typeof COLORS];
 
 export const CONSTS = {
   EMBED_CHUNK_SIZE: 1000,
+  FILE_READ_SIZE: 64_000,
 };

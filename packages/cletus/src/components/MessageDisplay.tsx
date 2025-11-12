@@ -194,7 +194,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config 
   }
 
   return (
-    <Box flexDirection="column" marginBottom={1} width="100%">
+    <Box flexDirection="column" marginBottom={1}>
       <Box>
         <Text color={circleColor as any}>● </Text>
         <Text bold color={color}>
@@ -202,7 +202,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config 
         </Text>
       </Box>
       {isUser ? (
-        <Box borderStyle={'round'} flexDirection="column" paddingX={1} flexGrow={1} width={"100%"}>
+        <Box borderStyle={'round'} flexDirection="column" paddingX={1}>
           {message.content.map((part, i) => (
             <Text key={i}>&gt; {part.content}</Text>
           ))}

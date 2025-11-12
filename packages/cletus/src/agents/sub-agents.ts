@@ -25,16 +25,18 @@ export function createSubAgents(ai: CletusAI) {
     description: 'Manages todos and task planning',
     content: `You are the Planner agent for Cletus, responsible for managing todos planning.
 
-<userInformation>
-{{userPrompt}}
-</userInformation>
-
 Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.
 
 You have been given the following request to perform by the chat agent, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
+
+<userInformation>
+{{userPrompt}}
+</userInformation>
 `,
     tools: plannerTools,
     metadataFn: (_, { config, chat }) => ({
@@ -52,19 +54,21 @@ You have been given the following request to perform by the chat agent, the conv
 Your role is to help search, add, and delete knowledge entries to assist with user requests.
 
 You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
-
-<userInformation>
-{{userPrompt}}
-</userInformation>
 
 Knowledge sources can be formatted as:
 - {dataType}:{id} - Knowledge from data records
 - file@{path}:summary - High-level file summaries
 - file@{path}:chunk[{index}] - Specific file sections
 - user - User-provided memories
+
+<userInformation>
+{{userPrompt}}
+</userInformation>
 `,
     tools: librarianTools,
     metadataFn: (_, { config, chat }) => ({
@@ -82,16 +86,20 @@ Knowledge sources can be formatted as:
 Your role is to help search, read, create, modify, and organize files within the project directory.
 
 You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
+    
+<IMPORTANT>
+- All file operations are relative to the current working directory: {{cwd}}
+- You do not have access outside of it.
+</IMPORTANT>
 
 <userInformation>
 {{userPrompt}}
 </userInformation>
-    
-IMPORTANT: All file operations are relative to the current working directory: {{cwd}}
-You do not have access outside of it. You can only operate on text-based files.
 `,
     tools: clerkTools,
     metadataFn: (_, { config, chat }) => ({
@@ -109,15 +117,17 @@ You do not have access outside of it. You can only operate on text-based files.
 Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
 
 You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
 
+Available Assistants: {{assistants}}
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
-
-Available Assistants: {{assistants}}
 `,
     tools: secretaryTools,
     metadataFn: (_, { config, chat }) => ({
@@ -143,18 +153,20 @@ Available Assistants: {{assistants}}
 Your role is to help create and modify type definitions while maintaining data integrity.
 
 You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
-
-<userInformation>
-{{userPrompt}}
-</userInformation>
 
 IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 - Never change field names or types (except to make more flexible like string)
 - Never change a field from optional to required if data exists
 - Only add new fields, update descriptions, or make fields more flexible
+
+<userInformation>
+{{userPrompt}}
+</userInformation>
 `,
     tools: architectTools,
     metadataFn: (_, { config, chat }) => ({
@@ -172,16 +184,18 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 Your role is to help with all image-related requests including creation, modification, and understanding visual content.
 
 You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
 <userRequest>
 {{request}}
 </userRequest>
 
+Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
+You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
+
 <userInformation>
 {{userPrompt}}
 </userInformation>
-
-Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
-You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
 `,
     tools: artistTools,
     metadataFn: (_, { config, chat }) => ({

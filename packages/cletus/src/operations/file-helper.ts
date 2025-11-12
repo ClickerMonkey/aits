@@ -360,8 +360,10 @@ export async function processFile(
       // Generate description if enabled and needed
       if (options.summarize && !processResult.description && processResult.sections && processResult.sections.length > 0 && options.summarizer) {
         const text = processResult.sections.join("\n\n");
-        const description = await options.summarizer(text);
-        processResult.description = description;
+        if (text.trim().length > 0) {
+          const description = await options.summarizer(text.trim());
+          processResult.description = description;
+        }
       }
     };
 

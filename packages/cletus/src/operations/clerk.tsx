@@ -83,7 +83,7 @@ export const file_summary = operationOf<
   },
   do: async (input, { cwd, ai, config }) => {
     const fullPath = path.resolve(cwd, input.path);
-    const characters = Math.min(input.characterLimit || 64_000, 64_000);
+    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
 
     const summarized = await processFile(fullPath, input.path, {
       assetPath: await getAssetPath(true),
@@ -434,7 +434,7 @@ export const file_move = operationOf<
 
 export const file_stats = operationOf<
   { path: string },
-  { path: string; size: number; created: string; modified: string; isDirectory: boolean, type: string, lines?: number, characters?: number }
+  { path: string; size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
 >({
   status: (input) => `Getting stats: ${path.basename(input.path)}`,
   mode: 'local',
@@ -458,22 +458,35 @@ export const file_stats = operationOf<
     const fullPath = path.resolve(cwd, input.path);
     const stats = await fs.stat(fullPath);
 
-    const type = await categorizeFile(fullPath, input.path);
+    const contentType = await categorizeFile(fullPath, input.path);
     let lines: number | undefined = undefined;
     let characters: number | undefined = undefined;
 
-    if (type === 'text') {
+    if (contentType === 'text') {
       const file = await fs.readFile(fullPath, 'utf-8');
       characters = file.length;
       lines = file.split('\n').length;
     }
+    
+    const typeAnalysis = [
+      [stats.isDirectory(), 'directory' ],
+      [stats.isFile(), contentType ],
+      [stats.isBlockDevice(), 'block-device' ],
+      [stats.isCharacterDevice(), 'character-device' ],
+      [stats.isSymbolicLink(), 'symlink' ],
+      [stats.isFIFO(), 'fifo' ],
+      [stats.isSocket(), 'socket' ],
+    ] as const;
+
+    const type = typeAnalysis.find(([is]) => is)?.[1] || 'unknown'
 
     return {
       path: input.path,
       size: stats.size,
       created: stats.birthtime.toISOString(),
       modified: stats.mtime.toISOString(),
-      isDirectory: stats.isDirectory(),
+      accessed: stats.atime.toISOString(),
+      mode: stats.mode,
       type,
       lines,
       characters
@@ -532,7 +545,7 @@ export const file_delete = operationOf<
 });
 
 export const file_read = operationOf<
-  { path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
+  { path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean, showLines?: boolean },
   { path: string; content: string; truncated: boolean }
 >({
   mode: 'read',
@@ -556,16 +569,28 @@ export const file_read = operationOf<
       };
     }
 
-    const characters = Math.min(input.characterLimit || 64_000, 64_000);
+    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
+    const withLines = input.showLines ? ' with line numbers' : '';
 
     return {
-      analysis: `This will read the ${type} file "${input.path}" (first ${characters.toLocaleString()} characters).`,
+      analysis: `This will read the ${type} file "${input.path}" (first ${characters.toLocaleString()} characters)${withLines}.`,
       doable: true,
     };
   },
   do: async (input, { cwd, ai }) => {
     const fullPath = path.resolve(cwd, input.path);
-    const characters = Math.min(input.characterLimit || 64_000, 64_000);
+    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
+
+    const readable = await fileIsReadable(fullPath);
+
+    if (!readable) {
+      throw new Error(`File "${input.path}" not found or not readable.`);
+    }
+
+    const type = await categorizeFile(fullPath, input.path);
+    if (type === 'unknown') {
+      throw new Error(`File "${input.path}" is of an unsupported type for reading.`);
+    }
 
     const processed = await processFile(fullPath, input.path, {
       assetPath: await getAssetPath(true),
@@ -573,13 +598,24 @@ export const file_read = operationOf<
       describeImages: input.describeImages ?? false,
       extractImages: input.extractImages ?? false,
       transcribeImages: input.transcribeImages ?? false,
-      summarize: true,
-      summarizer: (text) => summarize(ai, text.substring(0, characters)),
+      summarize: false,
       describer: (image) => describe(ai, image),
       transcriber: (image) => transcribe(ai, image),
     });
 
-    const content = processed.sections.join('\n');
+    let content = processed.sections.join('\n');
+
+    // Add line numbers if requested
+    if (input.showLines && content.length > 0) {
+      const lines = content.split('\n');
+      const maxLineNumWidth = lines.length.toString().length;
+      content = lines
+        .map((line, index) => {
+          const lineNum = (index + 1).toString().padStart(maxLineNumWidth, ' ');
+          return `${lineNum} | ${line}`;
+        })
+        .join('\n');
+    }
 
     return {
       path: input.path,

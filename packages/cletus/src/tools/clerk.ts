@@ -10,6 +10,7 @@ export function createClerkTools(ai: CletusAI) {
     name: 'file_search',
     description: 'Search for files using glob patterns',
     instructions: `Use this to find files by pattern. Supports glob syntax like "**/*.ts", "src/**/*.json". Returns up to the specified limit with optional offset for pagination.
+This ONLY lists files, it does NOT read their content.
 
 Example: Find all TypeScript files in src directory:
 { "glob": "src/**/*.ts", "limit": 10 }`,
@@ -139,6 +140,7 @@ Example: Read a source file:
     schema: z.object({
       path: z.string().describe('Relative file path'),
       characterLimit: z.number().optional().describe('Max characters to read (default: 64000)'),
+      showLines: z.boolean().optional().describe('Include line numbers in output (default: false)'),
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
