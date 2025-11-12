@@ -314,7 +314,7 @@ Example 2: Query with sorting:
       const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
       const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
       const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
-      
+
       return `Use this for analytics and reporting on ${type.friendlyName} data:
 - groupBy: Group by field(s)
 - where: Filter before aggregation
@@ -351,6 +351,16 @@ Example 2: Aggregate with filter:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
+  const dataIndex = aiTyped.tool({
+    name: 'data_index',
+    description: `Index data records for knowledge base. `,
+    descriptionFn: ({ type }) => `Index ${type.friendlyName} records for knowledge base`,
+    instructionsFn: ({ type }) => `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
+This should be done if an embedding model has changed or a knowledge template has changed.`,
+    schema: z.object({}),
+    call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: ctx.type.name } }, ctx as unknown as CletusAIContext),
+  });
+
   const dba = aiTyped.prompt({
     name: 'dba',
     description: 'Database administrator agent for data operations',
@@ -382,6 +392,7 @@ You have been given the following request to perform by the chat agent, the conv
       dataUpdateMany,
       dataDeleteMany,
       dataAggregate,
+      dataIndex,
     ],
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,

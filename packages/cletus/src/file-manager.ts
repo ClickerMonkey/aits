@@ -39,7 +39,7 @@ export abstract class JsonFile<T> {
   /**
    * Save changes to the file with concurrent update protection
    */
-  async save(modifier: (current: T) => void | Promise<void>): Promise<void> {
+  async save<R = void>(modifier: (current: T) => R | Promise<R>): Promise<R> {
     // Read current file state
     let fileData: any;
     try {
@@ -62,7 +62,7 @@ export abstract class JsonFile<T> {
     }
 
     // Apply modifications
-    await modifier(this.data);
+    const result = await modifier(this.data);
 
     // Update timestamp
     const newTimestamp = Date.now();
@@ -74,6 +74,8 @@ export abstract class JsonFile<T> {
 
     // Write to disk
     await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8');
+
+    return result;
   }
 
   /**

@@ -10,6 +10,7 @@ import { KnowledgeEntry } from "../schemas";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, FileType, processFile } from "./file-helper";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
+import { CONSTS } from "../constants";
 
 
 export async function searchFiles(cwd: string, pattern: string) {
@@ -21,9 +22,6 @@ export async function searchFiles(cwd: string, pattern: string) {
 
   return files;
 }
-
-const EMBED_CHUNK_SIZE = 1000;
-
 
 export const file_search = operationOf<
   { glob: string; limit?: number, offset?: number },
@@ -178,9 +176,9 @@ export const file_index = operationOf<
         ? parsed.sections 
         : [parsed.description || ''];
 
-      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0), EMBED_CHUNK_SIZE);
+      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0), CONSTS.EMBED_CHUNK_SIZE);
       indexingPromises.push(...embedChunks.map(async (texts, textIndex) => {
-        const offset = textIndex * EMBED_CHUNK_SIZE;
+        const offset = textIndex * CONSTS.EMBED_CHUNK_SIZE;
         const { embeddings, model } = await ai.embed.get({ texts });
         embeddings.forEach(({ embedding: vector, index }, i) => {
           knowledge.push({

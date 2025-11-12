@@ -32,12 +32,17 @@ Example: Get information about a type:
 - Never make optional fields required without a default value (breaking change)
 - You CAN add new fields (if required, must have default), update descriptions, update knowledgeTemplate, or delete optional fields
 Provide an update object with the changes to make.
+- Field names must be lowercase with no spaces.
+- Knowledge templates are Handlebars templates used to generate knowledge base entries for records of this type. They should include all fields and use #if statements for optional fields. Use field name and not friendly name.
 
 Example 1: Add a new optional field:
 { "name": "task", "update": { "fields": { "priority": { "friendlyName": "Priority", "type": "number", "required": false } } } }
 
 Example 2: Update description:
-{ "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }`,
+{ "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }
+ 
+If fields are being changed knowledgeTemplate MUST be updated to reflect those changes.
+If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.`,
     schema: z.object({
       name: z.string().describe('Type name'),
       update: z.object({
@@ -65,7 +70,7 @@ Example 2: Update description:
   const typeCreate = ai.tool({
     name: 'type_create',
     description: 'Create a new type definition',
-    instructions: `Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value.
+    instructions: `Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value. Field names must be all lowercase with no spaces.
 
 Example: Create a project tracking type:
 { "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }`,

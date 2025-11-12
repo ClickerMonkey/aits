@@ -71,6 +71,7 @@ export function createChatAgent(ai: CletusAI) {
   - data_update_many(set: object, where?: object, limit?: number)
   - data_delete_many(where: object, limit?: number)
   - data_aggregate(groupBy?: string[], where?: object, having?: object, select: Array<{function: string, field?: string, alias?: string}>, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
+  - data_index()
 
 Choose the appropriate agent based on what the user wants done.
 The agent will be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).

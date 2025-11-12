@@ -6,7 +6,7 @@ import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
 import { on } from 'events';
 import { COLORS } from '../constants';
-import { formatTime } from '../common';
+import { formatTime, pluralize } from '../common';
 
 interface OperationApprovalMenuProps {
   message: Message;
@@ -49,9 +49,9 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   // Timer for elapsed time
   useEffect(() => {
     if (isProcessing) {
-      startTimeRef.current = Date.now();
+      startTimeRef.current = performance.now();
       const interval = setInterval(() => {
-        setElapsedTime(Date.now() - startTimeRef.current);
+        setElapsedTime(performance.now() - startTimeRef.current);
       }, 100);
       return () => clearInterval(interval);
     }
@@ -71,7 +71,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     setIsProcessing(true);
     setMenuState('processing');
     setElapsedTime(0);
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     try {
       const operations = message.operations || [];
@@ -94,7 +94,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         }
       }
 
-      const elapsed = (Date.now() - startTime) / 1000;
+      const elapsed = (performance.now() - startTime);
 
       // Generate summary message
       let summaryText = '';
@@ -235,7 +235,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       setIsProcessing(true);
       setMenuState('processing');
       setElapsedTime(0);
-      const startTime = Date.now();
+      const startTime = performance.now();
 
       try {
         const operations = message.operations || [];
@@ -262,7 +262,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
         }
 
-        const elapsed = (Date.now() - startTime) / 1000;
+        const elapsed = (performance.now() - startTime);
 
         // Generate summary message
         const parts: string[] = [];
@@ -352,7 +352,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         flexDirection="column"
       >
         <Text color={COLORS.PROCESSING_TEXT}>
-          Processing operations... {(elapsedTime / 1000).toFixed(1)}s
+          Processing operations... {formatTime(elapsedTime)}
         </Text>
       </Box>
     );
@@ -408,7 +408,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         flexDirection="column"
       >
         <Text bold color={COLORS.APPROVAL_BORDER}>
-          {approvableOperations.length} operation{approvableOperations.length !== 1 ? 's' : ''} require{approvableOperations.length === 1 ? 's' : ''} approval (↑↓ to navigate, Enter to select):
+          {pluralize(approvableOperations.length, 'operation')} require approval (↑↓ to navigate, Enter to select):
         </Text>
 
         {hasMultipleOperations ? (

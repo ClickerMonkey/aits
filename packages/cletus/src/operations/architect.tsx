@@ -77,17 +77,13 @@ export const type_update = operationOf<
       return `Type not found: ${input.name}`;
     }
 
-    // Validate knowledgeTemplate if provided
-    if (input.update.knowledgeTemplate) {
-      const validation = validateTemplate(input.update.knowledgeTemplate, existing.fields);
-      if (validation !== true) {
-        return validation;
-      }
-    }
-
     // Validate field updates if provided
     if (input.update.fields) {
       for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
+        if (fieldName !== fieldName.toLowerCase()) {
+          return `Field name "${fieldName}" must be lowercase`;
+        }
+
         if (fieldUpdate === null) {
           // Deleting a field - check if it's required (breaking change)
           const existingField = existing.fields.find((f) => f.name === fieldName);
@@ -122,7 +118,51 @@ export const type_update = operationOf<
       }
     }
 
+    const templateFields = this.fieldify(input, existing.fields);
+    const template = input.update.knowledgeTemplate || existing?.knowledgeTemplate;
+    if (template) {
+      const validation = validateTemplate(template, templateFields);
+      if (validation !== true) {
+        return validation;
+      }
+    }
+
     return '';
+  },
+  fieldify(input: TypeUpdate, fields: TypeField[]): TypeField[] {
+    const newFields = fields.slice();
+    // Handle field updates
+    if (input.update.fields) {
+      for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
+        if (fieldUpdate === null) {
+          // Delete field
+          const fieldIndex = newFields.findIndex((f) => f.name === fieldName);
+          if (fieldIndex !== -1) {
+            newFields.splice(fieldIndex, 1);
+          }
+        } else {
+          // Update or add field
+          const existingField = newFields.find((f) => f.name === fieldName);
+          if (existingField) {
+            // Update existing field
+            Object.assign(existingField, fieldUpdate);
+          } else {
+            // Add new field (must provide full field definition)
+            if (fieldUpdate.type && fieldUpdate.friendlyName !== undefined) {
+              newFields.push({
+                name: fieldName,
+                friendlyName: fieldUpdate.friendlyName,
+                type: fieldUpdate.type,
+                required: fieldUpdate.required ?? false,
+                default: fieldUpdate.default,
+                enumOptions: fieldUpdate.enumOptions,
+              });
+            }
+          }
+        }
+      }
+    }
+    return newFields;
   },
   async analyze(input, { config }) {
     const validation = this.validate(input, config);
@@ -173,34 +213,7 @@ export const type_update = operationOf<
 
         // Handle field updates
         if (input.update.fields) {
-          for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
-            if (fieldUpdate === null) {
-              // Delete field
-              const fieldIndex = dataType.fields.findIndex((f) => f.name === fieldName);
-              if (fieldIndex !== -1) {
-                dataType.fields.splice(fieldIndex, 1);
-              }
-            } else {
-              // Update or add field
-              const existingField = dataType.fields.find((f) => f.name === fieldName);
-              if (existingField) {
-                // Update existing field
-                Object.assign(existingField, fieldUpdate);
-              } else {
-                // Add new field (must provide full field definition)
-                if (fieldUpdate.type && fieldUpdate.friendlyName !== undefined) {
-                  dataType.fields.push({
-                    name: fieldName,
-                    friendlyName: fieldUpdate.friendlyName,
-                    type: fieldUpdate.type,
-                    required: fieldUpdate.required ?? false,
-                    default: fieldUpdate.default,
-                    enumOptions: fieldUpdate.enumOptions,
-                  });
-                }
-              }
-            }
-          }
+          dataType.fields = this.fieldify(input, dataType.fields);
         }
       }
     });

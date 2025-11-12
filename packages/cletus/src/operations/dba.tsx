@@ -1,8 +1,12 @@
-import { after } from "node:test";
-import { formatName } from "../common";
+import Handlebars from "handlebars";
+import { getModel } from "@aits/core";
+import { CletusAIContext } from "../ai";
+import { chunkArray, formatName } from "../common";
 import { ConfigFile } from "../config";
+import { CONSTS } from "../constants";
 import { DataManager } from "../data";
-import { TypeDefinition } from "../schemas";
+import { KnowledgeFile } from "../knowledge";
+import { KnowledgeEntry, TypeDefinition } from "../schemas";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
@@ -19,7 +23,7 @@ function getType(config: ConfigFile, typeName: string): TypeDefinition {
 
 export const data_create = operationOf<
   { name: string; fields: Record<string, any> },
-  { id: string; name: string }
+  { id: string; name: string, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'create',
   status: ({ name }) => `Creating ${name} record`,
@@ -31,13 +35,21 @@ export const data_create = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, fields }, { config }) => {
-    const type = getType(config, name);
+  do: async ({ name, fields }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
     const id = await dataManager.create(fields);
 
-    return { id, name: type.name };
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [id], []); 
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after creating record: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+
+    return { id, name, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -60,7 +72,7 @@ export const data_create = operationOf<
 
 export const data_update = operationOf<
   { name: string; id: string; fields: Record<string, any> },
-  { id: string; updated: boolean }
+  { id: string; updated: boolean, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
   status: ({ name, id }) => `Updating ${name}: ${id.slice(0, 8)}`,
@@ -83,13 +95,21 @@ export const data_update = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, id, fields }, { config }) => {
-    const type = getType(config, name);
+  do: async ({ name, id, fields }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
     await dataManager.update(id, fields);
 
-    return { id, updated: true };
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [id], []); 
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after updating record: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+
+    return { id, updated: true, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -110,7 +130,7 @@ export const data_update = operationOf<
 
 export const data_delete = operationOf<
   { name: string; id: string },
-  { id: string; deleted: boolean }
+  { id: string; deleted: boolean, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'delete',
   status: ({ name, id }) => `Deleting ${name}: ${id.slice(0, 8)}`,
@@ -132,13 +152,21 @@ export const data_delete = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, id }, { config }) => {
-    const type = getType(config, name);
-    const dataManager = new DataManager(type.name);
+  do: async ({ name, id }, ctx) => {
+    const dataManager = new DataManager(name);
     await dataManager.load();
     await dataManager.delete(id);
 
-    return { id, deleted: true };
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [], [id]); 
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after deleting record: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+
+    return { id, deleted: true, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -215,7 +243,7 @@ export const data_select = operationOf<
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
-    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
+    const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const offset = op.input.offset ? `offset=${op.input.offset}` : '';
     const orderBy = op.input.orderBy ? `orderBy=${op.input.orderBy.map(o => o.field).join(',')}` : '';
@@ -236,7 +264,7 @@ export const data_select = operationOf<
 
 export const data_update_many = operationOf<
   { name: string; set: Record<string, any>; where: WhereClause; limit?: number },
-  { updated: number }
+  { updated: number, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
   status: ({ name }) => `Updating multiple ${name} records`,
@@ -255,7 +283,7 @@ export const data_update_many = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, limit, set, where }) => {
+  do: async ({ name, limit, set, where }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -271,12 +299,21 @@ export const data_update_many = operationOf<
       dataManager.update(record.id, set)
     ));
 
-    return { updated: matchingRecords.length };
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, matchingRecords.map(r => r.id), []); 
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after updating records: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+
+    return { updated: matchingRecords.length, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
     const set = 'set=' + Object.keys(op.input.set).join(',');
-    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
+    const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const params = [set, where, limit].filter(p => p).join(', ');
 
@@ -295,7 +332,7 @@ export const data_update_many = operationOf<
 
 export const data_delete_many = operationOf<
   { name: string; where: WhereClause; limit?: number },
-  { deleted: number }
+  { deleted: number, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'delete',
   status: ({ name }) => `Deleting multiple ${name} records`,
@@ -314,7 +351,7 @@ export const data_delete_many = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, limit }) => {
+  do: async ({ name, where, limit }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -324,13 +361,27 @@ export const data_delete_many = operationOf<
     if (limit) {
       matchingRecords = matchingRecords.slice(0, limit);
     }
+    
+    // If no matching records, return early
+    if (matchingRecords.length === 0) {
+      return { deleted: 0, libraryKnowledgeUpdated: false };
+    }
 
     // Delete all matching records
     await Promise.all(matchingRecords.map((record) =>
       dataManager.delete(record.id)
     ));
 
-    return { deleted: matchingRecords.length };
+    // Also remove from knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      await updateKnowledge(ctx, name, [], matchingRecords.map(r => r.id)); 
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after deleting records: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+
+    return { deleted: matchingRecords.length, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -491,8 +542,8 @@ export const data_aggregate = operationOf<
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
-    const where = op.input.where ? `where=${Object.keys(op.input.where).join(',')}` : ''
-    const having = op.input.having ? `having=${Object.keys(op.input.having).join(',')}` : ''
+    const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
+    const having = op.input.having ? `having=${whereString(op.input.having)}` : ''
     const groupBy = op.input.groupBy ? `groupBy=${op.input.groupBy.join(',')}` : ''
     const orderBy = op.input.orderBy ? `orderBy=${op.input.orderBy.map(o => o.field).join(',')}` : ''
     const select = 'select=' + op.input.select.map(s => s.function + (s.field ? `(${s.field})` : '')).join(',');
@@ -512,6 +563,127 @@ export const data_aggregate = operationOf<
     );
   },
 });
+
+export const data_index = operationOf<
+  { name: string },
+  { libraryKnowledgeUpdated: boolean }
+>({
+  mode: 'update',
+  status: ({ name }) => `Indexing ${name}`,
+  analyze: async ({ name }, { config }) => {
+    const type = getType(config, name);
+    
+    return {
+      analysis: `This will update the knowledge for type "${type.friendlyName}".`,
+      doable: true,
+    };
+  },
+  do: async ({ name }, ctx) => {
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+
+    const allRecords = dataManager.getAll();
+    const recordIds = allRecords.map(r => r.id);
+
+    const libraryKnowledgeUpdated = await updateKnowledge(ctx, name, recordIds, []);
+
+    return { libraryKnowledgeUpdated };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Index()`,
+      (op) => {
+        if (op.output?.libraryKnowledgeUpdated) {
+          return `Knowledge updated for type: ${type.friendlyName}`;
+        }
+        return null;
+      },
+    );
+  },
+});
+
+/**
+ * Updates knowledge entries for a given type.
+ * 
+ * @param ctx 
+ * @param type 
+ * @param update 
+ * @param remove 
+ */
+async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: string[], remove: string[]): Promise<boolean> {
+  const type = ctx.config.getData().types.find(t => t.name === typeName);
+  if (!type) {
+    throw new Error(`Data type not found: ${typeName}`);
+  }
+  if (!type.knowledgeTemplate && remove.length === 0) {
+    return false;
+  }
+
+  const dataFile = new DataManager(type.name);
+  await dataFile.load();
+  
+  const typeTemplate = type.knowledgeTemplate ? Handlebars.compile(type.knowledgeTemplate) : () => '';
+  const updateTemplates = update
+    .map(id => {
+      const record = dataFile.getById(id);
+      if (record) {
+        return { id, text: typeTemplate(record.fields) };
+      }
+      return null;
+    })
+    .filter(t => t !== null && t.text.trim().length > 0) as { id: string; text: string }[];
+
+  const knowledge: KnowledgeEntry[] = [];
+  const templateChunks = chunkArray(updateTemplates, CONSTS.EMBED_CHUNK_SIZE);
+
+  let embeddingModel: string | null = null;
+
+  await Promise.all(templateChunks.map(async (records) => {
+    const texts = records.map(r => r.text);
+    const { embeddings, model } = await ctx.ai.embed.get({ texts });
+    embeddings.forEach(({ embedding: vector, index }, i) => {
+      knowledge.push({
+        source: `${typeName}:${records[index].id}`,
+        text: texts[index],
+        vector: vector,
+        created: Date.now()
+      });
+    });
+    embeddingModel = getModel(model).id;
+  }));
+
+  const removing = new Set(remove.map(id => `${typeName}:${id}`));
+
+  const knowledgeFile = new KnowledgeFile();
+  await knowledgeFile.load();
+  await knowledgeFile.save(async (data) => {
+    // Do delete first, check all models.
+    for (const [model, entries] of Object.entries(data.knowledge)) {
+      data.knowledge[model] = entries.filter(e => !removing.has(e.source));
+    }
+    // Do update/insert
+    if (embeddingModel) {
+      let entryList = data.knowledge[embeddingModel];
+      if (!entryList) {
+        entryList = data.knowledge[embeddingModel] = [];
+      }
+      for (const entry of knowledge) {
+        const existing = entryList.find(e => e.source === entry.source);
+        if (existing) {
+          existing.updated = Date.now();
+          existing.text = entry.text;
+          existing.vector = entry.vector;
+        } else {
+          entryList.push(entry);
+        }
+      }
+    }
+  });
+
+  return true;
+} 
 
 function valueString(value: FieldCondition[keyof FieldCondition]): string {
   if (Array.isArray(value)) {
@@ -555,13 +727,13 @@ const OPERATOR_MAP: Record<string, string> = {
   equals: "=",
   contains: " CONTAINS ",
   startsWith: " STARTS WITH ",
-  endsWith: "E NDS WITH ", 
+  endsWith: " ENDS WITH ", 
   lt: "<",
   lte: "≤",
   gt: ">",
   gte: "≥",
   before: "≤",
   after: "≥",
-  oneOf: " one of ",
+  oneOf: " ONE OF ",
   isEmpty: "IS EMPTY",
 };

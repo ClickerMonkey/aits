@@ -51,3 +51,7 @@ export const COLORS = {
  * Type for color values
  */
 export type ColorValue = typeof COLORS[keyof typeof COLORS];
+
+export const CONSTS = {
+  EMBED_CHUNK_SIZE: 1000,
+};
