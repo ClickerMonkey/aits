@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import { describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunkArray } from "../common";
+import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
@@ -52,7 +52,15 @@ export const file_search = operationOf<
 });
 
 export const file_summary = operationOf<
-  { path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
+  { 
+    path: string, 
+    limit?: number,
+    offset?: number, 
+    limitOffsetMode?: 'characters' | 'lines', 
+    describeImages?: boolean, 
+    extractImages?: boolean, 
+    transcribeImages?: boolean,
+  },
   { path: string; size: number; truncated: boolean; summary: string; }
 >({
   mode: 'read',
@@ -76,15 +84,19 @@ export const file_summary = operationOf<
       };
     }
 
+    const limitOffsetMode = input.limitOffsetMode || 'characters';
+    const limit = limitOffsetMode === 'characters'
+      ? Math.min(CONSTS.MAX_CHARACTERS, input.limit || CONSTS.MAX_CHARACTERS)
+      : Math.min(CONSTS.MAX_LINES, input.limit || CONSTS.MAX_LINES);
+
     return {
-      analysis: `This will read and summarize the ${fileType} file at "${input.path}" (first 64,000 characters).`,
+      analysis: `This will read and summarize the ${fileType} file at "${input.path}" (first ${limit.toLocaleString()} ${limitOffsetMode}).`,
       doable: true,
     };
   },
   do: async (input, { cwd, ai, config }) => {
     const fullPath = path.resolve(cwd, input.path);
-    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
-
+    
     const summarized = await processFile(fullPath, input.path, {
       assetPath: await getAssetPath(true),
       sections: false,
@@ -92,7 +104,7 @@ export const file_summary = operationOf<
       extractImages: input.extractImages ?? false,
       transcribeImages: input.transcribeImages ?? false,
       summarize: true,
-      summarizer: (text) => summarize(ai, text.substring(0, characters)),
+      summarizer: (text) => summarize(ai, paginateText(text, input.limit, input.offset, input.limitOffsetMode)),
       describer: (image) => describe(ai, image),
       transcriber: (image) => transcribe(ai, image),
     });
@@ -102,7 +114,7 @@ export const file_summary = operationOf<
     return {
       path: input.path,
       size,
-      truncated: size > characters,
+      truncated: size > Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
       summary: summarized.description!,
     };
   },
@@ -164,7 +176,7 @@ export const file_index = operationOf<
         extractImages: input.extractImages ?? false,
         transcribeImages: input.transcribeImages ?? false,
         summarize: input.index === 'summary',
-        summarizer: (text) => summarize(ai, text),
+        summarizer: (text) => summarize(ai, paginateText(text)),
         describer: (image) => describe(ai, image),
         transcriber: (image) => transcribe(ai, image),
       });
@@ -545,7 +557,7 @@ export const file_delete = operationOf<
 });
 
 export const file_read = operationOf<
-  { path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean, showLines?: boolean },
+  { path: string, limit?: number, offset?: number, limitOffsetMode?: 'lines' | 'characters', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean, showLines?: boolean },
   { path: string; content: string; truncated: boolean }
 >({
   mode: 'read',
@@ -569,17 +581,21 @@ export const file_read = operationOf<
       };
     }
 
-    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
+    const limitOffsetMode = input.limitOffsetMode || 'characters';
+    const limit = limitOffsetMode === 'characters'
+      ? Math.min(CONSTS.MAX_CHARACTERS, input.limit || CONSTS.MAX_CHARACTERS)
+      : Math.min(CONSTS.MAX_LINES, input.limit || CONSTS.MAX_LINES);
+
     const withLines = input.showLines ? ' with line numbers' : '';
 
     return {
-      analysis: `This will read the ${type} file "${input.path}" (first ${characters.toLocaleString()} characters)${withLines}.`,
+      analysis: `This will read the ${type} file "${input.path}" (first ${limit.toLocaleString()} ${limitOffsetMode})${withLines}.`,
       doable: true,
     };
   },
   do: async (input, { cwd, ai }) => {
     const fullPath = path.resolve(cwd, input.path);
-    const characters = Math.min(input.characterLimit || CONSTS.FILE_READ_SIZE, CONSTS.FILE_READ_SIZE);
+    const limitOffsetMode = input.limitOffsetMode || 'characters';
 
     const readable = await fileIsReadable(fullPath);
 
@@ -617,10 +633,12 @@ export const file_read = operationOf<
         .join('\n');
     }
 
+    content = paginateText(content, input.limit, input.offset, limitOffsetMode);
+
     return {
       path: input.path,
-      content: content.substring(0, characters),
-      truncated: content.length > characters,
+      content: content,
+      truncated: content.length === Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
     };
   },
   render: (op) => renderOperation(

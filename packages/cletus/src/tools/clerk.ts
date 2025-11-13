@@ -31,7 +31,9 @@ Example: Summarize a PDF document:
 { "path": "docs/report.pdf", "characterLimit": 32000 }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
-      characterLimit: z.number().optional().describe('Max characters to process (default: 64000)'),
+      limit: z.number().optional().describe('Maximum summary length in characters/lines (default: 64,000 chars or 1000 lines - whatever is smaller)'),
+      offset: z.number().optional().describe('Character offset to start summary from (default: 0). This can be a negative number meaning it will start from the end of the file.'),
+      limitOffsetMode: z.enum(['characters', 'lines']).optional().describe('Whether limit & offset are in characters or lines (default: "characters")'),
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
@@ -139,7 +141,9 @@ Example: Read a source file:
 { "path": "src/main.ts" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
-      characterLimit: z.number().optional().describe('Max characters to read (default: 64000)'),
+      limit: z.number().optional().describe('Maximum summary length in characters/lines (default: 64,000 chars or 1000 lines - whatever is smaller)'),
+      offset: z.number().optional().describe('Character offset to start reading from (default: 0). This can be a negative number meaning it will start from the end of the file.'),
+      limitOffsetMode: z.enum(['characters', 'lines']).optional().describe('Whether limit & offset are in characters or lines (default: "characters")'),
       showLines: z.boolean().optional().describe('Include line numbers in output (default: false)'),
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),

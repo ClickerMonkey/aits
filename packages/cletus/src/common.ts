@@ -1,3 +1,4 @@
+import { CONSTS } from "./constants";
 
 /**
  * Formats time in milliseconds to a human-readable string.
@@ -106,4 +107,42 @@ export function chunkArray<T>(array: T[], chunkSize: number): T[][] {
     chunks.push(array.slice(i, i + chunkSize));
   }
   return chunks;
+}
+
+/**
+ * Paginate text by characters or lines. Never returns more than 64k characters. 
+ * In line mode it doesn't return more than 1k lines.
+ * 
+ * @param text - input text
+ * @param limit - maximum length
+ * @param offset - starting offset
+ * @param limitOffsetMode - 'characters' or 'lines'
+ * @returns 
+ */
+export function paginateText(
+  text: string, 
+  limit: number = 0,
+  offset: number = 0,
+  limitOffsetMode: 'characters' | 'lines' = 'characters',
+): string {
+ if (limitOffsetMode === 'lines') {
+    const lines = text.split('\n');
+    const start = (offset + lines.length) % lines.length;
+    const end = start + Math.min(limit || CONSTS.MAX_LINES, CONSTS.MAX_LINES);
+    let paginated = lines.slice(start, end);
+    const characters = lines.reduce((sum, line) => sum + line.length + 1, 0); // +1 for newline
+
+    if (characters <= CONSTS.MAX_CHARACTERS) {
+      return paginated.join('\n');
+    }
+
+    return offset < 0 
+      ? text.slice(-CONSTS.MAX_CHARACTERS) 
+      : text.slice(0, CONSTS.MAX_CHARACTERS);
+  } else {
+    const start = (offset + text.length) % text.length;
+    const end = start + Math.min(limit || CONSTS.MAX_CHARACTERS, CONSTS.MAX_CHARACTERS);
+
+    return text.slice(start, end);
+  }
 }

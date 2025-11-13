@@ -52,7 +52,11 @@ export const COLORS = {
  */
 export type ColorValue = typeof COLORS[keyof typeof COLORS];
 
+/**
+ * General constants for Cletus operations
+ */
 export const CONSTS = {
   EMBED_CHUNK_SIZE: 1000,
-  FILE_READ_SIZE: 64_000,
+  MAX_CHARACTERS: 64_000,
+  MAX_LINES: 1_000,
 };
