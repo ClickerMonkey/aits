@@ -96,7 +96,7 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
 /**
  * Build a Zod object schema for a type's fields
  */
-function buildFieldsSchema(typeDef: TypeDefinition) {
+export function buildFieldsSchema(typeDef: TypeDefinition) {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of typeDef.fields) {
     shape[field.name] = buildFieldSchema(field);

@@ -3,7 +3,7 @@ import { getModel } from "@aits/core";
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { CletusAIContext } from "../ai";
+import { CletusAIContext, transcribe } from "../ai";
 import { chunkArray, formatName } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
@@ -15,6 +15,7 @@ import { operationOf } from "./types";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
 import { searchFiles, processFile } from "./file-helper";
 import { getAssetPath } from "../file-manager";
+import { buildFieldsSchema } from "../tools/dba";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -641,7 +642,8 @@ export const data_import = operationOf<
       doable: importable.length > 0,
     };
   },
-  do: async ({ name, glob, transcribeImages = false }, { chatStatus, ai, config, cwd, log }) => {
+  do: async ({ name, glob, transcribeImages = false }, ctx) => {
+    const { chatStatus, ai, config, cwd, log } = ctx;
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -662,7 +664,7 @@ export const data_import = operationOf<
     chatStatus(`Found ${importableFiles.length} files to process`);
     
     // Build zod schema for extraction
-    const recordSchema = buildRecordSchema(type);
+    const recordSchema = buildFieldsSchema(type);
     const arraySchema = z.array(recordSchema) as z.ZodType<object, object>;
     
     let allExtractedRecords: Record<string, any>[] = [];
@@ -681,22 +683,43 @@ export const data_import = operationOf<
           describeImages: false,
           extractImages: false,
           summarize: false,
+          transcriber: (image) => transcribe(ai, image),
         });
         
         filesProcessed++;
         chatStatus(`Processing file ${filesProcessed}/${importableFiles.length}: ${file.file}`);
         
-        // Extract data from each section
+        // Group sections to minimize LLM calls (combine sections up to MAX_EXTRACTION_CHUNK_SIZE)
+        const sectionGroups: string[] = [];
+        let currentGroup = '';
+        
         for (const section of parsed.sections) {
           if (!section || section.trim().length === 0) {
             continue;
           }
           
+          // If adding this section would exceed the limit, save current group and start new one
+          if (currentGroup.length > 0 && currentGroup.length + section.length + 2 > CONSTS.MAX_EXTRACTION_CHUNK_SIZE) {
+            sectionGroups.push(currentGroup);
+            currentGroup = section;
+          } else {
+            // Add section to current group with separator
+            currentGroup = currentGroup.length > 0 ? currentGroup + '\n\n' + section : section;
+          }
+        }
+        
+        // Add final group if not empty
+        if (currentGroup.length > 0) {
+          sectionGroups.push(currentGroup);
+        }
+        
+        // Extract data from grouped sections
+        for (const group of sectionGroups) {
           try {
-            const extracted = await extractDataFromText(ai, config, type, arraySchema, section);
+            const extracted = await extractDataFromText(ai, config, type, arraySchema, group);
             allExtractedRecords.push(...extracted);
           } catch (error) {
-            log(`Warning: Failed to extract from section in ${file.file}: ${(error as Error).message}`);
+            log(`Warning: Failed to extract from section group in ${file.file}: ${(error as Error).message}`);
           }
         }
       } catch (error) {
@@ -778,7 +801,7 @@ export const data_import = operationOf<
     // Update knowledge base
     let libraryKnowledgeUpdated = true;
     try {
-      libraryKnowledgeUpdated = await updateKnowledge({ ai, config, log, chatStatus } as any, name, updatedIds, []);
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, updatedIds, []);
     } catch (e) {
       log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
@@ -934,50 +957,6 @@ const OPERATOR_MAP: Record<string, string> = {
   oneOf: " ONE OF ",
   isEmpty: "IS EMPTY",
 };
-
-/**
- * Build a Zod schema for a single record based on type definition
- */
-function buildRecordSchema(type: TypeDefinition) {
-  const shape: Record<string, z.ZodTypeAny> = {};
-  
-  for (const field of type.fields) {
-    let schema: z.ZodTypeAny;
-    
-    switch (field.type) {
-      case 'string':
-        schema = z.string();
-        break;
-      case 'number':
-        schema = z.number();
-        break;
-      case 'boolean':
-        schema = z.boolean();
-        break;
-      case 'enum':
-        schema = z.enum(field.enumOptions as [string, ...string[]]);
-        break;
-      case 'date':
-        schema = z.string(); // Dates are strings in JSON
-        break;
-      default:
-        schema = z.string();
-        break;
-    }
-    
-    if (!field.required) {
-      schema = schema.optional();
-    }
-    
-    if (field.default !== undefined) {
-      schema = schema.default(field.default);
-    }
-    
-    shape[field.name] = schema;
-  }
-  
-  return z.object(shape);
-}
 
 /**
  * Extract data records from text using AI with structured output
