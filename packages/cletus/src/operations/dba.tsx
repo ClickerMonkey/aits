@@ -1,15 +1,21 @@
 import Handlebars from "handlebars";
 import { getModel } from "@aits/core";
-import { CletusAIContext } from "../ai";
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { CletusAIContext, transcribe } from "../ai";
 import { abbreviate, chunkArray, formatName } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
 import { KnowledgeFile } from "../knowledge";
-import { KnowledgeEntry, TypeDefinition } from "../schemas";
+import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
+import { searchFiles, processFile } from "./file-helper";
+import { getAssetPath } from "../file-manager";
+import { buildFieldsSchema } from "../tools/dba";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -791,3 +797,126 @@ const OPERATOR_MAP: Record<string, string> = {
   oneOf: " ONE OF ",
   isEmpty: "IS EMPTY",
 };
+
+/**
+ * Extract data records from text using AI with structured output
+ */
+async function extractDataFromText(
+  ai: CletusAIContext['ai'],
+  config: ConfigFile,
+  type: TypeDefinition,
+  arraySchema: z.ZodType<object, object>,
+  text: string
+): Promise<Record<string, any>[]> {
+  const models = config.getData().user.models;
+  const model = models?.chat;
+  
+  const fieldDescriptions = type.fields.map(field => {
+    let desc = `- ${field.name} (${field.type})`;
+    if (field.required) desc += ' [required]';
+    if (field.enumOptions) desc += ` [options: ${field.enumOptions.join(', ')}]`;
+    if (field.default !== undefined) desc += ` [default: ${field.default}]`;
+    return desc;
+  }).join('\n');
+  
+  const prompt = `Extract all instances of ${type.friendlyName} from the following text.
+
+Type: ${type.friendlyName}
+${type.description || ''}
+
+Fields:
+${fieldDescriptions}
+
+Text:
+${text}
+
+Return an array of objects with the fields defined above. If no instances are found, return an empty array.`;
+  
+  try {
+    const response = await ai.chat.get({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a data extraction assistant. Extract structured data from text.' },
+        { role: 'user', content: prompt },
+      ],
+      responseFormat: arraySchema,
+    });
+    
+    // Parse JSON from content
+    const records = JSON.parse(response.content);
+    
+    if (!Array.isArray(records)) {
+      return [];
+    }
+    
+    return records;
+  } catch (error) {
+    // If structured output fails, return empty array
+    return [];
+  }
+}
+
+/**
+ * Determine which fields should be used for uniqueness checking
+ */
+async function determineUniqueFields(
+  ai: CletusAIContext['ai'],
+  config: ConfigFile,
+  type: TypeDefinition,
+  sampleRecords: Record<string, any>[]
+): Promise<string[]> {
+  const models = config.getData().user.models;
+  const model = models?.chat;
+  
+  const fieldDescriptions = type.fields.map(field => {
+    let desc = `- ${field.name} (${field.type})`;
+    if (field.required) desc += ' [required]';
+    if (field.enumOptions) desc += ` [options: ${field.enumOptions.join(', ')}]`;
+    return desc;
+  }).join('\n');
+  
+  const prompt = `Given the following type definition and sample records, determine which field(s) should be used to identify unique records and avoid duplicates.
+
+Type: ${type.friendlyName}
+${type.description || ''}
+
+Fields:
+${fieldDescriptions}
+
+Sample records (up to 10):
+${JSON.stringify(sampleRecords, null, 2)}
+
+Respond with a JSON array of field names that should be used for uniqueness checking. For example: ["email"] or ["firstName", "lastName"] or [] if all records should be considered unique.
+
+Consider:
+- ID fields (id, userId, email, etc.)
+- Natural keys (combinations of fields that make a record unique)
+- Return empty array [] if there's no reliable way to determine uniqueness`;
+  
+  try {
+    const response = await ai.chat.get({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields.' },
+        { role: 'user', content: prompt },
+      ],
+      responseFormat: z.array(z.string()),
+    });
+    
+    // Parse JSON from content
+    const fields = JSON.parse(response.content);
+    
+    if (!Array.isArray(fields)) {
+      return [];
+    }
+    
+    // Validate that all fields exist in the type
+    const validFields = fields.filter(field => 
+      type.fields.some(f => f.name === field)
+    );
+    
+    return validFields;
+  } catch (error) {
+    return [];
+  }
+}

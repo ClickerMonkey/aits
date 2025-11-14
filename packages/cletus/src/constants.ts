@@ -59,6 +59,7 @@ export const CONSTS = {
   EMBED_CHUNK_SIZE: 1000,
   MAX_CHARACTERS: 64_000,
   MAX_LINES: 1_000,
+  MAX_EXTRACTION_CHUNK_SIZE: 64_000, // Maximum size for data extraction to minimize LLM calls
 };
 
 /**
