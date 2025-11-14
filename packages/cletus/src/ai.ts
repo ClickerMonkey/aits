@@ -10,6 +10,7 @@ import { logger } from './logger';
 import { OperationManager } from './operations/manager';
 import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
+import z from 'zod';
 
 /**
  * Cletus AI Context
@@ -73,6 +74,13 @@ export function createCletusAI(configFile: ConfigFile) {
     ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),
   } as const;
 
+  const jsonReplacer = (_key: string, value: any) => {
+    if (value instanceof z.ZodType) {
+      return z.toJSONSchema(value, { target: 'draft-7'})
+    }
+    return value;
+  };
+
   // Create AI instance with context and metadata types
   const ai = AI.with<CletusContext, CletusMetadata>()
     .providers(providers)
@@ -113,13 +121,13 @@ export function createCletusAI(configFile: ConfigFile) {
       models,
     }).withHooks({
       beforeRequest: async (ctx, request, selected, tokens, cost) => {
-        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}: ${JSON.stringify(request, undefined, 2)}`);
+        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}: ${JSON.stringify(request, jsonReplacer, 2)}`);
       },
       afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
-        logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}: ${JSON.stringify(response, undefined, 2)}`);
+        logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}: ${JSON.stringify(response, jsonReplacer, 2)}`);
       },
       onError: async (type, message, error, ctx, request) => {
-        logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack} request=${JSON.stringify(request, undefined, 2)}`);
+        logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack} request=${JSON.stringify(request, jsonReplacer, 2)}`);
       }
     });
 
@@ -140,12 +148,24 @@ export type CletusTypeAIContext = ContextInfer<CletusTypeAI>;
  * Summarize text using the AI
  */
 export async function summarize(ai: CletusAI, text: string): Promise<string> {
+  const models = ai.config.defaultContext!.config!.getData().user.models;
+  const model = models?.summary || models?.chat;
+
   const response = await ai.chat.get({
+    model,
     messages: [
       { role: 'system', content: 'You are a helpful assistant that summarizes text files. Provide a concise summary of the following text.' },
       { role: 'user', content: text },
     ],
     maxTokens: 500,
+  }, {
+    metadata: {
+      minContextWindow: (text.length / 4) + 1000,
+      weights: {
+        cost: 0.5,
+        speed: 0.5,
+      },
+    }
   });
   return response.content;
 }
@@ -154,7 +174,11 @@ export async function summarize(ai: CletusAI, text: string): Promise<string> {
  * Describe an image using the AI
  */
 export async function describe(ai: CletusAI, image: string): Promise<string> {
+  const models = ai.config.defaultContext!.config!.getData().user.models;
+  const model = models?.describe || models?.imageAnalyze;
+
   const response = await ai.image.analyze.get({
+    model,
     images: [image],
     prompt: DESCRIBE_PROMPT,
     maxTokens: 1000,
@@ -167,7 +191,11 @@ export async function describe(ai: CletusAI, image: string): Promise<string> {
  * Transcribe an image to markdown using the AI
  */
 export async function transcribe(ai: CletusAI, image: string): Promise<string> {
+  const models = ai.config.defaultContext!.config!.getData().user.models;
+  const model = models?.describe || models?.imageAnalyze;
+
   const response = await ai.image.analyze.get({
+    model,
     images: [image],
     prompt: TRANSCRIBE_PROMPT,
     maxTokens: 4000,

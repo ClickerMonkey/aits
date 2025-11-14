@@ -7,7 +7,7 @@ import { ChatFile } from './chat.js';
 import { InkAnimatedText } from './components/InkAnimatedText.js';
 import { MessageDisplay } from './components/MessageDisplay.js';
 import { ModelSelector } from './components/ModelSelector.js';
-import { OperationApprovalMenu } from './components/OperationApprovalMenu.js';
+import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu.js';
 import { ConfigFile } from './config.js';
 import type { ChatMeta, ChatMode, Message } from './schemas.js';
 // @ts-ignore
@@ -174,7 +174,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
       if (lastAssistantMessage && lastAssistantMessage.operations) {
         const hasApprovalNeeded = lastAssistantMessage.operations.some((op) => op.status === 'analyzed');
-        setShowApprovalMenu(hasApprovalNeeded);
+        if (hasApprovalNeeded) {
+          setShowApprovalMenu(true);
+        }
       } else {
         setShowApprovalMenu(false);
       }
@@ -709,62 +711,17 @@ After installation and the SoX executable is in the path, restart Cletus and try
     }
   };
 
-  const handleSubmit = async () => {
-    if (!inputValue.trim() || isWaitingForResponse) return;
+  const handleOperation = async (result: CompletionResult | null) => {
+    setShowApprovalMenu(false);
 
-    // Don't submit if help menu is showing
-    if (showHelpMenu) {
-      setShowHelpMenu(false);
-      setInputValue('');
-      return;
+    logger.log(`operation result: ${JSON.stringify(result)}`);
+
+    if (result && (result.success + result.failed) > 0) {
+      handleExecution(chatMessages);
     }
+  };
 
-    // Check if it's a command
-    if (inputValue.startsWith('/')) {
-      const parts = inputValue.split(' ');
-      const cmdName = parts[0];
-      const matchingCmd = COMMANDS.find((cmd) => cmd.name === cmdName);
-
-      // If command not found or incomplete, don't execute
-      if (!matchingCmd) {
-        addSystemMessage(`❌ Unknown command: ${cmdName}. Type / to see available commands.`);
-        setInputValue('');
-        setShowCommandMenu(false);
-        return;
-      }
-
-      // If command requires input but none provided, don't execute
-      if (matchingCmd.takesInput && parts.length < 2) {
-        addSystemMessage(`❌ ${cmdName} requires input: ${matchingCmd.placeholder || 'value'}`);
-        return; // Don't clear input, let them continue typing
-      }
-
-      // Execute the command
-      await handleCommand(inputValue);
-      setInputValue('');
-      setShowCommandMenu(false);
-      return;
-    }
-
-    // Add user message
-    const userMessage: Message = {
-      role: 'user',
-      name: config.getData().user.name,
-      content: [{ type: 'text', content: inputValue }],
-      created: Date.now(),
-    };
-    addMessage(userMessage);
-
-    // Save user message to chat file even though it will be 
-    await chatFileRef.current.save((chat) => {
-      chat.messages.push(userMessage);
-    });
-
-    // Reset history navigation
-    setHistoryIndex(-1);
-    setSavedInput('');
-    setInputValue('');
-
+  const handleExecution = async (messages: Message[]) => {
     setIsWaitingForResponse(true);
     setElapsedTime(0);
     setTokenCount(0);
@@ -784,11 +741,6 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
     try {
       logger.log('request starting');
-
-      // The user message might not have gotten in yet due to async state updates, ensure it's included
-      const messages = chatMessages[chatMessages.length - 1] === userMessage
-        ? chatMessages
-        : [...chatMessages, userMessage];
 
       await runChatOrchestrator(
         {
@@ -846,8 +798,6 @@ After installation and the SoX executable is in the path, restart Cletus and try
         addSystemMessage(`❌ Error: ${error.message}`);
       }
 
-      console.error('Chat request error:', error);
-
       logger.log(`error: ${error.message} ${error.stack}`);
     } finally {
       clearInterval(tokenInterval);
@@ -858,55 +808,70 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
       abortControllerRef.current = null;
     }
-    
-    /*
+  };
 
-    // Simulate token streaming
-    const tokenInterval = setInterval(() => {
-      if (!controller.signal.aborted) {
-        setTokenCount((prev) => prev + Math.floor(Math.random() * 15) + 5);
-      }
-    }, 100);
+  const handleSubmit = async () => {
+    if (!inputValue.trim() || isWaitingForResponse) return;
 
-    try {
-      // Simulate AI response with 5s delay that can be interrupted
-      await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          if (!controller.signal.aborted) {
-            resolve();
-          }
-        }, 5000);
-
-        controller.signal.addEventListener('abort', () => {
-          clearTimeout(timeoutId);
-          clearInterval(timerInterval);
-          clearInterval(tokenInterval);
-          reject(new Error('Aborted'));
-        });
-      });
-
-      clearInterval(timerInterval);
-      clearInterval(tokenInterval);
-
-      if (!controller.signal.aborted) {
-        addMessage({
-          role: 'assistant',
-          name: chat.assistant,
-          content: [{ type: 'text', content: 'This is a simulated response (5 second delay). The actual chat implementation will use the AITS library to generate real responses. Press ESC to interrupt!' }],
-          created: Date.now(),
-        });
-      }
-    } catch (error: any) {
-      clearInterval(timerInterval);
-      clearInterval(tokenInterval);
-      if (error.message !== 'Aborted') {
-        addSystemMessage(`❌ Error: ${error.message}`);
-      }
-    } finally {
-      setIsWaitingForResponse(false);
-      abortControllerRef.current = null;
+    // Don't submit if help menu is showing
+    if (showHelpMenu) {
+      setShowHelpMenu(false);
+      setInputValue('');
+      return;
     }
-    */
+
+    // Check if it's a command
+    if (inputValue.startsWith('/')) {
+      const parts = inputValue.split(' ');
+      const cmdName = parts[0];
+      const matchingCmd = COMMANDS.find((cmd) => cmd.name === cmdName);
+
+      // If command not found or incomplete, don't execute
+      if (!matchingCmd) {
+        addSystemMessage(`❌ Unknown command: ${cmdName}. Type / to see available commands.`);
+        setInputValue('');
+        setShowCommandMenu(false);
+        return;
+      }
+
+      // If command requires input but none provided, don't execute
+      if (matchingCmd.takesInput && parts.length < 2) {
+        addSystemMessage(`❌ ${cmdName} requires input: ${matchingCmd.placeholder || 'value'}`);
+        return; // Don't clear input, let them continue typing
+      }
+
+      // Execute the command
+      await handleCommand(inputValue);
+      setInputValue('');
+      setShowCommandMenu(false);
+      return;
+    }
+
+    // Add user message
+    const userMessage: Message = {
+      role: 'user',
+      name: config.getData().user.name,
+      content: [{ type: 'text', content: inputValue }],
+      created: Date.now(),
+    };
+    addMessage(userMessage);
+
+    // Save user message to chat file even though it will be 
+    await chatFileRef.current.save((chat) => {
+      chat.messages.push(userMessage);
+    });
+
+    // Reset history navigation
+    setHistoryIndex(-1);
+    setSavedInput('');
+    setInputValue('');
+
+    // The user message might not have gotten in yet due to async state updates, ensure it's included
+    const messages = chatMessages[chatMessages.length - 1] === userMessage
+      ? chatMessages
+      : [...chatMessages, userMessage];
+
+    await handleExecution(messages);
   };
 
   // Handle input changes and command menu
@@ -974,7 +939,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
   }
 
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" height="100%" width="100%">
       
       {/* Messages Area */}
       <Box flexDirection="column" flexGrow={1} marginBottom={1}>
@@ -1123,9 +1088,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 return newMessages;
               });
             }}
-            onComplete={() => {
-              setShowApprovalMenu(false);
-            }}
+            onComplete={handleOperation}
           />
         ) : null;
       })()}

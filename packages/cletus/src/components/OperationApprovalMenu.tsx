@@ -1,23 +1,21 @@
 import { Box, Text, useInput } from 'ink';
 import React, { useEffect, useRef, useState } from 'react';
 import type { CletusAI } from '../ai';
-import type { ChatFile } from '../chat';
+import { formatTime, pluralize } from '../common';
+import { COLORS } from '../constants';
 import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
-import { on } from 'events';
-import { COLORS } from '../constants';
-import { formatTime, pluralize } from '../common';
 
 interface OperationApprovalMenuProps {
   message: Message;
   ai: CletusAI;
   onMessageUpdate?: (message: Message) => void;
-  onComplete: () => void;
+  onComplete: (result: CompletionResult | null) => void;
 }
 
 type MenuState = 'main' | 'approving-some' | 'processing' | 'complete';
 
-interface CompletionResult {
+export interface CompletionResult {
   success: number;
   failed: number;
   rejected: number;
@@ -61,7 +59,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   useEffect(() => {
     if (menuState === 'complete') {
       const timeout = setTimeout(() => {
-        onComplete();
+        onComplete(completionResult);
       }, 2500);
       return () => clearTimeout(timeout);
     }

@@ -5,6 +5,7 @@ import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, MessageContent, Operation } from '../schemas';
 import { createChatAgent } from './chat-agent';
 import { logger } from '../logger';
+import { group } from '../common';
 
 /**
  * Options for running the chat orchestrator
@@ -81,6 +82,7 @@ export async function runChatOrchestrator(
 
   const startTime = Date.now();
   const LOOP_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  const LOOP_MAX = 10;
 
   logger.log('orchestrator: starting');
 
@@ -137,7 +139,7 @@ export async function runChatOrchestrator(
     let loopIteration = 0;
 
     // Orchestration loop
-    while (loopIteration === 0) { // just do one for now
+    while (loopIteration < LOOP_MAX) {
       if (signal.aborted) {
         break;
       }
@@ -192,9 +194,6 @@ export async function runChatOrchestrator(
         signal,
         messages: currentMessages,
         chatStatus: (status: string) => onEvent({ type: 'status', status }),
-        metadata: {
-          model: chatMeta.model ?? config.getData().user.models?.chat,
-        },
         /*
         // @ts-ignore
         runner: withEvents<typeof chatAgent>({
@@ -266,7 +265,7 @@ export async function runChatOrchestrator(
               const lastUserMsg = messages[messages.length - 1];
               if (lastUserMsg.role === 'user') {
                 lastUserMsg.tokens = chunk.tokens;
-                await chatData.save((chat) => {
+                chatData.save((chat) => {
                   const msgIndex = chat.messages.findIndex((m) => m.created === lastUserMsg.created);
                   if (msgIndex >= 0) {
                     chat.messages[msgIndex].tokens = chunk.tokens;
@@ -312,69 +311,41 @@ export async function runChatOrchestrator(
         return v;
       }, 2)}`);
 
-      let doMore = false;
-
-      // Save operations if any
-      if (ops.operations.length > 0) {
-        pending.operations = ops.operations;
-
-        logger.log(`orchestrator: ${ops.operations.length} operations executed`);
-
-        // Save to chat file
-        await chatData.save((chat) => {
-          // Find or add the pending message
-          const existingIndex = chat.messages.findIndex((m) => m.created === pending.created);
-          if (existingIndex >= 0) {
-            chat.messages[existingIndex].operations = ops.operations;
-          }
-        });
-
-        const done = ops.operations.filter((op) => op.status === 'done').length;
-        const needApproval = ops.operations.filter((op) => op.status === 'analyzed').length;
-        const undoable = ops.operations.filter((op) => op.status === 'analyzedBlocked').length;
-        const errors = ops.operations.filter((op) => op.error).length;
-
-        const summary = `⚙️ ${ops.operations.length} operations ${JSON.stringify({ done, needApproval, undoable, errors })}`;
-        onEvent({ type: 'operations', operations: ops.operations, summary });
-
-        // Check if we should loop
-        const allExecuted = ops.operations.every((op) => op.output || op.error);
-        if (allExecuted && ops.operations.length > 0) {
-          logger.log('orchestrator: all operations executed, looping');
-
-          // Add operation result messages to context
-          const operationMessages: AIMessage[] = ops.operations.map((op) => ({
-            role: 'assistant',
-            name: chatMeta.assistant,
-            content: [{ type: 'text' as const, content: op.message || '' }],
-            created: Date.now(),
-          }));
-
-          currentMessages = [...currentMessages, ...operationMessages];
-
-          // Reset token counters for next iteration
-          outputTokens = 0;
-          reasoningTokens = 0;
-          discardedTokens = 0;
-
-          // Continue loop
-          doMore = true; // continue;
-        }
-      }
-
-      logger.log('orchestrator: completing');
-
-      // Save final assistant message
-      // await chatData.save((chat) => {
-      //   chat.messages.push(pending);
-      // });
-
+      // Emit completion event
       onEvent({ type: 'complete', message: pending });
 
-      if (!doMore) {
+      // Check for abort
+      if (signal.aborted) {
         break;
       }
+
+      // Log operation summary
+      const operationSummary = group(
+        ops.operations,
+        (op) => op.status,
+        (op) => op,
+        (ops) => ops.length
+      );
+
+      logger.log(`orchestrator: operations summary: ${JSON.stringify(operationSummary)}`);
+
+      // If the user needs to approve any OR there are no operations, exit loop
+      const needsApproval = ops.operations.some((op) => op.status === 'analyzed');
+      const noOperations = ops.operations.length === 0;
+      if (needsApproval || noOperations) {
+        break;
+      }
+
+      // Push pending to current messages for context, continue loop
+      currentMessages.push(pending);
+      loopIteration++;
+      outputTokens = 0;
+      reasoningTokens = 0;
+      discardedTokens = 0;
     }
+
+    logger.log('orchestrator: completing');
+
   } catch (error: any) {
     if (error.message !== 'Aborted') {
       logger.log(`orchestrator: error - ${error.message}: ${error.stack}`);

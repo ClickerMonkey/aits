@@ -127,8 +127,13 @@ export function paginateText(
 ): string {
  if (limitOffsetMode === 'lines') {
     const lines = text.split('\n');
+    const max = Math.min(limit || CONSTS.MAX_LINES, CONSTS.MAX_LINES);
+    if (lines.length <= max) {
+      return text;
+    }
+
     const start = (offset + lines.length) % lines.length;
-    const end = start + Math.min(limit || CONSTS.MAX_LINES, CONSTS.MAX_LINES);
+    const end = start + max;
     let paginated = lines.slice(start, end);
     const characters = lines.reduce((sum, line) => sum + line.length + 1, 0); // +1 for newline
 
@@ -139,10 +144,68 @@ export function paginateText(
     return offset < 0 
       ? text.slice(-CONSTS.MAX_CHARACTERS) 
       : text.slice(0, CONSTS.MAX_CHARACTERS);
-  } else {
+  } else { 
+    const max = Math.min(limit || CONSTS.MAX_CHARACTERS, CONSTS.MAX_CHARACTERS);
+    if (text.length < max) {
+      return text;
+    }
+
     const start = (offset + text.length) % text.length;
-    const end = start + Math.min(limit || CONSTS.MAX_CHARACTERS, CONSTS.MAX_CHARACTERS);
+    const end = start + max;
 
     return text.slice(start, end);
   }
+}
+
+/**
+ * Groups items in an array by a key function, with optional value extraction and reduction.
+ * 
+ * @param array - The items to group
+ * @param keyFn - Function to extract the key for grouping
+ * @param valueFn - Function to extract the value for each item
+ * @param reduceFn - Function to reduce the grouped values
+ * @returns The grouped and reduced map
+ */
+export function groupMap<T, K, V = T, R = V[]>(
+  array: T[],
+  keyFn: (item: T) => K,
+  valueFn?: (item: T) => V,
+  reduceFn?: (items: V[]) => R,
+): Map<K, R> {
+  const value = valueFn || ((item: T) => item as unknown as V);
+  const reduce = reduceFn || ((items: V[]) => items as unknown as R);
+
+  const valueMap = new Map<K, V[]>();
+  for (const item of array) {
+    const key = keyFn(item);
+    const group = valueMap.get(key) || [];
+    group.push(value(item));
+    valueMap.set(key, group);
+  }
+
+  const reducedMap = new Map<K, R>();
+  valueMap.forEach((items, key) => {
+    reducedMap.set(key, reduce(items));
+  });
+
+  return reducedMap;
+}
+
+
+/**
+ * Groups items in an array by a key function, with optional value extraction and reduction.
+ * 
+ * @param array - The items to group
+ * @param keyFn - Function to extract the key for grouping
+ * @param valueFn - Function to extract the value for each item
+ * @param reduceFn - Function to reduce the grouped values
+ * @returns The grouped and reduced object
+ */
+export function group<T, K extends PropertyKey, V = T, R = V[]>(
+  array: T[],
+  keyFn: (item: T) => K,
+  valueFn?: (item: T) => V,
+  reduceFn?: (items: V[]) => R,
+): Record<K, R> {
+  return Object.fromEntries(groupMap(array, keyFn, valueFn, reduceFn).entries()) as Record<K, R>;
 }

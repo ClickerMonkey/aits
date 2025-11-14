@@ -22,6 +22,9 @@ export const UserSchema = z.object({
     transcription: z.string().optional(),
     speech: z.string().optional(),
     embedding: z.string().optional(),
+    summary: z.string().optional(),
+    describe: z.string().optional(),
+    transcribe: z.string().optional(),
   }).optional(),
 });
 

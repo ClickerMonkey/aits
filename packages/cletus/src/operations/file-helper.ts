@@ -358,11 +358,11 @@ export async function processFile(
     // Process sections as soon as we can.
     const processSections = async () => {
       // Generate description if enabled and needed
-      if (options.summarize && !processResult.description && processResult.sections && processResult.sections.length > 0 && options.summarizer) {
-        const text = processResult.sections.join("\n\n");
+      if (options.summarize && !result.description && result.sections && result.sections.length > 0 && options.summarizer) {
+        const text = result.sections.join("\n\n");
         if (text.trim().length > 0) {
           const description = await options.summarizer(text.trim());
-          processResult.description = description;
+          result.description = description;
         }
       }
     };

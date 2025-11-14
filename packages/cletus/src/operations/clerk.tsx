@@ -120,7 +120,7 @@ export const file_summary = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Summarize("${path.basename(op.input.path)}")`,
+    `Summarize("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         return abbreviate(op.output.summary, 60);
@@ -263,7 +263,7 @@ export const file_create = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Write("${path.basename(op.input.path)}")`,
+    `Write("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         return `Created file with ${op.output.size} characters, ${op.output.lines} lines`;
@@ -339,7 +339,7 @@ export const file_copy = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Copy("${op.input.glob}", "${path.basename(op.input.target)}")`,
+    `Copy("${op.input.glob}", "${op.input.target}")`,
     (op) => {
       if (op.output) {
         const count = op.output.source.length;
@@ -434,7 +434,7 @@ export const file_move = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Move("${op.input.glob}", "${path.basename(op.input.target)}")`,
+    `Move("${op.input.glob}", "${op.input.target}")`,
     (op) => {
       if (op.output) {
         return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${path.basename(op.output.target)}`;
@@ -506,7 +506,7 @@ export const file_stats = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `FileStats("${path.basename(op.input.path)}")`,
+    `FileStats("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         const sizeKB = (op.output.size / 1024).toFixed(1);
@@ -546,7 +546,7 @@ export const file_delete = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Delete("${path.basename(op.input.path)}")`,
+    `Delete("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         return `Deleted ${path.basename(op.output.path)}`;
@@ -643,7 +643,7 @@ export const file_read = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Read("${path.basename(op.input.path)}")`,
+    `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         return `Read ${op.output.content.length} characters${op.output.truncated ? ' (truncated)' : ''}`;
@@ -869,10 +869,10 @@ export const dir_create = operationOf<
   },
   render: (op) => renderOperation(
     op,
-    `Dir("${path.basename(op.input.path)}")`,
+    `Dir("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created directory ${path.basename(op.output.path)}`;
+        return `Created directory ${op.output.path}`;
       }
       return null;
     }

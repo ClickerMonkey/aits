@@ -29,7 +29,7 @@ type SettingsView =
   | 'select-model'
   | 'confirm';
 
-type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'transcription' | 'speech' | 'embedding';
+type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe';
 
 interface InkSettingsMenuProps {
   config: ConfigFile;
@@ -594,6 +594,9 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       { label: `🎙️ Transcription: ${currentModels.transcription || '(none)'}`, value: 'transcription' },
       { label: `🔊 Text-to-Speech: ${currentModels.speech || '(none)'}`, value: 'speech' },
       { label: `🔢 Embeddings: ${currentModels.embedding || '(none)'}`, value: 'embedding' },
+      { label: `📃 Summary: ${currentModels.summary || '(none)'}`, value: 'summary' },
+      { label: `👁️ Describe: ${currentModels.describe || '(none)'}`, value: 'describe' },
+      { label: `📑 Transcribe: ${currentModels.transcribe || '(none)'}`, value: 'transcribe' },
       { label: '← Back', value: '__back__' },
     ];
 
@@ -637,6 +640,9 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       transcription: ['hearing'],
       speech: ['audio'],
       embedding: ['embedding'],
+      summary: ['chat'],
+      describe: ['vision', 'chat'],
+      transcribe: ['vision', 'chat'],
     };
 
     const modelTypeLabels: Record<ModelType, string> = {
@@ -647,6 +653,9 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       transcription: 'Transcription',
       speech: 'Text-to-Speech',
       embedding: 'Embeddings',
+      summary: 'Summarize Text',
+      describe: 'Describe Image',
+      transcribe: 'Transcribe Image',
     };
 
     return (
