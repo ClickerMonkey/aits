@@ -29,20 +29,12 @@ export const knowledge_search = operationOf<
     const modelId = getModel(embeddingResult.model).id;
     const queryVector = embeddingResult.embeddings[0].embedding;
 
-    // Search for similar entries
-    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit);
-
-    // Filter by source prefix if provided
-    let filteredEntries = similarEntries;
-    if (input.sourcePrefix) {
-      filteredEntries = similarEntries.filter((result) =>
-        result.entry.source.startsWith(input.sourcePrefix!)
-      );
-    }
+    // Search for similar entries, optionally filtering by source prefix
+    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit, input.sourcePrefix);
 
     return {
       query: input.query,
-      results: filteredEntries.map((result) => ({
+      results: similarEntries.map((result) => ({
         source: result.entry.source,
         text: result.entry.text,
         similarity: result.similarity,

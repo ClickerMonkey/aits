@@ -92,6 +92,8 @@ export class ConfigFile extends JsonFile<Config> {
         pronouns: '',
         memory: [],
         debug: false,
+        globalPrompt: '',
+        promptFiles: ['cletus.md', 'agents.md', 'claude.md'],
         autonomous: {
           maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS,
           timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS,
