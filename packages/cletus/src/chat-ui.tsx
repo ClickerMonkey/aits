@@ -9,7 +9,7 @@ import { MessageDisplay } from './components/MessageDisplay.js';
 import { ModelSelector } from './components/ModelSelector.js';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu.js';
 import { ConfigFile } from './config.js';
-import type { ChatMeta, ChatMode, Message } from './schemas.js';
+import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas.js';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
@@ -75,6 +75,11 @@ const MODETEXT: Record<ChatMode, string> = {
   create: 'create allowed',
   update: 'update allowed',
   delete: 'delete allowed',
+};
+
+const AGENTMODETEXT: Record<AgentMode, string> = {
+  default: 'all agents',
+  plan: 'planner only',
 };
 
 
@@ -224,6 +229,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       if (inputValue === '') {
         setInputValue('');
       }
+      return;
+    }
+
+    // Alt+M to toggle agent mode
+    if (key.meta && input === 'm' && !isWaitingForResponse) {
+      const newAgentMode = chatMeta.agentMode === 'plan' ? 'default' : 'plan';
+      onChatUpdate({ agentMode: newAgentMode });
+      setChatMeta({ ...chatMeta, agentMode: newAgentMode });
+      addSystemMessage(`✓ Agent mode changed to: ${newAgentMode}`);
       return;
     }
 
@@ -390,6 +404,10 @@ CHAT MODES:
 • update - Auto-approve read, create & update operations
 • delete - Auto-approve all operations (least safe)
 
+AGENT MODES:
+• default - All sub-agents available (planner, librarian, clerk, secretary, architect, artist, dba)
+• plan    - Only planner sub-agent available (for focused task management)
+
 AVAILABLE COMMANDS:
 /help       - Show this help message
 /quit       - Exit the chat
@@ -410,6 +428,7 @@ KEYBOARD SHORTCUTS:
 • Ctrl+C      - Exit chat
 • ESC         - Interrupt AI response or stop transcription
 • Alt+T       - Start/stop voice transcription
+• Alt+M       - Toggle agent mode (default/plan)
 • Alt+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
@@ -1042,13 +1061,14 @@ After installation and the SoX executable is in the path, restart Cletus and try
               </Box>
               <Box flexDirection="column" marginLeft={2}>
                 <Text dimColor>Alt+T: transcribe</Text>
+                <Text dimColor>Alt+M: toggle agent mode</Text>
                 <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>
             </Box>
           </Box>
           <Box flexDirection="column" marginTop={1}>
-            <Text bold color="cyan">Modes:</Text>
+            <Text bold color="cyan">Chat Modes:</Text>
             <Box flexDirection="row" gap={2}>
               <Box flexDirection="column">
                 <Text dimColor>none: local only</Text>
@@ -1059,6 +1079,18 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>update: +update ops</Text>
                 <Text dimColor>delete: +all ops</Text>
                 <Text dimColor>(use /mode to change)</Text>
+              </Box>
+            </Box>
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">Agent Modes:</Text>
+            <Box flexDirection="row" gap={2}>
+              <Box flexDirection="column">
+                <Text dimColor>default: all agents</Text>
+                <Text dimColor>plan: planner only</Text>
+              </Box>
+              <Box flexDirection="column" marginLeft={2}>
+                <Text dimColor>(Alt+M to toggle)</Text>
               </Box>
             </Box>
           </Box>
@@ -1128,7 +1160,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
         <Text dimColor>
           {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
-          {MODETEXT[chatMeta.mode]} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
+          {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
           {isWaitingForResponse ? (
             <>
