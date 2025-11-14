@@ -604,6 +604,164 @@ export const data_index = operationOf<
   },
 });
 
+export const data_import = operationOf<
+  { name: string; glob: string; chunkSize?: number; overlap?: number },
+  { imported: number; updated: number; skipped: number; libraryKnowledgeUpdated: boolean }
+>({
+  mode: 'create',
+  status: ({ name, glob }) => `Importing ${name} from ${glob}`,
+  analyze: async ({ name, glob }, { config, cwd }) => {
+    const type = getType(config, name);
+    const { glob: globLib } = await import('glob');
+    const files = await globLib(glob, { cwd });
+    
+    return {
+      analysis: `This will import ${type.friendlyName} records from ${files.length} file(s) matching "${glob}". Files will be processed in chunks with AI extraction.`,
+      doable: true,
+    };
+  },
+  do: async ({ name, glob, chunkSize = 4000, overlap = 200 }, ctx) => {
+    const type = getType(ctx.config, name);
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+    
+    // Find files matching glob
+    const { glob: globLib } = await import('glob');
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const files = await globLib(glob, { cwd: ctx.cwd });
+    
+    ctx.chatStatus(`Found ${files.length} files to process`);
+    
+    // Build type schema description for AI
+    const typeSchema = buildTypeSchemaDescription(type);
+    
+    let allExtractedRecords: Record<string, any>[] = [];
+    
+    // Process each file
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const filePath = path.resolve(ctx.cwd, files[fileIndex]);
+      ctx.chatStatus(`Processing file ${fileIndex + 1}/${files.length}: ${files[fileIndex]}`);
+      
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        
+        // Process file content in chunks with overlap
+        const chunks = chunkTextWithOverlap(content, chunkSize, overlap);
+        ctx.chatStatus(`  Extracting from ${chunks.length} chunks...`);
+        
+        // Process chunks in parallel batches
+        const batchSize = 5;
+        for (let i = 0; i < chunks.length; i += batchSize) {
+          const batch = chunks.slice(i, Math.min(i + batchSize, chunks.length));
+          const batchResults = await Promise.all(
+            batch.map(async (chunk, batchIdx) => {
+              const chunkIndex = i + batchIdx;
+              try {
+                const extracted = await extractDataFromChunk(ctx, type, typeSchema, chunk);
+                return extracted;
+              } catch (error) {
+                ctx.log(`Warning: Failed to extract from chunk ${chunkIndex + 1}: ${(error as Error).message}`);
+                return [];
+              }
+            })
+          );
+          
+          // Flatten and add to all records
+          allExtractedRecords.push(...batchResults.flat());
+          ctx.chatStatus(`  Processed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`);
+        }
+      } catch (error) {
+        ctx.log(`Warning: Failed to read file ${filePath}: ${(error as Error).message}`);
+      }
+    }
+    
+    ctx.chatStatus(`Extracted ${allExtractedRecords.length} potential records`);
+    
+    // Get sample records for uniqueness determination
+    const sampleSize = Math.min(10, allExtractedRecords.length);
+    const sampleRecords = allExtractedRecords.slice(0, sampleSize);
+    
+    // Ask AI to determine unique fields
+    let uniqueFields: string[] = [];
+    if (allExtractedRecords.length > 0) {
+      ctx.chatStatus('Determining unique fields...');
+      uniqueFields = await determineUniqueFields(ctx, type, typeSchema, sampleRecords);
+    }
+    
+    ctx.chatStatus(`Using unique fields: ${uniqueFields.length > 0 ? uniqueFields.join(', ') : 'none (all records will be imported)'}`);
+    
+    // Merge data based on unique fields
+    const existingRecords = dataManager.getAll();
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+    const updatedIds: string[] = [];
+    
+    for (const record of allExtractedRecords) {
+      // Find existing record by unique fields
+      let existingRecord = null;
+      if (uniqueFields.length > 0) {
+        existingRecord = existingRecords.find(existing => 
+          uniqueFields.every(field => existing.fields[field] === record[field])
+        );
+      }
+      
+      if (existingRecord) {
+        // Check if there are actual changes
+        const hasChanges = Object.keys(record).some(
+          field => JSON.stringify(existingRecord!.fields[field]) !== JSON.stringify(record[field])
+        );
+        
+        if (hasChanges) {
+          await dataManager.update(existingRecord.id, record);
+          updatedIds.push(existingRecord.id);
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        // Create new record
+        const id = await dataManager.create(record);
+        updatedIds.push(id);
+        imported++;
+      }
+      
+      // Update progress periodically
+      const total = imported + updated + skipped;
+      if (total % 10 === 0) {
+        ctx.chatStatus(`Progress: ${total}/${allExtractedRecords.length} records processed`);
+      }
+    }
+    
+    ctx.chatStatus('Updating knowledge base...');
+    
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, updatedIds, []);
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+    
+    return { imported, updated, skipped, libraryKnowledgeUpdated };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Import("${op.input.glob}")`,
+      (op) => {
+        if (op.output) {
+          return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.skipped} duplicate(s)`;
+        }
+        return null;
+      },
+    );
+  },
+});
+
 /**
  * Updates knowledge entries for a given type.
  * 
@@ -737,3 +895,156 @@ const OPERATOR_MAP: Record<string, string> = {
   oneOf: " ONE OF ",
   isEmpty: "IS EMPTY",
 };
+
+/**
+ * Build a description of the type schema for AI extraction
+ */
+function buildTypeSchemaDescription(type: TypeDefinition): string {
+  const fieldDescriptions = type.fields.map(field => {
+    let desc = `- ${field.name} (${field.type})`;
+    if (field.required) desc += ' [required]';
+    if (field.enumOptions) desc += ` [options: ${field.enumOptions.join(', ')}]`;
+    if (field.default !== undefined) desc += ` [default: ${field.default}]`;
+    return desc;
+  }).join('\n');
+  
+  return `Type: ${type.friendlyName}
+${type.description || ''}
+
+Fields:
+${fieldDescriptions}`;
+}
+
+/**
+ * Chunk text with overlap for AI processing
+ */
+function chunkTextWithOverlap(text: string, chunkSize: number, overlap: number): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  
+  while (start < text.length) {
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push(text.slice(start, end));
+    
+    if (end >= text.length) break;
+    start = end - overlap;
+  }
+  
+  return chunks;
+}
+
+/**
+ * Extract data records from a text chunk using AI
+ */
+async function extractDataFromChunk(
+  ctx: CletusAIContext,
+  type: TypeDefinition,
+  typeSchema: string,
+  chunk: string
+): Promise<Record<string, any>[]> {
+  const models = ctx.config.getData().user.models;
+  const model = models?.chat;
+  
+  const prompt = `Extract all instances of ${type.friendlyName} from the following text chunk.
+
+${typeSchema}
+
+Return a JSON array of objects, where each object contains the fields defined above. If no instances are found, return an empty array.
+
+Text chunk:
+${chunk}
+
+Respond with ONLY a valid JSON array, no explanation or markdown formatting.`;
+  
+  try {
+    const response = await ctx.ai.chat.get({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a data extraction assistant. Extract structured data from text and respond with valid JSON arrays only.' },
+        { role: 'user', content: prompt },
+      ],
+      maxTokens: 2000,
+    });
+    
+    // Parse the JSON response
+    const content = response.content.trim();
+    // Remove markdown code blocks if present
+    const jsonText = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '');
+    const records = JSON.parse(jsonText);
+    
+    if (!Array.isArray(records)) {
+      ctx.log(`Warning: AI response was not an array: ${jsonText}`);
+      return [];
+    }
+    
+    return records;
+  } catch (error) {
+    ctx.log(`Error extracting data from chunk: ${(error as Error).message}`);
+    return [];
+  }
+}
+
+/**
+ * Determine which fields should be used for uniqueness checking
+ */
+async function determineUniqueFields(
+  ctx: CletusAIContext,
+  type: TypeDefinition,
+  typeSchema: string,
+  sampleRecords: Record<string, any>[]
+): Promise<string[]> {
+  const models = ctx.config.getData().user.models;
+  const model = models?.chat;
+  
+  const prompt = `Given the following type definition and sample records, determine which field(s) should be used to identify unique records and avoid duplicates.
+
+${typeSchema}
+
+Sample records (up to 10):
+${JSON.stringify(sampleRecords, null, 2)}
+
+Respond with a JSON array of field names that should be used for uniqueness checking. For example: ["email"] or ["firstName", "lastName"] or [] if all records should be considered unique.
+
+Consider:
+- ID fields (id, userId, email, etc.)
+- Natural keys (combinations of fields that make a record unique)
+- Return empty array [] if there's no reliable way to determine uniqueness
+
+Respond with ONLY a valid JSON array of field names, no explanation or markdown formatting.`;
+  
+  try {
+    const response = await ctx.ai.chat.get({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields. Respond with valid JSON arrays only.' },
+        { role: 'user', content: prompt },
+      ],
+      maxTokens: 500,
+    });
+    
+    // Parse the JSON response
+    const content = response.content.trim();
+    // Remove markdown code blocks if present
+    const jsonText = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '');
+    const fields = JSON.parse(jsonText);
+    
+    if (!Array.isArray(fields)) {
+      ctx.log(`Warning: AI response for unique fields was not an array: ${jsonText}`);
+      return [];
+    }
+    
+    // Validate that all fields exist in the type
+    const validFields = fields.filter(field => 
+      type.fields.some(f => f.name === field)
+    );
+    
+    if (validFields.length !== fields.length) {
+      ctx.log(`Warning: Some suggested unique fields don't exist in type definition: ${fields.join(', ')}`);
+    }
+    
+    return validFields;
+  } catch (error) {
+    ctx.log(`Error determining unique fields: ${(error as Error).message}`);
+    return [];
+  }
+}

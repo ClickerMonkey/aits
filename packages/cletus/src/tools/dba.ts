@@ -361,6 +361,29 @@ This should be done if an embedding model has changed or a knowledge template ha
     call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: ctx.type.name } }, ctx as unknown as CletusAIContext),
   });
 
+  const dataImport = aiTyped.tool({
+    name: 'data_import',
+    description: `Import data from files using AI extraction`,
+    descriptionFn: ({ type }) => `Import ${type.friendlyName} records from files`,
+    instructionsFn: ({ type }) => `Use this to import ${type.friendlyName} records from text files. The tool will:
+1. Find files matching the glob pattern
+2. Extract structured data using AI by processing files in chunks with overlap
+3. Determine unique fields automatically to avoid duplicates
+4. Merge data, updating existing records or creating new ones
+
+Example: Import from CSV or text files:
+{ "glob": "data/*.csv" }
+
+Example: Import with custom chunk settings:
+{ "glob": "import/*.txt", "chunkSize": 3000, "overlap": 300 }`,
+    schema: z.object({
+      glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
+      chunkSize: z.number().optional().describe('Characters per chunk for AI processing (default: 4000)'),
+      overlap: z.number().optional().describe('Character overlap between chunks (default: 200)'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
+  });
+
   const dba = aiTyped.prompt({
     name: 'dba',
     description: 'Database administrator agent for data operations',
@@ -393,6 +416,7 @@ You have been given the following request to perform by the chat agent, the conv
       dataDeleteMany,
       dataAggregate,
       dataIndex,
+      dataImport,
     ],
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
