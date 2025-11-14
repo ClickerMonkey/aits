@@ -104,9 +104,15 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
   searchBySimilarity(
     model: string,
     queryVector: number[],
-    topK: number = 5
+    topK: number = 5,
+    sourcePrefix?: string
   ): Array<{ entry: KnowledgeEntry; similarity: number }> {
-    const entries = this.getEntries(model);
+    let entries = this.getEntries(model);
+
+    // Filter by source prefix before computing similarities to optimize performance
+    if (sourcePrefix) {
+      entries = entries.filter((entry) => entry.source.startsWith(sourcePrefix));
+    }
 
     const results = entries
       .map((entry) => ({

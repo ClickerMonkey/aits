@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { CletusAIContext, transcribe } from "../ai";
-import { chunkArray, formatName } from "../common";
+import { abbreviate, chunkArray, formatName } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
@@ -817,6 +817,60 @@ export const data_import = operationOf<
       (op) => {
         if (op.output) {
           return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.skipped} duplicate(s)`;
+        }
+        return null;
+      },
+    );
+  },
+});
+
+export const data_search = operationOf<
+  { name: string; query: string; n?: number },
+  { query: string; results: Array<{ source: string; text: string; similarity: number }> }
+>({
+  mode: 'read',
+  status: ({ name, query }) => `Searching ${name}: ${abbreviate(query, 25)}`,
+  analyze: async ({ name, query, n }, { config }) => {
+    const type = getType(config, name);
+    const limit = n || 10;
+    return {
+      analysis: `This will search ${type.friendlyName} knowledge for "${query}", returning up to ${limit} results.`,
+      doable: true,
+    };
+  },
+  do: async ({ name, query, n }, { ai }) => {
+    const knowledge = new KnowledgeFile();
+    await knowledge.load();
+
+    const limit = n || 10;
+    
+    // Generate embedding for query
+    const embeddingResult = await ai.embed.get({ texts: [query] });
+    const modelId = getModel(embeddingResult.model).id;
+    const queryVector = embeddingResult.embeddings[0].embedding;
+
+    // Search for similar entries with source prefix matching the type name
+    const sourcePrefix = `${name}:`;
+    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit, sourcePrefix);
+
+    return {
+      query,
+      results: similarEntries.map((result) => ({
+        source: result.entry.source,
+        text: result.entry.text,
+        similarity: result.similarity,
+      })),
+    };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Search("${abbreviate(op.input.query, 20)}")`,
+      (op) => {
+        if (op.output) {
+          const count = op.output.results.length;
+          return `Found ${count} result${count !== 1 ? 's' : ''}`;
         }
         return null;
       },

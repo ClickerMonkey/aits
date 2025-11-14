@@ -383,6 +383,21 @@ Example: Import with image text extraction:
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
+    
+  const dataSearch = aiTyped.tool({
+    name: 'data_search',
+    description: `Search data records by semantic similarity`,
+    descriptionFn: ({ type }) => `Search ${type.friendlyName} records by semantic similarity`,
+    instructionsFn: ({ type }) => `Use this to find relevant ${type.friendlyName} records from the knowledge base using semantic search. Provide a query and optionally specify the number of results.
+
+Example: Search for relevant records:
+{ "query": "user preferences for notifications", "n": 5 }`,
+    schema: z.object({
+      query: z.string().describe('Search query text'),
+      n: z.number().optional().describe('Maximum results (default: 10)'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: ctx.type.name, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
+  });
 
   const dba = aiTyped.prompt({
     name: 'dba',
@@ -417,6 +432,7 @@ You have been given the following request to perform by the chat agent, the conv
       dataAggregate,
       dataIndex,
       dataImport,
+      dataSearch,
     ],
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
