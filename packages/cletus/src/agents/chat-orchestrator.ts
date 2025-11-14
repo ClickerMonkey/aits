@@ -6,6 +6,7 @@ import type { ChatMeta, Message, MessageContent, Operation } from '../schemas';
 import { createChatAgent } from './chat-agent';
 import { logger } from '../logger';
 import { group } from '../common';
+import { AUTONOMOUS } from '../constants.js';
 
 /**
  * Options for running the chat orchestrator
@@ -82,8 +83,8 @@ export async function runChatOrchestrator(
 
   const startTime = Date.now();
   // Use configured values or fallback to defaults
-  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeout ?? 5 * 60 * 1000; // Default: 5 minutes
-  const LOOP_MAX = config.getData().user.autonomous?.maxIterations ?? 10; // Default: 10 iterations
+  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
+  const LOOP_MAX = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
 
   logger.log('orchestrator: starting');
 
@@ -147,7 +148,7 @@ export async function runChatOrchestrator(
 
       // Check timeout
       if (Date.now() - startTime > LOOP_TIMEOUT) {
-        const timeoutMinutes = Math.round(LOOP_TIMEOUT / 60000);
+        const timeoutMinutes = Math.round(LOOP_TIMEOUT / AUTONOMOUS.MS_PER_MINUTE);
         onEvent({ type: 'error', error: `Operation timeout: exceeded ${timeoutMinutes} minute limit` });
         break;
       }

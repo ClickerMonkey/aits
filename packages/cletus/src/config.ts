@@ -6,6 +6,7 @@ import {
   type ChatMeta,
   type TypeDefinition,
 } from './schemas';
+import { AUTONOMOUS } from './constants.js';
 
 /**
  * Default assistants created during initialization
@@ -92,8 +93,8 @@ export class ConfigFile extends JsonFile<Config> {
         memory: [],
         debug: false,
         autonomous: {
-          maxIterations: 10,
-          timeout: 5 * 60 * 1000, // 5 minutes
+          maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS,
+          timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS,
         },
       },
       providers: {

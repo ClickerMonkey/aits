@@ -11,6 +11,7 @@ import { getChatPath, getDataPath } from '../file-manager.js';
 import { ModelCapability } from '@aits/ai';
 import { logger } from '../logger.js';
 import { abbreviate } from '../common.js';
+import { AUTONOMOUS } from '../constants.js';
 
 type SettingsView =
   | 'menu'
@@ -81,12 +82,12 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       setApiKeyInput('');
       setInputError(null);
     } else if (view === 'change-max-iterations') {
-      const current = config.getData().user.autonomous?.maxIterations ?? 10;
+      const current = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
       setMaxIterationsInput(current.toString());
       setInputError(null);
     } else if (view === 'change-timeout') {
-      const current = config.getData().user.autonomous?.timeout ?? 300000;
-      setTimeoutInput(Math.round(current / 60000).toString());
+      const current = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
+      setTimeoutInput(Math.round(current / AUTONOMOUS.MS_PER_MINUTE).toString());
       setInputError(null);
     }
   }, [view]);
@@ -216,18 +217,18 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
           <TextInput
             value={maxIterationsInput}
             onChange={setMaxIterationsInput}
-            placeholder="10"
+            placeholder={AUTONOMOUS.DEFAULT_MAX_ITERATIONS.toString()}
             onSubmit={async () => {
               const value = parseInt(maxIterationsInput);
-              if (!isNaN(value) && value >= 1) {
+              if (!isNaN(value) && value >= AUTONOMOUS.MIN_ITERATIONS) {
                 await config.save((data) => {
-                  data.user.autonomous = data.user.autonomous || { maxIterations: 10, timeout: 300000 };
+                  data.user.autonomous = data.user.autonomous || { maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS, timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS };
                   data.user.autonomous.maxIterations = value;
                 });
                 setMessage(`✓ Max iterations updated to: ${value}`);
                 handleBack();
               } else {
-                setInputError('Please enter a number >= 1');
+                setInputError(`Please enter a number >= ${AUTONOMOUS.MIN_ITERATIONS}`);
               }
             }}
           />
@@ -261,19 +262,20 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
           <TextInput
             value={timeoutInput}
             onChange={setTimeoutInput}
-            placeholder="5"
+            placeholder={Math.round(AUTONOMOUS.DEFAULT_TIMEOUT_MS / AUTONOMOUS.MS_PER_MINUTE).toString()}
             onSubmit={async () => {
               const minutes = parseInt(timeoutInput);
-              if (!isNaN(minutes) && minutes >= 1) {
-                const timeoutMs = minutes * 60 * 1000;
+              const minMinutes = Math.ceil(AUTONOMOUS.MIN_TIMEOUT_MS / AUTONOMOUS.MS_PER_MINUTE);
+              if (!isNaN(minutes) && minutes >= minMinutes) {
+                const timeoutMs = minutes * AUTONOMOUS.MS_PER_MINUTE;
                 await config.save((data) => {
-                  data.user.autonomous = data.user.autonomous || { maxIterations: 10, timeout: 300000 };
+                  data.user.autonomous = data.user.autonomous || { maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS, timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS };
                   data.user.autonomous.timeout = timeoutMs;
                 });
                 setMessage(`✓ Timeout updated to: ${minutes} minute${minutes !== 1 ? 's' : ''}`);
                 handleBack();
               } else {
-                setInputError('Please enter a number >= 1');
+                setInputError(`Please enter a number >= ${minMinutes}`);
               }
             }}
           />
@@ -790,8 +792,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
   // Main Menu
   const debugEnabled = config.getData().user.debug;
-  const maxIterations = config.getData().user.autonomous?.maxIterations ?? 10;
-  const timeoutMinutes = Math.round((config.getData().user.autonomous?.timeout ?? 300000) / 60000);
+  const maxIterations = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
+  const timeoutMinutes = Math.round((config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS) / AUTONOMOUS.MS_PER_MINUTE);
   const menuItems = [
     { label: '✏️ Change name', value: 'change-name' },
     { label: '✏️ Change pronouns', value: 'change-pronouns' },
