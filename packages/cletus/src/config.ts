@@ -6,7 +6,7 @@ import {
   type ChatMeta,
   type TypeDefinition,
 } from './schemas';
-import { AUTONOMOUS } from './constants.js';
+import { AUTONOMOUS } from './constants';
 
 /**
  * Default assistants created during initialization

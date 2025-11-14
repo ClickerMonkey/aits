@@ -610,6 +610,220 @@ export const data_index = operationOf<
   },
 });
 
+export const data_import = operationOf<
+  { name: string; glob: string; transcribeImages?: boolean },
+  { imported: number; updated: number; skipped: number; libraryKnowledgeUpdated: boolean }
+>({
+  mode: 'create',
+  status: ({ name, glob }) => `Importing ${name} from ${glob}`,
+  analyze: async ({ name, glob }, { config, cwd }) => {
+    const type = getType(config, name);
+    const files = await searchFiles(cwd, glob);
+    
+    const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
+    const images = files.filter(f => f.fileType === 'image').map(f => f.file);
+    const unknown = files.filter(f => f.fileType === 'unknown').map(f => f.file);
+    const importable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image').map(f => f.file);
+    
+    let analysis = '';
+    if (unreadable.length > 0) {
+      analysis += `Found ${unreadable.length} unreadable file(s): ${unreadable.join(', ')}\n`;
+    }
+    if (images.length > 0) {
+      analysis += `Found ${images.length} image file(s) (images will be skipped unless transcribeImages is enabled)\n`;
+    }
+    if (unknown.length > 0) {
+      analysis += `Found ${unknown.length} file(s) of unknown/unsupported format: ${unknown.join(', ')}.\n`;
+    }
+    analysis += `This will import ${type.friendlyName} records from ${importable.length} file(s) matching "${glob}". Files will be processed with AI extraction.`;
+    
+    return {
+      analysis,
+      doable: importable.length > 0,
+    };
+  },
+  do: async ({ name, glob, transcribeImages = false }, ctx) => {
+    const { chatStatus, ai, config, cwd, log } = ctx;
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+    
+    // Find and filter files
+    const files = await searchFiles(cwd, glob);
+    const importableFiles = files.filter(f => {
+      if (f.fileType === 'unknown' || f.fileType === 'unreadable') {
+        return false;
+      }
+      // Include images only if transcribeImages is enabled
+      if (f.fileType === 'image' && !transcribeImages) {
+        return false;
+      }
+      return true;
+    });
+    
+    chatStatus(`Found ${importableFiles.length} files to process`);
+    
+    // Build zod schema for extraction
+    const recordSchema = buildFieldsSchema(type);
+    const arraySchema = z.array(recordSchema) as z.ZodType<object, object>;
+    
+    let allExtractedRecords: Record<string, any>[] = [];
+    
+    // Process files in parallel
+    let filesProcessed = 0;
+    await Promise.allSettled(importableFiles.map(async (file) => {
+      const fullPath = path.resolve(cwd, file.file);
+      
+      try {
+        // Process file to get sections
+        const parsed = await processFile(fullPath, file.file, {
+          assetPath: await getAssetPath(true),
+          sections: true,
+          transcribeImages: transcribeImages,
+          describeImages: false,
+          extractImages: false,
+          summarize: false,
+          transcriber: (image) => transcribe(ai, image),
+        });
+        
+        filesProcessed++;
+        chatStatus(`Processing file ${filesProcessed}/${importableFiles.length}: ${file.file}`);
+        
+        // Group sections to minimize LLM calls (combine sections up to MAX_EXTRACTION_CHUNK_SIZE)
+        const sectionGroups: string[] = [];
+        let currentGroup = '';
+        
+        for (const section of parsed.sections) {
+          if (!section || section.trim().length === 0) {
+            continue;
+          }
+          
+          // If adding this section would exceed the limit, save current group and start new one
+          if (currentGroup.length > 0 && currentGroup.length + section.length + 2 > CONSTS.MAX_EXTRACTION_CHUNK_SIZE) {
+            sectionGroups.push(currentGroup);
+            currentGroup = section;
+          } else {
+            // Add section to current group with separator
+            currentGroup = currentGroup.length > 0 ? currentGroup + '\n\n' + section : section;
+          }
+        }
+        
+        // Add final group if not empty
+        if (currentGroup.length > 0) {
+          sectionGroups.push(currentGroup);
+        }
+        
+        // Extract data from grouped sections
+        for (const group of sectionGroups) {
+          try {
+            const extracted = await extractDataFromText(ai, config, type, arraySchema, group);
+            allExtractedRecords.push(...extracted);
+          } catch (error) {
+            log(`Warning: Failed to extract from section group in ${file.file}: ${(error as Error).message}`);
+          }
+        }
+      } catch (error) {
+        log(`Warning: Failed to process file ${file.file}: ${(error as Error).message}`);
+      }
+    }));
+    
+    chatStatus(`Extracted ${allExtractedRecords.length} potential records`);
+    
+    // Get sample records for uniqueness determination
+    const sampleSize = Math.min(10, allExtractedRecords.length);
+    const sampleRecords = allExtractedRecords.slice(0, sampleSize);
+    
+    // Ask AI to determine unique fields
+    let uniqueFields: string[] = [];
+    if (allExtractedRecords.length > 0) {
+      chatStatus('Determining unique fields...');
+      uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
+    }
+    
+    chatStatus(`Using unique fields: ${uniqueFields.length > 0 ? uniqueFields.join(', ') : 'none (all records will be imported)'}`);
+    
+    // Merge data based on unique fields
+    const existingRecords = dataManager.getAll();
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+    const updatedIds: string[] = [];
+    
+    // Use single save operation for all changes
+    await dataManager.save((dataFile) => {
+      for (const record of allExtractedRecords) {
+        // Find existing record by unique fields
+        let existingRecord = null;
+        if (uniqueFields.length > 0) {
+          existingRecord = dataFile.data.find(existing => 
+            uniqueFields.every(field => existing.fields[field] === record[field])
+          );
+        }
+        
+        if (existingRecord) {
+          // Check if there are actual changes
+          const hasChanges = Object.keys(record).some(
+            field => JSON.stringify(existingRecord!.fields[field]) !== JSON.stringify(record[field])
+          );
+          
+          if (hasChanges) {
+            Object.assign(existingRecord.fields, record);
+            existingRecord.updated = Date.now();
+            updatedIds.push(existingRecord.id);
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // Create new record
+          const id = uuidv4();
+          const now = Date.now();
+          dataFile.data.push({
+            id,
+            created: now,
+            updated: now,
+            fields: record,
+          });
+          updatedIds.push(id);
+          imported++;
+        }
+        
+        // Update progress periodically
+        const total = imported + updated + skipped;
+        if (total % 10 === 0) {
+          chatStatus(`Progress: ${total}/${allExtractedRecords.length} records processed`);
+        }
+      }
+    });
+    
+    chatStatus('Updating knowledge base...');
+    
+    // Update knowledge base
+    let libraryKnowledgeUpdated = true;
+    try {
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, updatedIds, []);
+    } catch (e) {
+      log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
+      libraryKnowledgeUpdated = false;
+    }
+    
+    return { imported, updated, skipped, libraryKnowledgeUpdated };
+  },
+  render: (op, config) => {
+    const type = getType(config, op.input.name);
+    return renderOperation(
+      op,
+      `${formatName(type.friendlyName)}Import("${op.input.glob}")`,
+      (op) => {
+        if (op.output) {
+          return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.skipped} duplicate(s)`;
+        }
+        return null;
+      },
+    );
+  },
+});
+
 export const data_search = operationOf<
   { name: string; query: string; n?: number },
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }

@@ -1,5 +1,5 @@
 import { any, z } from 'zod';
-import { AUTONOMOUS } from './constants.js';
+import { AUTONOMOUS } from './constants';
 
 // ============================================================================
 // User Schema

@@ -2,16 +2,16 @@ import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
-import type { ConfigFile } from '../config.js';
-import { ModelSelector } from './ModelSelector.js';
-import { createCletusAI } from '../ai.js';
-import type { Providers } from '../schemas.js';
+import type { ConfigFile } from '../config';
+import { ModelSelector } from './ModelSelector';
+import { createCletusAI } from '../ai';
+import type { Providers } from '../schemas';
 import fs from 'fs/promises';
-import { getChatPath, getDataPath } from '../file-manager.js';
+import { getChatPath, getDataPath } from '../file-manager';
 import { ModelCapability } from '@aits/ai';
-import { logger } from '../logger.js';
-import { abbreviate } from '../common.js';
-import { AUTONOMOUS } from '../constants.js';
+import { logger } from '../logger';
+import { abbreviate } from '../common';
+import { AUTONOMOUS } from '../constants';
 
 type SettingsView =
   | 'menu'

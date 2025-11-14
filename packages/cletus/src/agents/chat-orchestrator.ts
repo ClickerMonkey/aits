@@ -6,7 +6,7 @@ import type { ChatMeta, Message, MessageContent, Operation } from '../schemas';
 import { createChatAgent } from './chat-agent';
 import { logger } from '../logger';
 import { group } from '../common';
-import { AUTONOMOUS } from '../constants.js';
+import { AUTONOMOUS } from '../constants';
 
 /**
  * Options for running the chat orchestrator
