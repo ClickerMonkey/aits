@@ -240,7 +240,7 @@ No user memories.
 
 {{/if}}
 {{#if promptFilesContent}}
-{{promptFilesContent}}
+{{{promptFilesContent}}}
 
 {{/if}}
 {{#if assistant}}
