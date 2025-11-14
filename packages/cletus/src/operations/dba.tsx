@@ -1,15 +1,20 @@
 import Handlebars from "handlebars";
 import { getModel } from "@aits/core";
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 import { CletusAIContext } from "../ai";
 import { chunkArray, formatName } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
 import { KnowledgeFile } from "../knowledge";
-import { KnowledgeEntry, TypeDefinition } from "../schemas";
+import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
+import { searchFiles, processFile } from "./file-helper";
+import { getAssetPath } from "../file-manager";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -605,78 +610,101 @@ export const data_index = operationOf<
 });
 
 export const data_import = operationOf<
-  { name: string; glob: string; chunkSize?: number; overlap?: number },
+  { name: string; glob: string; transcribeImages?: boolean },
   { imported: number; updated: number; skipped: number; libraryKnowledgeUpdated: boolean }
 >({
   mode: 'create',
   status: ({ name, glob }) => `Importing ${name} from ${glob}`,
   analyze: async ({ name, glob }, { config, cwd }) => {
     const type = getType(config, name);
-    const { glob: globLib } = await import('glob');
-    const files = await globLib(glob, { cwd });
+    const files = await searchFiles(cwd, glob);
+    
+    const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
+    const images = files.filter(f => f.fileType === 'image').map(f => f.file);
+    const unknown = files.filter(f => f.fileType === 'unknown').map(f => f.file);
+    const importable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image').map(f => f.file);
+    
+    let analysis = '';
+    if (unreadable.length > 0) {
+      analysis += `Found ${unreadable.length} unreadable file(s): ${unreadable.join(', ')}\n`;
+    }
+    if (images.length > 0) {
+      analysis += `Found ${images.length} image file(s) (images will be skipped unless transcribeImages is enabled)\n`;
+    }
+    if (unknown.length > 0) {
+      analysis += `Found ${unknown.length} file(s) of unknown/unsupported format: ${unknown.join(', ')}.\n`;
+    }
+    analysis += `This will import ${type.friendlyName} records from ${importable.length} file(s) matching "${glob}". Files will be processed with AI extraction.`;
     
     return {
-      analysis: `This will import ${type.friendlyName} records from ${files.length} file(s) matching "${glob}". Files will be processed in chunks with AI extraction.`,
-      doable: true,
+      analysis,
+      doable: importable.length > 0,
     };
   },
-  do: async ({ name, glob, chunkSize = 4000, overlap = 200 }, ctx) => {
-    const type = getType(ctx.config, name);
+  do: async ({ name, glob, transcribeImages = false }, { chatStatus, ai, config, cwd, log }) => {
+    const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
     
-    // Find files matching glob
-    const { glob: globLib } = await import('glob');
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const files = await globLib(glob, { cwd: ctx.cwd });
+    // Find and filter files
+    const files = await searchFiles(cwd, glob);
+    const importableFiles = files.filter(f => {
+      if (f.fileType === 'unknown' || f.fileType === 'unreadable') {
+        return false;
+      }
+      // Include images only if transcribeImages is enabled
+      if (f.fileType === 'image' && !transcribeImages) {
+        return false;
+      }
+      return true;
+    });
     
-    ctx.chatStatus(`Found ${files.length} files to process`);
+    chatStatus(`Found ${importableFiles.length} files to process`);
     
-    // Build type schema description for AI
-    const typeSchema = buildTypeSchemaDescription(type);
+    // Build zod schema for extraction
+    const recordSchema = buildRecordSchema(type);
+    const arraySchema = z.array(recordSchema) as z.ZodType<object, object>;
     
     let allExtractedRecords: Record<string, any>[] = [];
     
-    // Process each file
-    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
-      const filePath = path.resolve(ctx.cwd, files[fileIndex]);
-      ctx.chatStatus(`Processing file ${fileIndex + 1}/${files.length}: ${files[fileIndex]}`);
+    // Process files in parallel
+    let filesProcessed = 0;
+    await Promise.allSettled(importableFiles.map(async (file) => {
+      const fullPath = path.resolve(cwd, file.file);
       
       try {
-        const content = await fs.readFile(filePath, 'utf-8');
+        // Process file to get sections
+        const parsed = await processFile(fullPath, file.file, {
+          assetPath: await getAssetPath(true),
+          sections: true,
+          transcribeImages: transcribeImages,
+          describeImages: false,
+          extractImages: false,
+          summarize: false,
+        });
         
-        // Process file content in chunks with overlap
-        const chunks = chunkTextWithOverlap(content, chunkSize, overlap);
-        ctx.chatStatus(`  Extracting from ${chunks.length} chunks...`);
+        filesProcessed++;
+        chatStatus(`Processing file ${filesProcessed}/${importableFiles.length}: ${file.file}`);
         
-        // Process chunks in parallel batches
-        const batchSize = 5;
-        for (let i = 0; i < chunks.length; i += batchSize) {
-          const batch = chunks.slice(i, Math.min(i + batchSize, chunks.length));
-          const batchResults = await Promise.all(
-            batch.map(async (chunk, batchIdx) => {
-              const chunkIndex = i + batchIdx;
-              try {
-                const extracted = await extractDataFromChunk(ctx, type, typeSchema, chunk);
-                return extracted;
-              } catch (error) {
-                ctx.log(`Warning: Failed to extract from chunk ${chunkIndex + 1}: ${(error as Error).message}`);
-                return [];
-              }
-            })
-          );
+        // Extract data from each section
+        for (const section of parsed.sections) {
+          if (!section || section.trim().length === 0) {
+            continue;
+          }
           
-          // Flatten and add to all records
-          allExtractedRecords.push(...batchResults.flat());
-          ctx.chatStatus(`  Processed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`);
+          try {
+            const extracted = await extractDataFromText(ai, config, type, arraySchema, section);
+            allExtractedRecords.push(...extracted);
+          } catch (error) {
+            log(`Warning: Failed to extract from section in ${file.file}: ${(error as Error).message}`);
+          }
         }
       } catch (error) {
-        ctx.log(`Warning: Failed to read file ${filePath}: ${(error as Error).message}`);
+        log(`Warning: Failed to process file ${file.file}: ${(error as Error).message}`);
       }
-    }
+    }));
     
-    ctx.chatStatus(`Extracted ${allExtractedRecords.length} potential records`);
+    chatStatus(`Extracted ${allExtractedRecords.length} potential records`);
     
     // Get sample records for uniqueness determination
     const sampleSize = Math.min(10, allExtractedRecords.length);
@@ -685,11 +713,11 @@ export const data_import = operationOf<
     // Ask AI to determine unique fields
     let uniqueFields: string[] = [];
     if (allExtractedRecords.length > 0) {
-      ctx.chatStatus('Determining unique fields...');
-      uniqueFields = await determineUniqueFields(ctx, type, typeSchema, sampleRecords);
+      chatStatus('Determining unique fields...');
+      uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
     }
     
-    ctx.chatStatus(`Using unique fields: ${uniqueFields.length > 0 ? uniqueFields.join(', ') : 'none (all records will be imported)'}`);
+    chatStatus(`Using unique fields: ${uniqueFields.length > 0 ? uniqueFields.join(', ') : 'none (all records will be imported)'}`);
     
     // Merge data based on unique fields
     const existingRecords = dataManager.getAll();
@@ -698,50 +726,61 @@ export const data_import = operationOf<
     let skipped = 0;
     const updatedIds: string[] = [];
     
-    for (const record of allExtractedRecords) {
-      // Find existing record by unique fields
-      let existingRecord = null;
-      if (uniqueFields.length > 0) {
-        existingRecord = existingRecords.find(existing => 
-          uniqueFields.every(field => existing.fields[field] === record[field])
-        );
-      }
-      
-      if (existingRecord) {
-        // Check if there are actual changes
-        const hasChanges = Object.keys(record).some(
-          field => JSON.stringify(existingRecord!.fields[field]) !== JSON.stringify(record[field])
-        );
-        
-        if (hasChanges) {
-          await dataManager.update(existingRecord.id, record);
-          updatedIds.push(existingRecord.id);
-          updated++;
-        } else {
-          skipped++;
+    // Use single save operation for all changes
+    await dataManager.save((dataFile) => {
+      for (const record of allExtractedRecords) {
+        // Find existing record by unique fields
+        let existingRecord = null;
+        if (uniqueFields.length > 0) {
+          existingRecord = dataFile.data.find(existing => 
+            uniqueFields.every(field => existing.fields[field] === record[field])
+          );
         }
-      } else {
-        // Create new record
-        const id = await dataManager.create(record);
-        updatedIds.push(id);
-        imported++;
+        
+        if (existingRecord) {
+          // Check if there are actual changes
+          const hasChanges = Object.keys(record).some(
+            field => JSON.stringify(existingRecord!.fields[field]) !== JSON.stringify(record[field])
+          );
+          
+          if (hasChanges) {
+            Object.assign(existingRecord.fields, record);
+            existingRecord.updated = Date.now();
+            updatedIds.push(existingRecord.id);
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // Create new record
+          const id = uuidv4();
+          const now = Date.now();
+          dataFile.data.push({
+            id,
+            created: now,
+            updated: now,
+            fields: record,
+          });
+          updatedIds.push(id);
+          imported++;
+        }
+        
+        // Update progress periodically
+        const total = imported + updated + skipped;
+        if (total % 10 === 0) {
+          chatStatus(`Progress: ${total}/${allExtractedRecords.length} records processed`);
+        }
       }
-      
-      // Update progress periodically
-      const total = imported + updated + skipped;
-      if (total % 10 === 0) {
-        ctx.chatStatus(`Progress: ${total}/${allExtractedRecords.length} records processed`);
-      }
-    }
+    });
     
-    ctx.chatStatus('Updating knowledge base...');
+    chatStatus('Updating knowledge base...');
     
     // Update knowledge base
     let libraryKnowledgeUpdated = true;
     try {
-      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, updatedIds, []);
+      libraryKnowledgeUpdated = await updateKnowledge({ ai, config, log, chatStatus } as any, name, updatedIds, []);
     } catch (e) {
-      ctx.log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
+      log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
     }
     
@@ -897,9 +936,62 @@ const OPERATOR_MAP: Record<string, string> = {
 };
 
 /**
- * Build a description of the type schema for AI extraction
+ * Build a Zod schema for a single record based on type definition
  */
-function buildTypeSchemaDescription(type: TypeDefinition): string {
+function buildRecordSchema(type: TypeDefinition) {
+  const shape: Record<string, z.ZodTypeAny> = {};
+  
+  for (const field of type.fields) {
+    let schema: z.ZodTypeAny;
+    
+    switch (field.type) {
+      case 'string':
+        schema = z.string();
+        break;
+      case 'number':
+        schema = z.number();
+        break;
+      case 'boolean':
+        schema = z.boolean();
+        break;
+      case 'enum':
+        schema = z.enum(field.enumOptions as [string, ...string[]]);
+        break;
+      case 'date':
+        schema = z.string(); // Dates are strings in JSON
+        break;
+      default:
+        schema = z.string();
+        break;
+    }
+    
+    if (!field.required) {
+      schema = schema.optional();
+    }
+    
+    if (field.default !== undefined) {
+      schema = schema.default(field.default);
+    }
+    
+    shape[field.name] = schema;
+  }
+  
+  return z.object(shape);
+}
+
+/**
+ * Extract data records from text using AI with structured output
+ */
+async function extractDataFromText(
+  ai: CletusAIContext['ai'],
+  config: ConfigFile,
+  type: TypeDefinition,
+  arraySchema: z.ZodType<object, object>,
+  text: string
+): Promise<Record<string, any>[]> {
+  const models = config.getData().user.models;
+  const model = models?.chat;
+  
   const fieldDescriptions = type.fields.map(field => {
     let desc = `- ${field.name} (${field.type})`;
     if (field.required) desc += ' [required]';
@@ -908,78 +1000,39 @@ function buildTypeSchemaDescription(type: TypeDefinition): string {
     return desc;
   }).join('\n');
   
-  return `Type: ${type.friendlyName}
+  const prompt = `Extract all instances of ${type.friendlyName} from the following text.
+
+Type: ${type.friendlyName}
 ${type.description || ''}
 
 Fields:
-${fieldDescriptions}`;
-}
+${fieldDescriptions}
 
-/**
- * Chunk text with overlap for AI processing
- */
-function chunkTextWithOverlap(text: string, chunkSize: number, overlap: number): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  
-  while (start < text.length) {
-    const end = Math.min(start + chunkSize, text.length);
-    chunks.push(text.slice(start, end));
-    
-    if (end >= text.length) break;
-    start = end - overlap;
-  }
-  
-  return chunks;
-}
+Text:
+${text}
 
-/**
- * Extract data records from a text chunk using AI
- */
-async function extractDataFromChunk(
-  ctx: CletusAIContext,
-  type: TypeDefinition,
-  typeSchema: string,
-  chunk: string
-): Promise<Record<string, any>[]> {
-  const models = ctx.config.getData().user.models;
-  const model = models?.chat;
-  
-  const prompt = `Extract all instances of ${type.friendlyName} from the following text chunk.
-
-${typeSchema}
-
-Return a JSON array of objects, where each object contains the fields defined above. If no instances are found, return an empty array.
-
-Text chunk:
-${chunk}
-
-Respond with ONLY a valid JSON array, no explanation or markdown formatting.`;
+Return an array of objects with the fields defined above. If no instances are found, return an empty array.`;
   
   try {
-    const response = await ctx.ai.chat.get({
+    const response = await ai.chat.get({
       model,
       messages: [
-        { role: 'system', content: 'You are a data extraction assistant. Extract structured data from text and respond with valid JSON arrays only.' },
+        { role: 'system', content: 'You are a data extraction assistant. Extract structured data from text.' },
         { role: 'user', content: prompt },
       ],
-      maxTokens: 2000,
+      responseFormat: arraySchema,
     });
     
-    // Parse the JSON response
-    const content = response.content.trim();
-    // Remove markdown code blocks if present
-    const jsonText = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '');
-    const records = JSON.parse(jsonText);
+    // Parse JSON from content
+    const records = JSON.parse(response.content);
     
     if (!Array.isArray(records)) {
-      ctx.log(`Warning: AI response was not an array: ${jsonText}`);
       return [];
     }
     
     return records;
   } catch (error) {
-    ctx.log(`Error extracting data from chunk: ${(error as Error).message}`);
+    // If structured output fails, return empty array
     return [];
   }
 }
@@ -988,17 +1041,28 @@ Respond with ONLY a valid JSON array, no explanation or markdown formatting.`;
  * Determine which fields should be used for uniqueness checking
  */
 async function determineUniqueFields(
-  ctx: CletusAIContext,
+  ai: CletusAIContext['ai'],
+  config: ConfigFile,
   type: TypeDefinition,
-  typeSchema: string,
   sampleRecords: Record<string, any>[]
 ): Promise<string[]> {
-  const models = ctx.config.getData().user.models;
+  const models = config.getData().user.models;
   const model = models?.chat;
+  
+  const fieldDescriptions = type.fields.map(field => {
+    let desc = `- ${field.name} (${field.type})`;
+    if (field.required) desc += ' [required]';
+    if (field.enumOptions) desc += ` [options: ${field.enumOptions.join(', ')}]`;
+    return desc;
+  }).join('\n');
   
   const prompt = `Given the following type definition and sample records, determine which field(s) should be used to identify unique records and avoid duplicates.
 
-${typeSchema}
+Type: ${type.friendlyName}
+${type.description || ''}
+
+Fields:
+${fieldDescriptions}
 
 Sample records (up to 10):
 ${JSON.stringify(sampleRecords, null, 2)}
@@ -1008,28 +1072,22 @@ Respond with a JSON array of field names that should be used for uniqueness chec
 Consider:
 - ID fields (id, userId, email, etc.)
 - Natural keys (combinations of fields that make a record unique)
-- Return empty array [] if there's no reliable way to determine uniqueness
-
-Respond with ONLY a valid JSON array of field names, no explanation or markdown formatting.`;
+- Return empty array [] if there's no reliable way to determine uniqueness`;
   
   try {
-    const response = await ctx.ai.chat.get({
+    const response = await ai.chat.get({
       model,
       messages: [
-        { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields. Respond with valid JSON arrays only.' },
+        { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields.' },
         { role: 'user', content: prompt },
       ],
-      maxTokens: 500,
+      responseFormat: z.array(z.string()),
     });
     
-    // Parse the JSON response
-    const content = response.content.trim();
-    // Remove markdown code blocks if present
-    const jsonText = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '');
-    const fields = JSON.parse(jsonText);
+    // Parse JSON from content
+    const fields = JSON.parse(response.content);
     
     if (!Array.isArray(fields)) {
-      ctx.log(`Warning: AI response for unique fields was not an array: ${jsonText}`);
       return [];
     }
     
@@ -1038,13 +1096,8 @@ Respond with ONLY a valid JSON array of field names, no explanation or markdown 
       type.fields.some(f => f.name === field)
     );
     
-    if (validFields.length !== fields.length) {
-      ctx.log(`Warning: Some suggested unique fields don't exist in type definition: ${fields.join(', ')}`);
-    }
-    
     return validFields;
   } catch (error) {
-    ctx.log(`Error determining unique fields: ${(error as Error).message}`);
     return [];
   }
 }

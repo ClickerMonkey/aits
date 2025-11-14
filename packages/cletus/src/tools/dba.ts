@@ -365,21 +365,21 @@ This should be done if an embedding model has changed or a knowledge template ha
     name: 'data_import',
     description: `Import data from files using AI extraction`,
     descriptionFn: ({ type }) => `Import ${type.friendlyName} records from files`,
-    instructionsFn: ({ type }) => `Use this to import ${type.friendlyName} records from text files. The tool will:
+    instructionsFn: ({ type }) => `Use this to import ${type.friendlyName} records from files. The tool will:
 1. Find files matching the glob pattern
-2. Extract structured data using AI by processing files in chunks with overlap
-3. Determine unique fields automatically to avoid duplicates
-4. Merge data, updating existing records or creating new ones
+2. Process readable files (text, PDF, Excel, Word documents)
+3. Extract structured data using AI with schema validation
+4. Determine unique fields automatically to avoid duplicates
+5. Merge data, updating existing records or creating new ones
 
 Example: Import from CSV or text files:
 { "glob": "data/*.csv" }
 
-Example: Import with custom chunk settings:
-{ "glob": "import/*.txt", "chunkSize": 3000, "overlap": 300 }`,
+Example: Import with image text extraction:
+{ "glob": "documents/**/*.pdf", "transcribeImages": true }`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
-      chunkSize: z.number().optional().describe('Characters per chunk for AI processing (default: 4000)'),
-      overlap: z.number().optional().describe('Character overlap between chunks (default: 200)'),
+      transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
