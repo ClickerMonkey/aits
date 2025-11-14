@@ -16,6 +16,8 @@ type SettingsView =
   | 'menu'
   | 'change-name'
   | 'change-pronouns'
+  | 'change-global-prompt'
+  | 'manage-prompt-files'
   | 'view-memories'
   | 'add-memory'
   | 'delete-memory'
@@ -50,6 +52,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   // State for all input fields
   const [nameInput, setNameInput] = useState('');
   const [pronounsInput, setPronounsInput] = useState('');
+  const [globalPromptInput, setGlobalPromptInput] = useState('');
   const [memoryInput, setMemoryInput] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
@@ -69,6 +72,9 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       setInputError(null);
     } else if (view === 'change-pronouns') {
       setPronounsInput(config.getData().user.pronouns || '');
+      setInputError(null);
+    } else if (view === 'change-global-prompt') {
+      setGlobalPromptInput(config.getData().user.globalPrompt || '');
       setInputError(null);
     } else if (view === 'add-memory') {
       setMemoryInput('');
@@ -182,6 +188,72 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
         </Box>
         <Box marginTop={1}>
           <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Change Global Prompt
+  if (view === 'change-global-prompt') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Enter your global prompt:
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>This prompt will be included in every chat session</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={globalPromptInput}
+            onChange={setGlobalPromptInput}
+            placeholder="e.g., Always be concise and professional"
+            onSubmit={async () => {
+              await config.save((data) => {
+                data.user.globalPrompt = globalPromptInput;
+              });
+              setMessage(`✓ Global prompt updated`);
+              handleBack();
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Manage Prompt Files
+  if (view === 'manage-prompt-files') {
+    const promptFiles = config.getData().user.promptFiles || ['cletus.md', 'agents.md', 'claude.md'];
+    
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Prompt Files Configuration
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Files searched in current working directory (case-insensitive):</Text>
+        </Box>
+        {promptFiles.map((file, index) => (
+          <Box key={index} marginBottom={1}>
+            <Text>{index + 1}. {file}</Text>
+          </Box>
+        ))}
+        <Box marginTop={1} marginBottom={1}>
+          <Text dimColor>Current order: {promptFiles.join(', ')}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <SelectInput
+            items={[{ label: '← Back', value: 'back' }]}
+            onSelect={handleBack}
+          />
         </Box>
       </Box>
     );
@@ -690,6 +762,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   const menuItems = [
     { label: '✏️ Change name', value: 'change-name' },
     { label: '✏️ Change pronouns', value: 'change-pronouns' },
+    { label: '📝 Change global prompt', value: 'change-global-prompt' },
+    { label: '📄 View prompt files', value: 'manage-prompt-files' },
     { label: '💭 View memories', value: 'view-memories' },
     { label: '➕ Add a memory', value: 'add-memory' },
     { label: '🗑️ Delete a memory', value: 'delete-memory' },

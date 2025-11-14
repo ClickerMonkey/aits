@@ -11,6 +11,7 @@ import { OperationManager } from './operations/manager';
 import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 import z from 'zod';
+import { loadPromptFiles } from './prompt-loader';
 
 /**
  * Cletus AI Context
@@ -102,6 +103,12 @@ export function createCletusAI(configFile: ConfigFile) {
         const now = new Date();
         const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
 
+        // Load prompt files from cwd
+        const promptFilesContent = await loadPromptFiles(
+          ctx.cwd || process.cwd(),
+          config.user.promptFiles || ['cletus.md', 'agents.md', 'claude.md']
+        );
+
         const userPromptData = {
           currentDateTime: now.toLocaleString(locale, { timeZone}),
           locale,
@@ -113,6 +120,8 @@ export function createCletusAI(configFile: ConfigFile) {
           todos: chat?.todos || [],
           types: config.types,
           chatPrompt: chat?.prompt,
+          globalPrompt: config.user.globalPrompt,
+          promptFilesContent,
         };
         const userPrompt = USER_PROMPT(userPromptData);
         
@@ -224,6 +233,16 @@ No user memories.
 {{/if}}
 </user>
 
+{{#if globalPrompt}}
+<global-prompt>
+{{globalPrompt}}
+</global-prompt>
+
+{{/if}}
+{{#if promptFilesContent}}
+{{promptFilesContent}}
+
+{{/if}}
 {{#if assistant}}
 Assistant Persona: {{assistant.name}}
 {{assistant.prompt}}

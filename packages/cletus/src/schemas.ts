@@ -14,6 +14,8 @@ export const UserSchema = z.object({
   pronouns: z.string().optional(),
   memory: z.array(UserMemorySchema).default([]),
   debug: z.boolean().default(true),
+  globalPrompt: z.string().optional(),
+  promptFiles: z.array(z.string()).default(['cletus.md', 'agents.md', 'claude.md']),
   models: z.object({
     chat: z.string().optional(),
     imageGenerate: z.string().optional(),
