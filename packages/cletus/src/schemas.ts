@@ -27,6 +27,10 @@ export const UserSchema = z.object({
     describe: z.string().optional(),
     transcribe: z.string().optional(),
   }).optional(),
+  autonomous: z.object({
+    maxIterations: z.number().min(1).default(10),
+    timeoutMs: z.number().min(1000).default(5 * 60 * 1000),
+  }).optional(),
 });
 
 // ============================================================================

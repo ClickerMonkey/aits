@@ -81,8 +81,9 @@ export async function runChatOrchestrator(
   const { chatAgent, messages, chatMeta, config, chatData, signal } = options;
 
   const startTime = Date.now();
-  const LOOP_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  const LOOP_MAX = 10;
+  // Use configured values or fallback to defaults
+  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeoutMs ?? 5 * 60 * 1000; // Default: 5 minutes
+  const LOOP_MAX = config.getData().user.autonomous?.maxIterations ?? 10; // Default: 10 iterations
 
   logger.log('orchestrator: starting');
 
@@ -146,7 +147,8 @@ export async function runChatOrchestrator(
 
       // Check timeout
       if (Date.now() - startTime > LOOP_TIMEOUT) {
-        onEvent({ type: 'error', error: 'Operation timeout: exceeded 5 minute limit' });
+        const timeoutMinutes = Math.round(LOOP_TIMEOUT / 60000);
+        onEvent({ type: 'error', error: `Operation timeout: exceeded ${timeoutMinutes} minute limit` });
         break;
       }
 

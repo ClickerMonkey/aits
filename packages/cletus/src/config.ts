@@ -91,6 +91,10 @@ export class ConfigFile extends JsonFile<Config> {
         pronouns: '',
         memory: [],
         debug: false,
+        autonomous: {
+          maxIterations: 10,
+          timeoutMs: 5 * 60 * 1000, // 5 minutes
+        },
       },
       providers: {
         openai: null,
