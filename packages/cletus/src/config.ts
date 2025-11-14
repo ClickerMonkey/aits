@@ -93,7 +93,7 @@ export class ConfigFile extends JsonFile<Config> {
         debug: false,
         autonomous: {
           maxIterations: 10,
-          timeoutMs: 5 * 60 * 1000, // 5 minutes
+          timeout: 5 * 60 * 1000, // 5 minutes
         },
       },
       providers: {

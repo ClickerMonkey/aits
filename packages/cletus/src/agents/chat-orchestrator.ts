@@ -82,7 +82,7 @@ export async function runChatOrchestrator(
 
   const startTime = Date.now();
   // Use configured values or fallback to defaults
-  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeoutMs ?? 5 * 60 * 1000; // Default: 5 minutes
+  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeout ?? 5 * 60 * 1000; // Default: 5 minutes
   const LOOP_MAX = config.getData().user.autonomous?.maxIterations ?? 10; // Default: 10 iterations
 
   logger.log('orchestrator: starting');

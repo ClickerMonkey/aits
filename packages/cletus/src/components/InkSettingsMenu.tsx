@@ -27,6 +27,8 @@ type SettingsView =
   | 'manage-provider-input'
   | 'manage-models'
   | 'select-model'
+  | 'change-max-iterations'
+  | 'change-timeout'
   | 'confirm';
 
 type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe';
@@ -52,6 +54,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   const [pronounsInput, setPronounsInput] = useState('');
   const [memoryInput, setMemoryInput] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [maxIterationsInput, setMaxIterationsInput] = useState('');
+  const [timeoutInput, setTimeoutInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
 
   // Set terminal title
@@ -75,6 +79,14 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       setInputError(null);
     } else if (view === 'manage-provider-input') {
       setApiKeyInput('');
+      setInputError(null);
+    } else if (view === 'change-max-iterations') {
+      const current = config.getData().user.autonomous?.maxIterations ?? 10;
+      setMaxIterationsInput(current.toString());
+      setInputError(null);
+    } else if (view === 'change-timeout') {
+      const current = config.getData().user.autonomous?.timeout ?? 300000;
+      setTimeoutInput(Math.round(current / 60000).toString());
       setInputError(null);
     }
   }, [view]);
@@ -180,6 +192,97 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             }}
           />
         </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Change Max Iterations
+  if (view === 'change-max-iterations') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Max autonomous iterations:
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>How many times can I loop autonomously without approval? (min: 1)</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={maxIterationsInput}
+            onChange={setMaxIterationsInput}
+            placeholder="10"
+            onSubmit={async () => {
+              const value = parseInt(maxIterationsInput);
+              if (!isNaN(value) && value >= 1) {
+                await config.save((data) => {
+                  data.user.autonomous = data.user.autonomous || { maxIterations: 10, timeout: 300000 };
+                  data.user.autonomous.maxIterations = value;
+                });
+                setMessage(`✓ Max iterations updated to: ${value}`);
+                handleBack();
+              } else {
+                setInputError('Please enter a number >= 1');
+              }
+            }}
+          />
+        </Box>
+        {inputError && (
+          <Box marginTop={1}>
+            <Text color="red">{inputError}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Change Timeout
+  if (view === 'change-timeout') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Autonomous timeout (minutes):
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>How many minutes can I run autonomously before timing out? (min: 1)</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={timeoutInput}
+            onChange={setTimeoutInput}
+            placeholder="5"
+            onSubmit={async () => {
+              const minutes = parseInt(timeoutInput);
+              if (!isNaN(minutes) && minutes >= 1) {
+                const timeoutMs = minutes * 60 * 1000;
+                await config.save((data) => {
+                  data.user.autonomous = data.user.autonomous || { maxIterations: 10, timeout: 300000 };
+                  data.user.autonomous.timeout = timeoutMs;
+                });
+                setMessage(`✓ Timeout updated to: ${minutes} minute${minutes !== 1 ? 's' : ''}`);
+                handleBack();
+              } else {
+                setInputError('Please enter a number >= 1');
+              }
+            }}
+          />
+        </Box>
+        {inputError && (
+          <Box marginTop={1}>
+            <Text color="red">{inputError}</Text>
+          </Box>
+        )}
         <Box marginTop={1}>
           <Text dimColor>Enter to submit, ESC to go back</Text>
         </Box>
@@ -687,6 +790,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
   // Main Menu
   const debugEnabled = config.getData().user.debug;
+  const maxIterations = config.getData().user.autonomous?.maxIterations ?? 10;
+  const timeoutMinutes = Math.round((config.getData().user.autonomous?.timeout ?? 300000) / 60000);
   const menuItems = [
     { label: '✏️ Change name', value: 'change-name' },
     { label: '✏️ Change pronouns', value: 'change-pronouns' },
@@ -698,6 +803,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     { label: '🗑️ Delete a data type', value: 'delete-type' },
     { label: '🔌 Manage providers', value: 'manage-providers' },
     { label: '🤖 Manage models', value: 'manage-models' },
+    { label: `🔄 Max autonomous iterations: ${maxIterations}`, value: 'change-max-iterations' },
+    { label: `⏱️ Autonomous timeout: ${timeoutMinutes}m`, value: 'change-timeout' },
     { label: `🐛 Debug logging ${debugEnabled ? '✅' : '❌'}`, value: 'toggle-debug' },
     { label: '← Back to main menu', value: '__back__' },
   ];
