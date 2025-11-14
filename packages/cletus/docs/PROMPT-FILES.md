@@ -17,9 +17,12 @@ By default, Cletus searches for the following files in your current working dire
 ## How It Works
 
 1. When starting a chat, Cletus searches for the configured prompt files in the current working directory
-2. Files are loaded in the order specified in settings
-3. Each file's content is wrapped in a `<prompt-file>` tag with the file name
-4. The content is included in the system prompt sent to the AI
+2. Files are checked in the order specified in settings
+3. **The first file found is used** - subsequent files are ignored
+4. The file's content is wrapped in a `<prompt-file>` tag with the file name
+5. The content is included in the system prompt sent to the AI
+
+**Example:** If you configure `['cletus.md', 'agents.md', 'claude.md']` and only `agents.md` exists in your directory, that file will be loaded. If both `cletus.md` and `agents.md` exist, only `cletus.md` will be used.
 
 ## Usage
 
@@ -45,13 +48,17 @@ You can also set a global prompt that applies to all chat sessions:
 4. Enter your prompt text
 5. Press Enter to save
 
-### Viewing Current Configuration
+### Managing Prompt Files
 
-To see which files are configured:
+To manage which files are searched and their priority order:
 
 1. Run Cletus
 2. Select "Settings" from the main menu
-3. Choose "View prompt files"
+3. Choose "Manage prompt files"
+4. You can:
+   - **Add a file**: Add new filenames to the search list
+   - **Reorder files**: Change priority (first file found wins)
+   - **Remove a file**: Remove filenames from the search list
 
 ## Example Prompt File
 
@@ -72,15 +79,16 @@ This is a monorepo for AI tools. Each package should be independent.
 - Suggest best practices proactively
 ```
 
-## File Priority
+## Prompt Priority
 
-If multiple files define conflicting instructions, they are processed in order:
-1. Global prompt (from settings)
-2. Prompt files (in configured order)
-3. Assistant persona (if selected)
-4. Chat-specific prompt (if set)
+The order in which prompts are included in the context (highest to lowest priority):
+1. Chat-specific prompt (if set for the chat)
+2. Assistant persona (if selected)
+3. **First prompt file found** (only one file is loaded)
+4. Global prompt (from settings)
+5. Base system prompt
 
-Later prompts take precedence over earlier ones when there are conflicts.
+**Important:** Only the first file found from your configured list is loaded. For example, if you configure `['custom.md', 'cletus.md', 'agents.md']` and both `custom.md` and `cletus.md` exist, only `custom.md` will be used.
 
 ## Security
 

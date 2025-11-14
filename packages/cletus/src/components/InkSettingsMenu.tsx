@@ -18,6 +18,9 @@ type SettingsView =
   | 'change-pronouns'
   | 'change-global-prompt'
   | 'manage-prompt-files'
+  | 'add-prompt-file'
+  | 'reorder-prompt-files'
+  | 'remove-prompt-file'
   | 'view-memories'
   | 'add-memory'
   | 'delete-memory'
@@ -53,6 +56,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   const [nameInput, setNameInput] = useState('');
   const [pronounsInput, setPronounsInput] = useState('');
   const [globalPromptInput, setGlobalPromptInput] = useState('');
+  const [promptFileInput, setPromptFileInput] = useState('');
   const [memoryInput, setMemoryInput] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
@@ -75,6 +79,9 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       setInputError(null);
     } else if (view === 'change-global-prompt') {
       setGlobalPromptInput(config.getData().user.globalPrompt || '');
+      setInputError(null);
+    } else if (view === 'add-prompt-file') {
+      setPromptFileInput('');
       setInputError(null);
     } else if (view === 'add-memory') {
       setMemoryInput('');
@@ -231,6 +238,15 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   if (view === 'manage-prompt-files') {
     const promptFiles = config.getData().user.promptFiles || ['cletus.md', 'agents.md', 'claude.md'];
     
+    const items = [
+      { label: `Current files (first found used): ${promptFiles.join(', ')}`, value: '__info__' },
+      { label: '', value: '__separator__' },
+      { label: '➕ Add a file', value: 'add' },
+      { label: '🔄 Reorder files', value: 'reorder' },
+      { label: '🗑️ Remove a file', value: 'remove' },
+      { label: '← Back', value: 'back' },
+    ];
+    
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
@@ -239,22 +255,166 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
           </Text>
         </Box>
         <Box marginBottom={1}>
-          <Text dimColor>Files searched in current working directory (case-insensitive):</Text>
+          <Text dimColor>First file found in cwd will be used (case-insensitive)</Text>
         </Box>
-        {promptFiles.map((file, index) => (
-          <Box key={index} marginBottom={1}>
-            <Text>{index + 1}. {file}</Text>
-          </Box>
-        ))}
-        <Box marginTop={1} marginBottom={1}>
-          <Text dimColor>Current order: {promptFiles.join(', ')}</Text>
+        <SelectInput
+          items={items}
+          onSelect={(item) => {
+            if (item.value === '__info__' || item.value === '__separator__') {
+              return;
+            }
+            if (item.value === 'back') {
+              handleBack();
+            } else if (item.value === 'add') {
+              setView('add-prompt-file');
+            } else if (item.value === 'reorder') {
+              setView('reorder-prompt-files');
+            } else if (item.value === 'remove') {
+              setView('remove-prompt-file');
+            }
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Add Prompt File
+  if (view === 'add-prompt-file') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Add a prompt file
+          </Text>
         </Box>
-        <Box marginTop={1}>
-          <SelectInput
-            items={[{ label: '← Back', value: 'back' }]}
-            onSelect={handleBack}
+        <Box marginBottom={1}>
+          <Text dimColor>Enter filename (e.g., cletus.md, custom.md)</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={promptFileInput}
+            onChange={setPromptFileInput}
+            placeholder="e.g., custom.md"
+            onSubmit={async () => {
+              if (promptFileInput.trim()) {
+                const fileName = promptFileInput.trim();
+                await config.save((data) => {
+                  if (!data.user.promptFiles) {
+                    data.user.promptFiles = [];
+                  }
+                  if (!data.user.promptFiles.includes(fileName)) {
+                    data.user.promptFiles.push(fileName);
+                    setMessage(`✓ Added "${fileName}" to prompt files`);
+                  } else {
+                    setMessage(`⚠ "${fileName}" already exists`);
+                  }
+                });
+                handleBack();
+              }
+            }}
           />
         </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Reorder Prompt Files
+  if (view === 'reorder-prompt-files') {
+    const promptFiles = config.getData().user.promptFiles || [];
+    
+    if (promptFiles.length === 0) {
+      setMessage('⚠ No prompt files to reorder');
+      handleBack();
+      return null;
+    }
+
+    const items = promptFiles.map((file, index) => ({
+      label: `${index + 1}. ${file}`,
+      value: index.toString(),
+    }));
+    items.push({ label: '← Cancel', value: '__cancel__' });
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Reorder Prompt Files
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Select a file to move up in priority</Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={async (item) => {
+            if (item.value === '__cancel__') {
+              setView('manage-prompt-files');
+              return;
+            }
+            
+            const index = parseInt(item.value);
+            if (index > 0) {
+              await config.save((data) => {
+                const files = data.user.promptFiles || [];
+                // Swap with previous item
+                [files[index - 1], files[index]] = [files[index], files[index - 1]];
+              });
+              setMessage(`✓ Moved "${promptFiles[index]}" up`);
+            } else {
+              setMessage(`⚠ "${promptFiles[index]}" is already first`);
+            }
+            setView('manage-prompt-files');
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Remove Prompt File
+  if (view === 'remove-prompt-file') {
+    const promptFiles = config.getData().user.promptFiles || [];
+    
+    if (promptFiles.length === 0) {
+      setMessage('⚠ No prompt files to remove');
+      handleBack();
+      return null;
+    }
+
+    const items = promptFiles.map((file, index) => ({
+      label: file,
+      value: index.toString(),
+    }));
+    items.push({ label: '← Cancel', value: '__cancel__' });
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Remove a prompt file
+          </Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={async (item) => {
+            if (item.value === '__cancel__') {
+              setView('manage-prompt-files');
+              return;
+            }
+            
+            const index = parseInt(item.value);
+            const fileName = promptFiles[index];
+            
+            await config.save((data) => {
+              data.user.promptFiles = data.user.promptFiles?.filter((_, i) => i !== index) || [];
+            });
+            setMessage(`✓ Removed "${fileName}"`);
+            setView('manage-prompt-files');
+          }}
+        />
       </Box>
     );
   }
@@ -763,7 +923,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     { label: '✏️ Change name', value: 'change-name' },
     { label: '✏️ Change pronouns', value: 'change-pronouns' },
     { label: '📝 Change global prompt', value: 'change-global-prompt' },
-    { label: '📄 View prompt files', value: 'manage-prompt-files' },
+    { label: '📄 Manage prompt files', value: 'manage-prompt-files' },
     { label: '💭 View memories', value: 'view-memories' },
     { label: '➕ Add a memory', value: 'add-memory' },
     { label: '🗑️ Delete a memory', value: 'delete-memory' },

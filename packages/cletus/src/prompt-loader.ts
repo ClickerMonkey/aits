@@ -4,13 +4,12 @@ import path from 'path';
 /**
  * Load prompt files from the current working directory
  * Files are searched case-insensitively
+ * Returns the first file found from the list
  */
 export async function loadPromptFiles(
   cwd: string,
   fileNames: string[]
 ): Promise<string> {
-  const loadedContents: string[] = [];
-
   for (const fileName of fileNames) {
     try {
       // Read directory to find case-insensitive match
@@ -26,7 +25,7 @@ export async function loadPromptFiles(
         if (stats.isFile()) {
           const content = await fs.readFile(filePath, 'utf-8');
           if (content.trim()) {
-            loadedContents.push(`<prompt-file name="${matchedFile}">\n${content}\n</prompt-file>`);
+            return `<prompt-file name="${matchedFile}">\n${content}\n</prompt-file>`;
           }
         }
       }
@@ -36,5 +35,5 @@ export async function loadPromptFiles(
     }
   }
 
-  return loadedContents.join('\n\n');
+  return '';
 }
