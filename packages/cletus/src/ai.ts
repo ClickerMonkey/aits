@@ -27,6 +27,7 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
+  agentMode: 'plan' | 'default';
 }
 
 /**
@@ -92,6 +93,7 @@ export function createCletusAI(configFile: ConfigFile) {
         ops: new OperationManager('none'),
         log: logger.log.bind(logger),
         chatStatus: () => {},
+        agentMode: 'default',
       },
       providedContext: async (ctx) => {
         if (ctx.userPrompt) {
@@ -109,6 +111,7 @@ export function createCletusAI(configFile: ConfigFile) {
           config.user.promptFiles || ['cletus.md', 'agents.md', 'claude.md']
         );
 
+        const agentMode = chat?.agentMode || 'default';
         const userPromptData = {
           currentDateTime: now.toLocaleString(locale, { timeZone}),
           locale,
@@ -116,6 +119,7 @@ export function createCletusAI(configFile: ConfigFile) {
           user: config.user,
           assistant: config.assistants.find((a) => a.name === chat?.assistant),
           mode: chat?.mode || 'none',
+          agentMode,
           currentTodo: chat?.todos.find((t) => !t.done),
           todos: chat?.todos || [],
           types: config.types,
@@ -125,7 +129,7 @@ export function createCletusAI(configFile: ConfigFile) {
         };
         const userPrompt = USER_PROMPT(userPromptData);
         
-        return { ...ctx, userPrompt, cache: {} };
+        return { ...ctx, userPrompt, cache: {}, agentMode };
       },
       models,
     }).withHooks({
@@ -273,6 +277,10 @@ Chat Mode: {{mode}}
 - create: Read & create operations are automatic, others require approval
 - update: Read, create, & update operations are automatic, delete requires approval
 - delete: All operations are automatic
+
+Agent Mode: {{agentMode}}
+- default: All sub-agents are available for delegation
+- plan: Only the planner sub-agent is available. Use this mode when you need to focus on planning and task management
 
 {{#if chatPrompt}}
 Prompt: {{chatPrompt}}

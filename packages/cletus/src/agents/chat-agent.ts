@@ -89,11 +89,17 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
 </rules>
 `,
-    schema: ({ config }) => z.object({
-      agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
-      request: z.string().describe('The user request to pass along to the sub-agent'),
-      typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
-    }),
+    schema: ({ config, agentMode }) => {
+      const availableAgents = agentMode === 'plan' 
+        ? ['planner'] as const
+        : ['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba'] as const;
+      
+      return z.object({
+        agent: z.enum(availableAgents).describe('Which sub-agent to use'),
+        request: z.string().describe('The user request to pass along to the sub-agent'),
+        typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
+      });
+    },
     refs: subAgents,
     call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
@@ -156,6 +162,10 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 </userInformation>
 
 You have access to specialized agents via the 'delegate' tool. When the user asks for something, determine which agent can best handle it and delegate the work. You can delegate to multiple agents if needed.
+
+The current agent mode determines which sub-agents are available:
+- In 'default' mode, all sub-agents are available for delegation
+- In 'plan' mode, only the planner sub-agent is available - use this mode when focusing on planning and task management
 
 You MUST use the 'delegate' tool to perform any actions; do not attempt to do anything yourself.
 

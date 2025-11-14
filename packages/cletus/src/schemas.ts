@@ -122,12 +122,15 @@ export const TodoItemSchema = z.object({
 
 export const ChatModeSchema = z.enum(['none', 'read', 'create', 'update', 'delete']);
 
+export const AgentModeSchema = z.enum(['plan', 'default']);
+
 export const ChatMetaSchema = z.object({
   id: z.string(),
   title: z.string(),
   assistant: z.string().optional(),
   prompt: z.string().optional(),
   mode: ChatModeSchema.default('none'),
+  agentMode: AgentModeSchema.default('default'),
   model: z.string().optional(),
   created: z.number(),
   updated: z.number(),
@@ -314,6 +317,7 @@ export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;
 export type ChatMeta = z.infer<typeof ChatMetaSchema>;
 export type ChatMode = z.infer<typeof ChatModeSchema>;
+export type AgentMode = z.infer<typeof AgentModeSchema>;
 export type FieldType = z.infer<typeof FieldTypeSchema>;
 export type TypeField = z.infer<typeof TypeFieldSchema>;
 export type TypeDefinition = z.infer<typeof TypeDefinitionSchema>;
