@@ -629,18 +629,13 @@ export const data_search = operationOf<
     const modelId = getModel(embeddingResult.model).id;
     const queryVector = embeddingResult.embeddings[0].embedding;
 
-    // Search for similar entries with source prefix "type:"
-    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit);
-
-    // Filter by source prefix matching the type name
+    // Search for similar entries with source prefix matching the type name
     const sourcePrefix = `${name}:`;
-    const filteredEntries = similarEntries.filter((result) =>
-      result.entry.source.startsWith(sourcePrefix)
-    );
+    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit, sourcePrefix);
 
     return {
       query,
-      results: filteredEntries.map((result) => ({
+      results: similarEntries.map((result) => ({
         source: result.entry.source,
         text: result.entry.text,
         similarity: result.similarity,
