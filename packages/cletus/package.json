@@ -46,8 +46,8 @@
     "glob": "^11.0.0",
     "handlebars": "^4.7.8",
     "ink": "^6.4.0",
-    "ink-markdown": "^1.0.4",
     "ink-select-input": "^6.2.0",
+    "ink-syntax-highlight": "^2.0.2",
     "ink-text-input": "^6.0.0",
     "mammoth": "^1.9.1",
     "mic": "^2.1.2",
@@ -70,7 +70,6 @@
     "@types/uuid": "^10.0.0",
     "@types/wav": "^1.0.4",
     "esbuild": "^0.26.0",
-    "esbuild-plugin-node-externals": "^1.0.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },

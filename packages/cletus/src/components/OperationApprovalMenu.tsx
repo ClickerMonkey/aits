@@ -5,12 +5,14 @@ import { formatTime, pluralize } from '../common';
 import { COLORS } from '../constants';
 import { OperationManager } from '../operations/manager';
 import type { Message } from '../schemas';
+import { on } from 'events';
 
 interface OperationApprovalMenuProps {
   message: Message;
   ai: CletusAI;
   onMessageUpdate?: (message: Message) => void;
   onComplete: (result: CompletionResult | null) => void;
+  onChatStatus?: (status: string) => void;
 }
 
 type MenuState = 'main' | 'approving-some' | 'processing' | 'complete';
@@ -27,6 +29,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   ai,
   onMessageUpdate,
   onComplete,
+  onChatStatus,
 }) => {
   const [menuState, setMenuState] = useState<MenuState>('main');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -75,7 +78,9 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       const operations = message.operations || [];
       const manager = new OperationManager('none');
 
-      const ctx = await ai.buildContext({});
+      const ctx = await ai.buildContext({
+        chatStatus: onChatStatus,
+      });
 
       let success = 0;
       let failed = 0;

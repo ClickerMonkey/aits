@@ -1,4 +1,6 @@
 import { Box, Text } from 'ink';
+import SyntaxHighlight from 'ink-syntax-highlight';
+// import Markdown from 'ink-markdown';
 import React from 'react';
 import type { Message } from '../schemas';
 import { COLORS } from '../constants';
@@ -15,9 +17,7 @@ interface MessageDisplayProps {
  */
 const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boolean; italic?: boolean; underline?: boolean }> => {
   const segments: Array<{ text: string; bold?: boolean; italic?: boolean; underline?: boolean }> = [];
-  let remaining = text;
-  let currentIndex = 0;
-
+  
   // Find all formatting markers in order
   const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline'; isStart: boolean; length: number }> = [];
 
@@ -88,75 +88,114 @@ const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boole
 const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
   const lines = children.split('\n');
 
+  // Break up into code and non-code sections
+  type GroupType = 'code' | 'text';
+  type Group = { type: GroupType; language?: string; padding: number, content: string[] };
+
+  const groups: Group[] = [];
+  let currentGroup: Group | null = null;
+  let inCodeBlock = false;
+  lines.forEach((line) => {
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      if (inCodeBlock) {
+        const language = line.trim().substring(3).trim() || undefined;
+        currentGroup = { type: 'code', language, content: [], padding: line.indexOf('`') };
+        groups.push(currentGroup);
+      } else {
+        currentGroup = null;
+      }
+    } else {
+      if (inCodeBlock) {
+        currentGroup!.content.push(line);
+      } else {
+        if (currentGroup && currentGroup.type === 'text') {
+          currentGroup.content.push(line);
+        } else {
+          currentGroup = { type: 'text', content: [line], padding: 0 };
+          groups.push(currentGroup);
+        }
+      }
+    }
+  });  
+
   return (
     <Box flexDirection="column">
-      {lines.map((line, i) => {
-        // Heading
-        if (line.startsWith('# ')) {
-          return <Text key={i} bold color={COLORS.MARKDOWN_HEADING}>{line.substring(2)}</Text>;
-        }
-        if (line.startsWith('## ')) {
-          return <Text key={i} bold>{line.substring(3)}</Text>;
-        }
-        if (line.startsWith('### ')) {
-          return <Text key={i} bold dimColor>{line.substring(4)}</Text>;
-        }
-
-        // Code block
-        if (line.startsWith('```')) {
-          return null; // Skip code fence markers for now
-        }
-
-        // Bullet list
-        if (line.startsWith('- ') || line.startsWith('* ')) {
-          const content = line.substring(2);
-          const segments = parseInlineFormatting(content);
+      {groups.map((group, gi) => {
+        if (group.type === 'code') {
           return (
-            <Box key={i}>
-              <Text>  • </Text>
-              {segments.map((seg, j) => (
-                <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
-                  {seg.text}
-                </Text>
-              ))}
-            </Box>
+            <SyntaxHighlight code={group.content.join('\n')} language={group.language} key={gi} />
           );
-        }
+        } else {
+          return group.content.map((line, i) => {
+            // Heading
+            if (line.startsWith('# ')) {
+              return <Text key={i} bold color={COLORS.MARKDOWN_HEADING}>{line.substring(2)}</Text>;
+            }
+            if (line.startsWith('## ')) {
+              return <Text key={i} bold>{line.substring(3)}</Text>;
+            }
+            if (line.startsWith('### ')) {
+              return <Text key={i} bold dimColor>{line.substring(4)}</Text>;
+            }
 
-        // Numbered list
-        const numberedMatch = line.match(/^(\d+\.\s)/);
-        if (numberedMatch) {
-          const prefix = numberedMatch[1];
-          const content = line.substring(prefix.length);
-          const segments = parseInlineFormatting(content);
-          return (
-            <Box key={i}>
-              <Text>  {prefix}</Text>
-              {segments.map((seg, j) => (
-                <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
-                  {seg.text}
-                </Text>
-              ))}
-            </Box>
-          );
-        }
+            // Code block
+            if (line.startsWith('```')) {
+              return null; // Skip code fence markers for now
+            }
 
-        // Empty line
-        if (line.trim() === '') {
-          return <Text key={i}> </Text>;
-        }
+            // Bullet list
+            if (line.startsWith('- ') || line.startsWith('* ')) {
+              const content = line.substring(2);
+              const segments = parseInlineFormatting(content);
+              return (
+                <Box key={i}>
+                  <Text>  • </Text>
+                  {segments.map((seg, j) => (
+                    <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
+                      {seg.text}
+                    </Text>
+                  ))}
+                </Box>
+              );
+            }
 
-        // Regular text with inline formatting
-        const segments = parseInlineFormatting(line);
-        return (
-          <Box key={i}>
-            {segments.map((seg, j) => (
-              <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
-                {seg.text}
-              </Text>
-            ))}
-          </Box>
-        );
+            // Numbered list
+            const numberedMatch = line.match(/^(\d+\.\s)/);
+            if (numberedMatch) {
+              const prefix = numberedMatch[1];
+              const content = line.substring(prefix.length);
+              const segments = parseInlineFormatting(content);
+              return (
+                <Box key={i}>
+                  <Text>  {prefix}</Text>
+                  {segments.map((seg, j) => (
+                    <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
+                      {seg.text}
+                    </Text>
+                  ))}
+                </Box>
+              );
+            }
+
+            // Empty line
+            if (line.trim() === '') {
+              return <Text key={i}> </Text>;
+            }
+
+            // Regular text with inline formatting
+            const segments = parseInlineFormatting(line);
+            return (
+              <Box key={i}>
+                {segments.map((seg, j) => (
+                  <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
+                    {seg.text}
+                  </Text>
+                ))}
+              </Box>
+            );
+          });
+        }
       })}
     </Box>
   );

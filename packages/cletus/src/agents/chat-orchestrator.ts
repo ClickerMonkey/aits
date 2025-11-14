@@ -332,7 +332,8 @@ export async function runChatOrchestrator(
       // If the user needs to approve any OR there are no operations, exit loop
       const needsApproval = ops.operations.some((op) => op.status === 'analyzed');
       const noOperations = ops.operations.length === 0;
-      if (needsApproval || noOperations) {
+      const noTodos = chatMeta.todos.length === 0;
+      if (needsApproval || noOperations || noTodos) {
         break;
       }
 

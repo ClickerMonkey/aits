@@ -14,7 +14,7 @@ export function createChatAgent(ai: CletusAI) {
   const delegate = ai.tool({
     name: 'delegate',
     description: 'Delegate work to a specialized sub-agent',
-    instructions: `Use this tool to route requests to specialized agents:
+    instructionsFn: ({ cwd }) => `Use this tool to route requests to specialized agents:
 
 - **planner**: The user will make requests and when a request takes multiple steps to complete, you should use the planner agent to create and manage todos for Cletus to perform. These are only to keep track of Cletus's own work and should not be presented to the user unless explicitly asked for.
   - todos_clear()
@@ -85,7 +85,7 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - If the user wants to create something and it sounds like a record or data entry, use the 'dba' agent - if they mention a concept that doesn't exist confirm if necessary and use the 'architect'.
 - If the user explicitly asks to memories, or assistants - use the 'secretary' agent.
 - If the user says something and it sounds important to remember for all future conversations, use the 'secretary' agent to add a memory.
-- All file operations are done within the current working directory - not outside. All files are relative.
+- All file operations are done within the current working directory - not outside. All files are relative. CWD: ${cwd}
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
 </rules>
 `,
@@ -180,6 +180,9 @@ The workflow will be:
 This will repeat to complete the user's requests efficiently and accurately.
 When operations are in a finished state you can provide a summary to the user of what was done. 
 When actively working on todos and presenting operations to the user to be accepted/rejected, keep the summaries concise with exactly what the user needs to see to make a good decision.
+IMPORTANT: 
+- If the last message is an assistant message and you don't have anything to add, do NOT respond again - wait for the user to make another request. Respond with no content.
+- Do not perform the same operations multiple times unless the user explicitly asks you to.
 </behavior>
 
 <rules>
@@ -194,7 +197,7 @@ Files:
 </rules>
 `,
     tools: [delegate],
-    toolsMax: 5,
+    toolsMax: 50,
     metadata: {
       weights: {
         speed: 0.7,

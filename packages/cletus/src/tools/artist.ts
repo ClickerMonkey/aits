@@ -4,7 +4,7 @@ import type { CletusAI } from '../ai';
 /**
  * Create artist tools for image operations
  * Images are stored in .cletus/images/ and referenced via file:// syntax
- */
+*/
 export function createArtistTools(ai: CletusAI) {
   const imageGenerate = ai.tool({
     name: 'image_generate',

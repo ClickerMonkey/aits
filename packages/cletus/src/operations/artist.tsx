@@ -1,13 +1,14 @@
-import { ImageGenerationResponse } from "@aits/ai";
+import { ImageGenerationResponse, ScoredModel } from "@aits/ai";
 import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import sharp from "sharp";
-import { abbreviate, cosineSimilarity, pluralize } from "../common";
+import { abbreviate, chunkArray, cosineSimilarity, pluralize } from "../common";
 import { getImagePath } from "../file-manager";
-import { fileIsReadable } from "./file-helper";
+import { fileIsReadable, searchFiles } from "./file-helper";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
+import { CONSTS } from "../constants";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const cleanPath = imagePath.replace('file://', '');
@@ -272,47 +273,38 @@ export const image_describe = operationOf<
   ),
 });
 
-// TODO phil this
 export const image_find = operationOf<
   { prompt: string; glob: string; maxImages?: number; n?: number },
-  { prompt: string; searched: number; results: Array<{ path: string; score: number }> }
+  { prompt: string; searched: number; results: Array<{ path: string; score: number, matches: string }> }
 >({
   mode: 'read',
   status: (input) => `Finding images: ${abbreviate(input.prompt, 35)}`,
   analyze: async (input, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
-
-    // Check if any images match the glob pattern
-    const files = await glob(input.glob, { cwd });
-    const imageFiles = files.filter((f) =>
-      f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.gif')
-    );
-
-    if (imageFiles.length === 0) {
+    const files = await searchFiles(cwd, input.glob);
+    const images = files.filter(f => f.fileType === 'image').slice(0, maxImages);
+    
+    if (images.length === 0) {
       return {
         analysis: `This would search 0 images - no images match pattern "${input.glob}".`,
         doable: true,
       };
     }
 
-    const searchCount = Math.min(imageFiles.length, maxImages);
+    const searchCount = Math.min(images.length, maxImages);
     return {
       analysis: `This will search ${searchCount} image(s) matching pattern "${input.glob}", returning top ${n} matches for: "${input.prompt}"`,
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config }) => {
+  do: async (input, { ai, cwd, config, chatStatus }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
+    const files = await searchFiles(cwd, input.glob);
+    const images = files.filter(f => f.fileType === 'image').slice(0, maxImages);
 
-    // Find images matching glob
-    const files = await glob(input.glob, { cwd });
-    const imageFiles = files.filter((f) =>
-      f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.gif')
-    ).slice(0, maxImages);
-
-    if (imageFiles.length === 0) {
+    if (images.length === 0) {
       return {
         prompt: input.prompt,
         searched: 0,
@@ -320,78 +312,109 @@ export const image_find = operationOf<
       };
     }
 
-    // Generate descriptions for all images concurrently
-    const descriptions = await Promise.all(imageFiles.map(async (file) => {
-      const fullPath = path.resolve(cwd, file);
+    // Perferred search method is to use image embeddings and cosine similarity
+    // Not all providers have an image embedding model.
+    const embedModel = config.getData().user.models?.imageEmbed;
+    const embeddingModels: ScoredModel[] = []; // ai.models.search({ required: ['embedding', 'vision'] });
 
-      try {
-        const imageBuffer = await fs.readFile(fullPath);
-        const base64 = imageBuffer.toString('base64');
-        const mimeType = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
-        const dataUrl = `data:${mimeType};base64,${base64}`;
+    // If we have a suitable image embedding model, use that
+    if ((embedModel && embeddingModels.find(m => m.model.id === embedModel)) || embeddingModels.length > 0) {
+      throw new Error('Image embedding search not yet implemented');
+    } else {
+      // Fallback to using image analysis with text prompt
+      const model = config.getData().user.models?.imageAnalyze;
+      const prompt = `The user is looking for images that match this description
+<description>
+${input.prompt}
+</description>
+Analyze the image and return a subset of the description that best matches the content of the image. 
+If the description does not match the image in anyway, return an empty string.
+If the description perfectly matches the image, return the entire description.
+Do not return any additional text other than the matching description subset.`;
 
-        const response = await ai.image.analyze.get({
-          model: config.getData().user.models?.imageAnalyze,
-          prompt: 'Describe this image briefly in 1-2 sentences.',
-          images: [dataUrl],
-        });
+      let analyzeCount = 0;
+      chatStatus(`Step 1/3: Describing ${images.length} images...`);
 
-        return {
-          path: file,
-          description: response.content,
-        };
-      } catch (error) {
-        return {
-          path: file,
-          description: '',
-        };
-      }
-    }));
+      // Generate descriptions for all images concurrently
+      const imagesDescribed = await Promise.all(images.map(async ({ file }) => {
+        try {
+          const imageData = await loadImageAsDataUrl(cwd, file);
+          
+          const response = await ai.image.analyze.get({
+            model,
+            prompt,
+            images: [imageData],
+          });
 
-    // Filter out failed descriptions
-    const validDescriptions = descriptions.filter((d) => d.description);
+          analyzeCount++;
+          chatStatus(`Step 1/3: Described ${analyzeCount}/${images.length} images...`);
 
-    // Embed all descriptions in batches of 1000
-    const batchSize = 1000;
-    const allEmbeddings: Array<{ path: string; embedding: number[] }> = [];
+          return {
+            path: file,
+            description: response.content,
+          };
+        } catch (error) {
+          return {
+            path: file,
+            description: '',
+          };
+        }
+      }));
 
-    for (let i = 0; i < validDescriptions.length; i += batchSize) {
-      const batch = validDescriptions.slice(i, i + batchSize);
-      const texts = batch.map((d) => d.description);
+      // Filter out failed descriptions
+      const imagesValid = imagesDescribed.filter((d) => d.description);
+      const chunks = chunkArray(imagesValid, CONSTS.EMBED_CHUNK_SIZE);
 
-      const embeddingResult = await ai.embed.get({ texts });
+      // Track embedding progress
+      let embeddedCount = 0;
+      chatStatus(`Step 2/3: Embedding descriptions...`);
 
-      for (let j = 0; j < batch.length; j++) {
-        allEmbeddings.push({
-          path: batch[j].path,
-          embedding: embeddingResult.embeddings[j].embedding,
-        });
-      }
+      // Embed descriptions in chunks
+      const imagesEmbeddedChunks = await Promise.all(chunks.map(async (chunk, chunkIndex) => {
+        const texts = chunk.map((d) => d.description);
+        const embeddings = await ai.embed.get({ texts });
+
+        embeddedCount += chunk.length;
+        chatStatus(`Step 2/3: Embedded ${embeddedCount}/${chunk.length} descriptions...`);
+
+        return embeddings.embeddings.map(({ embedding, index }, i) => ({
+          embedding,
+          ...chunk[index],
+        }));
+      }));
+
+      const imagesEmbedded = imagesEmbeddedChunks.flat();
+
+      chatStatus(`Step 3/3: Scoring and selecting top ${n} images...`);
+
+      // Score images by cosine similarity to prompt embedding
+      const { embeddings: [{ embedding: promptEmbedding }] } = await ai.embed.get({ texts: [input.prompt] });
+
+      const imagesScored = imagesEmbedded.map((item) => ({
+        score: cosineSimilarity(promptEmbedding, item.embedding),
+        ...item,
+      }));
+
+      // Sort by score descending
+      imagesScored.sort((a, b) => b.score - a.score);
+
+      // Return top N results
+      const topResults = imagesScored.slice(0, n).map((item) => ({
+        path: item.path,
+        score: item.score,
+        matches: item.description,
+      }));
+
+      return {
+        prompt: input.prompt,
+        searched: images.length,
+        results: topResults, 
+      };
     }
-
-    // Embed the prompt
-    const promptEmbedding = await ai.embed.get({ texts: [input.prompt] });
-    const promptVector = promptEmbedding.embeddings[0].embedding;
-
-    // Calculate similarity scores
-    const scored = allEmbeddings.map((item) => ({
-      path: item.path,
-      score: cosineSimilarity(promptVector, item.embedding),
-    }));
-
-    // Sort by score and return top N
-    scored.sort((a, b) => b.score - a.score);
-    const topResults = scored.slice(0, n);
-
-    return {
-      prompt: input.prompt,
-      searched: imageFiles.length,
-      results: topResults,
-    };
   },
   render: (op) => renderOperation(
     op,
-    `ImageFind("${abbreviate(op.input.prompt, 25)}", "${op.input.glob}")`,
+    `ImageFind("${abbreviate(op.input.prompt, 50)}", "${op.input.glob}")`,
     (op) => {
       if (op.output) {
         const resultCount = op.output.results.length;

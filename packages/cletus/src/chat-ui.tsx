@@ -1089,6 +1089,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
               });
             }}
             onComplete={handleOperation}
+            onChatStatus={setCurrentStatus}
           />
         ) : null;
       })()}

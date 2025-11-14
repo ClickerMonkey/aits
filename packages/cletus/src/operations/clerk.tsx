@@ -7,25 +7,15 @@ import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
-import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, FileType, processFile } from "./file-helper";
+import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, searchFiles, processFile } from "./file-helper";
 import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
 
 
-export async function searchFiles(cwd: string, pattern: string) {
-  const filePaths = await glob(pattern, { cwd, nocase: true });
-  const files = await Promise.all(filePaths.map(async (file) => ({
-    file,
-    fileType: await categorizeFile(path.join(cwd, file)).catch(() => 'unreadable') as FileType | 'unreadable',
-  })));
-
-  return files;
-}
-
 export const file_search = operationOf<
   { glob: string; limit?: number, offset?: number },
-  { glob: string; count: number; files: string[] }
+  { count: number; files: string[] }
 >({
   mode: 'local',
   status: (input) => `Searching files: ${input.glob}`,
@@ -61,7 +51,7 @@ export const file_summary = operationOf<
     extractImages?: boolean, 
     transcribeImages?: boolean,
   },
-  { path: string; size: number; truncated: boolean; summary: string; }
+  { size: number; truncated: boolean; summary: string; }
 >({
   mode: 'read',
   status: (input) => `Summarizing: ${path.basename(input.path)}`,
@@ -112,7 +102,6 @@ export const file_summary = operationOf<
     const size = summarized.sections.reduce((acc, sec) => acc + (sec?.length || 0), 0);
 
     return {
-      path: input.path,
       size,
       truncated: size > Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
       summary: summarized.description!,
@@ -132,7 +121,7 @@ export const file_summary = operationOf<
 
 export const file_index = operationOf<
   { glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
-  { glob: string; files: string[], knowledge: number }
+  { files: string[], knowledge: number }
 >({
   mode: 'create',
   status: (input) => `Indexing files: ${input.glob}`,
@@ -164,7 +153,10 @@ export const file_index = operationOf<
     const knowledge: KnowledgeEntry[] = [];
     let embeddingModel: string = 'default';
 
-    // TODO chatStatus with progress that increases as files are processed and embeddings
+    let filesProcessed = 0;
+    let filesEmbedded = 0;
+
+    chatStatus(`Indexing ${indexableFiles.length} files...`);
 
     await Promise.allSettled(indexableFiles.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
@@ -180,6 +172,9 @@ export const file_index = operationOf<
         describer: (image) => describe(ai, image),
         transcriber: (image) => transcribe(ai, image),
       });
+
+      filesProcessed++;
+      chatStatus(`Parsed/embedded ${filesProcessed}/${filesEmbedded} out of ${indexableFiles.length} files...`);
       
       const getSource = input.index === 'content'
         ? (sectionIndex: number) => `file@${file.file}:chunk[${sectionIndex}]`
@@ -201,18 +196,21 @@ export const file_index = operationOf<
           });
         });
         embeddingModel = getModel(model).id;
+
+        filesEmbedded++;
+        chatStatus(`Parsed/embedded ${filesProcessed}/${filesEmbedded} out of ${indexableFiles.length} files...`);
       }));
     }));
 
     await Promise.all(indexingPromises);
 
     const knowledgeFile = new KnowledgeFile();
+    await knowledgeFile.load();
     await knowledgeFile.addEntries(embeddingModel, knowledge);
     
     return {
-      glob: input.glob,
       files: indexableFiles.map(f => f.file),
-      knowledge: indexingPromises.length,
+      knowledge: knowledge.length,
     };
   },
   render: (op) => renderOperation(
@@ -229,7 +227,7 @@ export const file_index = operationOf<
 
 export const file_create = operationOf<
   { path: string; content: string },
-  { path: string; size: number, lines: number }
+  { size: number, lines: number }
 >({
   mode: 'create',
   status: (input) => `Creating file: ${path.basename(input.path)}`,
@@ -259,7 +257,7 @@ export const file_create = operationOf<
 
     const lines = input.content.split('\n').length;
 
-    return { path: input.path, size: input.content.length, lines };
+    return { size: input.content.length, lines };
   },
   render: (op) => renderOperation(
     op,
@@ -275,7 +273,7 @@ export const file_create = operationOf<
 
 export const file_copy = operationOf<
   { glob: string; target: string },
-  { source: string[]; target: string }
+  { source: string[] }
 >({
   mode: 'create',
   status: (input) => `Copying: ${input.glob} → ${path.basename(input.target)}`,
@@ -335,7 +333,7 @@ export const file_copy = operationOf<
       await fs.copyFile(sourcePath, targetPath);
     }));
 
-    return { source: source, target: input.target };
+    return { source };
   },
   render: (op) => renderOperation(
     op,
@@ -352,7 +350,7 @@ export const file_copy = operationOf<
 
 export const file_move = operationOf<
   { glob: string; target: string },
-  { count: number; target: string; files: string[] }
+  { count: number; files: string[] }
 >({
   mode: 'update',
   status: (input) => `Moving: ${input.glob} → ${path.basename(input.target)}`,
@@ -390,7 +388,7 @@ export const file_move = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async (input, { cwd, chatStatus }) => {
     const files = await glob(input.glob, { cwd });
     if (files.length === 0) {
       throw new Error(`No files match pattern "${input.glob}".`);
@@ -407,7 +405,7 @@ export const file_move = operationOf<
       throw new Error(`Target "${input.target}" must be a directory when moving multiple files.`);
     }
 
-    // TODO chatStatus with progress that increases as files are moved
+    let filesMoved = 0;
 
     if (fileToFile) {
       const targetPathDirectory = path.dirname(targetPath);
@@ -417,20 +415,27 @@ export const file_move = operationOf<
 
       await fs.mkdir(targetPathDirectory, { recursive: true });
       await fs.rename(path.resolve(cwd, files[0]), targetFullPath);
+
+      filesMoved++;
     } else {
       if (!targetDirectory.isDirectory) {
         await fs.mkdir(targetPath, { recursive: true });
       }
 
-      await Promise.all(files.map(async (file) => {
+      await Promise.allSettled(files.map(async (file) => {
         const sourcePath = path.resolve(cwd, file);
         const destPath = path.join(targetPath, file);
         await fs.mkdir(path.dirname(destPath), { recursive: true });
         await fs.rename(sourcePath, destPath);
+
+        filesMoved++;
+        chatStatus(`Moved ${filesMoved}/${files.length} files...`);
       }));
     }
 
-    return { count: files.length, target: input.target, files };
+    chatStatus(`Moved ${filesMoved === files.length ? 'all' : filesMoved} files.`);
+
+    return { count: files.length, files };
   },
   render: (op) => renderOperation(
     op,
@@ -446,7 +451,7 @@ export const file_move = operationOf<
 
 export const file_stats = operationOf<
   { path: string },
-  { path: string; size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
+  { size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
 >({
   status: (input) => `Getting stats: ${path.basename(input.path)}`,
   mode: 'local',
@@ -493,7 +498,6 @@ export const file_stats = operationOf<
     const type = typeAnalysis.find(([is]) => is)?.[1] || 'unknown'
 
     return {
-      path: input.path,
       size: stats.size,
       created: stats.birthtime.toISOString(),
       modified: stats.mtime.toISOString(),
@@ -519,7 +523,7 @@ export const file_stats = operationOf<
 
 export const file_delete = operationOf<
   { path: string },
-  { path: string; deleted: boolean }
+  { deleted: boolean }
 >({
   mode: 'delete',
   status: (input) => `Deleting: ${path.basename(input.path)}`,
@@ -542,7 +546,7 @@ export const file_delete = operationOf<
     const fullPath = path.resolve(cwd, input.path);
     await fs.unlink(fullPath);
 
-    return { path: input.path, deleted: true };
+    return { deleted: true };
   },
   render: (op) => renderOperation(
     op,
@@ -558,7 +562,7 @@ export const file_delete = operationOf<
 
 export const file_read = operationOf<
   { path: string, limit?: number, offset?: number, limitOffsetMode?: 'lines' | 'characters', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean, showLines?: boolean },
-  { path: string; content: string; truncated: boolean }
+  { content: string; truncated: boolean }
 >({
   mode: 'read',
   status: (input) => `Reading: ${path.basename(input.path)}`,
@@ -636,7 +640,6 @@ export const file_read = operationOf<
     content = paginateText(content, input.limit, input.offset, limitOffsetMode);
 
     return {
-      path: input.path,
       content: content,
       truncated: content.length === Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
     };
@@ -685,7 +688,7 @@ export const text_search = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai }) => {
+  do: async (input, { cwd, ai, chatStatus }) => {
     const files = await searchFiles(cwd, input.glob);
     const readable = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
@@ -701,9 +704,10 @@ export const text_search = operationOf<
     const pattern = new RegExp(input.regex, input.caseInsensitive !== false ? 'gi' : 'g');
     const surrounding = input.surrounding || 0;
 
-    // TODO chatStatus with progress that increases as files are processed
+    let filesProcessed = 0;
+    chatStatus(`Searching ${readable.length} files...`);
 
-    const results = await Promise.all(readable.map(async (file) => {
+    const results = await Promise.allSettled(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
         assetPath: await getAssetPath(true),
@@ -714,6 +718,9 @@ export const text_search = operationOf<
         transcribeImages: input.transcribeImages ?? false,
         transcriber: (image) => transcribe(ai, image),
       });
+
+      filesProcessed++;
+      chatStatus(`Searched ${filesProcessed}/${readable.length} files...`);
 
       type Section = {
         start: number;
@@ -798,7 +805,10 @@ export const text_search = operationOf<
       };
     }));
 
-    const withMatches = results.filter(r => r.matchCount > 0);
+    const successful = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const withMatches = successful.filter(r => r.matchCount > 0);
+
+    chatStatus(`Searched ${successful.length === results.length ? 'all' : `${successful.length}/${results.length}`} files, ${withMatches} files with matches.`);
 
     switch (output) {
       case 'file-count':
@@ -836,7 +846,7 @@ export const text_search = operationOf<
 
 export const dir_create = operationOf<
   { path: string },
-  { path: string; created: boolean }
+  { created: boolean }
 >({
   mode: 'create',
   status: (input) => `Creating directory: ${path.basename(input.path)}`,
@@ -865,7 +875,8 @@ export const dir_create = operationOf<
   do: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     await fs.mkdir(fullPath, { recursive: true });
-    return { path: input.path, created: true };
+
+    return { created: true };
   },
   render: (op) => renderOperation(
     op,

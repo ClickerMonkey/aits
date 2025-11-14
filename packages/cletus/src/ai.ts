@@ -121,13 +121,13 @@ export function createCletusAI(configFile: ConfigFile) {
       models,
     }).withHooks({
       beforeRequest: async (ctx, request, selected, tokens, cost) => {
-        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}: ${JSON.stringify(request, jsonReplacer, 2)}`);
+        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}:\n${JSON.stringify(request, jsonReplacer, 2)}`);
       },
       afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
-        logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}: ${JSON.stringify(response, jsonReplacer, 2)}`);
+        logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}:\n${JSON.stringify(response, jsonReplacer, 2)}`);
       },
       onError: async (type, message, error, ctx, request) => {
-        logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack} request=${JSON.stringify(request, jsonReplacer, 2)}`);
+        logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack}:\n${JSON.stringify(request, jsonReplacer, 2)}`);
       }
     });
 

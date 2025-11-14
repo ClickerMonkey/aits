@@ -7,8 +7,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as puppeteer from 'puppeteer';
+import * as url from 'url';
 import { fetchModels, fetchZDRModels, convertOpenRouterModel } from '@aits/openrouter';
 import { writeModelTS } from '../codegen';
+
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Scrape performance metrics from OpenRouter model page
@@ -193,18 +197,16 @@ export async function scrapeOpenRouter(
 }
 
 // CLI execution
-if (require.main === module) {
-  const args = process.argv.slice(2);
-  const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
-  const scrapeMetrics = args.includes('--metrics');
+const args = process.argv.slice(2);
+const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
+const scrapeMetrics = args.includes('--metrics');
 
-  const concurrencyArg = args.find((arg) => arg.startsWith('--concurrency='));
-  const concurrency = concurrencyArg
-    ? parseInt(concurrencyArg.split('=')[1], 10)
-    : 5;
+const concurrencyArg = args.find((arg) => arg.startsWith('--concurrency='));
+const concurrency = concurrencyArg
+  ? parseInt(concurrencyArg.split('=')[1], 10)
+  : 5;
 
-  scrapeOpenRouter(outputDir, { metrics: scrapeMetrics, concurrency }).catch((error) => {
-    console.error('✗ OpenRouter scraping failed:', error);
-    process.exit(1);
-  });
-}
+scrapeOpenRouter(outputDir, { metrics: scrapeMetrics, concurrency }).catch((error) => {
+  console.error('✗ OpenRouter scraping failed:', error);
+  process.exit(1);
+});

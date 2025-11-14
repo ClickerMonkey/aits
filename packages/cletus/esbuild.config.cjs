@@ -1,5 +1,4 @@
 const esbuild = require('esbuild');
-const nodeExternalsPlugin = require('esbuild-plugin-node-externals').default;
 
 const stubPlugin = {
   name: 'stub',

@@ -29,7 +29,7 @@ type SettingsView =
   | 'select-model'
   | 'confirm';
 
-type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe';
+type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe';
 
 interface InkSettingsMenuProps {
   config: ConfigFile;
@@ -591,6 +591,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       { label: `🎨 Image Generation: ${currentModels.imageGenerate || '(none)'}`, value: 'imageGenerate' },
       { label: `✏️ Image Editing: ${currentModels.imageEdit || '(none)'}`, value: 'imageEdit' },
       { label: `👁️ Image Analysis: ${currentModels.imageAnalyze || '(none)'}`, value: 'imageAnalyze' },
+      { label: `👁️ Image Embed: ${currentModels.imageEmbed || '(none)'}`, value: 'imageEmbed' },
       { label: `🎙️ Transcription: ${currentModels.transcription || '(none)'}`, value: 'transcription' },
       { label: `🔊 Text-to-Speech: ${currentModels.speech || '(none)'}`, value: 'speech' },
       { label: `🔢 Embeddings: ${currentModels.embedding || '(none)'}`, value: 'embedding' },
@@ -637,6 +638,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       imageGenerate: ['image'],
       imageEdit: ['image', 'vision'],
       imageAnalyze: ['vision'],
+      imageEmbed: ['vision', 'embedding'],
       transcription: ['hearing'],
       speech: ['audio'],
       embedding: ['embedding'],
@@ -650,6 +652,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       imageGenerate: 'Image Generation',
       imageEdit: 'Image Editing',
       imageAnalyze: 'Image Analysis',
+      imageEmbed: 'Image Embedding',
       transcription: 'Transcription',
       speech: 'Text-to-Speech',
       embedding: 'Embeddings',

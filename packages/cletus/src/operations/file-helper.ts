@@ -9,6 +9,7 @@ import { fileTypeFromFile } from "file-type";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import { Poppler } from "node-poppler";
 import { RecursiveCharacterTextSplitter, SupportedTextSplitterLanguage, SupportedTextSplitterLanguages } from "@langchain/textsplitters";
+import { glob } from "glob";
 
 
 export interface FileOptions {
@@ -301,6 +302,23 @@ export async function categorizeFile(filePath: string, fileName: string = filePa
   } else {
     return 'unknown';
   }
+}
+
+/**
+ * Search files in a directory matching a glob pattern
+ * 
+ * @param cwd - Current working directory
+ * @param pattern - Glob pattern
+ * @returns 
+ */
+export async function searchFiles(cwd: string, pattern: string) {
+  const filePaths = await glob(pattern, { cwd, nocase: true });
+  const files = await Promise.all(filePaths.map(async (file) => ({
+    file,
+    fileType: await categorizeFile(path.join(cwd, file)).catch(() => 'unreadable') as FileType | 'unreadable',
+  })));
+
+  return files;
 }
 
 export async function processFile(

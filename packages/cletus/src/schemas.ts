@@ -19,6 +19,7 @@ export const UserSchema = z.object({
     imageGenerate: z.string().optional(),
     imageEdit: z.string().optional(),
     imageAnalyze: z.string().optional(),
+    imageEmbed: z.string().optional(),
     transcription: z.string().optional(),
     speech: z.string().optional(),
     embedding: z.string().optional(),
