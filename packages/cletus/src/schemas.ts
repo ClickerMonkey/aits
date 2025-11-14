@@ -220,6 +220,7 @@ export const OperationKindSchema = z.enum([
   'data_delete_many',
   'data_aggregate',
   'data_index',
+  'data_import',
   'data_search',
   // librarian
   'knowledge_search',

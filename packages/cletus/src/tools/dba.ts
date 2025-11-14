@@ -96,7 +96,7 @@ function buildFieldSchema(field: TypeField): z.ZodTypeAny {
 /**
  * Build a Zod object schema for a type's fields
  */
-function buildFieldsSchema(typeDef: TypeDefinition) {
+export function buildFieldsSchema(typeDef: TypeDefinition) {
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of typeDef.fields) {
     shape[field.name] = buildFieldSchema(field);
@@ -361,6 +361,29 @@ This should be done if an embedding model has changed or a knowledge template ha
     call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: ctx.type.name } }, ctx as unknown as CletusAIContext),
   });
 
+  const dataImport = aiTyped.tool({
+    name: 'data_import',
+    description: `Import data from files using AI extraction`,
+    descriptionFn: ({ type }) => `Import ${type.friendlyName} records from files`,
+    instructionsFn: ({ type }) => `Use this to import ${type.friendlyName} records from files. The tool will:
+1. Find files matching the glob pattern
+2. Process readable files (text, PDF, Excel, Word documents)
+3. Extract structured data using AI with schema validation
+4. Determine unique fields automatically to avoid duplicates
+5. Merge data, updating existing records or creating new ones
+
+Example: Import from CSV or text files:
+{ "glob": "data/*.csv" }
+
+Example: Import with image text extraction:
+{ "glob": "documents/**/*.pdf", "transcribeImages": true }`,
+    schema: z.object({
+      glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
+      transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
+  });
+    
   const dataSearch = aiTyped.tool({
     name: 'data_search',
     description: `Search data records by semantic similarity`,
@@ -408,6 +431,7 @@ You have been given the following request to perform by the chat agent, the conv
       dataDeleteMany,
       dataAggregate,
       dataIndex,
+      dataImport,
       dataSearch,
     ],
     metadataFn: (_, { config, chat }) => ({
