@@ -873,7 +873,7 @@ export const data_search = operationOf<
           return `Found ${count} result${count !== 1 ? 's' : ''}`;
         }
         return null;
-      },
+      }
     );
   },
 });

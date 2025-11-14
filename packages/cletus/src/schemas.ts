@@ -1,4 +1,5 @@
 import { any, z } from 'zod';
+import { AUTONOMOUS } from './constants';
 
 // ============================================================================
 // User Schema
@@ -28,6 +29,10 @@ export const UserSchema = z.object({
     summary: z.string().optional(),
     describe: z.string().optional(),
     transcribe: z.string().optional(),
+  }).optional(),
+  autonomous: z.object({
+    maxIterations: z.number().min(AUTONOMOUS.MIN_ITERATIONS).default(AUTONOMOUS.DEFAULT_MAX_ITERATIONS),
+    timeout: z.number().min(AUTONOMOUS.MIN_TIMEOUT_MS).default(AUTONOMOUS.DEFAULT_TIMEOUT_MS),
   }).optional(),
 });
 

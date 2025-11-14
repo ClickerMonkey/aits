@@ -61,3 +61,19 @@ export const CONSTS = {
   MAX_LINES: 1_000,
   MAX_EXTRACTION_CHUNK_SIZE: 64_000, // Maximum size for data extraction to minimize LLM calls
 };
+
+/**
+ * Autonomous operation constants
+ */
+export const AUTONOMOUS = {
+  /** Default maximum number of autonomous loop iterations */
+  DEFAULT_MAX_ITERATIONS: 10,
+  /** Default timeout for autonomous operations in milliseconds (5 minutes) */
+  DEFAULT_TIMEOUT_MS: 5 * 60 * 1000,
+  /** Minimum allowed iterations */
+  MIN_ITERATIONS: 1,
+  /** Minimum allowed timeout in milliseconds (1 second) */
+  MIN_TIMEOUT_MS: 1000,
+  /** Milliseconds per minute for time conversions */
+  MS_PER_MINUTE: 60 * 1000,
+} as const;

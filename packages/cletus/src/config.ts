@@ -6,6 +6,7 @@ import {
   type ChatMeta,
   type TypeDefinition,
 } from './schemas';
+import { AUTONOMOUS } from './constants';
 
 /**
  * Default assistants created during initialization
@@ -93,6 +94,10 @@ export class ConfigFile extends JsonFile<Config> {
         debug: false,
         globalPrompt: '',
         promptFiles: ['cletus.md', 'agents.md', 'claude.md'],
+        autonomous: {
+          maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS,
+          timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS,
+        },
       },
       providers: {
         openai: null,
