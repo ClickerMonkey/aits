@@ -91,6 +91,8 @@ export class ConfigFile extends JsonFile<Config> {
         pronouns: '',
         memory: [],
         debug: false,
+        globalPrompt: '',
+        promptFiles: ['cletus.md', 'agents.md', 'claude.md'],
       },
       providers: {
         openai: null,
