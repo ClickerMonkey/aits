@@ -102,7 +102,6 @@ export const ProvidersSchema = z.object({
   openai: OpenAIConfigSchema.nullable(),
   openrouter: OpenRouterConfigSchema.nullable(),
   replicate: ReplicateConfigSchema.nullable(),
-  tavily: TavilyConfigSchema.nullable(),
 });
 
 // ============================================================================
@@ -173,6 +172,7 @@ export const ConfigSchema = z.object({
   updated: z.number(),
   user: UserSchema,
   providers: ProvidersSchema,
+  tavily: TavilyConfigSchema.nullable(),
   assistants: z.array(AssistantSchema),
   chats: z.array(ChatMetaSchema),
   types: z.array(TypeDefinitionSchema),

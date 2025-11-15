@@ -47,21 +47,28 @@ Example 3: Search for specific content with regex:
   const webApiCall = ai.tool({
     name: 'web_api_call',
     description: 'Make REST API calls to external services',
-    instructions: `Use this to make HTTP requests to REST APIs. Supports all common HTTP methods and custom headers.
+    instructions: `Use this to make HTTP requests to REST APIs. Supports all common HTTP methods, custom headers, and different content types.
 
 Example 1: GET request:
 { "url": "https://api.example.com/data", "method": "GET" }
 
 Example 2: POST request with JSON body:
-{ "url": "https://api.example.com/items", "method": "POST", "headers": {"Content-Type": "application/json"}, "body": "{\\"name\\": \\"Test\\"}" }
+{ "url": "https://api.example.com/items", "method": "POST", "requestType": "json", "body": "{\\"name\\": \\"Test\\"}" }
 
-Example 3: Request with authentication:
-{ "url": "https://api.example.com/protected", "method": "GET", "headers": {"Authorization": "Bearer token123"} }`,
+Example 3: Request with authentication expecting JSON response:
+{ "url": "https://api.example.com/protected", "method": "GET", "headers": {"Authorization": "Bearer ..."}, "responseType": "json" }
+
+Request/Response Types:
+- json: Automatically sets/parses JSON content
+- text: Plain text (default)
+- binary: Base64-encoded binary data`,
     schema: z.object({
       url: z.string().describe('API endpoint URL'),
       method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).describe('HTTP method'),
       headers: z.record(z.string(), z.string()).optional().describe('Request headers as key-value pairs'),
       body: z.string().optional().describe('Request body (for POST, PUT, PATCH)'),
+      requestType: z.enum(['json', 'text', 'binary']).optional().describe('Request body type (default: text)'),
+      responseType: z.enum(['json', 'text', 'binary']).optional().describe('Expected response type (default: text)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_api_call', input }, ctx),
   });

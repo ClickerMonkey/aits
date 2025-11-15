@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import { tavily } from '@tavily/core';
 import { abbreviate } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
@@ -15,11 +16,11 @@ export const web_search = operationOf<
   signature: 'web_search(query: string, maxResults?: number)',
   status: (input) => `Searching web: ${abbreviate(input.query, 35)}`,
   analyze: async (input, { config }) => {
-    const tavilyConfig = config.getData().providers.tavily;
+    const tavilyConfig = config.getData().tavily;
     
     if (!tavilyConfig?.apiKey) {
       return {
-        analysis: 'This would fail - Tavily API key not configured. Please add it in Settings > Manage Providers.',
+        analysis: 'This would fail - Tavily API key not configured. Please add it in Settings > Tavily.',
         doable: false,
       };
     }
@@ -30,14 +31,12 @@ export const web_search = operationOf<
     };
   },
   do: async (input, { config }) => {
-    const tavilyConfig = config.getData().providers.tavily;
+    const tavilyConfig = config.getData().tavily;
     
     if (!tavilyConfig?.apiKey) {
       throw new Error('Tavily API key not configured');
     }
 
-    // Dynamically import tavily to avoid issues if not installed
-    const { tavily } = await import('@tavily/core');
     const client = tavily({ apiKey: tavilyConfig.apiKey });
 
     const response = await client.search(input.query, {
@@ -81,9 +80,50 @@ export const web_get_page = operationOf<
   analyze: async (input) => {
     const parts: string[] = [`This will fetch the ${input.type} content from "${input.url}"`];
     
+    // Validate URL
+    try {
+      new URL(input.url);
+    } catch {
+      return {
+        analysis: `This would fail - "${input.url}" is not a valid URL.`,
+        doable: false,
+      };
+    }
+
+    // Validate regex if provided
     if (input.regex) {
-      parts.push(`and search for pattern "${input.regex}" with ${input.surrounding || 0} surrounding lines`);
-    } else if (input.lineStart || input.lineEnd) {
+      try {
+        new RegExp(input.regex, 'gi');
+        parts.push(`and search for pattern "${input.regex}" with ${input.surrounding || 0} surrounding lines`);
+      } catch (e) {
+        return {
+          analysis: `This would fail - Invalid regex pattern: ${e instanceof Error ? e.message : 'unknown error'}`,
+          doable: false,
+        };
+      }
+    }
+    
+    // Validate line ranges
+    if (input.lineStart !== undefined || input.lineEnd !== undefined) {
+      if (input.lineStart !== undefined && input.lineStart < 1) {
+        return {
+          analysis: 'This would fail - lineStart must be greater than or equal to 1.',
+          doable: false,
+        };
+      }
+      if (input.lineEnd !== undefined && input.lineEnd < 1) {
+        return {
+          analysis: 'This would fail - lineEnd must be greater than or equal to 1.',
+          doable: false,
+        };
+      }
+      if (input.lineStart !== undefined && input.lineEnd !== undefined && input.lineStart > input.lineEnd) {
+        return {
+          analysis: 'This would fail - lineStart must be less than or equal to lineEnd.',
+          doable: false,
+        };
+      }
+      
       const start = input.lineStart || 1;
       const end = input.lineEnd ? ` to ${input.lineEnd}` : '+';
       parts.push(`from line ${start}${end}`);
@@ -102,8 +142,14 @@ export const web_get_page = operationOf<
 
     try {
       const page = await browser.newPage();
+      
+      // Set user agent to avoid being blocked
+      await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      );
+      
       await page.goto(input.url, {
-        waitUntil: 'networkidle2',
+        waitUntil: ['domcontentloaded', 'networkidle2'],
         timeout: 30000,
       });
 
@@ -111,8 +157,7 @@ export const web_get_page = operationOf<
       if (input.type === 'html') {
         content = await page.content();
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        content = await page.evaluate(() => (globalThis as any).document.body.textContent || '');
+        content = await page.$eval('body', el => el.textContent || '');
       }
 
       const lines = content.split('\n');
@@ -122,7 +167,7 @@ export const web_get_page = operationOf<
 
       // Apply regex filtering if provided
       if (input.regex) {
-        const regex = new RegExp(input.regex, 'g');
+        const regex = new RegExp(input.regex, 'gi');
         const surrounding = input.surrounding || 0;
         const matchedLines = new Set<number>();
         matches = [];
@@ -140,8 +185,16 @@ export const web_get_page = operationOf<
         // Build result from matched lines
         const sortedLines = Array.from(matchedLines).sort((a, b) => a - b);
         resultContent = sortedLines.map(i => lines[i]).join('\n');
+        
+        // Apply line range on top of regex results if provided
+        if (input.lineStart !== undefined || input.lineEnd !== undefined) {
+          const resultLines = resultContent.split('\n');
+          const start = Math.max(0, (input.lineStart || 1) - 1);
+          const end = input.lineEnd !== undefined ? Math.min(resultLines.length, input.lineEnd) : resultLines.length;
+          resultContent = resultLines.slice(start, end).join('\n');
+        }
       } 
-      // Apply line range if provided
+      // Apply line range if provided and no regex
       else if (input.lineStart !== undefined || input.lineEnd !== undefined) {
         const start = Math.max(0, (input.lineStart || 1) - 1);
         const end = input.lineEnd !== undefined ? Math.min(lines.length, input.lineEnd) : lines.length;
@@ -179,13 +232,30 @@ export const web_get_page = operationOf<
 // ============================================================================
 
 export const web_api_call = operationOf<
-  { url: string; method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'; headers?: Record<string, string>; body?: string },
-  { url: string; method: string; status: number; statusText: string; headers: Record<string, string>; body: string }
+  { 
+    url: string; 
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'; 
+    headers?: Record<string, string>; 
+    body?: string;
+    requestType?: 'json' | 'text' | 'binary';
+    responseType?: 'json' | 'text' | 'binary';
+  },
+  { status: number; statusText: string; headers: Record<string, string>; body: string }
 >({
   mode: 'read',
-  signature: 'web_api_call(url: string, method: string, headers?, body?)',
+  signature: 'web_api_call(url: string, method: string, headers?, body?, requestType?, responseType?)',
   status: (input) => `API ${input.method}: ${abbreviate(input.url, 35)}`,
   analyze: async (input) => {
+    // Validate URL
+    try {
+      new URL(input.url);
+    } catch {
+      return {
+        analysis: `This would fail - "${input.url}" is not a valid URL.`,
+        doable: false,
+      };
+    }
+
     const parts: string[] = [`This will make a ${input.method} request to "${input.url}"`];
     
     if (input.headers && Object.keys(input.headers).length > 0) {
@@ -193,7 +263,12 @@ export const web_api_call = operationOf<
     }
     
     if (input.body) {
-      parts.push(`and request body`);
+      const reqType = input.requestType || 'text';
+      parts.push(`and ${reqType} request body`);
+    }
+
+    if (input.responseType) {
+      parts.push(`expecting ${input.responseType} response`);
     }
 
     return {
@@ -202,9 +277,23 @@ export const web_api_call = operationOf<
     };
   },
   do: async (input) => {
+    const headers: Record<string, string> = { ...(input.headers || {}) };
+    
+    // Set appropriate Content-Type header based on requestType
+    if (input.body && ['POST', 'PUT', 'PATCH'].includes(input.method)) {
+      const requestType = input.requestType || 'text';
+      if (requestType === 'json' && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      } else if (requestType === 'binary' && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/octet-stream';
+      } else if (requestType === 'text' && !headers['Content-Type']) {
+        headers['Content-Type'] = 'text/plain';
+      }
+    }
+
     const options: RequestInit = {
       method: input.method,
-      headers: input.headers || {},
+      headers,
     };
 
     if (input.body && ['POST', 'PUT', 'PATCH'].includes(input.method)) {
@@ -212,20 +301,36 @@ export const web_api_call = operationOf<
     }
 
     const response = await fetch(input.url, options);
-    const responseBody = await response.text();
+    
+    // Parse response based on responseType
+    const responseType = input.responseType || 'text';
+    let responseBody: string;
+    
+    if (responseType === 'json') {
+      try {
+        const json = await response.json();
+        responseBody = JSON.stringify(json, null, 2);
+      } catch {
+        // Fall back to text if JSON parsing fails
+        responseBody = await response.text();
+      }
+    } else if (responseType === 'binary') {
+      const arrayBuffer = await response.arrayBuffer();
+      responseBody = Buffer.from(arrayBuffer).toString('base64');
+    } else {
+      responseBody = await response.text();
+    }
 
     // Convert Headers object to plain object
-    const headers: Record<string, string> = {};
+    const responseHeaders: Record<string, string> = {};
     response.headers.forEach((value, key) => {
-      headers[key] = value;
+      responseHeaders[key] = value;
     });
 
     return {
-      url: input.url,
-      method: input.method,
       status: response.status,
       statusText: response.statusText,
-      headers,
+      headers: responseHeaders,
       body: responseBody,
     };
   },

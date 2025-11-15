@@ -31,6 +31,8 @@ type SettingsView =
   | 'manage-providers'
   | 'manage-provider-action'
   | 'manage-provider-input'
+  | 'manage-tavily'
+  | 'manage-tavily-input'
   | 'manage-models'
   | 'select-model'
   | 'change-max-iterations'
@@ -786,6 +788,88 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     );
   }
 
+  // Manage Tavily
+  if (view === 'manage-tavily') {
+    const tavily = config.getData().tavily;
+    const isConfigured = tavily !== null;
+
+    const items = isConfigured
+      ? [
+          { label: 'Update API key', value: 'update' },
+          { label: 'Remove Tavily', value: 'remove' },
+          { label: '← Back', value: '__back__' },
+        ]
+      : [
+          { label: 'Add API key', value: 'add' },
+          { label: '← Back', value: '__back__' },
+        ];
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Tavily (Web Search) - {isConfigured ? 'Configured' : 'Not configured'}
+          </Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={(item) => {
+            if (item.value === '__back__') {
+              handleBack();
+              return;
+            }
+            if (item.value === 'remove') {
+              showConfirm('Remove Tavily API key?', async () => {
+                await config.save((data) => {
+                  data.tavily = null;
+                });
+                setMessage('✓ Tavily removed');
+              });
+              return;
+            }
+            setView('manage-tavily-input');
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Manage Tavily Input
+  if (view === 'manage-tavily-input') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Enter Tavily API key:
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Get your key from: https://tavily.com</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={apiKeyInput}
+            onChange={setApiKeyInput}
+            placeholder="tvly-..."
+            onSubmit={async () => {
+              if (apiKeyInput.trim()) {
+                await config.save((data) => {
+                  data.tavily = { apiKey: apiKeyInput };
+                });
+                setMessage('✓ Tavily configured!');
+                setView('menu');
+              }
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   // Manage Providers
   if (view === 'manage-providers') {
     const providers = config.getData().providers;
@@ -802,10 +886,6 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       {
         label: `Replicate ${providers.replicate ? '✅' : '❌'}`,
         value: 'replicate',
-      },
-      {
-        label: `Tavily ${providers.tavily ? '✅' : '❌'} (Web Search)`,
-        value: 'tavily',
       },
       { label: '← Back', value: '__back__' },
     ];
@@ -886,7 +966,6 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       openai: 'https://platform.openai.com/api-keys',
       openrouter: 'https://openrouter.ai/settings/keys',
       replicate: 'https://replicate.com/account/api-tokens',
-      tavily: 'https://tavily.com',
     };
 
     return (
@@ -1043,6 +1122,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     { label: '🗑️ Delete a chat', value: 'delete-chat' },
     { label: '🗑️ Delete a data type', value: 'delete-type' },
     { label: '🔌 Manage providers', value: 'manage-providers' },
+    { label: `🌐 Tavily (Web Search) ${config.getData().tavily ? '✅' : '❌'}`, value: 'manage-tavily' },
     { label: '🤖 Manage models', value: 'manage-models' },
     { label: `🔄 Max autonomous iterations: ${maxIterations}`, value: 'change-max-iterations' },
     { label: `⏱️ Autonomous timeout: ${timeoutMinutes}m`, value: 'change-timeout' },

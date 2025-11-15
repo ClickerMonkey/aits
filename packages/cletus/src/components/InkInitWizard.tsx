@@ -34,8 +34,8 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     openai: null,
     openrouter: null,
     replicate: null,
-    tavily: null,
   });
+  const [tavilyConfig, setTavilyConfig] = useState<{ apiKey: string } | null>(null);
   const [name, setName] = useState('');
   const [pronouns, setPronouns] = useState('');
   const [memory, setMemory] = useState('');
@@ -377,7 +377,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
           ]}
           onSelect={(item) => {
             if (item.value === 'yes') {
-              setProviders({ ...providers, tavily: { apiKey: tavilyKey } });
+              setTavilyConfig({ apiKey: tavilyKey });
             }
             setStep('user-name');
           }}
@@ -441,7 +441,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
                 setError('API key is required');
                 return;
               }
-              setProviders({ ...providers, tavily: { apiKey } });
+              setTavilyConfig({ apiKey });
               setStep('user-name');
             }}
           />
@@ -552,6 +552,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
                   });
                 }
                 data.providers = providers;
+                data.tavily = tavilyConfig;
               });
 
               // Create knowledge file
