@@ -249,20 +249,20 @@ export class AI<T extends AIBaseTypes> {
   async buildCoreContext(requiredCtx: AIContextRequired<T>): Promise<Context<T>> {
     const ctx = await this.buildContext(requiredCtx);
 
-    if (ctx.executor && ctx.streamer && ctx.estimateTokens) {
+    if (ctx.executor && ctx.streamer && ctx.estimateUsage) {
       return ctx;
     }
 
     // Get executor and streamer from ChatAPI
     const execute = this.chat.createExecutor();
     const stream = this.chat.createStreamer();
-    const estimateTokens = this.estimateMessageTokens.bind(this);
+    const estimateUsage = this.estimateMessageUsage.bind(this);
 
     return {
       ...ctx,
       execute,
       stream,
-      estimateTokens,
+      estimateUsage,
     } as Context<T>;
   }
 
@@ -434,21 +434,24 @@ export class AI<T extends AIBaseTypes> {
   }
 
   /**
-   * Estimate tokens for a message (used by API classes)
+   * Estimate usage for a message (used by API classes and Prompts)
    * 
-   * @param message - Message to estimate tokens for
-   * @returns 
+   * @param message - Message to estimate usage for
+   * @returns Usage statistics including tokens for text, images, audio, etc.
    */
-  estimateMessageTokens(message: Message): number {
+  estimateMessageUsage(message: Message): Usage {
     if (message.tokens !== undefined) {
-      return message.tokens;
+      return { inputTokens: message.tokens, totalTokens: message.tokens };
     }
 
-    let tokens = 0;
+    let textTokens = 0;
+    let imageTokens = 0;
+    let audioTokens = 0;
+    let fileTokens = 0;
 
     let addText = (text: string | undefined) => {
       if (text) {
-        tokens += Math.ceil(text.length / this.tokens.text.divisor);
+        textTokens += Math.ceil(text.length / this.tokens.text.divisor);
       }
     };
 
@@ -468,41 +471,71 @@ export class AI<T extends AIBaseTypes> {
         addText(content.type);
 
         const metrics = this.tokens[content.type || 'text'];
+        let contentTokens = 0;
 
         if (typeof content.content === 'string') {
           if (content.content.startsWith('data:')) {
-            // Base64 image
-            tokens += metrics.max
+            // Base64 data
+            contentTokens = metrics.max
               ? Math.min(metrics.max, Math.ceil(content.content.length / metrics.base64Divisor))
               : Math.ceil(content.content.length / metrics.base64Divisor);
           } else if (content.content.startsWith('http') && content.type !== 'text') {
             // URL - use fallback estimate
-            tokens += metrics.fallback;
+            contentTokens = metrics.fallback;
           } else {
             addText(content.content);
+            continue; // Already added as text
           }
         } else if (content.content instanceof Uint8Array) {
-          // Binary data - use fallback estimate
-          tokens += Math.ceil(content.content.byteLength / metrics.divisor);
+          // Binary data
+          contentTokens = Math.ceil(content.content.byteLength / metrics.divisor);
         } else if (content.content instanceof Blob) {
           // Blob data
-          tokens += Math.ceil(content.content.size / metrics.divisor);
+          contentTokens = Math.ceil(content.content.size / metrics.divisor);
         } else {
           // URL or Stream - use fallback estimate
-          tokens += metrics.fallback;
+          contentTokens = metrics.fallback;
+        }
+
+        // Categorize tokens by content type
+        switch (content.type) {
+          case 'image':
+            imageTokens += contentTokens;
+            break;
+          case 'audio':
+            audioTokens += contentTokens;
+            break;
+          case 'file':
+            fileTokens += contentTokens;
+            break;
+          default:
+            textTokens += contentTokens;
         }
       }
     }
 
-    return tokens;
+    const totalTokens = textTokens + imageTokens + audioTokens + fileTokens;
+
+    return {
+      inputTokens: totalTokens,
+      totalTokens,
+    };
   }
 
   /**
-   * Estimate tokens for a request (used by API classes)
+   * Estimate usage for a request (used by API classes)
    * @internal
    */
-  estimateRequestTokens(request: Request): number {
-    return request.messages.reduce((sum, msg) => sum + this.estimateMessageTokens(msg), 0);
+  estimateRequestUsage(request: Request): Usage {
+    const usage: Usage = { inputTokens: 0, totalTokens: 0 };
+    
+    for (const msg of request.messages) {
+      const msgUsage = this.estimateMessageUsage(msg);
+      usage.inputTokens = (usage.inputTokens || 0) + (msgUsage.inputTokens || 0);
+      usage.totalTokens = (usage.totalTokens || 0) + (msgUsage.totalTokens || 0);
+    }
+    
+    return usage;
   }
 
   /**

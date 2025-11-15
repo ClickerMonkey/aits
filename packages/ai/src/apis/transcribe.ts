@@ -79,8 +79,9 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected estimateRequestTokens(): number {
-    return 1000; // Default estimate for audio
+  protected estimateRequestUsage(): Usage {
+    const tokens = 1000; // Default estimate for audio
+    return { inputTokens: tokens, totalTokens: tokens };
   }
 
   protected async *executeStreamRequest(

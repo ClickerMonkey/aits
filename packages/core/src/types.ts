@@ -253,14 +253,15 @@ export type Context<TContext, TMetadata> = TContext &
   signal?: AbortSignal;
 
   /**
-   * An optional function to estimate token usage for a message. 
+   * An optional function to estimate usage for a message. 
    * 
-   * If this is not provided, and the message has no tokens - it will the average available tokens per message.
+   * This handles non-text data types (images, audio, files) more accurately than just token counting.
+   * If this is not provided, and the message has no tokens - it will use the average available tokens per message.
    * 
-   * @param message - The message to estimate tokens for.
-   * @returns The estimated number of tokens.
+   * @param message - The message to estimate usage for.
+   * @returns The estimated usage statistics.
    */
-  estimateTokens?: (messages: Message) => number | undefined;
+  estimateUsage?: (message: Message) => Usage | undefined;
 
   /**
    * The default number of completion tokens to reserve when calculating available prompt tokens.

@@ -81,12 +81,13 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
       : 'Image generation streaming failed';
   }
 
-  protected estimateRequestTokens(request: ImageGenerationRequest): number {
+  protected estimateRequestUsage(request: ImageGenerationRequest): Usage {
     // Rough estimate based on prompt length and image size
     const promptTokens = Math.ceil(request.prompt.length / 4);
     const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
     const qualityMultiplier = request.quality === 'high' ? 2 : 1;
-    return promptTokens * sizeMultiplier * qualityMultiplier;
+    const tokens = promptTokens * sizeMultiplier * qualityMultiplier;
+    return { inputTokens: tokens, totalTokens: tokens };
   }
 
   protected async executeRequest(
@@ -210,11 +211,12 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
       : 'Image editing streaming failed';
   }
 
-  protected estimateRequestTokens(request: ImageEditRequest): number {
+  protected estimateRequestUsage(request: ImageEditRequest): Usage {
     // Rough estimate based on prompt length and image size
     const promptTokens = Math.ceil(request.prompt.length / 4);
     const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    return promptTokens * sizeMultiplier;
+    const tokens = promptTokens * sizeMultiplier;
+    return { inputTokens: tokens, totalTokens: tokens };
   }
 
   protected async executeRequest(
@@ -357,9 +359,9 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected estimateRequestTokens(request: ImageAnalyzeRequest, selected: SelectedModelFor<T>): number {
+  protected estimateRequestUsage(request: ImageAnalyzeRequest, selected: SelectedModelFor<T>): Usage {
     const chatRequest = this.convertToChatRequest(request);
-    return super.estimateRequestTokens(chatRequest as any, selected);
+    return this.ai.estimateRequestUsage(chatRequest);
   }
 
   protected async executeRequest(

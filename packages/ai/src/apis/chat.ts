@@ -35,7 +35,7 @@
  * ```
  */
 
-import { getChunksFromResponse, getResponseFromChunks, type Executor, type Streamer } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, type Executor, type Streamer, type Usage } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -180,8 +180,8 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     return operation === 'request' ? 'Chat request failed' : 'Chat streaming failed';
   }
 
-  protected estimateRequestTokens(request: Request, selected: SelectedModelFor<T>): number {
-    return this.ai.estimateRequestTokens(request);
+  protected estimateRequestUsage(request: Request, selected: SelectedModelFor<T>): Usage {
+    return this.ai.estimateRequestUsage(request);
   }
 
   protected async executeRequest<TRuntimeContext extends AIContext<T>>(

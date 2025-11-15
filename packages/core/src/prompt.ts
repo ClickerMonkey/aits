@@ -1123,9 +1123,10 @@ export class Prompt<
         }
       }
       messageTokens = chunks.map((c, i) => c.map(() => chunkTokens[i] / c.length)).flat();
-    } else if (ctx.estimateTokens) {
+    } else if (ctx.estimateUsage) {
       for (const msg of request.messages) {
-        msg.tokens = ctx.estimateTokens(msg);
+        const usage = ctx.estimateUsage(msg);
+        msg.tokens = usage?.inputTokens || usage?.totalTokens || 0;
       }
       messageTokens = request.messages.map(m => m.tokens!);
     } else if (usage?.inputTokens) {
