@@ -157,10 +157,11 @@ export async function runChatOrchestrator(
         const result = Array.prototype.push.apply(this, items);
         
         // For each new operation, create a new content entry tied to it
-        for (const op of items) {
-          const operationIndex = pending.operations!.length - items.length + items.indexOf(op);
+        for (let i = 0; i < items.length; i++) {
+          const op = items[i];
+          const operationIndex = pending.operations!.length - items.length + i;
           // Add a new text content entry for text that comes after this operation
-          pending.content.push({ type: 'text', content: '', operationIndex });
+          pending.content.push({ type: 'text', content: op.message || '', operationIndex });
         }
         
         onEvent({ type: 'pendingUpdate', pending });

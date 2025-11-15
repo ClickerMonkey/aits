@@ -263,9 +263,10 @@ export function convertMessage(msg: Message): AIMessage {
     if (msgContent.operationIndex !== undefined && msg.operations && msg.operations[msgContent.operationIndex]) {
       const op = msg.operations[msgContent.operationIndex];
       content.push({ type: 'text', content: op.message || 'pending...' });
+    } else {
+      // Add the content itself
+      content.push(convertContent(msgContent));
     }
-    // Add the content itself
-    content.push(convertContent(msgContent));
   }
   
   return {
