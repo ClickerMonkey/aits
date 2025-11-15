@@ -92,7 +92,6 @@ export function createCletusAI(configFile: ConfigFile) {
         ops: new OperationManager('none'),
         log: logger.log.bind(logger),
         chatStatus: () => {},
-        agentMode: 'default',
       },
       providedContext: async (ctx) => {
         if (ctx.userPrompt) {

@@ -28,7 +28,7 @@ import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, ty
 import fs from 'fs';
 import OpenAI, { Uploadable } from 'openai';
 import { Stream } from 'openai/core/streaming';
-import z from 'zod';
+import z, { size } from 'zod';
 import { isContextWindowError, parseContextWindowError, type RetryConfig, RetryContext, type RetryEvents, withRetry } from './retry';
 import { ContextWindowError, ProviderError } from './types';
 
@@ -1031,7 +1031,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
               headers,
               body,
             };
-            
+
             throw new ProviderError(this.name, `Chat completion request failed: ${JSON.stringify(details)}`);
           }
 
@@ -1148,6 +1148,156 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Get image generation parameters based on model and request.
+   * 
+   * @param request - Image generation request
+   * @param model - Model ID
+   * @returns 
+   */
+  getGenerateParameters(request: ImageGenerationRequest, model: string): OpenAI.Images.ImageGenerateParams {    
+    const modelId = model.includes('gpt-image-')
+      ? 'gpt-image'
+      : model.includes('dall-e-2')
+        ? 'dall-e-2'
+        : model.includes('dall-e-3')
+          ? 'dall-e-3'
+          : 'unknown';
+
+    const modelParameters = {
+      'gpt-image': {
+        style: {
+          'vivid': undefined,
+          'natural': undefined,
+        },
+        background: {
+          'transparent': 'transparent',
+          'opaque': 'opaque',
+          'auto': 'auto',
+        },
+        quality: {
+          'low': 'low',
+          'medium': 'medium',
+          'high': 'high',
+        },
+        responseFormat: {
+          'url': undefined,
+          'b64_json': undefined,
+        },
+        sizes: [
+          { width: 1024, height: 1024 },
+          { width: 1536, height: 1024 },
+          { width: 1024, height: 1536 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 10 },
+      },
+      'dall-e-2': {
+        style: {
+          'vivid': undefined,
+          'natural': undefined,
+        },
+        background: {
+          'transparent': undefined,
+          'opaque': undefined,
+          'auto': undefined,
+        },
+        quality: {
+          'low': 'standard',
+          'medium': 'standard',
+          'high': 'standard',
+        },
+        responseFormat: {
+          'url': 'url',
+          'b64_json': 'b64_json',
+        },
+        sizes: [
+          { width: 256, height: 256 },
+          { width: 512, height: 512 },
+          { width: 1024, height: 1024 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 10 },
+      },
+      'dall-e-3': {
+        style: { 
+          'vivid': 'vivid',
+          'natural': 'natural',
+        },
+        background: {
+          'transparent': undefined,
+          'opaque': undefined,
+          'auto': undefined,
+        },
+        quality: {
+          'low': 'standard',
+          'medium': 'hd',
+          'high': 'hd',
+        },
+        responseFormat: {
+          'url': 'url',
+          'b64_json': 'b64_json',
+        },
+        sizes: [
+          { width: 1024, height: 1024 },
+          { width: 1792, height: 1024 },
+          { width: 1024, height: 1792 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 1 },
+      },
+      'unknown': {
+        style: {
+          'vivid': undefined,
+          'natural': undefined,
+        },
+        background: {
+          'transparent': undefined,
+          'opaque': undefined,
+          'auto': undefined,
+        },
+        quality: {
+          'low': undefined,
+          'medium': undefined,
+          'high': undefined,
+        },
+        responseFormat: {
+          'url': undefined,
+          'b64_json': undefined,
+        },
+        sizes: [] as { width: number; height: number }[],
+        n: { min: 1, max: 1 },
+      },
+    } as const;
+
+    const sizesAvailable = modelParameters[modelId].sizes;
+    let size: OpenAI.Images.ImageGenerateParams['size'] = undefined;
+    if (request.size && sizesAvailable.length > 0) {
+      const [widthStr, heightStr] = request.size.split('x');
+      const width = parseInt(widthStr, 10);
+      const height = parseInt(heightStr, 10);
+      const closest = sizesAvailable
+        .map(d => ({
+          ...d,
+          ratioDiff: Math.abs(d.width / d.height - width / height),
+          scale: Math.min(d.width / width, d.height / height)
+        }))
+        .sort((a, b) => a.ratioDiff - b.ratioDiff || b.scale - a.scale)[0];
+
+      size = `${closest.width}x${closest.height}` as OpenAI.Images.ImageGenerateParams['size'];
+    }
+
+    const params: OpenAI.Images.ImageGenerateParams = {
+      model,
+      prompt: request.prompt,
+      n: request.n ? Math.max(modelParameters[modelId].n.min, Math.min(modelParameters[modelId].n.max, request.n)) : undefined,
+      size,
+      quality: request.quality ? modelParameters[modelId].quality[request.quality] : undefined,
+      style: request.style ? modelParameters[modelId].style[request.style] : undefined,
+      background: request.background ? modelParameters[modelId].background[request.background] : undefined,
+      response_format: request.responseFormat ? modelParameters[modelId].responseFormat[request.responseFormat] : undefined,
+    };
+
+    return params;
+  }
+    
+  /**
    * Generate images.
    *
    * @param request Image generation request parameters
@@ -1166,15 +1316,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const { model, retry } = this.getRequestData<OpenAI.Images.ImagesResponse>(request, undefined, ctx, effectiveConfig, 'generate image', effectiveConfig.defaultModels?.imageGenerate || 'gpt-image-1');
     
+    const baseParams = this.getGenerateParameters(request, model.id);
     const params: OpenAI.Images.ImageGenerateParamsNonStreaming = {
-      model: model.id,
-      prompt: request.prompt,
-      n: request.n,
-      size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
-      quality: request.quality as 'standard' | 'hd' | undefined,
-      style: request.style as 'vivid' | 'natural' | undefined,
-      background: request.background,
-      response_format: request.responseFormat || 'b64_json',
+      ...baseParams,
       user: request.userIdentifier,
       ...request.extra,
       stream: false,
@@ -1236,20 +1380,14 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     const effectiveConfig = { ...this.config, ...config };
 
     const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Images.ImageGenStreamEvent>>(request, undefined, ctx, effectiveConfig, 'generate image stream', effectiveConfig.defaultModels?.imageGenerate || 'gpt-image-1');
-    
+    const baseParams = this.getGenerateParameters(request, model.id);
+
     const imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
 
     const params: OpenAI.Images.ImageGenerateParamsStreaming = {
-      model: model.id,
-      prompt: request.prompt,
-      n: 1,
-      size: request.size as '1024x1024' | '1024x1792' | '1792x1024' | null | undefined,
-      quality: request.quality as 'standard' | 'hd' | undefined,
-      style: request.style as 'vivid' | 'natural' | undefined,
-      background: request.background,
+      ...baseParams,
       user: request.userIdentifier,
       partial_images: imageStreams,
-      response_format: request.responseFormat,
       ...request.extra,
       stream: true,
     };
@@ -1292,6 +1430,98 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     }
   }
 
+  
+  /**
+   * Get image generation parameters based on model and request.
+   * 
+   * @param request - Image generation request
+   * @param model - Model ID
+   * @returns 
+   */
+  getEditParameters(request: ImageEditRequest, model: string): Omit<OpenAI.Images.ImageEditParams, 'image'> {
+    const modelId = model.includes('gpt-image-')
+      ? 'gpt-image'
+      : model.includes('dall-e-2')
+        ? 'dall-e-2'
+        : model.includes('dall-e-3')
+          ? 'dall-e-3'
+          : 'unknown';
+
+    const modelParameters = {
+      'gpt-image': {
+        responseFormat: {
+          'url': undefined,
+          'b64_json': undefined,
+        },
+        sizes: [
+          { width: 1024, height: 1024 },
+          { width: 1536, height: 1024 },
+          { width: 1024, height: 1536 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 10 },
+      },
+      'dall-e-2': {
+        responseFormat: {
+          'url': 'url',
+          'b64_json': 'b64_json',
+        },
+        sizes: [
+          { width: 256, height: 256 },
+          { width: 512, height: 512 },
+          { width: 1024, height: 1024 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 10 },
+      },
+      'dall-e-3': {
+        responseFormat: {
+          'url': 'url',
+          'b64_json': 'b64_json',
+        },
+        sizes: [
+          { width: 1024, height: 1024 },
+          { width: 1792, height: 1024 },
+          { width: 1024, height: 1792 },
+        ] as { width: number; height: number }[],
+        n: { min: 1, max: 1 },
+      },
+      'unknown': {
+        responseFormat: {
+          'url': undefined,
+          'b64_json': undefined,
+        },
+        sizes: [] as { width: number; height: number }[],
+        n: { min: 1, max: 1 },
+      },
+    } as const;
+
+    const sizesAvailable = modelParameters[modelId].sizes;
+    let size: OpenAI.Images.ImageEditParams['size'] = undefined;
+    if (request.size && sizesAvailable.length > 0) {
+      const [widthStr, heightStr] = request.size.split('x');
+      const width = parseInt(widthStr, 10);
+      const height = parseInt(heightStr, 10);
+      const closest = sizesAvailable
+        .map(d => ({
+          ...d,
+          ratioDiff: Math.abs(d.width / d.height - width / height),
+          scale: Math.min(d.width / width, d.height / height)
+        }))
+        .sort((a, b) => a.ratioDiff - b.ratioDiff || b.scale - a.scale)[0];
+
+      size = `${closest.width}x${closest.height}` as OpenAI.Images.ImageEditParams['size'];
+    }
+
+    const params: Omit<OpenAI.Images.ImageEditParams, 'image'> = {
+      model,
+      prompt: request.prompt,
+      n: request.n ? Math.max(modelParameters[modelId].n.min, Math.min(modelParameters[modelId].n.max, request.n)) : undefined,
+      size,
+      response_format: request.responseFormat ? modelParameters[modelId].responseFormat[request.responseFormat] : undefined,
+    };
+
+    return params;
+  }
+
   /**
    * Edit images using DALL-E models.
    *
@@ -1315,16 +1545,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     
     const image = this.toUploadableImage(request.image);
     const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+    const baseParams = this.getEditParameters(request, model.id);
     
     const params: OpenAI.Images.ImageEditParamsNonStreaming = {
-      model: model.id,
+      ...baseParams,
       image,
-      prompt: request.prompt,
       mask,
-      n: request.n,
-      size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
       user: request.userIdentifier,
-      response_format: request.responseFormat,
       ...request.extra,
       stream: false,
     };
@@ -1389,15 +1616,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     const image = this.toUploadableImage(request.image);
     const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
     const imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
+    const baseParams = this.getEditParameters(request, model.id);
 
     const params: OpenAI.Images.ImageEditParamsStreaming = {
-      model: model.id,
+      ...baseParams,
       image,
-      prompt: request.prompt,
       mask,
-      n: request.n || 1,
-      size: request.size as '1024x1024' | '512x512' | '256x256' | null | undefined,
-      response_format: request.responseFormat,
       user: request.userIdentifier,
       partial_images: imageStreams,
       ...request.extra,

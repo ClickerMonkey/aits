@@ -83,7 +83,7 @@ export const image_generate = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config }) => {
+  do: async (input, { ai, cwd, config, chatMessage }) => {
     // Generate images
     const response = await ai.image.generate.get({
       model: config.getData().user.models?.imageGenerate,
@@ -94,6 +94,13 @@ export const image_generate = operationOf<
     // Save images to files and collect file URLs
     const imagePaths = await saveGeneratedImage(response);
     const imageUrls = imagePaths.map((p) => `file://${p}`);
+
+    if (chatMessage) {
+      // Add image URLs to chat message
+      for (const imageUrl of imageUrls) {
+        chatMessage.content.push({ type: 'image', content: imageUrl });
+      }
+    }
 
     return {
       prompt: input.prompt,
@@ -136,7 +143,7 @@ export const image_edit = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config }) => {
+  do: async (input, { ai, cwd, config, chatMessage }) => {
     const image = await loadImageAsDataUrl(cwd, input.imagePath);
 
     // Edit image
@@ -147,11 +154,19 @@ export const image_edit = operationOf<
     });
 
     const edited = await saveGeneratedImage(response);
+    const imageUrls = edited.map((p) => `file://${p}`);
+
+    if (chatMessage) {
+      // Add image URLs to chat message
+      for (const imageUrl of imageUrls) {
+        chatMessage.content.push({ type: 'image', content: imageUrl });
+      }
+    }
 
     return {
       prompt: input.prompt,
       originalPath: input.imagePath,
-      editedPath: `file://${edited[0]}`,
+      editedPath: imageUrls[0],
     };
   },
   render: (op) => renderOperation(
