@@ -666,14 +666,80 @@ export const file_read = operationOf<
   ),
 });
 
+// Helper function to generate file edit content and diff
+async function generateFileEditDiff(
+  input: { path: string; request: string; offset?: number; limit?: number },
+  fileContent: string,
+  ai: any
+): Promise<{ newFileContent: string; diff: string; changed: boolean }> {
+  // Paginate the text if offset/limit are provided (lines only)
+  const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'lines');
+
+  // Use AI to generate new content based on the request
+  const models = ai.config.defaultContext!.config!.getData().user.models;
+  const model = models?.chat;
+
+  const response = await ai.chat.get({
+    model,
+    messages: [
+      { 
+        role: 'system', 
+        content: 'You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.'
+      },
+      { 
+        role: 'user', 
+        content: `Current content:\n\`\`\`\n${paginatedContent}\n\`\`\`\n\nRequest: ${input.request}\n\nProvide the edited content:` 
+      },
+    ],
+    maxTokens: Math.max(8000, paginatedContent.length * 2),
+  }, {
+    metadata: {
+      minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
+      weights: {
+        cost: 0.3,
+        speed: 0.7,
+      },
+    }
+  });
+
+  const newPaginatedContent = response.content;
+
+  // Apply the changes to the full file content
+  const lines = fileContent.split('\n');
+  const limit = input.limit || CONSTS.MAX_LINES;
+  const offset = input.offset || 0;
+  const start = (offset + lines.length) % lines.length;
+  const end = Math.min(start + limit, lines.length);
+  
+  const newLines = [...lines];
+  const newPaginatedLines = newPaginatedContent.split('\n');
+  newLines.splice(start, end - start, ...newPaginatedLines);
+  const newFileContent = newLines.join('\n');
+
+  // Generate unified diff to show what will be changed
+  const diff = Diff.createPatch(
+    input.path,
+    fileContent,
+    newFileContent,
+    'before',
+    'after'
+  );
+
+  return {
+    newFileContent,
+    diff,
+    changed: fileContent !== newFileContent,
+  };
+}
+
 export const file_edit = operationOf<
   { path: string; request: string; offset?: number; limit?: number },
-  { oldContent: string; newContent: string; changed: boolean; diff: string }
+  { diff: string; changed: boolean }
 >({
   mode: 'update',
   signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
-  status: (input) => `Editing: ${path.basename(input.path)}`,
-  analyze: async (input, { cwd }) => {
+  status: (input) => `Editing: ${paginateText(input.path, 100, -100)}`,
+  analyze: async (input, { cwd, ai }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
 
@@ -700,8 +766,12 @@ export const file_edit = operationOf<
       };
     }
 
+    // Read the file content and generate diff in analyze phase
+    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    const { diff } = await generateFileEditDiff(input, fileContent, ai);
+
     return {
-      analysis: `This will read the text file "${input.path}", apply the requested changes, and update the file.`,
+      analysis: diff,
       doable: true,
     };
   },
@@ -711,111 +781,31 @@ export const file_edit = operationOf<
     // Read the file content
     const fileContent = await fs.readFile(fullPath, 'utf-8');
     
-    // Paginate the text if offset/limit are provided
-    const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'characters');
-
-    // Use AI to generate new content based on the request
-    const models = ai.config.defaultContext!.config!.getData().user.models;
-    const model = models?.chat;
-
-    const response = await ai.chat.get({
-      model,
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.'
-        },
-        { 
-          role: 'user', 
-          content: `Current content:\n\`\`\`\n${paginatedContent}\n\`\`\`\n\nRequest: ${input.request}\n\nProvide the edited content:` 
-        },
-      ],
-      maxTokens: Math.max(8000, paginatedContent.length * 2),
-    }, {
-      metadata: {
-        minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
-        weights: {
-          cost: 0.3,
-          speed: 0.7,
-        },
-      }
-    });
-
-    const newContent = response.content;
-
-    // Generate unified diff to show what will be changed
-    const diff = Diff.createPatch(
-      input.path,
-      paginatedContent,
-      newContent,
-      'before',
-      'after'
-    );
+    // Generate new content and diff
+    const { newFileContent, diff, changed } = await generateFileEditDiff(input, fileContent, ai);
 
     // Write the new content back to the file
-    await fs.writeFile(fullPath, newContent, 'utf-8');
+    await fs.writeFile(fullPath, newFileContent, 'utf-8');
 
     return {
-      oldContent: paginatedContent,
-      newContent,
-      changed: paginatedContent !== newContent,
       diff,
+      changed,
     };
   },
-  render: (op) => {
-    const React = require('react');
-    const { Box, Text } = require('ink');
-    const SyntaxHighlight = require('ink-syntax-highlight').default;
-    const { getStatusInfo, getElapsedTime } = require('../helpers/render');
-    const { COLORS } = require('../constants');
-    
-    const { color: statusColor, label: statusLabel } = getStatusInfo(op.status);
-    const elapsed = getElapsedTime(op);
-    const operationLabel = `Edit("${paginateText(op.input.path, 100, -100)}")`;
-    
-    let summary = 'Processing...';
-    if (op.error) {
-      summary = op.error;
-    } else if (op.output) {
-      if (!op.output.changed) {
-        summary = 'No changes made';
-      } else {
-        summary = `Applied changes to ${path.basename(op.input.path)}`;
+  render: (op) => renderOperation(
+    op,
+    `Edit("${paginateText(op.input.path, 100, -100)}")`,
+    (op) => {
+      if (op.output) {
+        if (!op.output.changed) {
+          return 'No changes made';
+        } else {
+          return `Applied changes`;
+        }
       }
-    } else if (op.analysis) {
-      summary = abbreviate(op.analysis.replaceAll(/\n/g, ' '), 60);
+      return null;
     }
-    
-    // Render diff if we have output with changes
-    let diffContent = null;
-    if (op.output && op.output.changed && op.output.diff) {
-      diffContent = React.createElement(
-        Box,
-        { marginLeft: 2, marginTop: 1, flexDirection: 'column' },
-        React.createElement(SyntaxHighlight, { code: op.output.diff, language: 'diff' })
-      );
-    }
-    
-    return React.createElement(
-      Box,
-      { flexDirection: 'column' },
-      React.createElement(
-        Box,
-        {},
-        React.createElement(Text, { color: statusColor as any }, '● '),
-        React.createElement(Text, {}, operationLabel + ' '),
-        React.createElement(Text, { dimColor: true }, '[' + statusLabel + '] '),
-        React.createElement(Text, { dimColor: true }, '(' + elapsed + ')')
-      ),
-      React.createElement(
-        Box,
-        { marginLeft: 2 },
-        React.createElement(Text, {}, ' → '),
-        React.createElement(Text, { color: op.error ? COLORS.ERROR_TEXT : undefined }, summary)
-      ),
-      diffContent
-    );
-  },
+  ),
 });
 
 export const text_search = operationOf<

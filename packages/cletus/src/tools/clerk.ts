@@ -162,13 +162,13 @@ Only works on text files. The request should be precise with specific rules and 
 Example 1: Modify a configuration file:
 { "path": "config/settings.json", "request": "Add a new field 'maxRetries' with value 3, and change 'timeout' from 5000 to 10000" }
 
-Example 2: Edit a specific section of a large file:
-{ "path": "src/utils.ts", "request": "Refactor the parseDate function to handle ISO 8601 format", "offset": 1000, "limit": 500 }`,
+Example 2: Edit a specific section of a large file (by line numbers):
+{ "path": "src/utils.ts", "request": "Refactor the parseDate function to handle ISO 8601 format", "offset": 100, "limit": 50 }`,
     schema: z.object({
       path: z.string().describe('Relative file path to edit'),
       request: z.string().describe('Detailed request describing the changes to make. Be precise with rules and requirements.'),
-      offset: z.number().optional().describe('Character/line offset to start editing from (default: 0). Negative numbers start from the end.'),
-      limit: z.number().optional().describe('Maximum characters/lines to edit (default: 64,000 chars or 1000 lines)'),
+      offset: z.number().optional().describe('Line offset to start editing from (default: 0). Negative numbers start from the end.'),
+      limit: z.number().optional().describe('Maximum lines to edit (default: 1000 lines)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_edit', input }, ctx),
   });
