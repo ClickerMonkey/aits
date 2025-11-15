@@ -92,6 +92,23 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
   }
 
   /**
+   * Delete knowledge entries matching a predicate function
+   */
+  async deleteWhere(predicate: (entry: KnowledgeEntry) => boolean): Promise<number> {
+    let deletedCount = 0;
+    await this.save((knowledge) => {
+      for (const model in knowledge.knowledge) {
+        const originalLength = knowledge.knowledge[model].length;
+        knowledge.knowledge[model] = knowledge.knowledge[model].filter(
+          (e) => !predicate(e)
+        );
+        deletedCount += originalLength - knowledge.knowledge[model].length;
+      }
+    });
+    return deletedCount;
+  }
+
+  /**
    * Get all entries for a specific model
    */
   getEntries(model: string): KnowledgeEntry[] {

@@ -140,59 +140,103 @@ export const knowledge_add = operationOf<
 });
 
 export const knowledge_delete = operationOf<
-  { sourcePrefix: string },
-  { sourcePrefix: string; deletedCount: number }
+  { sourcePattern: string; caseSensitive?: boolean },
+  { sourcePattern: string; caseSensitive: boolean; deletedCount: number; matchedSources: string[] }
 >({
   mode: 'delete',
-  signature: 'knowledge_delete(sourcePrefix: string)',
-  status: (input) => `Deleting knowledge: ${input.sourcePrefix}`,
+  signature: 'knowledge_delete(sourcePattern: string, caseSensitive?: boolean)',
+  status: (input) => `Deleting knowledge: ${input.sourcePattern}`,
   analyze: async (input, ctx) => {
+    // Validate regex pattern
+    let regex: RegExp;
+    try {
+      const flags = input.caseSensitive === false ? 'i' : '';
+      regex = new RegExp(input.sourcePattern, flags);
+    } catch (error) {
+      return {
+        analysis: `Invalid regex pattern "${input.sourcePattern}": ${error instanceof Error ? error.message : String(error)}`,
+        doable: false,
+      };
+    }
+
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
     const data = knowledge.getData();
+    const matchingSources = new Set<string>();
     let count = 0;
 
-    for (const entries of Object.values(data.knowledge)) {
-      count += entries.filter((e) => e.source.startsWith(input.sourcePrefix)).length;
-    }
-
-    return {
-      analysis: `This will delete ${count} knowledge entries with source prefix "${input.sourcePrefix}".`,
-      doable: true,
-    };
-  },
-  do: async (input, ctx) => {
-    const knowledge = new KnowledgeFile();
-    await knowledge.load();
-
-    const data = knowledge.getData();
-    let count = 0;
-
-    // Count entries to delete
-    for (const entries of Object.values(data.knowledge)) {
-      count += entries.filter((e) => e.source.startsWith(input.sourcePrefix)).length;
-    }
-
-    // Delete all matching sources
-    const sources = new Set<string>();
+    // Find all matching sources
     for (const entries of Object.values(data.knowledge)) {
       for (const entry of entries) {
-        if (entry.source.startsWith(input.sourcePrefix)) {
-          sources.add(entry.source);
+        if (regex.test(entry.source)) {
+          matchingSources.add(entry.source);
+          count++;
         }
       }
     }
 
-    for (const source of sources) {
-      await knowledge.deleteBySource(source);
+    const sourceList = Array.from(matchingSources).sort();
+    const topTen = sourceList.slice(0, 10);
+    const caseSensitiveStr = input.caseSensitive === false ? ' (case-insensitive)' : '';
+    
+    let analysis = `This will delete ${count} knowledge entr${count !== 1 ? 'ies' : 'y'} matching pattern "${input.sourcePattern}"${caseSensitiveStr}.`;
+    
+    if (topTen.length > 0) {
+      analysis += `\n\nTop ${topTen.length} matching sources:`;
+      topTen.forEach((source, i) => {
+        analysis += `\n  ${i + 1}. ${source}`;
+      });
+      
+      if (sourceList.length > 10) {
+        analysis += `\n  ... and ${sourceList.length - 10} more`;
+      }
+    } else {
+      analysis += '\n\nNo matching entries found.';
     }
 
-    return { sourcePrefix: input.sourcePrefix, deletedCount: count };
+    return {
+      analysis,
+      doable: true,
+    };
+  },
+  do: async (input, ctx) => {
+    // Validate regex pattern
+    let regex: RegExp;
+    try {
+      const flags = input.caseSensitive === false ? 'i' : '';
+      regex = new RegExp(input.sourcePattern, flags);
+    } catch (error) {
+      throw new Error(`Invalid regex pattern "${input.sourcePattern}": ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const knowledge = new KnowledgeFile();
+    await knowledge.load();
+
+    // Collect matching sources for output
+    const data = knowledge.getData();
+    const matchingSources = new Set<string>();
+    for (const entries of Object.values(data.knowledge)) {
+      for (const entry of entries) {
+        if (regex.test(entry.source)) {
+          matchingSources.add(entry.source);
+        }
+      }
+    }
+
+    // Delete entries matching the pattern
+    const deletedCount = await knowledge.deleteWhere((entry) => regex.test(entry.source));
+
+    return {
+      sourcePattern: input.sourcePattern,
+      caseSensitive: input.caseSensitive !== false,
+      deletedCount,
+      matchedSources: Array.from(matchingSources).sort().slice(0, 10),
+    };
   },
   render: (op) => renderOperation(
     op,
-    `KnowledgeDelete("${op.input.sourcePrefix}")`,
+    `KnowledgeDelete("${op.input.sourcePattern}")`,
     (op) => {
       if (op.output) {
         return `Deleted ${op.output.deletedCount} entr${op.output.deletedCount !== 1 ? 'ies' : 'y'}`;

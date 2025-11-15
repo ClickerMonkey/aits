@@ -46,13 +46,20 @@ Example: Store a project detail:
 
   const knowledgeDelete = ai.tool({
     name: 'knowledge_delete',
-    description: 'Delete all knowledge entries matching a source prefix',
-    instructions: `Use this to remove knowledge entries. Provide a source prefix to delete all matching entries (e.g., "task:123" or "file@{path}:summary"). Be careful as this is permanent.
+    description: 'Delete all knowledge entries matching a source pattern',
+    instructions: `Use this to remove knowledge entries. Provide a regex pattern to match sources and optionally specify case sensitivity. Be careful as this is permanent.
 
-Example: Delete all knowledge from a specific file:
-{ "sourcePrefix": "file@docs/old-guide.md:" }`,
+Example: Delete all knowledge from a specific file (exact match):
+{ "sourcePattern": "^file@docs/old-guide\\.md:", "caseSensitive": true }
+
+Example: Delete all knowledge from task 123 (case insensitive):
+{ "sourcePattern": "task:123", "caseSensitive": false }
+
+Example: Delete all user knowledge:
+{ "sourcePattern": "^user:", "caseSensitive": true }`,
     schema: z.object({
-      sourcePrefix: z.string().describe('Source prefix to delete (e.g., "task:123", "user", "file@somefile.txt:")'),
+      sourcePattern: z.string().describe('Regex pattern to match source strings (e.g., "^task:123", "file@.*\\.md:", "^user:")'),
+      caseSensitive: z.boolean().optional().default(true).describe('Whether pattern matching is case-sensitive (default: true)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_delete', input }, ctx),
   });
