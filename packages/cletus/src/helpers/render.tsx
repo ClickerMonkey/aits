@@ -5,6 +5,35 @@ import { abbreviate, formatTime } from "../common";
 import { Operation } from "../schemas";
 
 /**
+ * Format a value for display in operation input/output
+ * - Arrays: JSON.stringify
+ * - Non-objects (primitives): String(x)
+ * - Objects: bullet list with hyphens, property values JSON.stringified
+ */
+function formatValue(value: any): React.ReactNode {
+  // Arrays: use JSON.stringify
+  if (Array.isArray(value)) {
+    return <Text>{JSON.stringify(value, null, 2)}</Text>;
+  }
+  
+  // Non-objects (primitives): use String(x)
+  if (typeof value !== 'object' || value === null) {
+    return <Text>{String(value)}</Text>;
+  }
+  
+  // Objects: bullet list with hyphens
+  return (
+    <Box flexDirection="column">
+      {Object.entries(value).map(([key, val], i) => (
+        <Box key={i}>
+          <Text>- {key}: {JSON.stringify(val)}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/**
  * Get status color and label for an operation status
  */
 export function getStatusInfo(status: Operation['status']): { color: string; label: string } {
@@ -101,7 +130,7 @@ export function renderOperation(
             <Text bold dimColor>Input:</Text>
           </Box>
           <Box marginLeft={4} flexDirection="column">
-            <Text>{JSON.stringify(op.input, null, 2)}</Text>
+            {formatValue(op.input)}
           </Box>
         </>
       )}
@@ -112,7 +141,7 @@ export function renderOperation(
             <Text bold dimColor>Output:</Text>
           </Box>
           <Box marginLeft={4} flexDirection="column">
-            <Text>{JSON.stringify(op.output, null, 2)}</Text>
+            {formatValue(op.output)}
           </Box>
         </>
       )}
