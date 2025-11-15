@@ -9,6 +9,7 @@
     "packages/openai",
     "packages/openrouter",
     "packages/replicate",
+    "packages/aws",
     "packages/models",
     "packages/cletus",
     "packages/test-integration"
