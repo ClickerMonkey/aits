@@ -218,6 +218,12 @@ export async function runChatOrchestrator(
               onEvent({ type: 'status', status: '' });
               break;
 
+            case 'text':
+              pending.content[0].content += chunk.content;
+              setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
+              onEvent({ type: 'pendingUpdate', pending });
+              break;
+
             case 'textComplete':
               pending.content[0].content = chunk.content;
               onEvent({ type: 'pendingUpdate', pending });

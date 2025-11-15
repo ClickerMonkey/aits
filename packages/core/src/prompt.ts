@@ -173,6 +173,7 @@ export type PromptToolEvents<TTools extends Tuple<AnyTool>> =
  */
 export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
   { type: 'textPartial', content: string, request: Request } |
+  { type: 'text', content: string, request: Request } |
   { type: 'refusal', content: string, request: Request } |
   { type: 'reason', content: string, request: Request } |
   { type: 'reasonPartial', content: string, request: Request } |
@@ -691,6 +692,11 @@ export class Prompt<
         }
       }
 
+      // Yield text event if content exists before processing tool calls
+      if (content.length > 0) {
+        yield emit({ type: 'text', content, request });
+      }
+
       // If we need to make some tool calls, lets do it! 
       // We might not have a finish_reason if we got a bad tool name.
       if (finishReason === 'tool_calls' || toolCalls.length) {
@@ -816,10 +822,13 @@ export class Prompt<
         }
       }
 
+      // Accumulate text content from this iteration
+      if (content.length > 0) {
+        completeText += content;
+      }
+
       // If we are finished, parse the output
       if (finishReason === 'stop') {
-        completeText = content;
-        
         if (!schema || (schema instanceof z.ZodString)) {
           result = content as unknown as TOutput;
 
