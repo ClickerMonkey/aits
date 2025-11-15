@@ -16,6 +16,9 @@ type WizardStep =
   | 'replicate-env'
   | 'replicate-confirm'
   | 'replicate-input'
+  | 'tavily-env'
+  | 'tavily-confirm'
+  | 'tavily-input'
   | 'user-name'
   | 'user-pronouns'
   | 'user-memory'
@@ -52,6 +55,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   const replicateKey = process.env.REPLICATE_API_KEY;
+  const tavilyKey = process.env.TAVILY_API_KEY;
 
   // Reset input states when step changes
   React.useEffect(() => {
@@ -279,7 +283,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setProviders({ ...providers, replicate: { apiKey: replicateKey } });
             }
-            setStep('user-name');
+            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
           }}
         />
       </Box>
@@ -306,7 +310,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setStep('replicate-input');
             } else {
-              setStep('user-name');
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
             }
           }}
         />
@@ -342,6 +346,101 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
                 return;
               }
               setProviders({ ...providers, replicate: { apiKey } });
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            }}
+          />
+        </Box>
+        {error && (
+          <Box marginTop={1}>
+            <Text color="red">{error}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Enter to continue, ESC to skip</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Tavily - Environment Key Detected
+  if (step === 'tavily-env' && tavilyKey) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text>Tavily API key detected in environment. Use it?</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              setProviders({ ...providers, tavily: { apiKey: tavilyKey } });
+            }
+            setStep('user-name');
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Tavily - Ask to Configure
+  if (step === 'tavily-env' && !tavilyKey) {
+    setStep('tavily-confirm');
+  }
+
+  if (step === 'tavily-confirm') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text>Would you like to configure Tavily? (Optional - enables web search)</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              setStep('tavily-input');
+            } else {
+              setStep('user-name');
+            }
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Tavily - Input API Key
+  if (step === 'tavily-input') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Tavily Setup
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Get your API key from: https://tavily.com</Text>
+          <Text dimColor>Note: Tavily provides web search capabilities for the Internet agent.</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={apiKey}
+            onChange={(value) => {
+              setApiKey(value);
+              setError(null);
+            }}
+            placeholder="tvly-..."
+            onSubmit={() => {
+              if (!apiKey) {
+                setError('API key is required');
+                return;
+              }
+              setProviders({ ...providers, tavily: { apiKey } });
               setStep('user-name');
             }}
           />

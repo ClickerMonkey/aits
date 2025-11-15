@@ -94,10 +94,15 @@ export const ReplicateConfigSchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const TavilyConfigSchema = z.object({
+  apiKey: z.string(),
+});
+
 export const ProvidersSchema = z.object({
   openai: OpenAIConfigSchema.nullable(),
   openrouter: OpenRouterConfigSchema.nullable(),
   replicate: ReplicateConfigSchema.nullable(),
+  tavily: TavilyConfigSchema.nullable(),
 });
 
 // ============================================================================
@@ -249,6 +254,10 @@ export const OperationKindSchema = z.enum([
   'assistant_add',
   'memory_list',
   'memory_update',
+  // internet
+  'web_search',
+  'web_get_page',
+  'web_api_call',
 ]);
 
 export const OperationSchema = z.object({

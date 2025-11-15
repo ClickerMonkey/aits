@@ -803,6 +803,10 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
         label: `Replicate ${providers.replicate ? '✅' : '❌'}`,
         value: 'replicate',
       },
+      {
+        label: `Tavily ${providers.tavily ? '✅' : '❌'} (Web Search)`,
+        value: 'tavily',
+      },
       { label: '← Back', value: '__back__' },
     ];
 
@@ -882,6 +886,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       openai: 'https://platform.openai.com/api-keys',
       openrouter: 'https://openrouter.ai/settings/keys',
       replicate: 'https://replicate.com/account/api-tokens',
+      tavily: 'https://tavily.com',
     };
 
     return (
