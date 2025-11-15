@@ -19,11 +19,9 @@ Importing files should be done with searchFiles + processFile.
 ### Adding Tools
 How to:
 1. Add tool name to OperationKindSchema in schemas.ts
-2. Update chat-agent.ts delegate tool with the signature of the tool
-3. Add tool definition in tools/[agent].ts, add it to tool list at the bottom
-4. Add tool operation implementation in operations/[agent].tsx
+2. Add tool definition in tools/[agent].ts, add it to tool list at the bottom
+3. Add tool operation implementation in operations/[agent].tsx
 
 ### Update Tools
-1. Update chat-agent.ts delegate tool if the signature has changed
-2. Update tool definition in tools/[agent].ts
-3. Update tool operation implementation in operations/[agent].tsx
+1. Update tool definition in tools/[agent].ts
+2. Update tool operation implementation in operations/[agent].tsx
