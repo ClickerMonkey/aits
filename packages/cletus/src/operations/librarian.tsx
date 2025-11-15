@@ -141,7 +141,7 @@ export const knowledge_add = operationOf<
 
 export const knowledge_delete = operationOf<
   { sourcePattern: string; caseSensitive?: boolean },
-  { sourcePattern: string; caseSensitive: boolean; deletedCount: number; matchedSources: string[] }
+  { deletedCount: number }
 >({
   mode: 'delete',
   signature: 'knowledge_delete(sourcePattern: string, caseSensitive?: boolean)',
@@ -213,26 +213,10 @@ export const knowledge_delete = operationOf<
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
-    // Collect matching sources for output
-    const data = knowledge.getData();
-    const matchingSources = new Set<string>();
-    for (const entries of Object.values(data.knowledge)) {
-      for (const entry of entries) {
-        if (regex.test(entry.source)) {
-          matchingSources.add(entry.source);
-        }
-      }
-    }
-
     // Delete entries matching the pattern
     const deletedCount = await knowledge.deleteWhere((entry) => regex.test(entry.source));
 
-    return {
-      sourcePattern: input.sourcePattern,
-      caseSensitive: input.caseSensitive !== false,
-      deletedCount,
-      matchedSources: Array.from(matchingSources).sort().slice(0, 10),
-    };
+    return { deletedCount };
   },
   render: (op) => renderOperation(
     op,

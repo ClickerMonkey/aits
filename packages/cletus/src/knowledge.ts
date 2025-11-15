@@ -95,8 +95,8 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
    * Delete knowledge entries matching a predicate function
    */
   async deleteWhere(predicate: (entry: KnowledgeEntry) => boolean): Promise<number> {
-    let deletedCount = 0;
-    await this.save((knowledge) => {
+    return this.save((knowledge) => {
+      let deletedCount = 0;
       for (const model in knowledge.knowledge) {
         const originalLength = knowledge.knowledge[model].length;
         knowledge.knowledge[model] = knowledge.knowledge[model].filter(
@@ -104,8 +104,8 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
         );
         deletedCount += originalLength - knowledge.knowledge[model].length;
       }
+      return deletedCount;
     });
-    return deletedCount;
   }
 
   /**
