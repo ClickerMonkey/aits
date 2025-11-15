@@ -1,0 +1,59 @@
+{
+  "name": "@aits/aws",
+  "version": "0.1.0",
+  "description": "@aits AWS - AWS Bedrock integration for @aits",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:unit": "jest --testPathIgnorePatterns=__integration__",
+    "test:integration": "jest --testPathPattern=__integration__",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=__integration__",
+    "test:watch": "jest --watch",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "aws",
+    "bedrock",
+    "typescript"
+  ],
+  "author": "ClickerMonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClickerMonkey/aits.git",
+    "directory": "packages/aws"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@aits/ai": "^0.1.0",
+    "@aits/core": "^0.1.0",
+    "@aws-sdk/client-bedrock": "^3.709.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.709.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "bugs": {
+    "url": "https://github.com/ClickerMonkey/aits/issues"
+  }
+}
