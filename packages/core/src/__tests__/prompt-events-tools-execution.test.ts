@@ -625,7 +625,7 @@ describe('Prompt 100% Coverage', () => {
         estimateUsage: (msg: Message) => {
           estimateCalls++;
           const tokens = msg.content.length * 0.25;
-          return { inputTokens: tokens, totalTokens: tokens };
+          return { text: { input: tokens } };
         },
         maxOutputTokens: 1000
       };

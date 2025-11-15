@@ -402,7 +402,7 @@ export abstract class BaseAPI<
    * @param selected - The selected model and provider
    */
   protected estimateRequestUsage(request: TRequest, selected: SelectedModelFor<T>): Usage {
-    return { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    return {};
   }
 
   /**

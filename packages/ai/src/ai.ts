@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
+import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';
@@ -437,11 +437,18 @@ export class AI<T extends AIBaseTypes> {
    * Estimate usage for a message (used by API classes and Prompts)
    * 
    * @param message - Message to estimate usage for
-   * @returns Usage statistics including tokens for text, images, audio, etc.
+   * @returns Usage statistics structured to match ModelPricing
    */
   estimateMessageUsage(message: Message): Usage {
+    const usage: Usage = {};
+
+    // If message has pre-calculated tokens, return as text input
     if (message.tokens !== undefined) {
-      return { inputTokens: message.tokens, totalTokens: message.tokens };
+      return {
+        text: {
+          input: message.tokens
+        }
+      };
     }
 
     let textTokens = 0;
@@ -514,12 +521,25 @@ export class AI<T extends AIBaseTypes> {
       }
     }
 
-    const totalTokens = textTokens + imageTokens + audioTokens + fileTokens;
+    // Build structured usage object
+    if (textTokens > 0) {
+      usage.text = { input: textTokens };
+    }
+    if (imageTokens > 0) {
+      usage.image = { input: imageTokens };
+    }
+    if (audioTokens > 0) {
+      usage.audio = { input: audioTokens };
+    }
+    // fileTokens are treated as text for now
+    if (fileTokens > 0) {
+      if (!usage.text) {
+        usage.text = {};
+      }
+      usage.text.input = (usage.text.input || 0) + fileTokens;
+    }
 
-    return {
-      inputTokens: totalTokens,
-      totalTokens,
-    };
+    return usage;
   }
 
   /**
@@ -527,12 +547,11 @@ export class AI<T extends AIBaseTypes> {
    * @internal
    */
   estimateRequestUsage(request: Request): Usage {
-    const usage: Usage = { inputTokens: 0, totalTokens: 0 };
+    const usage: Usage = {};
     
     for (const msg of request.messages) {
       const msgUsage = this.estimateMessageUsage(msg);
-      usage.inputTokens = (usage.inputTokens || 0) + (msgUsage.inputTokens || 0);
-      usage.totalTokens = (usage.totalTokens || 0) + (msgUsage.totalTokens || 0);
+      accumulateUsage(usage, msgUsage);
     }
     
     return usage;
@@ -540,6 +559,7 @@ export class AI<T extends AIBaseTypes> {
 
   /**
    * Calculate cost for a request (used by API classes)
+   * Matches the structure of Usage to ModelPricing for accurate cost calculation.
    * @internal
    */
   calculateCost(
@@ -558,54 +578,75 @@ export class AI<T extends AIBaseTypes> {
     
     let cost = 0;
 
-    if (usage.inputTokens && model.pricing.text?.input) {
-      const inputCost = (usage.inputTokens * model.pricing.text.input) / 1_000_000;
-      cost += inputCost;
+    // Text usage costs
+    if (usage.text && pricing.text) {
+      if (usage.text.input && pricing.text.input) {
+        cost += (usage.text.input * pricing.text.input) / 1_000_000;
+      }
+      if (usage.text.output && pricing.text.output) {
+        cost += (usage.text.output * pricing.text.output) / 1_000_000;
+      }
+      if (usage.text.cached && pricing.text.cached) {
+        cost += (usage.text.cached * pricing.text.cached) / 1_000_000;
+      }
     }
 
-    if (usage.outputTokens && model.pricing.text?.output) {
-      const outputCost = (usage.outputTokens * model.pricing.text.output) / 1_000_000;
-      cost += outputCost;
+    // Audio usage costs
+    if (usage.audio && pricing.audio) {
+      // Time-based pricing (per second)
+      if (usage.audio.seconds && pricing.audio.perSecond) {
+        cost += usage.audio.seconds * pricing.audio.perSecond;
+      }
+      // Token-based pricing
+      if (usage.audio.input && pricing.audio.input) {
+        cost += (usage.audio.input * pricing.audio.input) / 1_000_000;
+      }
+      if (usage.audio.output && pricing.audio.output) {
+        cost += (usage.audio.output * pricing.audio.output) / 1_000_000;
+      }
     }
 
-    if (usage.cachedTokens && model.pricing.text?.cached) {
-      const cachedCost = (usage.cachedTokens * model.pricing.text?.cached) / 1_000_000;
-      cost += cachedCost;
+    // Image usage costs
+    if (usage.image && pricing.image) {
+      // Input image tokens (for image analysis)
+      if (usage.image.input && pricing.image.input) {
+        cost += (usage.image.input * pricing.image.input) / 1_000_000;
+      }
+      // Output image costs (for image generation)
+      if (usage.image.output && pricing.image.output) {
+        for (const usageOutput of usage.image.output) {
+          // Find matching price for this quality/size
+          const priceEntry = pricing.image.output.find(p => p.quality === usageOutput.quality);
+          if (priceEntry) {
+            const sizeEntry = priceEntry.sizes.find(
+              s => s.width === usageOutput.size.width && s.height === usageOutput.size.height
+            );
+            if (sizeEntry) {
+              cost += sizeEntry.cost * usageOutput.count;
+            }
+          }
+        }
+      }
     }
 
-    if (usage.reasoningTokens && model.pricing.reasoning?.output) {
-      const reasoningCost = (usage.reasoningTokens * model.pricing.reasoning.output) / 1_000_000;
-      cost += reasoningCost;
+    // Reasoning usage costs
+    if (usage.reasoning && pricing.reasoning) {
+      if (usage.reasoning.input && pricing.reasoning.input) {
+        cost += (usage.reasoning.input * pricing.reasoning.input) / 1_000_000;
+      }
+      if (usage.reasoning.output && pricing.reasoning.output) {
+        cost += (usage.reasoning.output * pricing.reasoning.output) / 1_000_000;
+      }
+      if (usage.reasoning.cached && pricing.reasoning.cached) {
+        cost += (usage.reasoning.cached * pricing.reasoning.cached) / 1_000_000;
+      }
     }
 
-    // Audio time-based pricing (for speech/transcription)
-    if (usage.seconds && pricing.audio?.perSecond) {
-      const timeCost = usage.seconds * pricing.audio.perSecond;
-      cost += timeCost;
-    }
-
-    // Audio token-based pricing (if available)
-    // Note: Audio input/output can be priced per token in some models
-    if (pricing.audio?.input && usage.inputTokens && !pricing.text?.input) {
-      // Only apply audio input pricing if text pricing is not set (to avoid double-counting)
-      const audioCost = (usage.inputTokens * pricing.audio.input) / 1_000_000;
-      cost += audioCost;
-    }
-    if (pricing.audio?.output && usage.outputTokens && !pricing.text?.output) {
-      // Only apply audio output pricing if text pricing is not set (to avoid double-counting)
-      const audioCost = (usage.outputTokens * pricing.audio.output) / 1_000_000;
-      cost += audioCost;
-    }
-
-    // Image pricing is typically per-image rather than per-token
-    // Image generation costs are usually calculated in the image API based on request parameters
-    // (size, quality, number of images) using pricing.image.output
-    
-    // Embeddings cost (typically per token for embedding models)
-    if (pricing.embeddings?.cost && usage.inputTokens && !pricing.text?.input) {
-      // Only apply embeddings pricing if text pricing is not set (to avoid double-counting)
-      const embeddingCost = (usage.inputTokens * pricing.embeddings.cost) / 1_000_000;
-      cost += embeddingCost;
+    // Embeddings usage costs
+    if (usage.embeddings && pricing.embeddings) {
+      if (usage.embeddings.tokens && pricing.embeddings.cost) {
+        cost += (usage.embeddings.tokens * pricing.embeddings.cost) / 1_000_000;
+      }
     }
 
     // Fixed cost per request

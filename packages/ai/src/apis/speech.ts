@@ -88,7 +88,18 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
 
   protected estimateRequestUsage(request: SpeechRequest): Usage {
     const tokens = Math.ceil(request.text.length / 4);
-    return { inputTokens: tokens, totalTokens: tokens };
+    // Estimate output audio duration (rough estimate: 150 words per minute, 4 chars per word)
+    const estimatedMinutes = (request.text.length / 4 / 150);
+    const estimatedSeconds = estimatedMinutes * 60;
+    
+    return {
+      text: {
+        input: tokens
+      },
+      audio: {
+        seconds: estimatedSeconds
+      }
+    };
   }
 
   protected responseToChunks(response: SpeechResponse): SpeechResponse[] {

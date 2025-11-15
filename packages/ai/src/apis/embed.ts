@@ -83,7 +83,12 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
   protected estimateRequestUsage(request: EmbeddingRequest): Usage {
     const totalTextLength = request.texts.reduce((sum, text) => sum + text.length, 0);
     const tokens = Math.ceil(totalTextLength / 4);
-    return { inputTokens: tokens, totalTokens: tokens };
+    return {
+      embeddings: {
+        count: request.texts.length,
+        tokens
+      }
+    };
   }
 
   protected responseToChunks(response: EmbeddingResponse): never {

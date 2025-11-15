@@ -80,8 +80,20 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
   // ============================================================================
 
   protected estimateRequestUsage(): Usage {
-    const tokens = 1000; // Default estimate for audio
-    return { inputTokens: tokens, totalTokens: tokens };
+    // Default estimate for audio transcription
+    // Assume 1 minute of audio ~ 200 tokens of output
+    const estimatedMinutes = 1;
+    const estimatedTokens = estimatedMinutes * 200;
+    
+    return {
+      audio: {
+        seconds: estimatedMinutes * 60,
+        input: 1000 // Rough estimate for audio input tokens
+      },
+      text: {
+        output: estimatedTokens
+      }
+    };
   }
 
   protected async *executeStreamRequest(

@@ -90,7 +90,8 @@ describeIntegration('OpenRouter Integration', () => {
       expect(response.usage).toBeDefined();
 
       console.log(`  Response: ${response.content}`);
-      console.log(`  Tokens: ${response.usage?.totalTokens}`);
+      const totalTokens = (response.usage?.text?.input || 0) + (response.usage?.text?.output || 0);
+      console.log(`  Tokens: ${totalTokens}`);
     }, 30000);
 
     it('should stream chat completion', async () => {

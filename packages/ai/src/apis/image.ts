@@ -82,12 +82,26 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
   }
 
   protected estimateRequestUsage(request: ImageGenerationRequest): Usage {
-    // Rough estimate based on prompt length and image size
+    // Parse size from request (e.g., "1024x1024", "1536x1024")
+    const [width, height] = (request.size || '1024x1024').split('x').map(Number);
+    const quality = request.quality || 'standard';
+    const count = request.n || 1;
+
+    // Prompt tokens (text input)
     const promptTokens = Math.ceil(request.prompt.length / 4);
-    const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    const qualityMultiplier = request.quality === 'high' ? 2 : 1;
-    const tokens = promptTokens * sizeMultiplier * qualityMultiplier;
-    return { inputTokens: tokens, totalTokens: tokens };
+
+    return {
+      text: {
+        input: promptTokens
+      },
+      image: {
+        output: [{
+          quality,
+          size: { width, height },
+          count
+        }]
+      }
+    };
   }
 
   protected async executeRequest(
@@ -212,11 +226,29 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
   }
 
   protected estimateRequestUsage(request: ImageEditRequest): Usage {
-    // Rough estimate based on prompt length and image size
+    // Parse size from request
+    const [width, height] = (request.size || '1024x1024').split('x').map(Number);
+    const count = request.n || 1;
+    
+    // Prompt tokens (text input)
     const promptTokens = Math.ceil(request.prompt.length / 4);
-    const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    const tokens = promptTokens * sizeMultiplier;
-    return { inputTokens: tokens, totalTokens: tokens };
+
+    // Estimate input image tokens (assuming standard quality)
+    const imageInputTokens = 1000; // Rough estimate for input image processing
+
+    return {
+      text: {
+        input: promptTokens
+      },
+      image: {
+        input: imageInputTokens,
+        output: [{
+          quality: 'standard',
+          size: { width, height },
+          count
+        }]
+      }
+    };
   }
 
   protected async executeRequest(

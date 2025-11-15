@@ -273,7 +273,7 @@ describe('Prompt Final Coverage', () => {
         ],
         estimateUsage: () => {
           estimatorCalled = true;
-          return { inputTokens: 10, totalTokens: 10 };
+          return { text: { input: 10 } };
         },
         maxOutputTokens: 500
       };

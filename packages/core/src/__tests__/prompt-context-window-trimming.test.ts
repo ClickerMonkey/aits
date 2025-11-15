@@ -51,7 +51,7 @@ describe('Prompt Forget Function Coverage', () => {
       ],
       estimateUsage: (msg: Message) => {
         estimateCallCount++;
-        return { inputTokens: 200, totalTokens: 200 }; // Higher estimate to trigger trimming
+        return { text: { input: 200 } }; // Higher estimate to trigger trimming
       },
       maxOutputTokens: 500
     };
