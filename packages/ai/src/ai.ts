@@ -578,16 +578,40 @@ export class AI<T extends AIBaseTypes> {
       cost += reasoningCost;
     }
 
-    if (usage.seconds && model.pricing.audio?.perSecond) {
-      const timeCost = usage.seconds * model.pricing.audio.perSecond;
+    // Audio time-based pricing (for speech/transcription)
+    if (usage.seconds && pricing.audio?.perSecond) {
+      const timeCost = usage.seconds * pricing.audio.perSecond;
       cost += timeCost;
     }
 
-    if (model.pricing.perRequest) {
-      cost += model.pricing.perRequest;
+    // Audio token-based pricing (if available)
+    // Note: Audio input/output can be priced per token in some models
+    if (pricing.audio?.input && usage.inputTokens && !pricing.text?.input) {
+      // Only apply audio input pricing if text pricing is not set (to avoid double-counting)
+      const audioCost = (usage.inputTokens * pricing.audio.input) / 1_000_000;
+      cost += audioCost;
+    }
+    if (pricing.audio?.output && usage.outputTokens && !pricing.text?.output) {
+      // Only apply audio output pricing if text pricing is not set (to avoid double-counting)
+      const audioCost = (usage.outputTokens * pricing.audio.output) / 1_000_000;
+      cost += audioCost;
     }
 
-    // TODO non text input & output tokens
+    // Image pricing is typically per-image rather than per-token
+    // Image generation costs are usually calculated in the image API based on request parameters
+    // (size, quality, number of images) using pricing.image.output
+    
+    // Embeddings cost (typically per token for embedding models)
+    if (pricing.embeddings?.cost && usage.inputTokens && !pricing.text?.input) {
+      // Only apply embeddings pricing if text pricing is not set (to avoid double-counting)
+      const embeddingCost = (usage.inputTokens * pricing.embeddings.cost) / 1_000_000;
+      cost += embeddingCost;
+    }
+
+    // Fixed cost per request
+    if (pricing.perRequest) {
+      cost += pricing.perRequest;
+    }
 
     return cost;
   }

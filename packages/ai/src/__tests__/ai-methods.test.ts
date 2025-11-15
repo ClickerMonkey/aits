@@ -2,7 +2,7 @@
  * AI Class Methods Tests
  *
  * Tests for AI instance methods like buildContext, buildMetadata,
- * selectModel, estimateTokens, etc.
+ * selectModel, estimateUsage, etc.
  */
 
 import { AI } from '../ai';

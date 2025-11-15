@@ -606,7 +606,7 @@ describe('Prompt Final Coverage Lines', () => {
           { role: 'user', content: 'Message 1' },
           { role: 'assistant', content: 'Response 1' }
         ]
-        // No estimateTokens, no usage, messages have no tokens
+        // No estimateUsage, no usage, messages have no tokens
       };
 
       await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('no token usage was provided');
