@@ -668,7 +668,7 @@ export const file_read = operationOf<
 
 export const file_edit = operationOf<
   { path: string; request: string; offset?: number; limit?: number },
-  { oldContent: string; newContent: string; changed: boolean }
+  { oldContent: string; newContent: string; changed: boolean; diff: string }
 >({
   mode: 'update',
   signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
@@ -743,6 +743,15 @@ export const file_edit = operationOf<
 
     const newContent = response.content;
 
+    // Generate unified diff to show what will be changed
+    const diff = Diff.createPatch(
+      input.path,
+      paginatedContent,
+      newContent,
+      'before',
+      'after'
+    );
+
     // Write the new content back to the file
     await fs.writeFile(fullPath, newContent, 'utf-8');
 
@@ -750,6 +759,7 @@ export const file_edit = operationOf<
       oldContent: paginatedContent,
       newContent,
       changed: paginatedContent !== newContent,
+      diff,
     };
   },
   render: (op) => {
@@ -776,21 +786,13 @@ export const file_edit = operationOf<
       summary = abbreviate(op.analysis.replaceAll(/\n/g, ' '), 60);
     }
     
-    // Generate unified diff if we have output
+    // Render diff if we have output with changes
     let diffContent = null;
-    if (op.output && op.output.changed) {
-      const diff = Diff.createPatch(
-        op.input.path,
-        op.output.oldContent,
-        op.output.newContent,
-        'before',
-        'after'
-      );
-      
+    if (op.output && op.output.changed && op.output.diff) {
       diffContent = React.createElement(
         Box,
         { marginLeft: 2, marginTop: 1, flexDirection: 'column' },
-        React.createElement(SyntaxHighlight, { code: diff, language: 'diff' })
+        React.createElement(SyntaxHighlight, { code: op.output.diff, language: 'diff' })
       );
     }
     
