@@ -217,6 +217,7 @@ export const OperationKindSchema = z.enum([
   'file_stats',
   'file_delete',
   'file_read',
+  'file_edit',
   'text_search',
   'dir_create',
   // dba

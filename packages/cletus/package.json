@@ -42,6 +42,7 @@
     "@aits/openrouter": "^0.1.0",
     "@aits/replicate": "^0.1.0",
     "@langchain/textsplitters": "^0.1.0",
+    "diff": "^8.0.2",
     "file-type": "^21.0.0",
     "glob": "^11.0.0",
     "handlebars": "^4.7.8",
@@ -63,6 +64,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "@types/file-type": "^10.6.0",
     "@types/node": "^24.9.1",
     "@types/pdf-parse": "^1.1.5",

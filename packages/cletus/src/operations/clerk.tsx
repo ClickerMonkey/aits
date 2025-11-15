@@ -2,6 +2,7 @@ import { getModel } from "@aits/core";
 import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
+import * as Diff from 'diff';
 import { describe, summarize, transcribe } from "../ai";
 import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
@@ -663,6 +664,156 @@ export const file_read = operationOf<
       return null;
     }
   ),
+});
+
+export const file_edit = operationOf<
+  { path: string; request: string; offset?: number; limit?: number },
+  { oldContent: string; newContent: string; changed: boolean }
+>({
+  mode: 'update',
+  signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
+  status: (input) => `Editing: ${path.basename(input.path)}`,
+  analyze: async (input, { cwd }) => {
+    const fullPath = path.resolve(cwd, input.path);
+    const readable = await fileIsReadable(fullPath);
+
+    if (!readable) {
+      return {
+        analysis: `This would fail - file "${input.path}" not found or not readable.`,
+        doable: false,
+      };
+    }
+
+    const writable = await fileIsWritable(fullPath);
+    if (!writable) {
+      return {
+        analysis: `This would fail - file "${input.path}" is not writable.`,
+        doable: false,
+      };
+    }
+
+    const type = await categorizeFile(fullPath, input.path);
+    if (type !== 'text') {
+      return {
+        analysis: `This would fail - file "${input.path}" is not a text file (type: ${type}).`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will read the text file "${input.path}", apply the requested changes, and update the file.`,
+      doable: true,
+    };
+  },
+  do: async (input, { cwd, ai }) => {
+    const fullPath = path.resolve(cwd, input.path);
+
+    // Read the file content
+    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    
+    // Paginate the text if offset/limit are provided
+    const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'characters');
+
+    // Use AI to generate new content based on the request
+    const models = ai.config.defaultContext!.config!.getData().user.models;
+    const model = models?.chat;
+
+    const response = await ai.chat.get({
+      model,
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.'
+        },
+        { 
+          role: 'user', 
+          content: `Current content:\n\`\`\`\n${paginatedContent}\n\`\`\`\n\nRequest: ${input.request}\n\nProvide the edited content:` 
+        },
+      ],
+      maxTokens: Math.max(8000, paginatedContent.length * 2),
+    }, {
+      metadata: {
+        minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
+        weights: {
+          cost: 0.3,
+          speed: 0.7,
+        },
+      }
+    });
+
+    const newContent = response.content;
+
+    // Write the new content back to the file
+    await fs.writeFile(fullPath, newContent, 'utf-8');
+
+    return {
+      oldContent: paginatedContent,
+      newContent,
+      changed: paginatedContent !== newContent,
+    };
+  },
+  render: (op) => {
+    const React = require('react');
+    const { Box, Text } = require('ink');
+    const SyntaxHighlight = require('ink-syntax-highlight').default;
+    const { getStatusInfo, getElapsedTime } = require('../helpers/render');
+    const { COLORS } = require('../constants');
+    
+    const { color: statusColor, label: statusLabel } = getStatusInfo(op.status);
+    const elapsed = getElapsedTime(op);
+    const operationLabel = `Edit("${paginateText(op.input.path, 100, -100)}")`;
+    
+    let summary = 'Processing...';
+    if (op.error) {
+      summary = op.error;
+    } else if (op.output) {
+      if (!op.output.changed) {
+        summary = 'No changes made';
+      } else {
+        summary = `Applied changes to ${path.basename(op.input.path)}`;
+      }
+    } else if (op.analysis) {
+      summary = abbreviate(op.analysis.replaceAll(/\n/g, ' '), 60);
+    }
+    
+    // Generate unified diff if we have output
+    let diffContent = null;
+    if (op.output && op.output.changed) {
+      const diff = Diff.createPatch(
+        op.input.path,
+        op.output.oldContent,
+        op.output.newContent,
+        'before',
+        'after'
+      );
+      
+      diffContent = React.createElement(
+        Box,
+        { marginLeft: 2, marginTop: 1, flexDirection: 'column' },
+        React.createElement(SyntaxHighlight, { code: diff, language: 'diff' })
+      );
+    }
+    
+    return React.createElement(
+      Box,
+      { flexDirection: 'column' },
+      React.createElement(
+        Box,
+        {},
+        React.createElement(Text, { color: statusColor as any }, '● '),
+        React.createElement(Text, {}, operationLabel + ' '),
+        React.createElement(Text, { dimColor: true }, '[' + statusLabel + '] '),
+        React.createElement(Text, { dimColor: true }, '(' + elapsed + ')')
+      ),
+      React.createElement(
+        Box,
+        { marginLeft: 2 },
+        React.createElement(Text, {}, ' → '),
+        React.createElement(Text, { color: op.error ? COLORS.ERROR_TEXT : undefined }, summary)
+      ),
+      diffContent
+    );
+  },
 });
 
 export const text_search = operationOf<
