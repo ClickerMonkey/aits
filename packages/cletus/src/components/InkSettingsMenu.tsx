@@ -31,6 +31,7 @@ type SettingsView =
   | 'manage-providers'
   | 'manage-provider-action'
   | 'manage-provider-input'
+  | 'manage-openrouter-settings'
   | 'manage-tavily'
   | 'manage-tavily-input'
   | 'manage-models'
@@ -920,6 +921,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     const items = isConfigured
       ? [
           { label: 'Update API key', value: 'update' },
+          ...(providerKey === 'openrouter' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
           { label: 'Remove provider', value: 'remove' },
           { label: '← Back', value: '__back__' },
         ]
@@ -950,6 +952,10 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
                 setMessage(`✓ ${providerKey} removed`);
                 setView('manage-providers');
               });
+              return;
+            }
+            if (item.value === 'configure') {
+              setView('manage-openrouter-settings');
               return;
             }
             setProviderAction(item.value as 'update');
@@ -997,6 +1003,57 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
         </Box>
         <Box marginTop={1}>
           <Text dimColor>Enter to submit, ESC to go back</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Manage OpenRouter Settings
+  if (view === 'manage-openrouter-settings') {
+    const openrouter = config.getData().providers.openrouter;
+    const zdrEnabled = openrouter?.defaultParams?.providers?.dataCollection === 'deny';
+
+    const items = [
+      { label: `🔒 Zero Data Retention (ZDR) ${zdrEnabled ? '✅' : '❌'}`, value: 'toggle-zdr' },
+      { label: '← Back', value: '__back__' },
+    ];
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            OpenRouter Settings
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Configure OpenRouter-specific options</Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={async (item) => {
+            if (item.value === '__back__') {
+              setView('manage-provider-action');
+              return;
+            }
+            if (item.value === 'toggle-zdr') {
+              const newZdrValue = !zdrEnabled;
+              await config.save((data) => {
+                if (data.providers.openrouter) {
+                  if (!data.providers.openrouter.defaultParams) {
+                    data.providers.openrouter.defaultParams = {};
+                  }
+                  if (!data.providers.openrouter.defaultParams.providers) {
+                    data.providers.openrouter.defaultParams.providers = {};
+                  }
+                  data.providers.openrouter.defaultParams.providers.dataCollection = newZdrValue ? 'deny' : 'allow';
+                }
+              });
+              setMessage(`✓ ZDR ${newZdrValue ? 'enabled' : 'disabled'} - Your data ${newZdrValue ? 'will not be stored' : 'may be stored'} by OpenRouter`);
+            }
+          }}
+        />
+        <Box marginTop={1}>
+          <Text dimColor>Zero Data Retention ensures your data is not stored by OpenRouter</Text>
         </Box>
       </Box>
     );
