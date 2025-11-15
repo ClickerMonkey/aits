@@ -427,6 +427,7 @@ KEYBOARD SHORTCUTS:
 • ESC         - Interrupt AI response or stop transcription
 • Alt+T       - Start/stop voice transcription
 • Alt+M       - Toggle agent mode (default/plan)
+• Alt+I/O     - Toggle operation input/output details
 • Alt+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
@@ -1058,6 +1059,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
               <Box flexDirection="column" marginLeft={2}>
                 <Text dimColor>Alt+T: transcribe</Text>
                 <Text dimColor>Alt+M: toggle agent mode</Text>
+                <Text dimColor>Alt+I/O: toggle op details</Text>
                 <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>
