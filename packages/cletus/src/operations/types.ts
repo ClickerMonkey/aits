@@ -85,9 +85,12 @@ export type OperationDefinition<TInput, TOutput> = {
    * If provided, this will be used instead of the default operation display.
    *
    * @param op - The operation to render
+   * @param config - Configuration file
+   * @param showInput - Whether to show detailed input
+   * @param showOutput - Whether to show detailed output
    * @returns - React component to display
    */
-  render?: (op: OperationOf<TInput, TOutput>, config: ConfigFile) => React.ReactNode;
+  render?: (op: OperationOf<TInput, TOutput>, config: ConfigFile, showInput?: boolean, showOutput?: boolean) => React.ReactNode;
 
   /**
    * A signature passed into the chat-agent's delegate prompt to identify this operation.

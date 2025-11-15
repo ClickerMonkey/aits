@@ -104,6 +104,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedInput, setSavedInput] = useState('');
+  const [showInput, setShowInput] = useState(false);
+  const [showOutput, setShowOutput] = useState(false);
+  const [renderKey, setRenderKey] = useState(0);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -224,6 +227,24 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       onChatUpdate({ agentMode: newAgentMode });
       setChatMeta({ ...chatMeta, agentMode: newAgentMode });
       addSystemMessage(`✓ Agent mode changed to: ${newAgentMode}`);
+      return;
+    }
+
+    // Alt+I to toggle operation input details
+    if (key.meta && input === 'i') {
+      const newShowInput = !showInput;
+      setShowInput(newShowInput);
+      setRenderKey(k => k + 1); // Force re-render of Static content
+      addSystemMessage(`✓ Operation input ${newShowInput ? 'shown' : 'hidden'}`);
+      return;
+    }
+
+    // Alt+O to toggle operation output details
+    if (key.meta && input === 'o') {
+      const newShowOutput = !showOutput;
+      setShowOutput(newShowOutput);
+      setRenderKey(k => k + 1); // Force re-render of Static content
+      addSystemMessage(`✓ Operation output ${newShowOutput ? 'shown' : 'hidden'}`);
       return;
     }
 
@@ -416,6 +437,8 @@ KEYBOARD SHORTCUTS:
 • ESC         - Interrupt AI response or stop transcription
 • Alt+T       - Start/stop voice transcription
 • Alt+M       - Toggle agent mode (default/plan)
+• Alt+I       - Toggle operation input details
+• Alt+O       - Toggle operation output details
 • Alt+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
@@ -953,16 +976,16 @@ After installation and the SoX executable is in the path, restart Cletus and try
           </Box>
         ) : (
           <>
-            <Static items={visibleMessages}>
+            <Static key={renderKey} items={visibleMessages}>
               {(msg: Message) => (
-                <MessageDisplay key={msg.created} message={msg} config={config}/>
+                <MessageDisplay key={msg.created} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} />
+              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
             )}
             {showPendingMessage && (
-              <MessageDisplay message={pendingMessage} config={config} />
+              <MessageDisplay message={pendingMessage} config={config} showInput={showInput} showOutput={showOutput} />
             )}
           </>
         )}
@@ -1047,6 +1070,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
               <Box flexDirection="column" marginLeft={2}>
                 <Text dimColor>Alt+T: transcribe</Text>
                 <Text dimColor>Alt+M: toggle agent mode</Text>
+                <Text dimColor>Alt+I: toggle op input</Text>
+                <Text dimColor>Alt+O: toggle op output</Text>
                 <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>

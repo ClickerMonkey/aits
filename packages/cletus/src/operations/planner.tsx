@@ -26,7 +26,7 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
 
     return { cleared: true };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     'TodosClear()',
     (op) => {
@@ -35,7 +35,7 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
@@ -54,7 +54,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return { todos: chatObject?.todos || [] };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     'TodosList()',
     (op) => {
@@ -64,7 +64,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_add = operationOf<{ name: string }, { id: string; name: string }>({
@@ -92,7 +92,7 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
 
     return { id, name: input.name };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `TodosAdd("${abbreviate(op.input.name, 30)}")`,
     (op) => {
@@ -101,7 +101,7 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }>({
@@ -143,7 +143,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
 
     return { id: input.id, done: true };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `TodosDone(id: ${abbreviate(op.input.id, 8)})`,
     (op) => {
@@ -152,7 +152,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
@@ -171,7 +171,7 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
     const todo = chatObject?.todos.find((t) => t.id === input.id);
     return { todo: todo || null };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `TodosGet(id: ${abbreviate(op.input.id, 8)})`,
     (op) => {
@@ -180,7 +180,7 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }>({
@@ -214,7 +214,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
 
     return { id: input.id, removed: true };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `TodosRemove(id: ${abbreviate(op.input.id, 8)})`,
     (op) => {
@@ -223,7 +223,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });
 
 export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number }>({
@@ -250,7 +250,7 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
 
     return { count: input.todos.length };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `TodosReplace(${op.input.todos.length} todos)`,
     (op) => {
@@ -259,5 +259,5 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
       }
       return null;
     }
-  ),
+  , showInput, showOutput),
 });

@@ -5,6 +5,35 @@ import { abbreviate, formatTime } from "../common";
 import { Operation } from "../schemas";
 
 /**
+ * Format a value for display in operation input/output
+ * - Arrays: JSON.stringify
+ * - Non-objects (primitives): String(x)
+ * - Objects: bullet list with hyphens, property values JSON.stringified
+ */
+function formatValue(value: any): React.ReactNode {
+  // Arrays: use JSON.stringify
+  if (Array.isArray(value)) {
+    return <Text>{JSON.stringify(value, null, 2)}</Text>;
+  }
+  
+  // Non-objects (primitives): use String(x)
+  if (typeof value !== 'object' || value === null) {
+    return <Text>{String(value)}</Text>;
+  }
+  
+  // Objects: bullet list with hyphens
+  return (
+    <Box flexDirection="column">
+      {Object.entries(value).map(([key, val], i) => (
+        <Box key={i}>
+          <Text>- {key}: {JSON.stringify(val)}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/**
  * Get status color and label for an operation status
  */
 export function getStatusInfo(status: Operation['status']): { color: string; label: string } {
@@ -68,11 +97,15 @@ export function getSummary(
  * @param op - The operation to render
  * @param operationLabel - Display label for the operation (e.g., "FileCreate(...)")
  * @param getSummaryText - Optional function to generate custom summary text
+ * @param showInput - Whether to show detailed input
+ * @param showOutput - Whether to show detailed output
  */
 export function renderOperation(
   op: Operation,
   operationLabel: string,
-  getSummaryText?: (op: Operation) => string | null
+  getSummaryText?: (op: Operation) => string | null,
+  showInput?: boolean,
+  showOutput?: boolean
 ): React.ReactNode {
   const { color: statusColor, label: statusLabel } = getStatusInfo(op.status);
   const elapsed = getElapsedTime(op);
@@ -90,6 +123,28 @@ export function renderOperation(
         <Text>{' → '}</Text>
         <Text color={op.error ? COLORS.ERROR_TEXT : undefined}>{summary}</Text>
       </Box>
+      
+      {showInput && (
+        <>
+          <Box marginLeft={2} marginTop={1}>
+            <Text bold dimColor>Input:</Text>
+          </Box>
+          <Box marginLeft={4} flexDirection="column">
+            {formatValue(op.input)}
+          </Box>
+        </>
+      )}
+      
+      {showOutput && op.output && (
+        <>
+          <Box marginLeft={2} marginTop={1}>
+            <Text bold dimColor>Output:</Text>
+          </Box>
+          <Box marginLeft={4} flexDirection="column">
+            {formatValue(op.output)}
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
