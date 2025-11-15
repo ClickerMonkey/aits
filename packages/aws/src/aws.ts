@@ -322,19 +322,71 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   // Anthropic (Claude) Model Implementation
   // ============================================================================
 
+  /**
+   * Convert tools to Anthropic format
+   */
+  private convertToolsToAnthropic(request: Request): any[] | undefined {
+    if (!request.tools || request.tools.length === 0) return undefined;
+
+    return request.tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: z.toJSONSchema(tool.parameters, { target: 'draft-7' }),
+    }));
+  }
+
+  /**
+   * Convert tool choice to Anthropic format
+   */
+  private convertToolChoiceToAnthropic(request: Request): any | undefined {
+    if (!request.toolChoice) return undefined;
+
+    if (request.toolChoice === 'auto') return { type: 'auto' };
+    if (request.toolChoice === 'required') return { type: 'any' };
+    if (request.toolChoice === 'none') return undefined;
+    if (typeof request.toolChoice === 'object') {
+      return { type: 'tool', name: request.toolChoice.tool };
+    }
+
+    return undefined;
+  }
+
   private async executeAnthropicModel(modelId: string, request: Request, ctx: AIContextAny): Promise<Response> {
     // Convert messages to Anthropic format
     const messages = this.convertMessagesToAnthropic(request);
-    const system = request.messages.find(m => m.role === 'system')?.content;
+    
+    // Join all system messages
+    const systemMessages = request.messages.filter(m => m.role === 'system');
+    const system = systemMessages.length > 0
+      ? systemMessages.map(m => typeof m.content === 'string' ? m.content : '').join('\n\n')
+      : undefined;
 
-    const body = {
+    // Convert tools
+    const tools = this.convertToolsToAnthropic(request);
+    const tool_choice = tools ? this.convertToolChoiceToAnthropic(request) : undefined;
+
+    interface AnthropicRequestBody {
+      anthropic_version: string;
+      max_tokens: number;
+      messages: any[];
+      system?: string;
+      temperature?: number;
+      top_p?: number;
+      stop_sequences?: string | string[];
+      tools?: any[];
+      tool_choice?: any;
+    }
+
+    const body: AnthropicRequestBody = {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: request.maxTokens || 4096,
       messages,
-      system: typeof system === 'string' ? system : undefined,
+      system,
       temperature: request.temperature,
       top_p: request.topP,
       stop_sequences: request.stop,
+      tools,
+      tool_choice,
     };
 
     try {
@@ -348,9 +400,27 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
+      // Extract text content and tool calls
+      let content = '';
+      const toolCalls: ToolCall[] = [];
+
+      if (responseBody.content && Array.isArray(responseBody.content)) {
+        for (const block of responseBody.content) {
+          if (block.type === 'text') {
+            content += block.text;
+          } else if (block.type === 'tool_use') {
+            toolCalls.push({
+              id: block.id,
+              name: block.name,
+              arguments: JSON.stringify(block.input),
+            });
+          }
+        }
+      }
+
       return {
-        content: responseBody.content?.[0]?.text || '',
-        toolCalls: [],
+        content,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason: this.mapAnthropicStopReason(responseBody.stop_reason),
         model: { id: modelId },
         usage: {
@@ -367,16 +437,39 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
   private async* streamAnthropicModel(modelId: string, request: Request, ctx: AIContextAny): AsyncGenerator<Chunk> {
     const messages = this.convertMessagesToAnthropic(request);
-    const system = request.messages.find(m => m.role === 'system')?.content;
+    
+    // Join all system messages
+    const systemMessages = request.messages.filter(m => m.role === 'system');
+    const system = systemMessages.length > 0
+      ? systemMessages.map(m => typeof m.content === 'string' ? m.content : '').join('\n\n')
+      : undefined;
 
-    const body = {
+    // Convert tools
+    const tools = this.convertToolsToAnthropic(request);
+    const tool_choice = tools ? this.convertToolChoiceToAnthropic(request) : undefined;
+
+    interface AnthropicRequestBody {
+      anthropic_version: string;
+      max_tokens: number;
+      messages: any[];
+      system?: string;
+      temperature?: number;
+      top_p?: number;
+      stop_sequences?: string | string[];
+      tools?: any[];
+      tool_choice?: any;
+    }
+
+    const body: AnthropicRequestBody = {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: request.maxTokens || 4096,
       messages,
-      system: typeof system === 'string' ? system : undefined,
+      system,
       temperature: request.temperature,
       top_p: request.topP,
       stop_sequences: request.stop,
+      tools,
+      tool_choice,
     };
 
     try {
@@ -395,6 +488,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
       let inputTokens = 0;
       let outputTokens = 0;
+      
+      // Track tool calls similar to OpenAI implementation
+      type ToolCallItem = { id: string; name: string; arguments: string; named: boolean; finished: boolean };
+      const toolCallsMap = new Map<number, ToolCallItem>();
 
       for await (const event of response.body) {
         if (event.chunk) {
@@ -405,6 +502,58 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
               content: chunk.delta.text,
               finishReason: undefined,
             };
+          } else if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'tool_use') {
+            // Start of a tool use block
+            const index = chunk.index;
+            const toolCall: ToolCallItem = {
+              id: chunk.content_block.id,
+              name: chunk.content_block.name,
+              arguments: '',
+              named: true,
+              finished: false,
+            };
+            toolCallsMap.set(index, toolCall);
+            
+            // Yield toolCallNamed event
+            yield {
+              toolCallNamed: {
+                id: toolCall.id,
+                name: toolCall.name,
+                arguments: toolCall.arguments,
+              },
+            };
+          } else if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'input_json_delta') {
+            // Tool input accumulation
+            const index = chunk.index;
+            const toolCall = toolCallsMap.get(index);
+            if (toolCall) {
+              toolCall.arguments += chunk.delta.partial_json;
+              
+              // Yield toolCallArguments event
+              yield {
+                toolCallArguments: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                },
+              };
+            }
+          } else if (chunk.type === 'content_block_stop') {
+            // Tool use block completed
+            const index = chunk.index;
+            const toolCall = toolCallsMap.get(index);
+            if (toolCall && !toolCall.finished) {
+              toolCall.finished = true;
+              
+              // Yield toolCall event
+              yield {
+                toolCall: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                },
+              };
+            }
           } else if (chunk.type === 'message_start' && chunk.message?.usage) {
             inputTokens = chunk.message.usage.input_tokens || 0;
           } else if (chunk.type === 'message_delta') {
@@ -433,9 +582,46 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       .filter(m => m.role !== 'system')
       .map(msg => {
         if (msg.role === 'assistant') {
+          // Handle assistant messages with tool calls
+          if (msg.toolCalls && msg.toolCalls.length > 0) {
+            const content: any[] = [];
+            
+            // Add text content if present
+            if (msg.content && typeof msg.content === 'string' && msg.content.trim()) {
+              content.push({ type: 'text', text: msg.content });
+            }
+            
+            // Add tool use blocks
+            for (const toolCall of msg.toolCalls) {
+              content.push({
+                type: 'tool_use',
+                id: toolCall.id,
+                name: toolCall.name,
+                input: JSON.parse(toolCall.arguments),
+              });
+            }
+            
+            return {
+              role: 'assistant',
+              content,
+            };
+          }
+          
           return {
             role: 'assistant',
             content: typeof msg.content === 'string' ? msg.content : '',
+          };
+        } else if (msg.role === 'tool') {
+          // Handle tool result messages
+          return {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: msg.toolCallId,
+                content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+              },
+            ],
           };
         } else if (msg.role === 'user') {
           // Handle text and image content
@@ -493,6 +679,8 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         return 'length';
       case 'stop_sequence':
         return 'stop';
+      case 'tool_use':
+        return 'tool_calls';
       default:
         return 'stop';
     }
