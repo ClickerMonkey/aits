@@ -5,6 +5,7 @@ import { createArchitectTools } from '../tools/architect';
 import { createArtistTools } from '../tools/artist';
 import { createClerkTools } from '../tools/clerk';
 import { createDBAAgent } from '../tools/dba';
+import { createInternetTools } from '../tools/internet';
 import { createLibrarianTools } from '../tools/librarian';
 import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
@@ -20,6 +21,7 @@ export function createSubAgents(ai: CletusAI) {
   const secretaryTools = createSecretaryTools(ai);
   const architectTools = createArchitectTools(ai);
   const artistTools = createArtistTools(ai);
+  const internetTools = createInternetTools(ai);
   const dba = createDBAAgent(ai);
 
   const filterTools = <TTools extends Tuple<AnyTool>>(tools: TTools) => {
@@ -228,6 +230,38 @@ You can generate new images, edit existing ones, analyze images, describe them, 
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
+  // Internet sub-agent
+  const internet = ai.prompt({
+    name: 'internet',
+    description: 'Handles web searches, page fetching, and REST API calls',
+    content: `You are the Internet agent for Cletus, responsible for web operations.
+
+Your role is to help with web searches, fetching web page content, and making REST API calls.
+
+You have been given the following request to perform by Cletus, the conversation follows.
+It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
+Do ONLY this part of the request, Cletus will handle other parts with other agents.
+<userRequest>
+{{request}}
+</userRequest>
+
+You can:
+- Search the web using Tavily API (requires API key to be configured)
+- Fetch and extract content from web pages (HTML or plain text, with optional regex filtering)
+- Make REST API calls to external services (GET, POST, PUT, DELETE, etc.)
+
+<userInformation>
+{{userPrompt}}
+</userInformation>
+`,
+    tools: internetTools,
+    retool: filterTools(internetTools),
+    metadataFn: (_, { config, chat }) => ({
+      model: chat?.model || config.getData().user.models?.chat,
+    }),
+    input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
+  });
+
   return [
     planner,
     librarian,
@@ -235,6 +269,7 @@ You can generate new images, edit existing ones, analyze images, describe them, 
     secretary,
     architect,
     artist,
+    internet,
     dba,
   ] as [
     typeof planner,
@@ -243,6 +278,7 @@ You can generate new images, edit existing ones, analyze images, describe them, 
     typeof secretary,
     typeof architect,
     typeof artist,
+    typeof internet,
     typeof dba,
   ];
 }

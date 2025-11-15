@@ -7,6 +7,7 @@ import * as architect from './architect';
 import * as artist from './artist';
 import * as clerk from './clerk';
 import * as dba from './dba';
+import * as internet from './internet';
 import * as librarian from './librarian';
 import * as planner from './planner';
 import * as secretary from './secretary';
@@ -111,6 +112,7 @@ export const Operations = {
   ...architect,
   ...dba,
   ...artist,
+  ...internet,
 } as const;
 
 // Operation type for a specific operation kind

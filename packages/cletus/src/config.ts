@@ -104,6 +104,7 @@ export class ConfigFile extends JsonFile<Config> {
         openrouter: null,
         replicate: null,
       },
+      tavily: null,
       assistants: DEFAULT_ASSISTANTS,
       chats: [],
       types: DEFAULT_TYPES,
