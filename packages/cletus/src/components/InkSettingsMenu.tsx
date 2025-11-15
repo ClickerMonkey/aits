@@ -39,7 +39,7 @@ type SettingsView =
   | 'change-timeout'
   | 'confirm';
 
-type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe';
+type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe' | 'edit';
 
 interface InkSettingsMenuProps {
   config: ConfigFile;
@@ -1019,6 +1019,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       { label: `📃 Summary: ${currentModels.summary || '(none)'}`, value: 'summary' },
       { label: `👁️ Describe: ${currentModels.describe || '(none)'}`, value: 'describe' },
       { label: `📑 Transcribe: ${currentModels.transcribe || '(none)'}`, value: 'transcribe' },
+      { label: `✍️ Edit: ${currentModels.edit || '(none)'}`, value: 'edit' },
       { label: '← Back', value: '__back__' },
     ];
 
@@ -1066,6 +1067,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       summary: ['chat'],
       describe: ['vision', 'chat'],
       transcribe: ['vision', 'chat'],
+      edit: ['chat'],
     };
 
     const modelTypeLabels: Record<ModelType, string> = {
@@ -1080,6 +1082,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       summary: 'Summarize Text',
       describe: 'Describe Image',
       transcribe: 'Transcribe Image',
+      edit: 'File Edit',
     };
 
     return (

@@ -29,6 +29,7 @@ export const UserSchema = z.object({
     summary: z.string().optional(),
     describe: z.string().optional(),
     transcribe: z.string().optional(),
+    edit: z.string().optional(),
   }).optional(),
   autonomous: z.object({
     maxIterations: z.number().min(AUTONOMOUS.MIN_ITERATIONS).default(AUTONOMOUS.DEFAULT_MAX_ITERATIONS),
@@ -62,6 +63,7 @@ export const OpenAIConfigSchema = z.object({
     transcription: z.string().optional(),
     speech: z.string().optional(),
     embedding: z.string().optional(),
+    edit: z.string().optional(),
   }).optional(),
 });
 
@@ -222,6 +224,7 @@ export const OperationKindSchema = z.enum([
   'file_stats',
   'file_delete',
   'file_read',
+  'file_edit',
   'text_search',
   'dir_create',
   // dba
