@@ -34,6 +34,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     openai: null,
     openrouter: null,
     replicate: null,
+    tavily: null,
   });
   const [name, setName] = useState('');
   const [pronouns, setPronouns] = useState('');

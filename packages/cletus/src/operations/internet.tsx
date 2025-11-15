@@ -111,7 +111,8 @@ export const web_get_page = operationOf<
       if (input.type === 'html') {
         content = await page.content();
       } else {
-        content = await page.evaluate(() => document.body.textContent || '');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        content = await page.evaluate(() => (globalThis as any).document.body.textContent || '');
       }
 
       const lines = content.split('\n');
