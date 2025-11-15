@@ -108,7 +108,7 @@ export const image_generate = operationOf<
       images: imagePaths,
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `ImageGenerate("${abbreviate(op.input.prompt, 30)}", n=${op.input.n || 1})`,
     (op) => {
@@ -118,7 +118,7 @@ export const image_generate = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const image_edit = operationOf<
@@ -169,7 +169,7 @@ export const image_edit = operationOf<
       editedPath: imageUrls[0],
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `ImageEdit("${path.basename(op.input.imagePath)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
@@ -179,7 +179,7 @@ export const image_edit = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const image_analyze = operationOf<
@@ -231,7 +231,7 @@ export const image_analyze = operationOf<
       analysis: response.content,
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `ImageAnalyze(${pluralize(op.input.imagePaths.length, 'image')}, "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
@@ -240,7 +240,7 @@ export const image_analyze = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const image_describe = operationOf<
@@ -280,7 +280,7 @@ export const image_describe = operationOf<
       description: response.content,
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `ImageDescribe("${path.basename(op.input.imagePath)}")`,
     (op) => {
@@ -289,7 +289,7 @@ export const image_describe = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const image_find = operationOf<
@@ -430,7 +430,7 @@ Do not return any additional text other than the matching description subset.`;
       };
     }
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `ImageFind("${abbreviate(op.input.query, 50)}", "${op.input.glob}")`,
     (op) => {

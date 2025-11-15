@@ -68,13 +68,15 @@ export function getSummary(
  * @param op - The operation to render
  * @param operationLabel - Display label for the operation (e.g., "FileCreate(...)")
  * @param getSummaryText - Optional function to generate custom summary text
- * @param showDetails - Whether to show detailed input/output
+ * @param showInput - Whether to show detailed input
+ * @param showOutput - Whether to show detailed output
  */
 export function renderOperation(
   op: Operation,
   operationLabel: string,
   getSummaryText?: (op: Operation) => string | null,
-  showDetails?: boolean
+  showInput?: boolean,
+  showOutput?: boolean
 ): React.ReactNode {
   const { color: statusColor, label: statusLabel } = getStatusInfo(op.status);
   const elapsed = getElapsedTime(op);
@@ -93,7 +95,7 @@ export function renderOperation(
         <Text color={op.error ? COLORS.ERROR_TEXT : undefined}>{summary}</Text>
       </Box>
       
-      {showDetails && (
+      {showInput && (
         <>
           <Box marginLeft={2} marginTop={1}>
             <Text bold dimColor>Input:</Text>
@@ -101,17 +103,17 @@ export function renderOperation(
           <Box marginLeft={4} flexDirection="column">
             <Text>{JSON.stringify(op.input, null, 2)}</Text>
           </Box>
-          
-          {op.output && (
-            <>
-              <Box marginLeft={2} marginTop={1}>
-                <Text bold dimColor>Output:</Text>
-              </Box>
-              <Box marginLeft={4} flexDirection="column">
-                <Text>{JSON.stringify(op.output, null, 2)}</Text>
-              </Box>
-            </>
-          )}
+        </>
+      )}
+      
+      {showOutput && op.output && (
+        <>
+          <Box marginLeft={2} marginTop={1}>
+            <Text bold dimColor>Output:</Text>
+          </Box>
+          <Box marginLeft={4} flexDirection="column">
+            <Text>{JSON.stringify(op.output, null, 2)}</Text>
+          </Box>
         </>
       )}
     </Box>

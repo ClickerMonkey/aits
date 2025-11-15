@@ -42,7 +42,7 @@ export const knowledge_search = operationOf<
       })),
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeSearch("${abbreviate(op.input.query, 25)}")`,
     (op) => {
@@ -52,7 +52,7 @@ export const knowledge_search = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
@@ -81,7 +81,7 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
 
     return { sources: Array.from(sources) };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     'KnowledgeSources()',
     (op) => {
@@ -91,7 +91,7 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const knowledge_add = operationOf<
@@ -127,7 +127,7 @@ export const knowledge_add = operationOf<
 
     return { source, added: true };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeAdd("${abbreviate(op.input.text, 30)}")`,
     (op) => {
@@ -136,7 +136,7 @@ export const knowledge_add = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 export const knowledge_delete = operationOf<
@@ -190,7 +190,7 @@ export const knowledge_delete = operationOf<
 
     return { sourcePrefix: input.sourcePrefix, deletedCount: count };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeDelete("${op.input.sourcePrefix}")`,
     (op) => {
@@ -199,5 +199,5 @@ export const knowledge_delete = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });

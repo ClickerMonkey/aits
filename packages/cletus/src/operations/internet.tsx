@@ -54,7 +54,7 @@ export const web_search = operationOf<
       results,
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `WebSearch("${abbreviate(op.input.query, 30)}")`,
     (op) => {
@@ -63,7 +63,7 @@ export const web_search = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
 
 // ============================================================================
@@ -211,7 +211,7 @@ export const web_get_page = operationOf<
       await browser.close();
     }
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `WebGetPage("${abbreviate(op.input.url, 30)}", ${op.input.type})`,
     (op) => {
@@ -334,7 +334,7 @@ export const web_api_call = operationOf<
       body: responseBody,
     };
   },
-  render: (op, config, showDetails) => renderOperation(
+  render: (op, config, showInput, showOutput) => renderOperation(
     op,
     `WebApiCall(${op.input.method} "${abbreviate(op.input.url, 25)}")`,
     (op) => {
@@ -343,5 +343,5 @@ export const web_api_call = operationOf<
       }
       return null;
     }
-  , showDetails),
+  , showInput, showOutput),
 });
