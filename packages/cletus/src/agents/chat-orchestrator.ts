@@ -138,9 +138,32 @@ export async function runChatOrchestrator(
         operations: [],
       };
 
-      // Override push to emit updates
+      // Helper to get or create the last text content entry (not tied to an operation)
+      const getLastTextContent = () => {
+        // Find the last content entry without an operationIndex
+        for (let i = pending.content.length - 1; i >= 0; i--) {
+          if (pending.content[i].type === 'text' && pending.content[i].operationIndex === undefined) {
+            return pending.content[i];
+          }
+        }
+        // Create a new text content entry if none exists
+        const newContent = { type: 'text' as const, content: '' };
+        pending.content.push(newContent);
+        return newContent;
+      };
+
+      // Override push to emit updates and add new content entry for next text
       pending.operations!.push = function (...items: Operation[]) {
         const result = Array.prototype.push.apply(this, items);
+        
+        // For each new operation, create a new content entry tied to it
+        for (let i = 0; i < items.length; i++) {
+          const op = items[i];
+          const operationIndex = pending.operations!.length - items.length + i;
+          // Add a new text content entry for text that comes after this operation
+          pending.content.push({ type: 'text', content: op.message || '', operationIndex });
+        }
+        
         onEvent({ type: 'pendingUpdate', pending });
         return result;
       };
@@ -212,27 +235,65 @@ export async function runChatOrchestrator(
 
           switch (chunk.type) {
             case 'textPartial':
-              pending.content[0].content += chunk.content;
-              setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
-              onEvent({ type: 'pendingUpdate', pending });
-              onEvent({ type: 'status', status: '' });
+              {
+                const lastContent = getLastTextContent();
+                lastContent.content += chunk.content;
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                setOutputTokens(Math.ceil(totalTextLength / 4));
+                onEvent({ type: 'pendingUpdate', pending });
+                onEvent({ type: 'status', status: '' });
+              }
+              break;
+
+            case 'text':
+              {
+                const lastContent = getLastTextContent();
+                lastContent.content += chunk.content;
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                setOutputTokens(Math.ceil(totalTextLength / 4));
+                onEvent({ type: 'pendingUpdate', pending });
+              }
               break;
 
             case 'textComplete':
-              pending.content[0].content = chunk.content;
-              onEvent({ type: 'pendingUpdate', pending });
+              {
+                // Set all text content (concatenated)
+                const allText = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .map(c => c.content)
+                  .join('');
+                // Only update if different from what we expect
+                if (allText !== chunk.content) {
+                  // Reset all text content and set to the complete text
+                  pending.content = pending.content.filter(c => c.operationIndex !== undefined);
+                  pending.content.unshift({ type: 'text', content: chunk.content });
+                }
+                onEvent({ type: 'pendingUpdate', pending });
+              }
               break;
 
             case 'complete':
-              pending.content[0].content = chunk.output;
-              onEvent({ type: 'pendingUpdate', pending });
+              {
+                // Set all text content to the output
+                pending.content = pending.content.filter(c => c.operationIndex !== undefined);
+                pending.content.unshift({ type: 'text', content: chunk.output });
+                onEvent({ type: 'pendingUpdate', pending });
+              }
               break;
 
             case 'textReset':
-              pending.content[0].content = '';
-              addDiscardedTokens(outputTokens);
-              setOutputTokens(0);
-              onEvent({ type: 'pendingUpdate', pending });
+              {
+                // Clear all non-operation text content
+                pending.content = pending.content.filter(c => c.operationIndex !== undefined);
+                pending.content.unshift({ type: 'text', content: '' });
+                addDiscardedTokens(outputTokens);
+                setOutputTokens(0);
+                onEvent({ type: 'pendingUpdate', pending });
+              }
               break;
 
             case 'requestTokens':
