@@ -282,6 +282,7 @@ export const OperationSchema = z.object({
 export const MessageContentSchema = z.object({
   type: z.enum(['text', 'image', 'file', 'audio']),
   content: z.string(),
+  operationIndex: z.number().optional(),
 });
 
 export const MessageSchema = z.object({

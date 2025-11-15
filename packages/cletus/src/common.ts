@@ -255,17 +255,24 @@ export function gate() {
  * @returns 
  */
 export function convertMessage(msg: Message): AIMessage {
+  // Build interleaved content array
+  const content: AIMessageContent[] = [];
+  
+  for (const msgContent of msg.content) {
+    // If this content has an operationIndex, insert the operation message before it
+    if (msgContent.operationIndex !== undefined && msg.operations && msg.operations[msgContent.operationIndex]) {
+      const op = msg.operations[msgContent.operationIndex];
+      content.push({ type: 'text', content: op.message || 'pending...' });
+    }
+    // Add the content itself
+    content.push(convertContent(msgContent));
+  }
+  
   return {
     role: msg.role,
     name: msg.name,
     tokens: msg.tokens,
-    content: [
-      ...(msg.operations 
-        ? msg.operations.map((op): AIMessageContent => ({ type: 'text', content: op.message || 'pending...' })) 
-        : []
-      ),
-      ...msg.content.map(convertContent)
-    ],
+    content,
   };
 }
 
