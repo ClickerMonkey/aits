@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import * as Diff from 'diff';
-import { describe, summarize, transcribe } from "../ai";
+import { CletusAI, describe, summarize, transcribe } from "../ai";
 import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
@@ -670,14 +670,14 @@ export const file_read = operationOf<
 async function generateFileEditDiff(
   input: { path: string; request: string; offset?: number; limit?: number },
   fileContent: string,
-  ai: any
+  ai: CletusAI
 ): Promise<{ newFileContent: string; diff: string; changed: boolean }> {
   // Paginate the text if offset/limit are provided (lines only)
   const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'lines');
 
   // Use AI to generate new content based on the request
   const models = ai.config.defaultContext!.config!.getData().user.models;
-  const model = models?.chat;
+  const model = models?.edit || models?.chat;
 
   const response = await ai.chat.get({
     model,
@@ -695,26 +695,14 @@ async function generateFileEditDiff(
   }, {
     metadata: {
       minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
-      weights: {
-        cost: 0.3,
-        speed: 0.7,
-      },
     }
   });
 
   const newPaginatedContent = response.content;
 
-  // Apply the changes to the full file content
-  const lines = fileContent.split('\n');
-  const limit = input.limit || CONSTS.MAX_LINES;
-  const offset = input.offset || 0;
-  const start = (offset + lines.length) % lines.length;
-  const end = Math.min(start + limit, lines.length);
-  
-  const newLines = [...lines];
-  const newPaginatedLines = newPaginatedContent.split('\n');
-  newLines.splice(start, end - start, ...newPaginatedLines);
-  const newFileContent = newLines.join('\n');
+  // Apply the changes to the full file content by replacing the paginated section
+  const paginatedIndex = fileContent.indexOf(paginatedContent);
+  const newFileContent = fileContent.slice(0, paginatedIndex) + newPaginatedContent + fileContent.slice(paginatedIndex + paginatedContent.length);
 
   // Generate unified diff to show what will be changed
   const diff = Diff.createPatch(
