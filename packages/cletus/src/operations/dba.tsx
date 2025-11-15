@@ -58,7 +58,7 @@ export const data_create = operationOf<
 
     return { id, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const firstField = Object.keys(op.input.fields)[0];
     const additionalCount = Object.keys(op.input.fields).length - 1;
@@ -73,7 +73,7 @@ export const data_create = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -119,7 +119,7 @@ export const data_update = operationOf<
 
     return { updated: true, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const fields = type.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
     
@@ -132,7 +132,7 @@ export const data_update = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -177,7 +177,7 @@ export const data_delete = operationOf<
 
     return { deleted: true, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
 
     return renderOperation(
@@ -189,7 +189,7 @@ export const data_delete = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -251,7 +251,7 @@ export const data_select = operationOf<
       results: results.slice(recordOffset, recordOffset + recordLimit),
     };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
@@ -268,7 +268,7 @@ export const data_select = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -321,7 +321,7 @@ export const data_update_many = operationOf<
 
     return { updated: matchingRecords.length, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const set = 'set=' + Object.keys(op.input.set).join(',');
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
@@ -337,7 +337,7 @@ export const data_update_many = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -395,7 +395,7 @@ export const data_delete_many = operationOf<
 
     return { deleted: matchingRecords.length, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
@@ -410,7 +410,7 @@ export const data_delete_many = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 
@@ -553,7 +553,7 @@ export const data_aggregate = operationOf<
 
     return { results };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const having = op.input.having ? `having=${whereString(op.input.having)}` : ''
@@ -603,7 +603,7 @@ export const data_index = operationOf<
 
     return { libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     return renderOperation(
       op,
@@ -818,7 +818,7 @@ export const data_import = operationOf<
     
     return { imported, updated, skipped, libraryKnowledgeUpdated };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     return renderOperation(
       op,
@@ -872,7 +872,7 @@ export const data_search = operationOf<
       })),
     };
   },
-  render: (op, config) => {
+  render: (op, config, showDetails) => {
     const type = getType(config, op.input.name);
     return renderOperation(
       op,
@@ -884,7 +884,7 @@ export const data_search = operationOf<
         }
         return null;
       }
-    );
+    , showDetails);
   },
 });
 

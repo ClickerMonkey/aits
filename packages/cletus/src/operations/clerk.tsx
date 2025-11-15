@@ -31,7 +31,7 @@ export const file_search = operationOf<
 
     return { glob: input.glob, count: files.length, files: files.slice(offset, limit) };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Files("${op.input.glob}")`,
     (op) => {
@@ -40,7 +40,7 @@ export const file_search = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_summary = operationOf<
@@ -110,7 +110,7 @@ export const file_summary = operationOf<
       summary: summarized.description!,
     };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Summarize("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -119,7 +119,7 @@ export const file_summary = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_index = operationOf<
@@ -217,7 +217,7 @@ export const file_index = operationOf<
       knowledge: knowledge.length,
     };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Index("${op.input.glob}", ${op.input.index})`,
     (op) => {
@@ -226,7 +226,7 @@ export const file_index = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_create = operationOf<
@@ -264,7 +264,7 @@ export const file_create = operationOf<
 
     return { size: input.content.length, lines };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Write("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -273,7 +273,7 @@ export const file_create = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_copy = operationOf<
@@ -341,7 +341,7 @@ export const file_copy = operationOf<
 
     return { source };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Copy("${op.input.glob}", "${op.input.target}")`,
     (op) => {
@@ -351,7 +351,7 @@ export const file_copy = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_move = operationOf<
@@ -444,7 +444,7 @@ export const file_move = operationOf<
 
     return { count: files.length, files };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Move("${op.input.glob}", "${op.input.target}")`,
     (op) => {
@@ -453,7 +453,7 @@ export const file_move = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_stats = operationOf<
@@ -516,7 +516,7 @@ export const file_stats = operationOf<
       characters
     };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `FileStats("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -526,7 +526,7 @@ export const file_stats = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_delete = operationOf<
@@ -557,7 +557,7 @@ export const file_delete = operationOf<
 
     return { deleted: true };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Delete("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -566,7 +566,7 @@ export const file_delete = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 export const file_read = operationOf<
@@ -654,7 +654,7 @@ export const file_read = operationOf<
       truncated: content.length === Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
     };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -663,7 +663,7 @@ export const file_read = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });
 
 // Helper function to generate file edit content and diff
@@ -780,7 +780,7 @@ export const file_edit = operationOf<
       changed,
     };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Edit("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -964,7 +964,7 @@ export const text_search = operationOf<
         return { searched: results.length, matches: pagedResults.map(r => ({ file: r.file, matches: r.matches })) };
     }
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Search("${abbreviate(op.input.regex, 20)}", "${op.input.glob}")`,
     (op) => {
@@ -1020,7 +1020,7 @@ export const dir_create = operationOf<
 
     return { created: true };
   },
-  render: (op) => renderOperation(
+  render: (op, config, showDetails) => renderOperation(
     op,
     `Dir("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -1029,5 +1029,5 @@ export const dir_create = operationOf<
       }
       return null;
     }
-  ),
+  , showDetails),
 });

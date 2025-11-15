@@ -12,6 +12,7 @@ import { logger } from '../logger';
 interface MessageDisplayProps {
   message: Message;
   config: ConfigFile;
+  showOperationDetails?: boolean;
 }
 
 type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean, backgroundColor?: string, color?: string; url?: string };
@@ -226,7 +227,7 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
 /**
  * Component for rendering a chat message with consistent styling
  */
-export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config }) => {
+export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config, showOperationDetails = false }) => {
   const isUser = message.role === 'user';
   const color = message.role === 'user' 
     ? COLORS.USER
@@ -275,7 +276,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config 
               {message.operations.map((op, i) => {
                 const operationDef = Operations[op.type];
                 if (operationDef?.render) {
-                  return <React.Fragment key={i}>{operationDef.render(op, config)}</React.Fragment>;
+                  return <React.Fragment key={i}>{operationDef.render(op, config, showOperationDetails)}</React.Fragment>;
                 }
                 return (
                   <Text key={i} dimColor>

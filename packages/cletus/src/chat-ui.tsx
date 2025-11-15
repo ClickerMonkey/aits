@@ -104,6 +104,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedInput, setSavedInput] = useState('');
+  const [showOperationDetails, setShowOperationDetails] = useState(false);
+  const [renderKey, setRenderKey] = useState(0);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -224,6 +226,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       onChatUpdate({ agentMode: newAgentMode });
       setChatMeta({ ...chatMeta, agentMode: newAgentMode });
       addSystemMessage(`✓ Agent mode changed to: ${newAgentMode}`);
+      return;
+    }
+
+    // Alt+I or Alt+O to toggle operation input/output details
+    if ((key.meta && input === 'i') || (key.meta && input === 'o')) {
+      const newShowDetails = !showOperationDetails;
+      setShowOperationDetails(newShowDetails);
+      setRenderKey(k => k + 1); // Force re-render of Static content
+      addSystemMessage(`✓ Operation details ${newShowDetails ? 'shown' : 'hidden'}`);
       return;
     }
 
@@ -953,16 +964,16 @@ After installation and the SoX executable is in the path, restart Cletus and try
           </Box>
         ) : (
           <>
-            <Static items={visibleMessages}>
+            <Static key={renderKey} items={visibleMessages}>
               {(msg: Message) => (
-                <MessageDisplay key={msg.created} message={msg} config={config}/>
+                <MessageDisplay key={msg.created} message={msg} config={config} showOperationDetails={showOperationDetails}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} />
+              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} showOperationDetails={showOperationDetails} />
             )}
             {showPendingMessage && (
-              <MessageDisplay message={pendingMessage} config={config} />
+              <MessageDisplay message={pendingMessage} config={config} showOperationDetails={showOperationDetails} />
             )}
           </>
         )}
