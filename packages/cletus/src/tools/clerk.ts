@@ -152,6 +152,27 @@ Example: Read a source file:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_read', input }, ctx),
   });
 
+  const fileEdit = ai.tool({
+    name: 'file_edit',
+    description: 'Edit a text file using AI-powered content generation',
+    instructions: `Use this to edit text files by providing a detailed request describing the changes. The AI will read the current content (with pagination support), generate new content based on your request, and create a unified diff showing exactly what will change.
+
+Only works on text files. The request should be precise with specific rules and instructions. Do not leave out any details, be as explicit as possible. Do not mistranslate any specific user requests.
+
+Example 1: Modify a configuration file:
+{ "path": "config/settings.json", "request": "Add a new field 'maxRetries' with value 3, and change 'timeout' from 5000 to 10000" }
+
+Example 2: Edit a specific section of a large file (by line numbers):
+{ "path": "src/utils.ts", "request": "Refactor the parseDate function to handle ISO 8601 format", "offset": 100, "limit": 50 }`,
+    schema: z.object({
+      path: z.string().describe('Relative file path to edit'),
+      request: z.string().describe('Detailed request describing the changes to make. Be precise with rules and requirements.'),
+      offset: z.number().optional().describe('Line offset to start editing from (default: 0). Negative numbers start from the end.'),
+      limit: z.number().optional().describe('Maximum lines to edit (default: 1000 lines)'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_edit', input }, ctx),
+  });
+
   const textSearch = ai.tool({
     name: 'text_search',
     description: 'Search for regex pattern in files',
@@ -213,6 +234,7 @@ Example: Create a new feature directory:
     fileStats,
     fileDelete,
     fileRead,
+    fileEdit,
     textSearch,
     dirCreate,
   ] as [
@@ -225,6 +247,7 @@ Example: Create a new feature directory:
     typeof fileStats,
     typeof fileDelete,
     typeof fileRead,
+    typeof fileEdit,
     typeof textSearch,
     typeof dirCreate,
   ];

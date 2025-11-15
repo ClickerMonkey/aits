@@ -29,6 +29,7 @@ export const UserSchema = z.object({
     summary: z.string().optional(),
     describe: z.string().optional(),
     transcribe: z.string().optional(),
+    edit: z.string().optional(),
   }).optional(),
   autonomous: z.object({
     maxIterations: z.number().min(AUTONOMOUS.MIN_ITERATIONS).default(AUTONOMOUS.DEFAULT_MAX_ITERATIONS),
@@ -62,6 +63,7 @@ export const OpenAIConfigSchema = z.object({
     transcription: z.string().optional(),
     speech: z.string().optional(),
     embedding: z.string().optional(),
+    edit: z.string().optional(),
   }).optional(),
 });
 
@@ -92,6 +94,10 @@ export const OpenRouterConfigSchema = OpenAIConfigSchema.extend({
 export const ReplicateConfigSchema = z.object({
   apiKey: z.string(),
   baseUrl: z.string().optional(),
+});
+
+export const TavilyConfigSchema = z.object({
+  apiKey: z.string(),
 });
 
 export const ProvidersSchema = z.object({
@@ -168,6 +174,7 @@ export const ConfigSchema = z.object({
   updated: z.number(),
   user: UserSchema,
   providers: ProvidersSchema,
+  tavily: TavilyConfigSchema.nullable(),
   assistants: z.array(AssistantSchema),
   chats: z.array(ChatMetaSchema),
   types: z.array(TypeDefinitionSchema),
@@ -217,6 +224,7 @@ export const OperationKindSchema = z.enum([
   'file_stats',
   'file_delete',
   'file_read',
+  'file_edit',
   'text_search',
   'dir_create',
   // dba
@@ -249,6 +257,10 @@ export const OperationKindSchema = z.enum([
   'assistant_add',
   'memory_list',
   'memory_update',
+  // internet
+  'web_search',
+  'web_get_page',
+  'web_api_call',
 ]);
 
 export const OperationSchema = z.object({

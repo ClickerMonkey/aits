@@ -2,7 +2,8 @@ import { getModel } from "@aits/core";
 import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
-import { describe, summarize, transcribe } from "../ai";
+import * as Diff from 'diff';
+import { CletusAI, describe, summarize, transcribe } from "../ai";
 import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
@@ -659,6 +660,136 @@ export const file_read = operationOf<
     (op) => {
       if (op.output) {
         return `Read ${op.output.content.length} characters${op.output.truncated ? ' (truncated)' : ''}`;
+      }
+      return null;
+    }
+  ),
+});
+
+// Helper function to generate file edit content and diff
+async function generateFileEditDiff(
+  input: { path: string; request: string; offset?: number; limit?: number },
+  fileContent: string,
+  ai: CletusAI
+): Promise<{ newFileContent: string; diff: string; changed: boolean }> {
+  // Paginate the text if offset/limit are provided (lines only)
+  const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'lines');
+
+  // Use AI to generate new content based on the request
+  const models = ai.config.defaultContext!.config!.getData().user.models;
+  const model = models?.edit || models?.chat;
+
+  const response = await ai.chat.get({
+    model,
+    messages: [
+      { 
+        role: 'system', 
+        content: 'You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.'
+      },
+      { 
+        role: 'user', 
+        content: `Current content:\n\`\`\`\n${paginatedContent}\n\`\`\`\n\nRequest: ${input.request}\n\nProvide the edited content:` 
+      },
+    ],
+    maxTokens: Math.max(8000, paginatedContent.length * 2),
+  }, {
+    metadata: {
+      minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
+    }
+  });
+
+  const newPaginatedContent = response.content;
+
+  // Apply the changes to the full file content by replacing the paginated section
+  const paginatedIndex = fileContent.indexOf(paginatedContent);
+  const newFileContent = fileContent.slice(0, paginatedIndex) + newPaginatedContent + fileContent.slice(paginatedIndex + paginatedContent.length);
+
+  // Generate unified diff to show what will be changed
+  const diff = Diff.createPatch(
+    input.path,
+    fileContent,
+    newFileContent,
+    'before',
+    'after'
+  );
+
+  return {
+    newFileContent,
+    diff,
+    changed: fileContent !== newFileContent,
+  };
+}
+
+export const file_edit = operationOf<
+  { path: string; request: string; offset?: number; limit?: number },
+  { diff: string; changed: boolean }
+>({
+  mode: 'update',
+  signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
+  status: (input) => `Editing: ${paginateText(input.path, 100, -100)}`,
+  analyze: async (input, { cwd, ai }) => {
+    const fullPath = path.resolve(cwd, input.path);
+    const readable = await fileIsReadable(fullPath);
+
+    if (!readable) {
+      return {
+        analysis: `This would fail - file "${input.path}" not found or not readable.`,
+        doable: false,
+      };
+    }
+
+    const writable = await fileIsWritable(fullPath);
+    if (!writable) {
+      return {
+        analysis: `This would fail - file "${input.path}" is not writable.`,
+        doable: false,
+      };
+    }
+
+    const type = await categorizeFile(fullPath, input.path);
+    if (type !== 'text') {
+      return {
+        analysis: `This would fail - file "${input.path}" is not a text file (type: ${type}).`,
+        doable: false,
+      };
+    }
+
+    // Read the file content and generate diff in analyze phase
+    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    const { diff } = await generateFileEditDiff(input, fileContent, ai);
+
+    return {
+      analysis: diff,
+      doable: true,
+    };
+  },
+  do: async (input, { cwd, ai }) => {
+    const fullPath = path.resolve(cwd, input.path);
+
+    // Read the file content
+    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    
+    // Generate new content and diff
+    const { newFileContent, diff, changed } = await generateFileEditDiff(input, fileContent, ai);
+
+    // Write the new content back to the file
+    await fs.writeFile(fullPath, newFileContent, 'utf-8');
+
+    return {
+      diff,
+      changed,
+    };
+  },
+  render: (op) => renderOperation(
+    op,
+    `Edit("${paginateText(op.input.path, 100, -100)}")`,
+    (op) => {
+      if (op.output) {
+        if (!op.output.changed) {
+          return 'No changes made';
+        } else {
+          return `Applied changes`;
+        }
       }
       return null;
     }

@@ -19,6 +19,7 @@ export function createChatAgent(ai: CletusAI) {
     { refs: secretaryTools },
     { refs: architectTools },
     { refs: artistTools },
+    { refs: internetTools },
     { refs: dbaTools },
   ] = subAgents;
 
@@ -46,6 +47,9 @@ ${architectTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n'
 - **artist**: Image generation, editing, analysis, and search
 ${artistTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
+- **internet**: Web searches, page fetching, and REST API calls
+${internetTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
+
 - **dba**: Data operations (create, update, delete, select, update many, delete many, aggregate) - when using this agent, you MUST specify the type of data to operate on using the 'type' parameter
 ${dbaTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
@@ -55,6 +59,7 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
 <rules>
 - If the user requests an action around data types defined that can be accomplished with a database query like tool call - use the 'dba'.
 - If the user requests anything related to images, use the 'artist' agent.
+- If the user requests anything related to web searches, fetching web pages, or making API calls, use the 'internet' agent.
 - If the user requests anything that would involve making multiple steps or tracking progress over time, use the 'planner' agent.
 - If the user requests anything related to file operations, use the 'clerk' agent.
 - If the user requests anything to a perceived data type that they don't have yet - confirm they want to create a new type with the 'architect' agent.
@@ -68,13 +73,13 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
 `,
     schema: ({ config }) => {
       return z.object({
-        agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
+        agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', 'dba']).describe('Which sub-agent to use'),
         request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls.'),
         typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
       });
     },
     refs: subAgents,
-    call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
+    call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, internet, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
 
       ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}`);
@@ -97,6 +102,7 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
             secretary,
             architect,
             artist,
+            internet,
           }[agent];
 
           if (!subAgent) {
