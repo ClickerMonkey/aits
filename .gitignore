@@ -5,6 +5,13 @@ package-lock.json
 # Build outputs
 dist/
 *.tsbuildinfo
+# Build artifacts in source directories
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts.map
+!packages/*/src/**/*.test.js
+!packages/*/src/**/__tests__/**/*.js
 
 # IDE
 .vscode/
