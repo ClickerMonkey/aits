@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
-import { ChatUI } from '../chat-ui.js';
-import { ChatFile } from '../chat.js';
-import type { ConfigFile } from '../config.js';
-import type { ChatMeta, Message } from '../schemas.js';
+import { ChatUI } from '../chat-ui';
+import { ChatFile } from '../chat';
+import type { ConfigFile } from '../config';
+import type { ChatMeta, Message } from '../schemas';
 
 interface InkChatViewProps {
   chatId: string;

@@ -2,22 +2,24 @@ import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import path from 'path';
 import React, { useEffect, useRef, useState } from 'react';
-import { createCletusAI } from './ai.js';
-import { ChatFile } from './chat.js';
-import { InkAnimatedText } from './components/InkAnimatedText.js';
-import { MessageDisplay } from './components/MessageDisplay.js';
-import { ModelSelector } from './components/ModelSelector.js';
-import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu.js';
-import { ConfigFile } from './config.js';
-import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas.js';
+import { createCletusAI } from './ai';
+import { ChatFile } from './chat';
+import { InkAnimatedText } from './components/InkAnimatedText';
+import { MessageDisplay } from './components/MessageDisplay';
+import { ModelSelector } from './components/ModelSelector';
+import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
+import { ConfigFile } from './config';
+import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
-import { createChatAgent } from './agents/chat-agent.js';
-import { runChatOrchestrator } from './agents/chat-orchestrator.js';
-import { logger } from './logger.js';
-import { fileIsDirectory } from './operations/file-helper.js';
-import { COLORS } from './constants.js';
+import { createChatAgent } from './agents/chat-agent';
+import { runChatOrchestrator } from './agents/chat-orchestrator';
+import { logger } from './logger';
+import { COLORS } from './constants';
+import { fileIsDirectory } from './helpers/files';
+import { useAdaptiveDebounce, useSyncedState } from './hooks';
+import { set } from 'zod';
 
 
 interface ChatUIProps {
@@ -85,13 +87,13 @@ const AGENTMODETEXT: Record<AgentMode, string> = {
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
   const [inputValue, setInputValue] = useState('');
-  const [chatMessages, setChatMessages] = useState<Message[]>(messages);
+  const [chatMessages, setChatMessages, getChatMessages] = useSyncedState<Message[]>(messages);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<Message | null>(null);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [showApprovalMenu, setShowApprovalMenu] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [chatMeta, setChatMeta] = useState<ChatMeta>(chat);
-  const [cursorOffset, setCursorOffset] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [tokenCount, setTokenCount] = useState(0);
   const [showModelSelector, setShowModelSelector] = useState(false);
@@ -102,18 +104,46 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedInput, setSavedInput] = useState('');
-  const [showApprovalMenu, setShowApprovalMenu] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
-  const transcriptionAbortRef = useRef<AbortController | null>(null);
+  const transcriptionAbortRef = useRef<AbortController | undefined>(undefined);
   const firstMessageRef = useRef<number>(Math.max(0, chatMessages.length - 20));
   const [ai, _] = useState(() => createCletusAI(config));
   const [chatAgent, __] = useState(() => createChatAgent(ai));
-
+  
   // Convenience function to add message
   const addMessage = (message: Message) => {
+    // Sets react state value and global value
     setChatMessages((prev) => [...prev, message]);
+    // Queue up the save
+    saveMessages();
+  };
+
+  // Convenience function to update message
+  const updateMessage = (message: Message) => {
+    // Sets react state value and global value
+    setChatMessages((prev) => prev.map((msg) => msg.created === message.created ? message : msg));
+    // Queue up the save
+    saveMessages();
+  };
+
+  // Debounced state
+  const [setElapsedTimeDebounced] = useAdaptiveDebounce(setElapsedTime);
+  const [setTokenCountDebounced] = useAdaptiveDebounce(setTokenCount);
+  const [setCurrentStatusDebounced] = useAdaptiveDebounce(setCurrentStatus);
+
+  // Cached state for rendering & other logic.
+  const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length));
+  const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
+  const operationApprovalPending = showApprovalMenu && !pendingMessage && !!lastAssistantMessage?.operations?.some((op) => op.status === 'analyzed');
+  
+  // Function to save messages to chat file
+  const saveMessages = () => {
+    chatFileRef.current.save((chat) => {
+      // Use current value to avoid race conditions
+      chat.messages = getChatMessages();
+    });
   };
 
   // Convenience function to add system message
@@ -146,54 +176,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     };
   }, [chatMeta.title]);
 
-  // Save messages to chat file when they change (debounced)
-  useEffect(() => {
-    const saveTimeout = setTimeout(() => {
-      const saveMessages = async () => {
-        const chatFile = chatFileRef.current;
-        try {
-          // Reload the file first to get the latest timestamp
-          await chatFile.load();
-          await chatFile.save((data) => {
-            data.messages = chatMessages;
-          });
-        } catch (error) {
-          console.error('Failed to save messages:', error);
-        }
-      };
-
-      // Only save if we have messages
-      if (chatMessages.length > 0) {
-        saveMessages();
-      }
-    }, 500); // Debounce for 500ms
-
-    return () => clearTimeout(saveTimeout);
-  }, [chatMessages]);
-
-  // Check if we need to show the approval menu
-  useEffect(() => {
-    if (!isWaitingForResponse && !pendingMessage) {
-      // Find the last assistant message
-      const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
-
-      if (lastAssistantMessage && lastAssistantMessage.operations) {
-        const hasApprovalNeeded = lastAssistantMessage.operations.some((op) => op.status === 'analyzed');
-        if (hasApprovalNeeded) {
-          setShowApprovalMenu(true);
-        }
-      } else {
-        setShowApprovalMenu(false);
-      }
-    } else {
-      setShowApprovalMenu(false);
-    }
-  }, [chatMessages, isWaitingForResponse, pendingMessage]);
-
   // Handle keyboard shortcuts
   useInput((input, key) => {
     // Don't handle input when approval menu is showing
-    if (showApprovalMenu) {
+    if (operationApprovalPending) {
       return;
     }
 
@@ -244,7 +230,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     // Alt+Up to navigate backwards through message history
     if (key.meta && key.upArrow && !isWaitingForResponse && !showCommandMenu && !showHelpMenu && !showExitPrompt) {
       // Extract user messages with text content
-      const userMessages = chatMessages
+      const userMessages = getChatMessages()
         .filter(msg => msg.role === 'user')
         .map(msg => {
           const textContent = msg.content.find(c => c.type === 'text');
@@ -271,7 +257,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       if (historyIndex === -1) return; // Already at bottom
 
       // Extract user messages with text content
-      const userMessages = chatMessages
+      const userMessages = getChatMessages()
         .filter(msg => msg.role === 'user')
         .map(msg => {
           const textContent = msg.content.find(c => c.type === 'text');
@@ -303,10 +289,14 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         abortControllerRef.current.abort();
         setIsWaitingForResponse(false);
         addSystemMessage('⚠️ Response interrupted by user');
+        setCurrentStatus('');
+        setShowApprovalMenu(false);
       } else if (isTranscribing && transcriptionAbortRef.current) {
         transcriptionAbortRef.current.abort();
         setIsTranscribing(false);
         addSystemMessage('⚠️ Transcription aborted');
+        setCurrentStatus('');
+        setShowApprovalMenu(false);
       }
     }
 
@@ -357,7 +347,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
           // Command takes input - autocomplete with space
           const newValue = selectedCmd.name + ' ';
           setInputValue(newValue);
-          setCursorOffset(newValue.length);
           setShowCommandMenu(false);
           setSelectedCommandIndex(0);
         } else {
@@ -370,8 +359,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
     }
   });
-
-  const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length));
 
   const handleCommand = async (command: string) => {
     const parts = command.split(' ');
@@ -694,6 +681,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       const wavWriterPromise = new Promise((resolve, reject) => {
         wavWriter.on('error', (e) => e ? reject(e) : resolve(null));
       });
+      wavWriter.write(audioBuffer);
       wavWriter.end();
       await wavWriterPromise;
 
@@ -726,24 +714,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
       logger.log(`Transcription error: ${error.message} ${error.stack}`);
     } finally {
       setIsTranscribing(false);
-      transcriptionAbortRef.current = null;
+      transcriptionAbortRef.current = undefined;
     }
   };
 
-  const handleOperation = async (result: CompletionResult | null) => {
-    setShowApprovalMenu(false);
-
-    logger.log(`operation result: ${JSON.stringify(result)}`);
-
-    if (result && (result.success + result.failed) > 0) {
-      handleExecution(chatMessages);
-    }
-  };
-
-  const handleExecution = async (messages: Message[]) => {
+  const handleOperationStart = () => {
     setIsWaitingForResponse(true);
     setElapsedTime(0);
-    setTokenCount(0);
     setCurrentStatus('');
     requestStartTimeRef.current = Date.now();
 
@@ -751,12 +728,33 @@ After installation and the SoX executable is in the path, restart Cletus and try
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    let tokens = 0;
-    const tokenInterval = setInterval(() => {
-      if (!controller.signal.aborted) {
-        setTokenCount(tokens);
-      }
-    }, 100);
+    return controller.signal;
+  };
+
+  const handleOperation = async (result: CompletionResult | null) => {
+    setIsWaitingForResponse(false);
+    setShowApprovalMenu(false);
+    setCurrentStatus('');
+    abortControllerRef.current = undefined;
+
+    logger.log(`operation result: ${JSON.stringify(result)}`);
+
+    if (result && (result.success + result.failed) > 0) {
+      handleExecution();
+    }
+  };
+
+  const handleExecution = async () => {
+    setIsWaitingForResponse(true);
+    setElapsedTime(0);
+    setTokenCount(0);
+    setCurrentStatus('');
+    setShowApprovalMenu(false);
+    requestStartTimeRef.current = Date.now();
+
+    // Create abort controller for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       logger.log('request starting');
@@ -764,7 +762,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       await runChatOrchestrator(
         {
           chatAgent,
-          messages,
+          messages: getChatMessages(),
           chatMeta,
           config,
           chatData: chatFileRef.current,
@@ -777,34 +775,35 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
           switch (event.type) {
             case 'pendingUpdate':
-              setPendingMessage({ ...event.message });
+              setPendingMessage({ ...event.pending })
+              break;
+              
+            case 'update':
+              updateMessage(event.message);
               break;
 
             case 'tokens':
-              tokens = event.output + event.reasoning + event.discarded;
+              setTokenCountDebounced(event.output + event.reasoning + event.discarded);
               break;
 
             case 'elapsed':
-              setElapsedTime(event.ms);
-              break;
-
-            case 'operations':
-              // addSystemMessage(event.summary);
+              setElapsedTimeDebounced(event.ms);
               break;
 
             case 'status':
-              setCurrentStatus(event.status);
+              setCurrentStatusDebounced(event.status);
               break;
 
             case 'complete':
               addMessage(event.message);
               setPendingMessage(null);
+              setShowApprovalMenu(true);
               setCurrentStatus('');
               break;
 
             case 'error':
               addSystemMessage(`❌ Error: ${event.error}`);
-              setCurrentStatus('');
+              setCurrentStatusDebounced('');
               break;
           }
         }
@@ -819,13 +818,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
       logger.log(`error: ${error.message} ${error.stack}`);
     } finally {
-      clearInterval(tokenInterval);
-
       setIsWaitingForResponse(false);
       setPendingMessage(null);
       setCurrentStatus('');
 
-      abortControllerRef.current = null;
+      abortControllerRef.current = undefined;
     }
   };
 
@@ -867,17 +864,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
     }
 
     // Add user message
-    const userMessage: Message = {
+    addMessage({
       role: 'user',
       name: config.getData().user.name,
       content: [{ type: 'text', content: inputValue }],
       created: Date.now(),
-    };
-    addMessage(userMessage);
-
-    // Save user message to chat file even though it will be 
-    await chatFileRef.current.save((chat) => {
-      chat.messages.push(userMessage);
     });
 
     // Reset history navigation
@@ -885,18 +876,12 @@ After installation and the SoX executable is in the path, restart Cletus and try
     setSavedInput('');
     setInputValue('');
 
-    // The user message might not have gotten in yet due to async state updates, ensure it's included
-    const messages = chatMessages[chatMessages.length - 1] === userMessage
-      ? chatMessages
-      : [...chatMessages, userMessage];
-
-    await handleExecution(messages);
+    await handleExecution();
   };
 
   // Handle input changes and command menu
   const handleInputChange = (value: string) => {
     setInputValue(value);
-    setCursorOffset(value.length);
 
     // Show help menu when typing ?
     if (value === '?') {
@@ -1105,31 +1090,30 @@ After installation and the SoX executable is in the path, restart Cletus and try
       )}
 
       {/* Operation Approval Menu */}
-      {showApprovalMenu && (() => {
-        const lastAssistantMessageIndex = chatMessages.findLastIndex((msg) => msg.role === 'assistant');
-        const lastAssistantMessage = chatMessages[lastAssistantMessageIndex];
-        
-        return lastAssistantMessage ? (
-          <OperationApprovalMenu
-            message={lastAssistantMessage}
-            ai={ai}
-            onMessageUpdate={(updatedMessage) => {
-              setChatMessages((prev) => {
-                const newMessages = prev.slice();
-                newMessages[lastAssistantMessageIndex] = updatedMessage;
-                return newMessages;
-              });
-            }}
-            onComplete={handleOperation}
-            onChatStatus={setCurrentStatus}
-          />
-        ) : null;
-      })()}
+      {lastAssistantMessage && showApprovalMenu && (
+        <OperationApprovalMenu
+          message={lastAssistantMessage}
+          ai={ai}
+          chatData={chatFileRef.current}
+          chatMeta={chat}
+          signal={abortControllerRef.current?.signal}
+          onMessageUpdate={updateMessage}
+          onStart={handleOperationStart}
+          onComplete={handleOperation}
+          onChatStatus={setCurrentStatusDebounced}
+        />
+      )}
 
       {/* Input Area */}
       <Box
         borderStyle="round"
-        borderColor={isTranscribing ? COLORS.INPUT_TRANSCRIBING : isWaitingForResponse ? COLORS.INPUT_WAITING : showApprovalMenu ? COLORS.INPUT_APPROVAL_MENU : COLORS.USER_INPUT_BORDER}
+        borderColor={isTranscribing 
+          ? COLORS.INPUT_TRANSCRIBING 
+          : isWaitingForResponse 
+            ? COLORS.INPUT_WAITING 
+            : operationApprovalPending 
+              ? COLORS.INPUT_APPROVAL_MENU 
+              : COLORS.USER_INPUT_BORDER}
         paddingX={1}
       >
         <Box width="100%">
@@ -1149,8 +1133,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 ? 'Press ESC to interrupt...'
                 : 'Type / for commands or your message...'
             }
-            showCursor={!isWaitingForResponse && !showApprovalMenu}
-            focus={!showExitPrompt && !showApprovalMenu}
+            showCursor={!isWaitingForResponse && !operationApprovalPending}
+            focus={!showExitPrompt && !operationApprovalPending}
           />
         </Box>
       </Box>

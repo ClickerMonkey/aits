@@ -1,12 +1,11 @@
-import { Message as AIMessage, MessageContent as AIMessageContent, withEvents } from '@aits/core';
 import type { ChatFile } from '../chat';
+import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
-import { OperationManager } from '../operations/manager';
-import type { ChatMeta, Message, MessageContent, Operation } from '../schemas';
-import { createChatAgent } from './chat-agent';
-import { logger } from '../logger';
-import { group } from '../common';
 import { AUTONOMOUS } from '../constants';
+import { logger } from '../logger';
+import { OperationManager } from '../operations/manager';
+import type { ChatMeta, Message, Operation } from '../schemas';
+import { createChatAgent } from './chat-agent';
 
 /**
  * Options for running the chat orchestrator
@@ -24,26 +23,14 @@ export interface OrchestratorOptions {
  * Events emitted by the chat orchestrator
  */
 export type OrchestratorEvent =
-  | { type: 'userMessage'; message: Message }
-  | { type: 'pendingUpdate'; message: Message }
+  | { type: 'pendingUpdate'; pending: Message }
+  | { type: 'update'; message: Message }
   | { type: 'tokens'; output: number; reasoning: number; discarded: number }
   | { type: 'elapsed'; ms: number }
   | { type: 'operations'; operations: Operation[]; summary: string }
   | { type: 'status'; status: string }
   | { type: 'complete'; message: Message }
   | { type: 'error'; error: string };
-
-/**
- * Convert MessageContent to AIMessageContent, transforming URLs
- */
-function convertContent(content: MessageContent): AIMessageContent {
-  return {
-    type: content.type || 'text',
-    content: typeof content.content === 'string' && /^(file|https?):\/\//.test(content.content)
-      ? new URL(content.content)
-      : content.content,
-  } as AIMessageContent;
-}
 
 // Silly verbs for status messages
 const sillyVerbs = [
@@ -82,9 +69,8 @@ export async function runChatOrchestrator(
   const { chatAgent, messages, chatMeta, config, chatData, signal } = options;
 
   const startTime = Date.now();
-  // Use configured values or fallback to defaults
-  const LOOP_TIMEOUT = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
-  const LOOP_MAX = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
+  const loopTimeout = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
+  const loopMax = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
 
   logger.log('orchestrator: starting');
 
@@ -95,7 +81,6 @@ export async function runChatOrchestrator(
     }
   }, 100);
 
-  let tokens = 0;
   let outputTokens = 0;
   let reasoningTokens = 0;
   let discardedTokens = 0;
@@ -116,39 +101,26 @@ export async function runChatOrchestrator(
   };
 
   const updateTokenCount = () => {
-    tokens = outputTokens + reasoningTokens + discardedTokens;
     onEvent({ type: 'tokens', output: outputTokens, reasoning: reasoningTokens, discarded: discardedTokens });
   };
 
   try {
     // Convert messages to AI format
-    const aiMessages: AIMessage[] = messages
+    const currentMessages = messages
       .filter((msg) => msg.role !== 'system')
-      .map((msg) => ({
-        role: msg.role,
-        name: msg.name,
-        tokens: msg.tokens,
-        content: [
-          ...(msg.operations 
-            ? msg.operations.map((op): AIMessageContent => ({ type: 'text', content: op.message || op.analysis || 'pending...' })) 
-            : []
-          ),
-          ...msg.content.map(convertContent)
-        ],
-      }));
+      .map(convertMessage);
 
-    let currentMessages = aiMessages;
     let loopIteration = 0;
 
     // Orchestration loop
-    while (loopIteration < LOOP_MAX) {
+    while (loopIteration < loopMax) {
       if (signal.aborted) {
         break;
       }
 
       // Check timeout
-      if (Date.now() - startTime > LOOP_TIMEOUT) {
-        const timeoutMinutes = Math.round(LOOP_TIMEOUT / AUTONOMOUS.MS_PER_MINUTE);
+      if (Date.now() - startTime > loopTimeout) {
+        const timeoutMinutes = Math.round(loopTimeout / AUTONOMOUS.MS_PER_MINUTE);
         onEvent({ type: 'error', error: `Operation timeout: exceeded ${timeoutMinutes} minute limit` });
         break;
       }
@@ -169,12 +141,12 @@ export async function runChatOrchestrator(
       // Override push to emit updates
       pending.operations!.push = function (...items: Operation[]) {
         const result = Array.prototype.push.apply(this, items);
-        onEvent({ type: 'pendingUpdate', message: { ...pending } });
+        onEvent({ type: 'pendingUpdate', pending });
         return result;
       };
 
       // Emit initial pending message
-      onEvent({ type: 'pendingUpdate', message: { ...pending } });
+      onEvent({ type: 'pendingUpdate', pending });
 
       // Create operation manager
       const ops = new OperationManager(chatMeta.mode);
@@ -232,90 +204,84 @@ export async function runChatOrchestrator(
       logger.log('orchestrator: processing response');
 
       // Process streaming response
-      for await (const chunk of chatResponse) {
-        if (signal.aborted) {
-          break;
-        }
-
-        switch (chunk.type) {
-          case 'textPartial':
-            pending.content[0].content += chunk.content;
-            setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
-            onEvent({ type: 'pendingUpdate', message: { ...pending } });
-            onEvent({ type: 'status', status: '' });
+      try {
+        for await (const chunk of chatResponse) {
+          if (signal.aborted) {
             break;
+          }
 
-          case 'textComplete':
-            pending.content[0].content = chunk.content;
-            onEvent({ type: 'pendingUpdate', message: { ...pending } });
-            break;
+          switch (chunk.type) {
+            case 'textPartial':
+              pending.content[0].content += chunk.content;
+              setOutputTokens(Math.ceil(pending.content[0].content.length / 4));
+              onEvent({ type: 'pendingUpdate', pending });
+              onEvent({ type: 'status', status: '' });
+              break;
 
-          case 'complete':
-            pending.content[0].content = chunk.output;
-            onEvent({ type: 'pendingUpdate', message: { ...pending } });
-            break;
+            case 'textComplete':
+              pending.content[0].content = chunk.content;
+              onEvent({ type: 'pendingUpdate', pending });
+              break;
 
-          case 'textReset':
-            pending.content[0].content = '';
-            addDiscardedTokens(outputTokens);
-            setOutputTokens(0);
-            onEvent({ type: 'pendingUpdate', message: { ...pending } });
-            break;
+            case 'complete':
+              pending.content[0].content = chunk.output;
+              onEvent({ type: 'pendingUpdate', pending });
+              break;
 
-          case 'requestTokens':
-            // Update user message tokens if this is first iteration
-            if (loopIteration === 1 && messages.length > 0) {
-              const lastUserMsg = messages[messages.length - 1];
-              if (lastUserMsg.role === 'user') {
-                lastUserMsg.tokens = chunk.tokens;
-                chatData.save((chat) => {
-                  const msgIndex = chat.messages.findIndex((m) => m.created === lastUserMsg.created);
-                  if (msgIndex >= 0) {
-                    chat.messages[msgIndex].tokens = chunk.tokens;
-                  }
-                });
+            case 'textReset':
+              pending.content[0].content = '';
+              addDiscardedTokens(outputTokens);
+              setOutputTokens(0);
+              onEvent({ type: 'pendingUpdate', pending });
+              break;
+
+            case 'requestTokens':
+              const lastUserMessage = messages.findLast((msg) => msg.role === 'user');
+              if (lastUserMessage && !lastUserMessage?.tokens) {
+                lastUserMessage.tokens = chunk.tokens;
+                onEvent({ type: 'update', message: lastUserMessage });
               }
-            }
-            break;
+              break;
 
-          case 'responseTokens':
-            setOutputTokens(chunk.tokens);
-            pending.tokens = chunk.tokens;
-            break;
+            case 'responseTokens':
+              setOutputTokens(chunk.tokens);
+              pending.tokens = chunk.tokens;
+              break;
 
-          case 'reason':
-            setReasoningTokens(Math.ceil(chunk.content.length / 4));
-            break;
+            case 'reason':
+              setReasoningTokens(Math.ceil(chunk.content.length / 4));
+              break;
 
-          case 'toolStart':
-            addDiscardedTokens(Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4));
-            break;
+            case 'toolStart':
+              addDiscardedTokens(Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4));
+              break;
 
-          case 'usage':
-            discardedTokens = 0;
-            setReasoningTokens(chunk.usage.reasoningTokens || 0);
-            setOutputTokens(chunk.usage.totalTokens || 0);
-            break;
+            case 'usage':
+              discardedTokens = 0;
+              setReasoningTokens(chunk.usage.reasoningTokens || 0);
+              setOutputTokens(chunk.usage.totalTokens || 0);
+              break;
+          }
         }
-      }
+      } finally {
+        await chatResponse.return?.(undefined);
 
-      await chatResponse.return?.(undefined);
+        logger.log(`Cletus trace: ${JSON.stringify(stackTrace, (k, v) => {
+          if (k === 'context' || k === 'parent') {
+            return undefined
+          }
+          if (k === 'component') {
+            return v.name;
+          }
+          if ((k === 'started' || k === 'completed') && typeof v === 'number') {
+            return new Date(v).toISOString();
+          }
+          return v;
+        }, 2)}`);
 
-      logger.log(`Cletus trace: ${JSON.stringify(stackTrace, (k, v) => {
-        if (k === 'context' || k === 'parent') {
-          return undefined
-        }
-        if (k === 'component') {
-          return v.name;
-        }
-        if ((k === 'started' || k === 'completed') && typeof v === 'number') {
-          return new Date(v).toISOString();
-        }
-        return v;
-      }, 2)}`);
-
-      // Emit completion event
-      onEvent({ type: 'complete', message: pending });
+        // Emit completion event
+        onEvent({ type: 'complete', message: pending });
+      }      
 
       // Check for abort
       if (signal.aborted) {
@@ -341,7 +307,7 @@ export async function runChatOrchestrator(
       }
 
       // Push pending to current messages for context, continue loop
-      currentMessages.push(pending);
+      currentMessages.push(convertMessage(pending));
       loopIteration++;
       outputTokens = 0;
       reasoningTokens = 0;

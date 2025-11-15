@@ -127,7 +127,7 @@ export interface PromptInput<
 export type PromptToolOutput<TTools extends AnyTool[]> =
   TTools extends Array<infer TI>
     ? TI extends Tool<any, any, infer TName, any, infer TO, any>
-      ? { tool: TName, result: TO }
+      ? { tool: TName, result: Resolved<TO> }
       : never
     : never
 ;

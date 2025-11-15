@@ -10,12 +10,12 @@ import { CONSTS } from "../constants";
 import { DataManager } from "../data";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
-import { renderOperation } from "./render-helpers";
+import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
-import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "./where-helpers";
-import { searchFiles, processFile } from "./file-helper";
+import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
+import { searchFiles, processFile } from "../helpers/files";
 import { getAssetPath } from "../file-manager";
-import { buildFieldsSchema } from "../tools/dba";
+import { buildFieldsSchema } from "../helpers/type";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -29,9 +29,10 @@ function getType(config: ConfigFile, typeName: string): TypeDefinition {
 
 export const data_create = operationOf<
   { name: string; fields: Record<string, any> },
-  { id: string; name: string, libraryKnowledgeUpdated: boolean }
+  { id: string; libraryKnowledgeUpdated: boolean }
 >({
   mode: 'create',
+  signature: 'data_create(fields)',
   status: ({ name }) => `Creating ${name} record`,
   analyze: async ({ name, fields }, { config })=> {
     const type = getType(config, name);
@@ -55,7 +56,7 @@ export const data_create = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { id, name, libraryKnowledgeUpdated };
+    return { id, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -78,9 +79,10 @@ export const data_create = operationOf<
 
 export const data_update = operationOf<
   { name: string; id: string; fields: Record<string, any> },
-  { id: string; updated: boolean, libraryKnowledgeUpdated: boolean }
+  { updated: boolean, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
+  signature: 'data_update(id: string, fields)',
   status: ({ name, id }) => `Updating ${name}: ${id.slice(0, 8)}`,
   analyze: async ({ name, id, fields }, { config }) => {
     const type = getType(config, name);
@@ -115,7 +117,7 @@ export const data_update = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { id, updated: true, libraryKnowledgeUpdated };
+    return { updated: true, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -136,9 +138,10 @@ export const data_update = operationOf<
 
 export const data_delete = operationOf<
   { name: string; id: string },
-  { id: string; deleted: boolean, libraryKnowledgeUpdated: boolean }
+  { deleted: boolean, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'delete',
+  signature: 'data_delete(id: string)',
   status: ({ name, id }) => `Deleting ${name}: ${id.slice(0, 8)}`,
   analyze: async ({ name, id }, { config }) => {
     const type = getType(config, name);
@@ -172,7 +175,7 @@ export const data_delete = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { id, deleted: true, libraryKnowledgeUpdated };
+    return { deleted: true, libraryKnowledgeUpdated };
   },
   render: (op, config) => {
     const type = getType(config, op.input.name);
@@ -195,6 +198,7 @@ export const data_select = operationOf<
   { count: number; results: any[] }
 >({
   mode: 'local',
+  signature: 'data_select(where?, offset?, limit?, orderBy?)',
   status: ({ name }) => `Selecting ${name} records`,
   analyze: async ({ name, where, offset, limit, orderBy }, { config }) => {
     const type = getType(config, name);
@@ -273,6 +277,7 @@ export const data_update_many = operationOf<
   { updated: number, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
+  signature: 'data_update_many(set, where, limit?)',
   status: ({ name }) => `Updating multiple ${name} records`,
   analyze: async ({ name, limit, set, where }, { config }) => {
     const type = getType(config, name);
@@ -341,6 +346,7 @@ export const data_delete_many = operationOf<
   { deleted: number, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'delete',
+  signature: 'data_delete_many(where, limit?)',
   status: ({ name }) => `Deleting multiple ${name} records`,
   analyze: async ({ name, where, limit }, { config }) => {
     const type = getType(config, name);
@@ -411,15 +417,16 @@ export const data_delete_many = operationOf<
 export const data_aggregate = operationOf<
   {
     name: string;
+    select: Array<{ function: 'count' | 'sum' | 'avg' | 'min' | 'max'; field?: string; alias?: string }>;
     where?: WhereClause;
     having?: WhereClause;
     groupBy?: string[];
     orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-    select: Array<{ function: 'count' | 'sum' | 'avg' | 'min' | 'max'; field?: string; alias?: string }>;
   },
   { results: any[] }
 >({
   mode: 'local',
+  signature: 'data_aggregate(select, where?, having?, groupBy?, orderBy?)',
   status: ({ name }) => `Aggregating ${name} records`,
   analyze: async ({ name, where }, { config }) => {
     const type = getType(config, name);
@@ -575,6 +582,7 @@ export const data_index = operationOf<
   { libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
+  signature: 'data_index()',
   status: ({ name }) => `Indexing ${name}`,
   analyze: async ({ name }, { config }) => {
     const type = getType(config, name);
@@ -615,6 +623,7 @@ export const data_import = operationOf<
   { imported: number; updated: number; skipped: number; libraryKnowledgeUpdated: boolean }
 >({
   mode: 'create',
+  signature: 'data_import(glob: string, transcribeImages?)',
   status: ({ name, glob }) => `Importing ${name} from ${glob}`,
   analyze: async ({ name, glob }, { config, cwd }) => {
     const type = getType(config, name);
@@ -829,6 +838,7 @@ export const data_search = operationOf<
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
   mode: 'read',
+  signature: 'data_search(query: string, n?)',
   status: ({ name, query }) => `Searching ${name}: ${abbreviate(query, 25)}`,
   analyze: async ({ name, query, n }, { config }) => {
     const type = getType(config, name);

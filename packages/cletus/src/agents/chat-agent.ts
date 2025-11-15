@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { createSubAgents } from './sub-agents';
 import { abbreviate } from '../common';
+import { Operations } from '../operations/types';
+import { ComponentOutput } from '@aits/core';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -10,6 +12,16 @@ export function createChatAgent(ai: CletusAI) {
   // Create all sub-agents
   const subAgents = createSubAgents(ai);
 
+  const [
+    { refs: plannerTools }, 
+    { refs: librarianTools },
+    { refs: clerkTools },
+    { refs: secretaryTools },
+    { refs: architectTools },
+    { refs: artistTools },
+    { refs: dbaTools },
+  ] = subAgents;
+
   // Create the routing tool that decides which sub-agent to use
   const delegate = ai.tool({
     name: 'delegate',
@@ -17,64 +29,28 @@ export function createChatAgent(ai: CletusAI) {
     instructionsFn: ({ cwd }) => `Use this tool to route requests to specialized agents:
 
 - **planner**: The user will make requests and when a request takes multiple steps to complete, you should use the planner agent to create and manage todos for Cletus to perform. These are only to keep track of Cletus's own work and should not be presented to the user unless explicitly asked for.
-  - todos_clear()
-  - todos_list()
-  - todos_add(name: string)
-  - todos_done(id: string)
-  - todos_get(id: string)
-  - todos_remove(id: string)
-  - todos_replace(todos: Array<{name: string, done?: boolean}>)
-
+${plannerTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
+  
 - **librarian**: Knowledge search, semantic search, managing knowledge. Knowledge is built from custom data, indexed files, and explicitly created by the user. It's text that can be retrieved with semantic search.
-  - knowledge_search(query: string, limit?: number, sourcePrefix?: string)
-  - knowledge_sources()
-  - knowledge_add(text: string)
-  - knowledge_delete(sourcePrefix: string)
-
+${librarianTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
+  
 - **clerk**: File operations (text search, semantic search, read, create, edit, delete, move, copy, info, summarization, indexing)
-  - file_search(glob: string, limit?: number, offset?: number)
-  - file_summary(path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
-  - file_index(glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
-  - file_create(path: string, content: string)
-  - file_copy(glob: string, target: string)
-  - file_move(glob: string, target: string)
-  - file_stats(path: string)
-  - file_delete(path: string)
-  - file_read(path: string, characterLimit?: number, describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean)
-  - text_search(glob: string, regex: string, surrounding?: number, caseInsensitive?: boolean, output?: 'file-count' | 'files' | 'match-count' | 'matches', offset?: number, limit?: number, transcribeImages?: boolean)
-  - dir_create(path: string)
+${clerkTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 - **secretary**: User memory, assistant personas, switching assistants
-  - assistant_switch(name: string)
-  - assistant_update(name: string, prompt: string)
-  - assistant_add(name: string, prompt: string)
-  - memory_list()
-  - memory_update(content: string)
+${secretaryTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 - **architect**: Type definitions, creating/modifying data schemas
-  - type_info(name: string)
-  - type_update(name: string, update: {friendlyName?: string, description?: string, knowledgeTemplate?: string, fields?: Record<string, object | null>})
-  - type_create(name: string, friendlyName: string, description?: string, knowledgeTemplate: string, fields: Array<{name: string, friendlyName: string, type: string, default?: any, required?: boolean, enumOptions?: string[]}>)
+${architectTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 - **artist**: Image generation, editing, analysis, and search
-  - image_generate(prompt: string, n?: number)
-  - image_edit(prompt: string, imagePath: string)
-  - image_analyze(prompt: string, imagePaths: string[], maxCharacters?: number)
-  - image_describe(imagePath: string)
-  - image_find(prompt: string, glob: string, maxImages?: number, n?: number)
+${artistTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 - **dba**: Data operations (create, update, delete, select, update many, delete many, aggregate) - when using this agent, you MUST specify the type of data to operate on using the 'type' parameter
-  - data_create(fields: object)
-  - data_update(id: string, fields: object)
-  - data_delete(id: string)
-  - data_select(where?: object, offset?: number, limit?: number, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
-  - data_update_many(set: object, where?: object, limit?: number)
-  - data_delete_many(where: object, limit?: number)
-  - data_aggregate(groupBy?: string[], where?: object, having?: object, select: Array<{function: string, field?: string, alias?: string}>, orderBy?: Array<{field: string, direction: 'asc' | 'desc'}>)
-  - data_index()
+${dbaTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 Choose the appropriate agent based on what the user wants done.
-The agent will be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
+The agent will NOT be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
 
 <rules>
 - If the user requests an action around data types defined that can be accomplished with a database query like tool call - use the 'dba'.
@@ -87,16 +63,13 @@ The agent will be fed the conversation and you need to provide a 'request' that 
 - If the user says something and it sounds important to remember for all future conversations, use the 'secretary' agent to add a memory.
 - All file operations are done within the current working directory - not outside. All files are relative. CWD: ${cwd}
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
+- If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
 </rules>
 `,
-    schema: ({ config, agentMode }) => {
-      const availableAgents = agentMode === 'plan' 
-        ? ['planner'] as const
-        : ['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba'] as const;
-      
+    schema: ({ config }) => {
       return z.object({
-        agent: z.enum(availableAgents).describe('Which sub-agent to use'),
-        request: z.string().describe('The user request to pass along to the sub-agent'),
+        agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'dba']).describe('Which sub-agent to use'),
+        request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls.'),
         typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
       });
     },
@@ -104,50 +77,47 @@ The agent will be fed the conversation and you need to provide a 'request' that 
     call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, dba], ctx) => {
       ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
 
-      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 50)}`);
+      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}`);
 
-      if (agent === 'dba') {
-        const types = ctx.config.getData().types;
-        const type = typeName ? types.find(t => t.name === typeName) : undefined;
-        if (!type) {
-          throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
+      const operationProgress = ctx.ops.operations.length;
+      const tools = await (() => {
+        if (agent === 'dba') {
+          const types = ctx.config.getData().types;
+          const type = typeName ? types.find(t => t.name === typeName) : undefined;
+          if (!type) {
+            throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
+          }
+          
+          return dba.get('tools', { request }, { ...ctx, type, messages: [] });
+        } else {
+          const subAgent = {
+            planner,
+            librarian,
+            clerk,
+            secretary,
+            architect,
+            artist,
+          }[agent];
+
+          if (!subAgent) {
+            throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
+          }
+
+          return subAgent.get('tools', { request }, { ...ctx, messages: [] });
         }
-        
-        const tools = await dba.get('tools', { request }, { ...ctx, type });
+      })();
 
-        // @ts-ignore
-        if (tools.length === 0) {
-          throw new Error('No dba tools matched the request, Cletus should try a different agent: ' + request);
-        }
-        
-        ctx.chatStatus(`Processing ${agent} results...`);
+      ctx.chatStatus(`Processing ${agent} results...`);
 
-        return tools;
-      } else {
-        const subAgent = {
-          planner,
-          librarian,
-          clerk,
-          secretary,
-          architect,
-          artist,
-        }[agent];
+      const agentInstructions = !tools?.length
+        ? `The ${agent} agent could not find any appropriate tools to handle the request. You should try a different agent or provide more details in the request and try again.`
+        : ctx.ops.automatedOperations(operationProgress)
+          ? `The ${agent} agent was able to complete all operations without user approval. The agent loop will continue - DO NOT RESPOND to the user yet. No questions. You will enter an automated loop until interrupted.`
+          : ctx.ops.needsUserInput(operationProgress)
+            ? `The ${agent} is handing operations off to the user for approval before proceeding. Present the operations clearly for approval - be concise but don't leave out any important details. DO NOT ask questions, the user will automatically be prompted for permission.`
+            : `The ${agent} agent is in a state where it needs user input before proceeding. Wait for the user to respond. Ask questions that are needed to get tool calls correct.`;
 
-        if (!subAgent) {
-          throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
-        }
-
-        const tools = await subAgent.get('tools', { request }, ctx);
-
-        // @ts-ignore
-        if (tools.length === 0) {
-          throw new Error(`No ${agent} tools matched the request, Cletus should try a different agent: ` + request);
-        }
-
-        ctx.chatStatus(`Processing ${agent} results...`);
-
-        return tools;
-      }
+      return { tools, agentInstructions };
     },
   });
 
@@ -194,6 +164,12 @@ IMPORTANT:
 - If the last message is an assistant message and you don't have anything to add, do NOT respond again - wait for the user to make another request. Respond with no content.
 - Do not perform the same operations multiple times unless the user explicitly asks you to.
 </behavior>
+
+<plan-mode>
+When the agent is in 'plan' mode the goal is to have the planner refine the todos until the user is satisfied and switches out of 'plan' mode.
+You do NOT mark todos done in this mode unless the user explicitly says to OR the todo represents a read-only operation.
+You should first use tools to read/select information to build the plan. Don't assume the plan is correct until you've verified all the details with tools and user input when appropriate.
+</plan-mode>
 
 <rules>
 Files:

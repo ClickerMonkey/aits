@@ -1,15 +1,22 @@
 import { Box, Text, useInput } from 'ink';
 import React, { useEffect, useRef, useState } from 'react';
 import type { CletusAI } from '../ai';
+import { ChatFile } from '../chat';
 import { formatTime, pluralize } from '../common';
 import { COLORS } from '../constants';
 import { OperationManager } from '../operations/manager';
-import type { Message } from '../schemas';
+import type { ChatMeta, Message } from '../schemas';
 import { on } from 'events';
+import { logger } from '../logger';
+
 
 interface OperationApprovalMenuProps {
   message: Message;
   ai: CletusAI;
+  chatMeta: ChatMeta;
+  chatData: ChatFile;
+  signal?: AbortSignal;
+  onStart?: () => void | AbortSignal;
   onMessageUpdate?: (message: Message) => void;
   onComplete: (result: CompletionResult | null) => void;
   onChatStatus?: (status: string) => void;
@@ -27,6 +34,10 @@ export interface CompletionResult {
 export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   message,
   ai,
+  chatMeta,
+  chatData,
+  signal,
+  onStart,
   onMessageUpdate,
   onComplete,
   onChatStatus,
@@ -60,27 +71,49 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
 
   // Auto-dismiss after completion
   useEffect(() => {
-    if (menuState === 'complete') {
+    if (menuState === 'complete' && completionResult) {
       const timeout = setTimeout(() => {
         onComplete(completionResult);
       }, 2500);
       return () => clearTimeout(timeout);
     }
-  }, [menuState, onComplete]);
+  }, [menuState, completionResult]);
+
+  const setComplete = (completedResult: CompletionResult) => {
+    setIsProcessing(false);
+    setCompletionResult(completedResult);
+    setMenuState('complete');
+  };
+
+  const getContext = async (overrideSignal?: AbortSignal) => {
+    return await ai.buildContext({
+      signal: overrideSignal || signal,
+      chat: chatMeta,
+      chatData,
+      chatMessage: message,
+      chatStatus: onChatStatus,
+    });
+  }
 
   const executeOperations = async (indices: number[]) => {
     setIsProcessing(true);
     setMenuState('processing');
     setElapsedTime(0);
     const startTime = performance.now();
+    let result: CompletionResult = {
+      success: 0,
+      failed: indices.length,
+      rejected: 0,
+      hasErrors: true,
+    };
 
     try {
+      const sessionSignal = onStart?.() || undefined;
+
       const operations = message.operations || [];
       const manager = new OperationManager('none');
 
-      const ctx = await ai.buildContext({
-        chatStatus: onChatStatus,
-      });
+      const ctx = await getContext(sessionSignal);
 
       let success = 0;
       let failed = 0;
@@ -119,24 +152,16 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       });
       onMessageUpdate?.(message)
 
-      setCompletionResult({
+      result = {
         success,
         failed,
         rejected: 0,
         hasErrors: failed > 0,
-      });
-      setIsProcessing(false);
-      setMenuState('complete');
+      };
     } catch (error: any) {
-      console.error('Failed to execute operations:', error);
-      setCompletionResult({
-        success: 0,
-        failed: indices.length,
-        rejected: 0,
-        hasErrors: true,
-      });
-      setIsProcessing(false);
-      setMenuState('complete');
+      logger.log(`Failed to execute operations: ${error.message}: ${error.stack}`);
+    } finally {
+      setComplete(result);
     }
   };
 
@@ -144,6 +169,12 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     setIsProcessing(true);
     setMenuState('processing');
     setElapsedTime(0);
+    let result: CompletionResult = {
+      success: 0,
+      failed: 0,
+      rejected: 0,
+      hasErrors: true,
+    };
 
     try {
       const operations = message.operations || [];
@@ -166,24 +197,16 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       });
       onMessageUpdate?.(message)
 
-      setCompletionResult({
+      result = {
         success: 0,
         failed: 0,
         rejected: indices.length,
         hasErrors: false,
-      });
-      setIsProcessing(false);
-      setMenuState('complete');
+      };
     } catch (error: any) {
-      console.error('Failed to reject operations:', error);
-      setCompletionResult({
-        success: 0,
-        failed: 0,
-        rejected: 0,
-        hasErrors: true,
-      });
-      setIsProcessing(false);
-      setMenuState('complete');
+      logger.log(`Failed to reject operations: ${error.message}: ${error.stack}`);
+    } finally {
+      setComplete(result)
     }
   };
 
@@ -239,11 +262,19 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       setMenuState('processing');
       setElapsedTime(0);
       const startTime = performance.now();
+      let result: CompletionResult = {
+        success: 0,
+        failed: approved.length,
+        rejected: rejected.length,
+        hasErrors: true,
+      };
 
       try {
+        const sessionSignal = onStart?.() || undefined;
+
         const operations = message.operations || [];
         const manager = new OperationManager('none');
-        const ctx = await ai.buildContext({});
+        const ctx = await getContext(sessionSignal);
 
         let success = 0;
         let failed = 0;
@@ -287,24 +318,16 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         });
         onMessageUpdate?.(message)
 
-        setCompletionResult({
+        result = {
           success,
           failed,
           rejected: rejected.length,
           hasErrors: failed > 0,
-        });
-        setIsProcessing(false);
-        setMenuState('complete');
+        };
       } catch (error: any) {
-        console.error('Failed to process operations:', error);
-        setCompletionResult({
-          success: 0,
-          failed: approved.length,
-          rejected: rejected.length,
-          hasErrors: true,
-        });
-        setIsProcessing(false);
-        setMenuState('complete');
+        logger.log(`Failed to process operations: ${error.message}: ${error.stack}`);
+      } finally {
+        setComplete(result);
       }
     }
   };

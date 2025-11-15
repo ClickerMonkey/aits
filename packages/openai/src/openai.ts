@@ -895,14 +895,27 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       let completion: OpenAI.Chat.Completions.ChatCompletion;
       try {
         completion = await retry(async (signal) => {
-          const inner = await client.chat.completions.create(params, { signal });
+          const { response, data } = await client.chat.completions.create(params, { signal }).withResponse();
 
-          const choice = inner.choices[0];
+          if (!response.ok) {
+            const headers = Object.fromEntries(response.headers);
+            const body = await response.text().catch(() => '');
+            const details = {
+              status: response.status,
+              statusText: response.statusText,
+              headers,
+              body,
+            };
+            
+            throw new ProviderError(this.name, `Chat completion request failed: ${JSON.stringify(details)}`);
+          }
+
+          const choice = data.choices[0];
           if (!choice) {
             throw new ProviderError(this.name, 'No choices in response');
           }
 
-          return inner;
+          return data;
         });
 
       } catch (e: any) {
@@ -1007,7 +1020,22 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       let stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
       try {
         stream = await retry(async (signal) => {
-          return await client.chat.completions.create(params, { signal });
+          const { response, data } = await client.chat.completions.create(params, { signal }).withResponse();
+
+          if (!response.ok) {
+            const headers = Object.fromEntries(response.headers);
+            const body = await response.text().catch(() => '');
+            const details = {
+              status: response.status,
+              statusText: response.statusText,
+              headers,
+              body,
+            };
+            
+            throw new ProviderError(this.name, `Chat completion request failed: ${JSON.stringify(details)}`);
+          }
+
+          return data;
         });
 
       } catch (e: any) {

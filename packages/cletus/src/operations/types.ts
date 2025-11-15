@@ -52,7 +52,7 @@ export type OperationDefinition<TInput, TOutput> = {
   /**
    * Operation mode required to perform this operation.
    */
-  mode: OperationMode | ((input: TInput, context: CletusAIContext) => OperationMode);
+  mode: OperationMode | ((input: Partial<TInput>, context: CletusAIContext) => OperationMode);
 
   /**
    * Human-readable status message for this operation (max 64 chars recommended).
@@ -87,6 +87,11 @@ export type OperationDefinition<TInput, TOutput> = {
    * @returns - React component to display
    */
   render?: (op: OperationOf<TInput, TOutput>, config: ConfigFile) => React.ReactNode;
+
+  /**
+   * A signature passed into the chat-agent's delegate prompt to identify this operation.
+   */
+  signature: string;
 };
 
 // Operation definition for a specific operation kind

@@ -27,7 +27,6 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
-  agentMode: 'plan' | 'default';
 }
 
 /**
@@ -129,7 +128,7 @@ export function createCletusAI(configFile: ConfigFile) {
         };
         const userPrompt = USER_PROMPT(userPromptData);
         
-        return { ...ctx, userPrompt, cache: {}, agentMode };
+        return { ...ctx, userPrompt, cache: {} };
       },
       models,
     }).withHooks({

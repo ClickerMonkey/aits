@@ -2,8 +2,8 @@ import Handlebars from 'handlebars';
 import { formatName } from "../common";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
-import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
+import { renderOperation } from '../helpers/render';
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
@@ -37,6 +37,7 @@ export const type_info = operationOf<
   { type: TypeDefinition | null }
 >({
   mode: 'local',
+  signature: 'type_info(name: string)',
   status: (input) => `Getting type info: ${input.name}`,
   analyze: async (input, { config }) => {
     return {
@@ -70,6 +71,7 @@ export const type_update = operationOf<
   { name: string; updated: boolean }
 >({
   mode: 'update',
+  signature: 'type_update(name: string, update...)',
   status: (input) => `Updating type: ${input.name}`,
   validate(input: TypeUpdate, config: ConfigFile): string {
     const existing = config.getData().types.find((t) => t.name === input.name);
@@ -232,6 +234,7 @@ export const type_create = operationOf<
   { type: TypeDefinition; created: boolean }
 >({
   mode: 'create',
+  signature: 'type_create(type: TypeDefinition)',
   status: (input) => `Creating type: ${input.name}`,
   validate(input: TypeDefinition, config: ConfigFile): string {
     const existing = config.getData().types.find((t) => t.name === input.name);

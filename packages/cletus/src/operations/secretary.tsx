@@ -1,13 +1,13 @@
-import React from "react";
-import { operationOf } from "./types";
-import { renderOperation } from "./render-helpers";
 import { abbreviate } from "../common";
+import { renderOperation } from "../helpers/render";
+import { operationOf } from "./types";
 
 export const assistant_switch = operationOf<
   { name: string },
-  { assistant: string }
+  { switched: boolean }
 >({
   mode: 'update',
+  signature: 'assistant_switch(name: string)',
   status: (input) => `Switching to assistant: ${input.name}`,
   analyze: async (input, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
@@ -33,7 +33,7 @@ export const assistant_switch = operationOf<
     }
 
     await config.updateChat(chat.id, { assistant: input.name });
-    return { assistant: input.name };
+    return { switched: true };
   },
   render: (op) => renderOperation(
     op,
@@ -49,9 +49,10 @@ export const assistant_switch = operationOf<
 
 export const assistant_update = operationOf<
   { name: string; prompt: string },
-  { name: string; updated: boolean }
+  { updated: boolean }
 >({
   mode: 'update',
+  signature: 'assistant_update(name: string, prompt: string)',
   status: (input) => `Updating assistant: ${input.name}`,
   analyze: async (input, { config }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
@@ -82,7 +83,7 @@ export const assistant_update = operationOf<
       }
     });
 
-    return { name: input.name, updated: true };
+    return { updated: true };
   },
   render: (op) => renderOperation(
     op,
@@ -98,9 +99,10 @@ export const assistant_update = operationOf<
 
 export const assistant_add = operationOf<
   { name: string; prompt: string },
-  { name: string; created: boolean }
+  { created: boolean }
 >({
   mode: 'create',
+  signature: 'assistant_add(name: string, prompt: string)',
   status: (input) => `Adding assistant: ${input.name}`,
   analyze: async (input, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
@@ -127,7 +129,7 @@ export const assistant_add = operationOf<
       prompt: input.prompt,
     });
 
-    return { name: input.name, created: true };
+    return { created: true };
   },
   render: (op) => renderOperation(
     op,
@@ -146,6 +148,7 @@ export const memory_list = operationOf<
   { memories: { text: string; created: string }[] }
 >({
   mode: 'local',
+  signature: 'memory_list()',
   status: () => 'Listing user memories',
   analyze: async (input, { config }) => {
     const memoryCount = config.getData().user.memory.length;
@@ -176,9 +179,10 @@ export const memory_list = operationOf<
 
 export const memory_update = operationOf<
   { content: string },
-  { content: string; added: boolean }
+  { added: boolean }
 >({
   mode: 'update',
+  signature: 'memory_update(content: string)',
   status: (input) => `Adding memory: ${abbreviate(input.content, 35)}`,
   analyze: async (input, { config }) => {
     return {
@@ -188,7 +192,7 @@ export const memory_update = operationOf<
   },
   do: async (input, { config }) => {
     await config.addMemory(input.content);
-    return { content: input.content, added: true };
+    return { added: true };
   },
   render: (op) => renderOperation(
     op,

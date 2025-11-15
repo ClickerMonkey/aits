@@ -5,10 +5,10 @@ import path from 'path';
 import sharp from "sharp";
 import { abbreviate, chunkArray, cosineSimilarity, pluralize } from "../common";
 import { getImagePath } from "../file-manager";
-import { fileIsReadable, searchFiles } from "./file-helper";
-import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
+import { renderOperation } from "../helpers/render";
+import { fileIsReadable, searchFiles } from "../helpers/files";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const cleanPath = imagePath.replace('file://', '');
@@ -73,6 +73,7 @@ export const image_generate = operationOf<
   { prompt: string; count: number; images: string[] }
 >({
   mode: 'create',
+  signature: 'image_generate(prompt: string, n?: number)',
   status: (input) => `Generating image: ${abbreviate(input.prompt, 35)}`,
   analyze: async (input, ctx) => {
     const count = input.n || 1;
@@ -118,6 +119,7 @@ export const image_edit = operationOf<
   { prompt: string; originalPath: string; editedPath: string }
 >({
   mode: 'update',
+  signature: 'image_edit(imagePath: string, prompt: string)',
   status: (input) => `Editing image: ${path.basename(input.imagePath)}`,
   analyze: async (input, { cwd }) => {
     const fullImagePath = resolveImage(cwd, input.imagePath);
@@ -170,6 +172,7 @@ export const image_analyze = operationOf<
   { prompt: string; imagePaths: string[]; analysis: string }
 >({
   mode: 'read',
+  signature: 'image_analyze(imagePaths: string[], prompt: string, maxCharacters?: number)',
   status: (input) => `Analyzing ${input.imagePaths.length} image(s)`,
   analyze: async (input, { cwd }) => {
     const maxChars = input.maxCharacters || 2084;
@@ -230,6 +233,7 @@ export const image_describe = operationOf<
   { imagePath: string; description: string }
 >({
   mode: 'read',
+  signature: 'image_describe(imagePath: string)',
   status: (input) => `Describing image: ${path.basename(input.imagePath)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = resolveImage(cwd, input.imagePath);
@@ -274,11 +278,12 @@ export const image_describe = operationOf<
 });
 
 export const image_find = operationOf<
-  { prompt: string; glob: string; maxImages?: number; n?: number },
-  { prompt: string; searched: number; results: Array<{ path: string; score: number, matches: string }> }
+  { query: string; glob: string; maxImages?: number; n?: number },
+  { searched: number; results: Array<{ path: string; score: number, matches: string }> }
 >({
   mode: 'read',
-  status: (input) => `Finding images: ${abbreviate(input.prompt, 35)}`,
+  signature: 'image_find(query: string, glob: string, maxImages?: number, n?: number)',
+  status: (input) => `Finding images: ${abbreviate(input.query, 35)}`,
   analyze: async (input, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
@@ -294,7 +299,7 @@ export const image_find = operationOf<
 
     const searchCount = Math.min(images.length, maxImages);
     return {
-      analysis: `This will search ${searchCount} image(s) matching pattern "${input.glob}", returning top ${n} matches for: "${input.prompt}"`,
+      analysis: `This will search ${searchCount} image(s) matching pattern "${input.glob}", returning top ${n} matches for: "${input.query}"`,
       doable: true,
     };
   },
@@ -306,7 +311,6 @@ export const image_find = operationOf<
 
     if (images.length === 0) {
       return {
-        prompt: input.prompt,
         searched: 0,
         results: [],
       };
@@ -325,7 +329,7 @@ export const image_find = operationOf<
       const model = config.getData().user.models?.imageAnalyze;
       const prompt = `The user is looking for images that match this description
 <description>
-${input.prompt}
+${input.query}
 </description>
 Analyze the image and return a subset of the description that best matches the content of the image. 
 If the description does not match the image in anyway, return an empty string.
@@ -388,7 +392,7 @@ Do not return any additional text other than the matching description subset.`;
       chatStatus(`Step 3/3: Scoring and selecting top ${n} images...`);
 
       // Score images by cosine similarity to prompt embedding
-      const { embeddings: [{ embedding: promptEmbedding }] } = await ai.embed.get({ texts: [input.prompt] });
+      const { embeddings: [{ embedding: promptEmbedding }] } = await ai.embed.get({ texts: [input.query] });
 
       const imagesScored = imagesEmbedded.map((item) => ({
         score: cosineSimilarity(promptEmbedding, item.embedding),
@@ -406,7 +410,6 @@ Do not return any additional text other than the matching description subset.`;
       }));
 
       return {
-        prompt: input.prompt,
         searched: images.length,
         results: topResults, 
       };
@@ -414,7 +417,7 @@ Do not return any additional text other than the matching description subset.`;
   },
   render: (op) => renderOperation(
     op,
-    `ImageFind("${abbreviate(op.input.prompt, 50)}", "${op.input.glob}")`,
+    `ImageFind("${abbreviate(op.input.query, 50)}", "${op.input.glob}")`,
     (op) => {
       if (op.output) {
         const resultCount = op.output.results.length;

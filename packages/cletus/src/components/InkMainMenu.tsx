@@ -2,10 +2,10 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
-import type { ConfigFile } from '../config.js';
-import { ChatFile } from '../chat.js';
-import type { ChatMeta } from '../schemas.js';
-import { InkSettingsMenu } from './InkSettingsMenu.js';
+import type { ConfigFile } from '../config';
+import { ChatFile } from '../chat';
+import type { ChatMeta } from '../schemas';
+import { InkSettingsMenu } from './InkSettingsMenu';
 
 type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat-prompt' | 'create-chat-mode';
 
@@ -154,6 +154,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
               assistant: selectedAssistant,
               prompt: customPrompt.trim() || undefined,
               mode: item.value as 'none' | 'read' | 'create' | 'update' | 'delete',
+              agentMode: 'default',
               created: now,
               updated: now,
               todos: [],

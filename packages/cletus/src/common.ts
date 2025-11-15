@@ -1,4 +1,6 @@
 import { CONSTS } from "./constants";
+import { Message, MessageContent } from "./schemas";
+import { Message as AIMessage, MessageContent as AIMessageContent } from "@aits/core";
 
 /**
  * Formats time in milliseconds to a human-readable string.
@@ -208,4 +210,75 @@ export function group<T, K extends PropertyKey, V = T, R = V[]>(
   reduceFn?: (items: V[]) => R,
 ): Record<K, R> {
   return Object.fromEntries(groupMap(array, keyFn, valueFn, reduceFn).entries()) as Record<K, R>;
+}
+
+/**
+ * Creates a gate function to serialize async operations.
+ * 
+ * @returns A function that serializes async operations
+ */
+export function gate() {
+  let keeper: Promise<void> = Promise.resolve();
+
+  return async<T>(fn: () => Promise<T>): Promise<T> => {
+    // Capture the current keeper immediately (before await)
+    const prevKeeper = keeper;
+    
+    // Create the new keeper promise immediately
+    let resolve!: () => void;
+    let reject!: (err: any) => void;
+    keeper = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    // Now wait for previous operation
+    await prevKeeper;
+
+    // Execute the function
+    try {
+      const result = await fn();
+      resolve(); // Release next waiting operation
+      return result;
+    } catch (err) {
+      reject(err); // Release next waiting operation with error
+      throw err;
+    }
+  };
+}
+
+
+/**
+ * Converts a Message to a ChatMessage.
+ * 
+ * @param msg 
+ * @returns 
+ */
+export function convertMessage(msg: Message): AIMessage {
+  return {
+    role: msg.role,
+    name: msg.name,
+    tokens: msg.tokens,
+    content: [
+      ...(msg.operations 
+        ? msg.operations.map((op): AIMessageContent => ({ type: 'text', content: op.message || 'pending...' })) 
+        : []
+      ),
+      ...msg.content.map(convertContent)
+    ],
+  };
+}
+
+/**
+ * 
+ * @param content 
+ * @returns 
+ */
+function convertContent(content: MessageContent): AIMessageContent {
+  return {
+    type: content.type || 'text',
+    content: typeof content.content === 'string' && /^(file|https?):\/\//.test(content.content)
+      ? new URL(content.content)
+      : content.content,
+  };
 }

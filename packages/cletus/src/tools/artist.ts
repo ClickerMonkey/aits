@@ -68,9 +68,9 @@ Example: Describe a screenshot:
     instructions: `Use this to search for images in a directory that match a text description. Each image is analyzed and embedded, then compared to the prompt embedding for similarity scoring. This operation can be slow for large numbers of images.
 
 Example: Find images of people in photos:
-{ "prompt": "photos containing people smiling", "glob": "photos/**/*.jpg", "n": 5 }`,
+{ "query": "photos containing people smiling", "glob": "photos/**/*.jpg", "n": 5 }`,
     schema: z.object({
-      prompt: z.string().describe('Description of what to find in images'),
+      query: z.string().describe('Description of what to find in images'),
       glob: z.string().describe('Glob pattern for image files to search (e.g., "**/*.png", "photos/*.jpg")'),
       maxImages: z.number().optional().default(100).describe('Maximum number of images to analyze (default: 100)'),
       n: z.number().optional().default(5).describe('Number of top results to return (default: 5)'),

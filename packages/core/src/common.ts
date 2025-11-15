@@ -198,9 +198,9 @@ export async function consumeAll<E>(gen: AsyncGenerator<E, any, any>): Promise<E
  * Resolves the type R from a value passed to `resolve`.
  */
 export type Resolved<T> = T extends Promise<infer U> 
-  ? U 
+  ? Resolved<U>
   : T extends AsyncGenerator<any, infer U, any> 
-    ? U 
+    ? Resolved<U>
     : T;
 
 /**

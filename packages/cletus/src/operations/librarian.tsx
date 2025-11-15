@@ -1,14 +1,15 @@
 import { getModel } from "@aits/core";
 import { abbreviate } from "../common";
 import { KnowledgeFile } from "../knowledge";
-import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
+import { renderOperation } from "../helpers/render";
 
 export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
   mode: 'read',
+  signature: 'knowledge_search(query: string, limit?: number, sourcePrefix?: string)',
   status: (input) => `Searching knowledge: ${abbreviate(input.query, 35)}`,
   analyze: async (input, ctx) => {
     const limit = input.limit || 10;
@@ -56,6 +57,7 @@ export const knowledge_search = operationOf<
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
   mode: 'local',
+  signature: 'knowledge_sources()',
   status: () => 'Listing knowledge sources',
   analyze: async (input, ctx) => {
     return {
@@ -97,6 +99,7 @@ export const knowledge_add = operationOf<
   { source: string; added: boolean }
 >({
   mode: 'create',
+  signature: 'knowledge_add(text: string)',
   status: (input) => `Adding knowledge: ${abbreviate(input.text, 40)}`,
   analyze: async (input, ctx) => {
     return {
@@ -141,6 +144,7 @@ export const knowledge_delete = operationOf<
   { sourcePrefix: string; deletedCount: number }
 >({
   mode: 'delete',
+  signature: 'knowledge_delete(sourcePrefix: string)',
   status: (input) => `Deleting knowledge: ${input.sourcePrefix}`,
   analyze: async (input, ctx) => {
     const knowledge = new KnowledgeFile();

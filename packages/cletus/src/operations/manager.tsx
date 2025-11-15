@@ -26,6 +26,27 @@ export class OperationManager {
     public operations: Operation[] = [],
   ) {
   }
+
+  /**
+   * If any operation requires approval.
+   */
+  public requiresApproval(offset: number = 0) {
+    return this.operations.slice(offset).some(op => op.status === 'analyzed');
+  }
+
+  /**
+   * If all operations are in a done state and we don't need approval.
+   */
+  public automatedOperations(offset: number = 0) {
+    return this.operations.length > offset && !this.requiresApproval(offset);
+  }
+
+  /**
+   * If the chat agent is in a state where it needs clarifications.
+   */
+  public needsUserInput(offset: number = 0) {
+    return this.operations.length <= offset;
+  }
   
   /**
    * Handle an operation based on the current mode.

@@ -41,7 +41,15 @@ export const COLORS = {
   INPUT_APPROVAL_MENU: 'gray' as const,
 
   // Markdown colors
-  MARKDOWN_HEADING: 'cyan' as const,
+  MAKRDOWN_HEADINGS: [
+    { color: 'rgb(0,255,255)', bold: true },
+    { color: 'rgb(0,210,210)', bold: true },
+    { color: 'rgb(0,165,165)', bold: true },
+    { color: 'rgb(0,130,130)', bold: true },
+    { color: 'rgb(0,95,95)', bold: true },
+    { color: 'rgb(0,60,60)', bold: false },
+  ] as const,
+  MARKDOWN_CODE_BACKGROUND: 'rgb(40,40,40)' as const,
 
   // Other UI elements
   DIM_TEXT: 'gray' as const,
@@ -60,7 +68,7 @@ export const CONSTS = {
   MAX_CHARACTERS: 64_000,
   MAX_LINES: 1_000,
   MAX_EXTRACTION_CHUNK_SIZE: 64_000, // Maximum size for data extraction to minimize LLM calls
-};
+} as const;
 
 /**
  * Autonomous operation constants

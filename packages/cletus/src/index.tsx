@@ -2,10 +2,10 @@
 
 import { render, Text } from 'ink';
 import React, { useState } from 'react';
-import { InkChatView } from './components/InkChatView.js';
-import { InkInitWizard } from './components/InkInitWizard.js';
-import { InkMainMenu } from './components/InkMainMenu.js';
-import { ConfigFile } from './config.js';
+import { InkChatView } from './components/InkChatView';
+import { InkInitWizard } from './components/InkInitWizard';
+import { InkMainMenu } from './components/InkMainMenu';
+import { ConfigFile } from './config';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 

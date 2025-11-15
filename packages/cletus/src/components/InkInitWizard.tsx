@@ -2,9 +2,9 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
-import { ConfigFile } from '../config.js';
-import { KnowledgeFile } from '../knowledge.js';
-import type { Providers } from '../schemas.js';
+import { ConfigFile } from '../config';
+import { KnowledgeFile } from '../knowledge';
+import type { Providers } from '../schemas';
 
 type WizardStep =
   | 'openai-env'

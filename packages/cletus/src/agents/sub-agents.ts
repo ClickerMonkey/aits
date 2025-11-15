@@ -1,4 +1,6 @@
-import type { CletusAI } from '../ai';
+import { AnyTool, Names, Tuple } from '@aits/core';
+import type { CletusAI, CletusAIContext, CletusContext } from '../ai';
+import { Operations } from '../operations/types';
 import { createArchitectTools } from '../tools/architect';
 import { createArtistTools } from '../tools/artist';
 import { createClerkTools } from '../tools/clerk';
@@ -6,6 +8,7 @@ import { createDBAAgent } from '../tools/dba';
 import { createLibrarianTools } from '../tools/librarian';
 import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
+import { OperationKind } from '../schemas';
 
 /**
  * Create all sub-agents, each with their own prompt and tools
@@ -18,6 +21,22 @@ export function createSubAgents(ai: CletusAI) {
   const architectTools = createArchitectTools(ai);
   const artistTools = createArtistTools(ai);
   const dba = createDBAAgent(ai);
+
+  const filterTools = <TTools extends Tuple<AnyTool>>(tools: TTools) => {
+    const isPlanMode = (name: OperationKind, ctx: CletusAIContext) => {
+      const modeFn = Operations[name]?.mode || 'unknown';
+      const mode = typeof modeFn === 'function' ? modeFn({}, ctx) : modeFn;
+      return mode === 'local' || mode === 'read';
+    };
+
+    return (input: any, ctx: CletusAIContext) => {
+      if (ctx.chat?.agentMode === 'plan') {
+        return tools.filter(t => isPlanMode(t.name, ctx)).map(t => t.name) as Names<TTools>[];
+      } else {
+        return tools.map(t => t.name) as Names<TTools>[];
+      }
+    }
+  }
 
   // Planner sub-agent
   const planner = ai.prompt({
@@ -71,6 +90,7 @@ Knowledge sources can be formatted as:
 </userInformation>
 `,
     tools: librarianTools,
+    retool: filterTools(librarianTools),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
@@ -102,6 +122,7 @@ Do ONLY this part of the request, Cletus will handle other parts with other agen
 </userInformation>
 `,
     tools: clerkTools,
+    retool: filterTools(clerkTools),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
@@ -130,6 +151,7 @@ Available Assistants: {{assistants}}
 </userInformation>
 `,
     tools: secretaryTools,
+    retool: filterTools(secretaryTools),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
@@ -169,6 +191,7 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 </userInformation>
 `,
     tools: architectTools,
+    retool: filterTools(architectTools),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
@@ -198,6 +221,7 @@ You can generate new images, edit existing ones, analyze images, describe them, 
 </userInformation>
 `,
     tools: artistTools,
+    retool: filterTools(artistTools),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),

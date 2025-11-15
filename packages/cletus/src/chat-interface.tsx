@@ -1,9 +1,9 @@
 import React from 'react';
 import { render } from 'ink';
-import { ChatUI } from './chat-ui.js';
-import { ConfigFile } from './config.js';
-import { ChatFile } from './chat.js';
-import type { ChatMeta } from './schemas.js';
+import { ChatUI } from './chat-ui';
+import { ConfigFile } from './config';
+import { ChatFile } from './chat';
+import type { ChatMeta } from './schemas';
 
 interface Message {
   role: 'user' | 'assistant';

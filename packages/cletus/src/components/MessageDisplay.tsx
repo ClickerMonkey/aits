@@ -12,14 +12,16 @@ interface MessageDisplayProps {
   config: ConfigFile;
 }
 
+type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean, backgroundColor?: string };
+
 /**
  * Parse inline markdown formatting and return text segments with styles
  */
-const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boolean; italic?: boolean; underline?: boolean }> => {
-  const segments: Array<{ text: string; bold?: boolean; italic?: boolean; underline?: boolean }> = [];
+const parseInlineFormatting = (text: string): LineSegment[] => {
+  const segments: LineSegment[] = [];
   
   // Find all formatting markers in order
-  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline'; isStart: boolean; length: number }> = [];
+  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'code'; isStart: boolean; length: number }> = [];
 
   // Find bold (**text**)
   let match;
@@ -42,6 +44,13 @@ const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boole
     markers.push({ index: match.index, type: 'underline', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'underline', isStart: false, length: 2 });
   }
+  
+  // Find code (`text`)
+  const codeRegex = /`(.+?)`/g;
+  while ((match = codeRegex.exec(text)) !== null) {
+    markers.push({ index: match.index, type: 'code', isStart: true, length: 1 });
+    markers.push({ index: match.index + match[0].length - 1, type: 'code', isStart: false, length: 1 });
+  }
 
   // If no formatting found, return plain text
   if (markers.length === 0) {
@@ -52,15 +61,23 @@ const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boole
   markers.sort((a, b) => a.index - b.index);
 
   // Process text with formatting
-  const activeFormats = { bold: false, italic: false, underline: false };
+  const activeFormats = { bold: false, italic: false, underline: false, code: false };
   let lastPos = 0;
+
+  const addSegment = (text: string) => {
+    if (activeFormats.code) {
+      segments.push({ text, backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND });
+    } else {
+      segments.push({ text, ...activeFormats });
+    }
+  };
 
   markers.forEach((marker) => {
     // Add text before this marker
     if (marker.index > lastPos) {
       const segment = text.substring(lastPos, marker.index);
       if (segment) {
-        segments.push({ text: segment, ...activeFormats });
+        addSegment(segment);
       }
     }
 
@@ -76,7 +93,7 @@ const parseInlineFormatting = (text: string): Array<{ text: string; bold?: boole
 
   // Add remaining text
   if (lastPos < text.length) {
-    segments.push({ text: text.substring(lastPos), ...activeFormats });
+    addSegment(text.substring(lastPos));
   }
 
   return segments;
@@ -129,14 +146,20 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
         } else {
           return group.content.map((line, i) => {
             // Heading
-            if (line.startsWith('# ')) {
-              return <Text key={i} bold color={COLORS.MARKDOWN_HEADING}>{line.substring(2)}</Text>;
-            }
-            if (line.startsWith('## ')) {
-              return <Text key={i} bold>{line.substring(3)}</Text>;
-            }
-            if (line.startsWith('### ')) {
-              return <Text key={i} bold dimColor>{line.substring(4)}</Text>;
+            const headingMatch = line.match(/^(\s*)([#]+)\s+(.*)/);
+            if (headingMatch) {
+              const [, leadingSpaces, hashes, headingText] = headingMatch;
+              const level = Math.min(hashes.length - 1, COLORS.MAKRDOWN_HEADINGS.length - 1);
+              const style = COLORS.MAKRDOWN_HEADINGS[level];
+              if (leadingSpaces) {
+                return (
+                  <Box key={i} marginLeft={leadingSpaces.length}>
+                    <Text {...style}>{headingText}</Text>
+                  </Box>
+                );
+              } else {
+                return <Text key={i} {...style}>{headingText}</Text>;
+              }
             }
 
             // Code block
@@ -145,37 +168,8 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
             }
 
             // Bullet list
-            if (line.startsWith('- ') || line.startsWith('* ')) {
-              const content = line.substring(2);
-              const segments = parseInlineFormatting(content);
-              return (
-                <Box key={i}>
-                  <Text>  • </Text>
-                  {segments.map((seg, j) => (
-                    <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
-                      {seg.text}
-                    </Text>
-                  ))}
-                </Box>
-              );
-            }
-
-            // Numbered list
-            const numberedMatch = line.match(/^(\d+\.\s)/);
-            if (numberedMatch) {
-              const prefix = numberedMatch[1];
-              const content = line.substring(prefix.length);
-              const segments = parseInlineFormatting(content);
-              return (
-                <Box key={i}>
-                  <Text>  {prefix}</Text>
-                  {segments.map((seg, j) => (
-                    <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
-                      {seg.text}
-                    </Text>
-                  ))}
-                </Box>
-              );
+            if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+              line = line.replace(/^(\s*)([-*])(\s+)/, '$1•$3')
             }
 
             // Empty line
@@ -186,12 +180,14 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
             // Regular text with inline formatting
             const segments = parseInlineFormatting(line);
             return (
-              <Box key={i}>
+              <Box key={i} flexWrap='wrap'>
+                <Text>
                 {segments.map((seg, j) => (
-                  <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline}>
+                  <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor}>
                     {seg.text}
                   </Text>
                 ))}
+                </Text>
               </Box>
             );
           });

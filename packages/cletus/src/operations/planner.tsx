@@ -1,10 +1,11 @@
 import { abbreviate } from "../common";
+import { renderOperation } from "../helpers/render";
 import type { TodoItem } from "../schemas";
-import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 
 export const todos_clear = operationOf<{}, { cleared: boolean }>({
-  mode: 'update',
+  mode: 'delete',
+  signature: 'todos_clear()',
   status: () => 'Clearing all todos',
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -39,6 +40,7 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
 
 export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
   mode: 'local',
+  signature: 'todos_list()',
   status: () => 'Listing todos',
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -67,6 +69,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
 
 export const todos_add = operationOf<{ name: string }, { id: string; name: string }>({
   mode: 'create',
+  signature: 'todos_add(name: string)',
   status: (input) => `Adding todo: ${abbreviate(input.name, 40)}`,
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -103,6 +106,7 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
 
 export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }>({
   mode: 'update',
+  signature: 'todos_done(id: string)',
   status: () => 'Marking todo as done',
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -153,6 +157,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
 
 export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
   mode: 'local',
+  signature: 'todos_get(id: string)',
   status: () => 'Getting todo details',
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -180,6 +185,7 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
 
 export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }>({
   mode: 'delete',
+  signature: 'todos_remove(id: string)',
   status: () => 'Removing todo',
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
@@ -222,6 +228,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
 
 export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number }>({
   mode: 'update',
+  signature: 'todos_replace(todos)',
   status: (input) => `Replacing with ${input.todos.length} todos`,
   analyze: async (input, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);

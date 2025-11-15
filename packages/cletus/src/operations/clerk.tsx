@@ -7,10 +7,10 @@ import { abbreviate, chunkArray, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
-import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, searchFiles, processFile } from "./file-helper";
-import { renderOperation } from "./render-helpers";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
+import { renderOperation } from "../helpers/render";
+import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, processFile, searchFiles } from "../helpers/files";
 
 
 export const file_search = operationOf<
@@ -18,6 +18,7 @@ export const file_search = operationOf<
   { count: number; files: string[] }
 >({
   mode: 'local',
+  signature: 'file_search(glob: string, limit?: number, offset?: number)',
   status: (input) => `Searching files: ${input.glob}`,
   async analyze(input, { cwd }) { return { analysis: `N/A`, doable: true }; },
   async do(input, { cwd }) {
@@ -54,6 +55,7 @@ export const file_summary = operationOf<
   { size: number; truncated: boolean; summary: string; }
 >({
   mode: 'read',
+  signature: 'file_summary(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Summarizing: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -124,6 +126,7 @@ export const file_index = operationOf<
   { files: string[], knowledge: number }
 >({
   mode: 'create',
+  signature: 'file_index(glob: string, index: "content" | "summary"...)',
   status: (input) => `Indexing files: ${input.glob}`,
   async analyze(input, { cwd }) {
     const files = await searchFiles(cwd, input.glob);
@@ -230,6 +233,7 @@ export const file_create = operationOf<
   { size: number, lines: number }
 >({
   mode: 'create',
+  signature: 'file_create(path: string, content: string)',
   status: (input) => `Creating file: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -276,6 +280,7 @@ export const file_copy = operationOf<
   { source: string[] }
 >({
   mode: 'create',
+  signature: 'file_copy(glob: string, target: string)',
   status: (input) => `Copying: ${input.glob} → ${path.basename(input.target)}`,
   analyze: async (input, { cwd }) => {
     const source = await glob(input.glob, { cwd });
@@ -353,6 +358,7 @@ export const file_move = operationOf<
   { count: number; files: string[] }
 >({
   mode: 'update',
+  signature: 'file_move(glob: string, target: string)',
   status: (input) => `Moving: ${input.glob} → ${path.basename(input.target)}`,
   analyze: async (input, { cwd }) => {
     const files = await glob(input.glob, { cwd });
@@ -455,6 +461,7 @@ export const file_stats = operationOf<
 >({
   status: (input) => `Getting stats: ${path.basename(input.path)}`,
   mode: 'local',
+  signature: 'file_stats(path: string)',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const fileExists = await fileIsReadable(fullPath);
@@ -526,6 +533,7 @@ export const file_delete = operationOf<
   { deleted: boolean }
 >({
   mode: 'delete',
+  signature: 'file_delete(path: string)',
   status: (input) => `Deleting: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -565,6 +573,7 @@ export const file_read = operationOf<
   { content: string; truncated: boolean }
 >({
   mode: 'read',
+  signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Reading: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -661,6 +670,7 @@ export const text_search = operationOf<
   { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> }
 >({
   mode: (input) => input.transcribeImages ? 'read' : 'local',
+  signature: 'text_search(glob: string, regex: string, surrounding?: number, ...)',
   status: (input) => `Searching text: ${abbreviate(input.regex, 35)}`,
   analyze: async (input, { cwd }) => {
     const surrounding = input.surrounding || 0;
@@ -849,6 +859,7 @@ export const dir_create = operationOf<
   { created: boolean }
 >({
   mode: 'create',
+  signature: 'dir_create(path: string)',
   status: (input) => `Creating directory: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);

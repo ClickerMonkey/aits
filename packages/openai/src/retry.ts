@@ -5,6 +5,8 @@
  * and flexible configuration for handling transient failures.
  */
 
+import { APIError } from "openai";
+
 /**
  * Configuration for retry behavior.
  */
@@ -284,24 +286,24 @@ export async function withRetry<T>(
       events?.onSuccess?.(attempt, duration, context);
       return result;
 
-    } catch (error) {
-      lastError = error as Error;
+    } catch (e: any) {
+      lastError = e as Error;
 
       // Check for context window errors (413 with specific patterns)
-      if (isContextWindowError(error)) {
+      if (isContextWindowError(e)) {
         // Don't retry, but let the caller handle this specially
-        throw error;
+        throw e;
       }
 
       // Check if we should retry
-      const shouldRetry = attempt < maxRetries && isRetryableError(error, config);
+      const shouldRetry = attempt < maxRetries && isRetryableError(e, config);
 
       if (!shouldRetry) {
         // No more retries or non-retryable error
         if (attempt >= maxRetries) {
           events?.onMaxRetriesExceeded?.(attempt, lastError, context);
         }
-        throw error;
+        throw e;
       }
 
       // Calculate backoff delay
