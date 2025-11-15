@@ -157,7 +157,7 @@ Example: Read a source file:
     description: 'Edit a text file using AI-powered content generation',
     instructions: `Use this to edit text files by providing a detailed request describing the changes. The AI will read the current content (with pagination support), generate new content based on your request, and create a unified diff showing exactly what will change.
 
-Only works on text files. The request should be precise with specific rules and instructions.
+Only works on text files. The request should be precise with specific rules and instructions. Do not leave out any details, be as explicit as possible. Do not mistranslate any specific user requests.
 
 Example 1: Modify a configuration file:
 { "path": "config/settings.json", "request": "Add a new field 'maxRetries' with value 3, and change 'timeout' from 5000 to 10000" }
