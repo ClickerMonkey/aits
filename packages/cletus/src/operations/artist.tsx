@@ -11,8 +11,14 @@ import { renderOperation } from "../helpers/render";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 
 function resolveImage(cwd: string, imagePath: string): string {
-  const cleanPath = imagePath.replace('file://', '');
+  const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
+  const cleanPath = filepath || imagePath;
   return path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
+}
+
+function linkImage(imagePath: string): string {
+  const filename = path.basename(imagePath);
+  return `[${filename}](${imagePath})`;
 }
 
 async function loadImageAsDataUrl(cwd: string, imagePath: string): Promise<string> {
@@ -70,7 +76,7 @@ async function saveGeneratedImage(response: ImageGenerationResponse) {
 
 export const image_generate = operationOf<
   { prompt: string; n?: number },
-  { prompt: string; count: number; images: string[] }
+  { count: number; images: string[] }
 >({
   mode: 'create',
   signature: 'image_generate(prompt: string, n?: number)',
@@ -93,7 +99,7 @@ export const image_generate = operationOf<
 
     // Save images to files and collect file URLs
     const imagePaths = await saveGeneratedImage(response);
-    const imageUrls = imagePaths.map((p) => `file://${p}`);
+    const imageUrls = imagePaths.map(linkImage);
 
     if (chatMessage) {
       // Add image URLs to chat message
@@ -103,7 +109,6 @@ export const image_generate = operationOf<
     }
 
     return {
-      prompt: input.prompt,
       count: imagePaths.length,
       images: imagePaths,
     };
@@ -114,7 +119,7 @@ export const image_generate = operationOf<
     (op) => {
       if (op.output) {
         const count = op.output.count;
-        return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"`;
+        return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"\n\t${op.output.images.map(linkImage).join(' - ')}`;
       }
       return null;
     }
@@ -123,7 +128,7 @@ export const image_generate = operationOf<
 
 export const image_edit = operationOf<
   { prompt: string; imagePath: string },
-  { prompt: string; originalPath: string; editedPath: string }
+  { editedPath: string }
 >({
   mode: 'update',
   signature: 'image_edit(imagePath: string, prompt: string)',
@@ -154,7 +159,7 @@ export const image_edit = operationOf<
     });
 
     const edited = await saveGeneratedImage(response);
-    const imageUrls = edited.map((p) => `file://${p}`);
+    const imageUrls = edited.map(linkImage);
 
     if (chatMessage) {
       // Add image URLs to chat message
@@ -174,8 +179,8 @@ export const image_edit = operationOf<
     `ImageEdit("${path.basename(op.input.imagePath)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        const fileName = path.basename(op.output.editedPath.replace('file://', ''));
-        return `Edited image saved to ${fileName}`;
+        const fileLink = linkImage(op.output.editedPath);
+        return `Edited image saved to ${fileLink}`;
       }
       return null;
     }
@@ -184,7 +189,7 @@ export const image_edit = operationOf<
 
 export const image_analyze = operationOf<
   { prompt: string; imagePaths: string[]; maxCharacters?: number },
-  { prompt: string; imagePaths: string[]; analysis: string }
+  { analysis: string, imageLinks: string[] }
 >({
   mode: 'read',
   signature: 'image_analyze(imagePaths: string[], prompt: string, maxCharacters?: number)',
@@ -226,9 +231,8 @@ export const image_analyze = operationOf<
     });
 
     return {
-      prompt: input.prompt,
-      imagePaths: input.imagePaths,
       analysis: response.content,
+      imageLinks: input.imagePaths.map(linkImage),
     };
   },
   render: (op, config, showInput, showOutput) => renderOperation(
@@ -245,7 +249,7 @@ export const image_analyze = operationOf<
 
 export const image_describe = operationOf<
   { imagePath: string },
-  { imagePath: string; description: string }
+  { imageLink: string; description: string }
 >({
   mode: 'read',
   signature: 'image_describe(imagePath: string)',
@@ -276,7 +280,7 @@ export const image_describe = operationOf<
     });
 
     return {
-      imagePath: input.imagePath,
+      imageLink: linkImage(input.imagePath),
       description: response.content,
     };
   },
@@ -294,7 +298,7 @@ export const image_describe = operationOf<
 
 export const image_find = operationOf<
   { query: string; glob: string; maxImages?: number; n?: number },
-  { searched: number; results: Array<{ path: string; score: number, matches: string }> }
+  { searched: number; results: Array<{ path: string; link: string; score: number, matches: string }> }
 >({
   mode: 'read',
   signature: 'image_find(query: string, glob: string, maxImages?: number, n?: number)',
@@ -420,6 +424,7 @@ Do not return any additional text other than the matching description subset.`;
       // Return top N results
       const topResults = imagesScored.slice(0, n).map((item) => ({
         path: item.path,
+        link: linkImage(item.path),
         score: item.score,
         matches: item.description,
       }));

@@ -24,6 +24,8 @@ export class OperationManager {
   public constructor(
     public mode: ChatMode,
     public operations: Operation[] = [],
+    public onOperationAdded?: (op: Operation, index: number) => void,
+    public onOperationUpdated?: (op: Operation, index: number) => void,
   ) {
   }
 
@@ -75,10 +77,7 @@ export class OperationManager {
 
     this.operations.push(op);
 
-    // Add operation to chat message if available
-    if (ctx.chatMessage) {
-      ctx.chatMessage.operations!.push(op);
-    }
+    this.onOperationAdded?.(op, this.operations.length - 1);
     
     // Update status with operation description
     const statusMsg = def.status ? def.status(op.input) : `Processing operation: ${op.type}`;
@@ -135,6 +134,8 @@ export class OperationManager {
         : op.status === 'analyzed'
           ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
           : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
+
+    this.onOperationUpdated?.(op, this.operations.indexOf(op));
 
     ctx.log(op);
 

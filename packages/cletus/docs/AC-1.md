@@ -214,7 +214,7 @@ This stores the message history of the chat.
         },
         {
           "type": "image",
-          "content": "file://path or data: or https:// - same for image, file, or audio type"
+          "content": "[filename](local/filepath) or data: or https:// - same for image, file, or audio type"
         }
       ],
       "created": 1523,

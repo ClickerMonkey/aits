@@ -106,7 +106,7 @@ Tools:
 
 #### artist
 Tools:
-- `image_generate(prompt: string, n: number)` - places generated images in .cletus/images/ and adds link via file:// syntax in chat messages. chat messages convert image file:// to appropriate file object
+- `image_generate(prompt: string, n: number)` - places generated images in .cletus/images/ and adds link via [filename](filepath) syntax in chat messages. chat messages convert image [filename](filepath) to appropriate file object
 - `image_edit(prompt: string, imagePath: string)` - imagePath points to cletus image or relative image file
 - `image_analyze(prompt: string, imagePaths: string[], maxCharacters: number=2084)` - maxCharacters/4=maxTokens
 - `image_describe(imagePath: string)` - describes what's in the image

@@ -215,7 +215,7 @@ Do ONLY this part of the request, Cletus will handle other parts with other agen
 {{request}}
 </userRequest>
 
-Generated images are saved to .cletus/images/ and linked in chat messages via file:// syntax.
+Generated images are saved to .cletus/images/ and linked in chat messages via [filename](filepath) syntax.
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
 
 <userInformation>

@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { COLORS } from "../constants";
 import { abbreviate, formatTime } from "../common";
 import { Operation } from "../schemas";
+import { Markdown } from "../components/Markdown";
 
 /**
  * Format a value for display in operation input/output
@@ -121,7 +122,11 @@ export function renderOperation(
       </Box>
       <Box marginLeft={2}>
         <Text>{' → '}</Text>
-        <Text color={op.error ? COLORS.ERROR_TEXT : undefined}>{summary}</Text>
+        {op.error ? (
+          <Text color={COLORS.ERROR_TEXT}>{summary}</Text>
+        ) : (
+          <Markdown>{summary}</Markdown>
+        )}
       </Box>
       
       {showInput && (

@@ -3,7 +3,7 @@ import type { CletusAI } from '../ai';
 
 /**
  * Create artist tools for image operations
- * Images are stored in .cletus/images/ and referenced via file:// syntax
+ * Images are stored in .cletus/images/ and referenced via [filename](filepath) syntax
 */
 export function createArtistTools(ai: CletusAI) {
   const imageGenerate = ai.tool({
@@ -23,13 +23,13 @@ Example: Generate a landscape image:
   const imageEdit = ai.tool({
     name: 'image_edit',
     description: 'Edit an existing image based on a text prompt',
-    instructions: `Use this to modify an existing image. Provide a file path (relative or file://) and a description of the edit. The edited image will be saved as a new file.
+    instructions: `Use this to modify an existing image. Provide a file path (relative or absolute path or[filename](filepath)) and a description of the edit. The edited image will be saved as a new file.
 
 Example: Add a sunset effect to an image:
 { "prompt": "Add warm sunset colors and lighting", "imagePath": "images/photo.jpg" }`,
     schema: z.object({
       prompt: z.string().describe('Description of how to edit the image'),
-      imagePath: z.string().describe('Path to the image to edit (relative path or file:// URL)'),
+      imagePath: z.string().describe('Path to the image to edit (relative path or absolute path or [filename](filepath) URL)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_edit', input }, ctx),
   });
@@ -43,7 +43,7 @@ Example: Compare two designs:
 { "prompt": "What are the main differences between these two UI designs?", "imagePaths": ["designs/v1.png", "designs/v2.png"] }`,
     schema: z.object({
       prompt: z.string().describe('Question or analysis request about the images'),
-      imagePaths: z.array(z.string()).describe('Paths to images to analyze (relative paths or file:// URLs)'),
+      imagePaths: z.array(z.string()).describe('Paths to images to analyze (relative paths or absolute file or [filename](filepath))'),
       maxCharacters: z.number().optional().default(2084).describe('Maximum response length (maxCharacters/4 = maxTokens, default: 2084)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_analyze', input }, ctx),
@@ -57,7 +57,7 @@ Example: Compare two designs:
 Example: Describe a screenshot:
 { "imagePath": "screenshots/dashboard.png" }`,
     schema: z.object({
-      imagePath: z.string().describe('Path to the image to describe (relative path or file:// URL)'),
+      imagePath: z.string().describe('Path to the image to describe (relative path or absolute path or [filename](filepath))'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_describe', input }, ctx),
   });

@@ -1,6 +1,9 @@
+import fs from "fs";
+import path from "path";
 import { CONSTS } from "./constants";
 import { Message, MessageContent } from "./schemas";
 import { Message as AIMessage, MessageContent as AIMessageContent } from "@aits/core";
+import { detectMimeType } from "./helpers/files";
 
 /**
  * Formats time in milliseconds to a human-readable string.
@@ -254,26 +257,12 @@ export function gate() {
  * @param msg 
  * @returns 
  */
-export function convertMessage(msg: Message): AIMessage {
-  // Build interleaved content array
-  const content: AIMessageContent[] = [];
-  
-  for (const msgContent of msg.content) {
-    // If this content has an operationIndex, insert the operation message before it
-    if (msgContent.operationIndex !== undefined && msg.operations && msg.operations[msgContent.operationIndex]) {
-      const op = msg.operations[msgContent.operationIndex];
-      content.push({ type: 'text', content: op.message || 'pending...' });
-    } else {
-      // Add the content itself
-      content.push(convertContent(msgContent));
-    }
-  }
-  
+export async function convertMessage(msg: Message): Promise<AIMessage> {
   return {
     role: msg.role,
     name: msg.name,
     tokens: msg.tokens,
-    content,
+    content: await Promise.all(msg.content.map(convertMessageContent)),
   };
 }
 
@@ -282,11 +271,43 @@ export function convertMessage(msg: Message): AIMessage {
  * @param content 
  * @returns 
  */
-function convertContent(content: MessageContent): AIMessageContent {
-  return {
-    type: content.type || 'text',
-    content: typeof content.content === 'string' && /^(file|https?):\/\//.test(content.content)
-      ? new URL(content.content)
-      : content.content,
-  };
+async function convertMessageContent(messageContent: MessageContent): Promise<AIMessageContent> {
+  const { type, content } = messageContent;
+  if (type === 'text') {
+    return { type, content };
+  }
+  if (content.startsWith('http://') || content.startsWith('https://')) {
+    return { type, content: new URL(content) };
+  }
+  const file = unlinkFile(content);
+  if (file) {
+    const imageBuffer = await fs.promises.readFile(file.filepath);
+    const base64Image = imageBuffer.toString("base64");
+    const mimeType = await detectMimeType(file.filepath, file.filename);
+
+    return { type, content: `data:${mimeType};base64,${base64Image}` };
+  }
+  return { type, content };
+}
+
+/**
+ * Converts a file link into a file filepath & filename.
+ * 
+ * @param link 
+ * @returns 
+ */
+export function unlinkFile(link: string): { filename: string; filepath: string} | null {
+  const [_, filename, filepath] = link.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
+  return filename && filepath ? { filename, filepath } : null;
+}
+
+/**
+ * Converts a filepath into a markdown-style file link.
+ * 
+ * @param filepath - The full path to the file.
+ * @param filename - The name of the file to display (defaults to the base name of the filepath).
+ * @returns 
+ */
+export function linkFile(filepath: string, filename: string = path.basename(filepath)): string {
+  return `[${filename}](${filepath})`;
 }

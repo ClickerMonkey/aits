@@ -106,9 +106,9 @@ export async function runChatOrchestrator(
 
   try {
     // Convert messages to AI format
-    const currentMessages = messages
+    const currentMessages = await Promise.all(messages
       .filter((msg) => msg.role !== 'system')
-      .map(convertMessage);
+      .map(convertMessage));
 
     let loopIteration = 0;
 
@@ -138,13 +138,20 @@ export async function runChatOrchestrator(
         operations: [],
       };
 
+      // Helper to update output token count
+      const updateOutputTokenCount = () => {
+        const totalTextLength = pending.content
+          .filter(c => c.type === 'text' && c.operationIndex === undefined)
+          .reduce((sum, c) => sum + c.content.length, 0);
+        setOutputTokens(Math.ceil(totalTextLength / 4));
+      };
+
       // Helper to get or create the last text content entry (not tied to an operation)
       const getLastTextContent = () => {
-        // Find the last content entry without an operationIndex
-        for (let i = pending.content.length - 1; i >= 0; i--) {
-          if (pending.content[i].type === 'text' && pending.content[i].operationIndex === undefined) {
-            return pending.content[i];
-          }
+        // Get the last entry - if it's text and not an operation, return it
+        const last = pending.content[pending.content.length - 1];
+        if (last && last.type === 'text' && last.operationIndex === undefined) {
+          return last;
         }
         // Create a new text content entry if none exists
         const newContent = { type: 'text' as const, content: '' };
@@ -152,27 +159,28 @@ export async function runChatOrchestrator(
         return newContent;
       };
 
-      // Override push to emit updates and add new content entry for next text
-      pending.operations!.push = function (...items: Operation[]) {
-        const result = Array.prototype.push.apply(this, items);
-        
-        // For each new operation, create a new content entry tied to it
-        for (let i = 0; i < items.length; i++) {
-          const op = items[i];
-          const operationIndex = pending.operations!.length - items.length + i;
-          // Add a new text content entry for text that comes after this operation
-          pending.content.push({ type: 'text', content: op.message || '', operationIndex });
-        }
-        
-        onEvent({ type: 'pendingUpdate', pending });
-        return result;
-      };
-
       // Emit initial pending message
       onEvent({ type: 'pendingUpdate', pending });
 
       // Create operation manager
-      const ops = new OperationManager(chatMeta.mode);
+      const ops = new OperationManager(
+        chatMeta.mode,
+        pending.operations!,
+        (op, operationIndex) => {
+          // Update pending message operation
+          pending.content.push({ type: 'text', content: op.message || '', operationIndex });
+          onEvent({ type: 'pendingUpdate', pending });
+        },
+        (op, operationIndex) => {
+          // Update pending message operation
+          pending.operations![operationIndex] = op;
+          const content = pending.content.find((c) => c.operationIndex === operationIndex);
+          if (content) {
+            content.content = op.message || '';
+          }
+          onEvent({ type: 'pendingUpdate', pending });
+        },
+      );
 
       logger.log('orchestrator: running chat agent');
 
@@ -238,10 +246,7 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content += chunk.content;
-                const totalTextLength = pending.content
-                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
-                  .reduce((sum, c) => sum + c.content.length, 0);
-                setOutputTokens(Math.ceil(totalTextLength / 4));
+                updateOutputTokenCount();
                 onEvent({ type: 'pendingUpdate', pending });
                 onEvent({ type: 'status', status: '' });
               }
@@ -250,46 +255,19 @@ export async function runChatOrchestrator(
             case 'text':
               {
                 const lastContent = getLastTextContent();
-                lastContent.content += chunk.content;
-                const totalTextLength = pending.content
-                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
-                  .reduce((sum, c) => sum + c.content.length, 0);
-                setOutputTokens(Math.ceil(totalTextLength / 4));
-                onEvent({ type: 'pendingUpdate', pending });
-              }
-              break;
-
-            case 'textComplete':
-              {
-                // Set all text content (concatenated)
-                const allText = pending.content
-                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
-                  .map(c => c.content)
-                  .join('');
-                // Only update if different from what we expect
-                if (allText !== chunk.content) {
-                  // Reset all text content and set to the complete text
-                  pending.content = pending.content.filter(c => c.operationIndex !== undefined);
-                  pending.content.unshift({ type: 'text', content: chunk.content });
-                }
-                onEvent({ type: 'pendingUpdate', pending });
-              }
-              break;
-
-            case 'complete':
-              {
-                // Set all text content to the output
-                pending.content = pending.content.filter(c => c.operationIndex !== undefined);
-                pending.content.unshift({ type: 'text', content: chunk.output });
+                lastContent.content = chunk.content;
+                updateOutputTokenCount();
                 onEvent({ type: 'pendingUpdate', pending });
               }
               break;
 
             case 'textReset':
               {
-                // Clear all non-operation text content
-                pending.content = pending.content.filter(c => c.operationIndex !== undefined);
-                pending.content.unshift({ type: 'text', content: '' });
+                // Clear all non-operation text 
+                const last = pending.content[pending.content.length - 1];
+                if (last.operationIndex === undefined && last.type === 'text') {
+                  last.content = '';
+                }
                 addDiscardedTokens(outputTokens);
                 setOutputTokens(0);
                 onEvent({ type: 'pendingUpdate', pending });
@@ -368,7 +346,7 @@ export async function runChatOrchestrator(
       }
 
       // Push pending to current messages for context, continue loop
-      currentMessages.push(convertMessage(pending));
+      currentMessages.push(await convertMessage(pending));
       loopIteration++;
       outputTokens = 0;
       reasoningTokens = 0;

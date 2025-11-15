@@ -647,7 +647,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @returns Array of OpenAI-formatted messages
    */
   protected convertMessages(request: Request): OpenAI.Chat.ChatCompletionMessageParam[] {
-    return request.messages.map((msg): OpenAI.Chat.ChatCompletionMessageParam => {
+    return request.messages.map((msg): OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Chat.ChatCompletionMessageParam[] => {
       switch (msg.role) {
         case 'system':
           return {
@@ -662,12 +662,35 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             content: this.convertContentText(msg.content, msg.name || 'tool'),
           };
         case 'assistant':
-          return {
-            role: msg.role,
-            name: this.convertName(msg.name),
-            tool_calls: msg.toolCalls?.map((tc) => this.convertToolCall(tc)),
-            content: this.convertContentText(msg.content, msg.name || 'assistant'),
-          };
+          const content = this.convertContent(msg.content, msg.name || 'assistant');
+          if (!content || typeof content === 'string' || content.every(c => c.type === 'text')) {
+            return {
+              role: msg.role,
+              name: this.convertName(msg.name),
+              tool_calls: msg.toolCalls?.map((tc) => this.convertToolCall(tc)),
+              content,
+            };
+          } else {
+            // Mixed content - need to split into multiple messages where non-text parts are separate messages
+            // sent as user messages because assistent role cannot have non-text content
+            const firstText = content.findIndex(c => c.type === 'text');
+            return content.map((contentPart, index): OpenAI.Chat.ChatCompletionMessageParam => {
+              if (contentPart.type === 'text') {
+                return {
+                  role: 'assistant',
+                  name: this.convertName(msg.name),
+                  tool_calls: index === firstText ? msg.toolCalls?.map((tc) => this.convertToolCall(tc)) : undefined,
+                  content: [contentPart],
+                };
+              } else {
+                return {
+                  role: 'user',
+                  name: this.convertName(msg.name),
+                  content: [contentPart],
+                };
+              }
+            });
+          }
         case 'user':
           return {
             role: msg.role,
@@ -675,7 +698,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             content: this.convertContent(msg.content, msg.name || 'user'),
           };
       }
-    });
+    }).flat();
   }
 
   /**
