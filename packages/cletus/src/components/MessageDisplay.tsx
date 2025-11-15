@@ -1,18 +1,20 @@
 import { Box, Text } from 'ink';
 import SyntaxHighlight from 'ink-syntax-highlight';
+import Link from 'ink-link';
 // import Markdown from 'ink-markdown';
 import React from 'react';
 import type { Message } from '../schemas';
 import { COLORS } from '../constants';
 import { Operations } from '../operations/types';
 import { ConfigFile } from '../config';
+import { logger } from '../logger';
 
 interface MessageDisplayProps {
   message: Message;
   config: ConfigFile;
 }
 
-type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean, backgroundColor?: string };
+type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean, backgroundColor?: string, color?: string; url?: string };
 
 /**
  * Parse inline markdown formatting and return text segments with styles
@@ -21,7 +23,7 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
   const segments: LineSegment[] = [];
   
   // Find all formatting markers in order
-  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'code'; isStart: boolean; length: number }> = [];
+  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'code' | 'link'; isStart: boolean; length: number }> = [];
 
   // Find bold (**text**)
   let match;
@@ -52,6 +54,13 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
     markers.push({ index: match.index + match[0].length - 1, type: 'code', isStart: false, length: 1 });
   }
 
+  // Find links [text](url) and treat as plain text for now
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  while ((match = linkRegex.exec(text)) !== null) {
+    markers.push({ index: match.index, type: 'link', isStart: true, length: 0 });
+    markers.push({ index: match.index + match[0].length, type: 'link', isStart: false, length: 0 });
+  }
+
   // If no formatting found, return plain text
   if (markers.length === 0) {
     return [{ text }];
@@ -61,12 +70,19 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
   markers.sort((a, b) => a.index - b.index);
 
   // Process text with formatting
-  const activeFormats = { bold: false, italic: false, underline: false, code: false };
+  const activeFormats = { bold: false, italic: false, underline: false, code: false, link: false };
   let lastPos = 0;
 
   const addSegment = (text: string) => {
     if (activeFormats.code) {
       segments.push({ text, backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND });
+    } else if (activeFormats.link) {
+      const [, name, url] = text.match(/\[([^\]]+)\]\(([^)]+)\)/) || [];
+      if (name && url) {
+        segments.push({ text: name, url, underline: true, color: COLORS.MARKDOWN_LINK }); 
+      } else {
+        segments.push({ text, underline: true, color: COLORS.MARKDOWN_LINK });
+      }
     } else {
       segments.push({ text, ...activeFormats });
     }
@@ -183,9 +199,19 @@ const MarkdownText: React.FC<{ children: string }> = ({ children }) => {
               <Box key={i} flexWrap='wrap'>
                 <Text>
                 {segments.map((seg, j) => (
-                  <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor}>
-                    {seg.text}
-                  </Text>
+                  <>
+                    {seg.url ? (
+                      <Link key={j} url={seg.url}>
+                        <Text bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor} color={seg.color}>
+                          {seg.text}
+                        </Text>
+                      </Link>
+                    ) : (
+                      <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor} color={seg.color}>
+                        {seg.text}
+                      </Text>
+                    )}
+                  </>
                 ))}
                 </Text>
               </Box>
