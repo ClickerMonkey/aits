@@ -59,9 +59,10 @@ export function abbreviate(text: string, maxLength: number, suffix: string = 'â€
  * - Objects: bullet list with hyphens, property values without JSON escaping
  * 
  * @param value - value to format
+ * @param depth - current indentation depth (default 0)
  * @returns formatted string
  */
-export function formatValue(value: any): string {
+export function formatValue(value: any, depth: number = 0): string {
   // Handle null/undefined
   if (value === null) {
     return 'null';
@@ -70,19 +71,22 @@ export function formatValue(value: any): string {
     return 'undefined';
   }
   
+  // Calculate indentation for the next level
+  const indent = '  '.repeat(depth + 1);
+  
   // Arrays: list items with hyphens
   if (Array.isArray(value)) {
     if (value.length === 0) {
       return '[]';
     }
     return value.map((item, i) => {
-      const formatted = formatValue(item);
+      const formatted = formatValue(item, depth + 1);
       // For simple values, show on same line
       if (typeof item !== 'object' || item === null) {
         return `- ${formatted}`;
       }
       // For objects, indent their properties
-      return `- ${formatted.split('\n').join('\n  ')}`;
+      return `- ${formatted.split('\n').join('\n' + indent)}`;
     }).join('\n');
   }
   
@@ -98,13 +102,13 @@ export function formatValue(value: any): string {
   }
   
   return entries.map(([key, val]) => {
-    const formatted = formatValue(val);
+    const formatted = formatValue(val, depth + 1);
     // For simple values, show on same line
     if (typeof val !== 'object' || val === null) {
       return `- ${key}: ${formatted}`;
     }
     // For complex values (objects/arrays), show on multiple lines
-    return `- ${key}:\n  ${formatted.split('\n').join('\n  ')}`;
+    return `- ${key}:\n${indent}${formatted.split('\n').join('\n' + indent)}`;
   }).join('\n');
 }
 
