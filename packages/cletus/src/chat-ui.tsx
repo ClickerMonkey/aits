@@ -106,6 +106,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [savedInput, setSavedInput] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
+  const [showSystemMessages, setShowSystemMessages] = useState(true);
   const [renderKey, setRenderKey] = useState(0);
   const [accumulatedUsage, setAccumulatedUsage] = useState<any>({});
   const [accumulatedCost, setAccumulatedCost] = useState(0);
@@ -272,6 +273,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       setShowOutput(newShowOutput);
       setRenderKey(k => k + 1); // Force re-render of Static content
       addSystemMessage(`✓ Operation output ${newShowOutput ? 'shown' : 'hidden'}`);
+      return;
+    }
+
+    // Alt+S to toggle system messages visibility
+    if (key.meta && input === 's') {
+      const newShowSystemMessages = !showSystemMessages;
+      setShowSystemMessages(newShowSystemMessages);
+      setRenderKey(k => k + 1); // Force re-render of Static content
+      addSystemMessage(`✓ System messages ${newShowSystemMessages ? 'shown' : 'hidden'}`);
       return;
     }
 
@@ -466,6 +476,7 @@ KEYBOARD SHORTCUTS:
 • Alt+M       - Toggle agent mode (default/plan)
 • Alt+I       - Toggle operation input details
 • Alt+O       - Toggle operation output details
+• Alt+S       - Toggle system messages visibility
 • Alt+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
@@ -957,7 +968,9 @@ After installation and the SoX executable is in the path, restart Cletus and try
   };
 
   // Calculate visible area (show last N messages to fit screen)
-  const visibleMessages = chatMessages.slice(firstMessageRef.current);
+  const visibleMessages = chatMessages
+    .slice(firstMessageRef.current)
+    .filter(msg => showSystemMessages || msg.role !== 'system');
 
   // Render all messages except pending normally
   const lastMessage = visibleMessages.length > 0 
@@ -1103,6 +1116,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>Alt+M: toggle agent mode</Text>
                 <Text dimColor>Alt+I: toggle op input</Text>
                 <Text dimColor>Alt+O: toggle op output</Text>
+                <Text dimColor>Alt+S: toggle system msgs</Text>
                 <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>
