@@ -9,7 +9,7 @@ import { Prompt } from '../prompt';
 import { Context, Message } from '../types';
 
 describe('Prompt Forget Function Coverage', () => {
-  it('should use estimateTokens to fill in missing token counts (line 934-940)', async () => {
+  it('should use estimateUsage to fill in missing token counts (line 934-940)', async () => {
     const prompt = new Prompt({
       name: 'estimate-test',
       description: 'Estimate test',
@@ -49,16 +49,16 @@ describe('Prompt Forget Function Coverage', () => {
         { role: 'user', content: 'msg2' }, // No tokens - will need estimation
         { role: 'user', content: 'msg3' } // Force high token count
       ],
-      estimateTokens: (msg: Message) => {
+      estimateUsage: (msg: Message) => {
         estimateCallCount++;
-        return 200; // Higher estimate to trigger trimming
+        return { text: { input: 200 } }; // Higher estimate to trigger trimming
       },
       maxOutputTokens: 500
     };
 
     await prompt.get({}, 'result', ctx);
 
-    // estimateTokens should be called for messages without tokens
+    // estimateUsage should be called for messages without tokens
     expect(estimateCallCount).toBeGreaterThan(0);
   });
 

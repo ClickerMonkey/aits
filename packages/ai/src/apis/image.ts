@@ -81,12 +81,27 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
       : 'Image generation streaming failed';
   }
 
-  protected estimateRequestTokens(request: ImageGenerationRequest): number {
-    // Rough estimate based on prompt length and image size
+  protected estimateRequestUsage(request: ImageGenerationRequest): Usage {
+    // Parse size from request (e.g., "1024x1024", "1536x1024")
+    const [width, height] = (request.size || '1024x1024').split('x').map(Number);
+    const quality = request.quality || 'standard';
+    const count = request.n || 1;
+
+    // Prompt tokens (text input)
     const promptTokens = Math.ceil(request.prompt.length / 4);
-    const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    const qualityMultiplier = request.quality === 'high' ? 2 : 1;
-    return promptTokens * sizeMultiplier * qualityMultiplier;
+
+    return {
+      text: {
+        input: promptTokens
+      },
+      image: {
+        output: [{
+          quality,
+          size: { width, height },
+          count
+        }]
+      }
+    };
   }
 
   protected async executeRequest(
@@ -210,11 +225,30 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
       : 'Image editing streaming failed';
   }
 
-  protected estimateRequestTokens(request: ImageEditRequest): number {
-    // Rough estimate based on prompt length and image size
+  protected estimateRequestUsage(request: ImageEditRequest): Usage {
+    // Parse size from request
+    const [width, height] = (request.size || '1024x1024').split('x').map(Number);
+    const count = request.n || 1;
+    
+    // Prompt tokens (text input)
     const promptTokens = Math.ceil(request.prompt.length / 4);
-    const sizeMultiplier = request.size?.includes('1024') ? 2 : 1;
-    return promptTokens * sizeMultiplier;
+
+    // Estimate input image tokens (assuming standard quality)
+    const imageInputTokens = 1000; // Rough estimate for input image processing
+
+    return {
+      text: {
+        input: promptTokens
+      },
+      image: {
+        input: imageInputTokens,
+        output: [{
+          quality: 'standard',
+          size: { width, height },
+          count
+        }]
+      }
+    };
   }
 
   protected async executeRequest(
@@ -357,9 +391,9 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
     };
   }
 
-  protected estimateRequestTokens(request: ImageAnalyzeRequest, selected: SelectedModelFor<T>): number {
+  protected estimateRequestUsage(request: ImageAnalyzeRequest, selected: SelectedModelFor<T>): Usage {
     const chatRequest = this.convertToChatRequest(request);
-    return super.estimateRequestTokens(chatRequest as any, selected);
+    return this.ai.estimateRequestUsage(chatRequest);
   }
 
   protected async executeRequest(

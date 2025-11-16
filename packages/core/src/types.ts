@@ -253,14 +253,15 @@ export type Context<TContext, TMetadata> = TContext &
   signal?: AbortSignal;
 
   /**
-   * An optional function to estimate token usage for a message. 
+   * An optional function to estimate usage for a message. 
    * 
-   * If this is not provided, and the message has no tokens - it will the average available tokens per message.
+   * This handles non-text data types (images, audio, files) more accurately than just token counting.
+   * If this is not provided, and the message has no tokens - it will use the average available tokens per message.
    * 
-   * @param message - The message to estimate tokens for.
-   * @returns The estimated number of tokens.
+   * @param message - The message to estimate usage for.
+   * @returns The estimated usage statistics.
    */
-  estimateTokens?: (messages: Message) => number | undefined;
+  estimateUsage?: (message: Message) => Usage | undefined;
 
   /**
    * The default number of completion tokens to reserve when calculating available prompt tokens.
@@ -424,23 +425,60 @@ export type ResponseFormat =
 
 /**
  * Statistics about usage for an AI request.
- * Includes token counts and optional cost information.
+ * Structured to match ModelPricing for accurate cost calculation and usage tracking.
+ * All token counts are specified per modality (text, audio, image, reasoning, embeddings).
  */
 export interface Usage
 {
-  /** Number of input tokens used (prompt) */
-  inputTokens?: number;
-  /** Number of output tokens used (completion) */
-  outputTokens?: number;
-  /** Total number of tokens used (input + output) */
-  totalTokens?: number;
-  /** Number of cached tokens used, if applicable */
-  cachedTokens?: number;
-  /** Number of reasoning tokens used, if applicable (for reasoning models) */
-  reasoningTokens?: number;
-  /** Duration of output in seconds, if measured */
-  seconds?: number;
-  /** Cost of the request in dollars, if calculated by the provider */
+  /** Text token usage (chat, completion, etc.) */
+  text?: {
+    /** Input tokens used (prompt) */
+    input?: number;
+    /** Output tokens used (completion) */
+    output?: number;
+    /** Cached tokens used, if applicable */
+    cached?: number;
+  };
+  /** Audio usage */
+  audio?: {
+    /** Input tokens used (for audio processing) */
+    input?: number;
+    /** Output tokens used (for audio generation) */
+    output?: number;
+    /** Duration in seconds (for time-based pricing) */
+    seconds?: number;
+  };
+  /** Image usage */
+  image?: {
+    /** Input tokens/images used (for image analysis) */
+    input?: number;
+    /** Output images generated */
+    output?: {
+      /** Quality level (e.g., 'low', 'medium', 'high', 'hd', 'standard') */
+      quality: string;
+      /** Image dimensions */
+      size: { width: number; height: number; };
+      /** Number of images at this quality/size */
+      count: number;
+    }[];
+  };
+  /** Reasoning token usage (for models with extended reasoning like o1) */
+  reasoning?: {
+    /** Input tokens used for reasoning */
+    input?: number;
+    /** Output reasoning tokens used */
+    output?: number;
+    /** Cached reasoning tokens, if applicable */
+    cached?: number;
+  };
+  /** Embeddings usage */
+  embeddings?: {
+    /** Number of embeddings generated */
+    count?: number;
+    /** Total tokens processed for embeddings */
+    tokens?: number;
+  };
+  /** Total cost of the request in dollars, if calculated */
   cost?: number;
 }
 

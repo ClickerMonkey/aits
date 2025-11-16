@@ -4,6 +4,7 @@
  * Provides text embedding functionality.
  */
 
+import type { Usage } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -79,9 +80,15 @@ export class EmbedAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected estimateRequestTokens(request: EmbeddingRequest): number {
+  protected estimateRequestUsage(request: EmbeddingRequest): Usage {
     const totalTextLength = request.texts.reduce((sum, text) => sum + text.length, 0);
-    return Math.ceil(totalTextLength / 4);
+    const tokens = Math.ceil(totalTextLength / 4);
+    return {
+      embeddings: {
+        count: request.texts.length,
+        tokens
+      }
+    };
   }
 
   protected responseToChunks(response: EmbeddingResponse): never {

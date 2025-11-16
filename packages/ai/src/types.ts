@@ -1080,7 +1080,7 @@ export interface AIHooks<T extends AIBaseTypes> {
     ctx: AIContext<T>,
     request: BaseRequest,
     selected: SelectedModelFor<T>,
-    estimatedTokens: number,
+    estimatedUsage: Usage,
     estimatedCost: number
   ) => Promise<void> | void;
 

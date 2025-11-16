@@ -589,7 +589,7 @@ describe('Prompt 100% Coverage', () => {
   });
 
   describe('Context Window Management and Message Trimming', () => {
-    it('should use estimateTokens for messages without token counts', async () => {
+    it('should use estimateUsage for messages without token counts', async () => {
       const prompt = new Prompt({
         name: 'estimate-in-forget',
         description: 'Estimate in forget',
@@ -622,9 +622,10 @@ describe('Prompt 100% Coverage', () => {
           { role: 'user', content: 'Message without tokens' },
           { role: 'assistant', content: 'Response without tokens' }
         ],
-        estimateTokens: (msg: Message) => {
+        estimateUsage: (msg: Message) => {
           estimateCalls++;
-          return msg.content.length * 0.25;
+          const tokens = msg.content.length * 0.25;
+          return { text: { input: tokens } };
         },
         maxOutputTokens: 1000
       };

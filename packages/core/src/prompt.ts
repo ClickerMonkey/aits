@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
 import z from 'zod';
 
-import { accumulateUsage, Fn, getChunksFromResponse, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateUsage, Fn, getChunksFromResponse, getInputTokens, getModel, getOutputTokens, getTotalTokens, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
 import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 
@@ -582,7 +582,9 @@ export class Prompt<
         if (chunk.usage) {
           usage = chunk.usage;
           if (!requestTokensSent) {
-            yield emit({ type: 'requestTokens', tokens: chunk.usage.inputTokens ?? 0, request });
+            // Calculate input tokens from usage structure
+            const inputTokens = getInputTokens(chunk.usage);
+            yield emit({ type: 'requestTokens', tokens: inputTokens, request });
             requestTokensSent = true;
           }
           accumulateUsage(accumulatedUsage, chunk.usage);
@@ -950,8 +952,9 @@ export class Prompt<
     yield emit({ type: 'textComplete', content: completeText, request });
 
     // Yield token usage if available
-    if (usage?.outputTokens) {
-      yield emit({ type: 'responseTokens', tokens: usage.outputTokens, request });
+    const outputTokens = getOutputTokens(usage);
+    if (outputTokens > 0) {
+      yield emit({ type: 'responseTokens', tokens: outputTokens, request });
     }
 
     yield emit({ type: 'usage', usage: accumulatedUsage, request });
@@ -1077,7 +1080,9 @@ export class Prompt<
    */
   private forget(request: Request, ctx: Context<TContext, TMetadata>, usage?: Usage): Message[] {
     const model = getModel(request.model);
-    const contextWindow = model?.contextWindow ?? ctx.contextWindow ?? usage?.totalTokens;
+    // Calculate total tokens from usage structure
+    const totalTokens = usage ? getTotalTokens(usage) : undefined;
+    const contextWindow = model?.contextWindow ?? ctx.contextWindow ?? totalTokens;
 
     // We can't forget our past if we don't know the context window
     if (contextWindow === undefined) {
@@ -1115,21 +1120,26 @@ export class Prompt<
         chunks[0].unshift(...currentChunk);
       }
       // Distribute tokens across messages in each chunk
-      // If we have usage.inputTokens, we add them to the last chunk (usage.inputTokens - totalMessageTokens)
-      if (usage?.inputTokens) {
-        const overage = totalMessageTokens - usage.inputTokens;
-        if (overage > 0) {
-          chunkTokens[chunkTokens.length - 1] += overage;
+      // If we have usage input tokens, we add them to the last chunk (usage.inputTokens - totalMessageTokens)
+      if (usage) {
+        const usageInputTokens = getInputTokens(usage);
+        if (usageInputTokens > 0) {
+          const overage = totalMessageTokens - usageInputTokens;
+          if (overage > 0) {
+            chunkTokens[chunkTokens.length - 1] += overage;
+          }
         }
       }
       messageTokens = chunks.map((c, i) => c.map(() => chunkTokens[i] / c.length)).flat();
-    } else if (ctx.estimateTokens) {
+    } else if (ctx.estimateUsage) {
       for (const msg of request.messages) {
-        msg.tokens = ctx.estimateTokens(msg);
+        const msgUsage = ctx.estimateUsage(msg);
+        // Calculate total tokens from structured usage
+        msg.tokens = getTotalTokens(msgUsage);
       }
       messageTokens = request.messages.map(m => m.tokens!);
-    } else if (usage?.inputTokens) {
-      const spreadTokens = usage.inputTokens;
+    } else if (usage?.text?.input) {
+      const spreadTokens = usage.text.input;
       const perMessage = Math.floor(spreadTokens / request.messages.length);
       messageTokens = request.messages.map(() => perMessage);
     } else {

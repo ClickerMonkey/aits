@@ -472,7 +472,7 @@ describe('Prompt Streaming and Tool Events', () => {
           { role: 'user', content: 'Message 1' },
           { role: 'assistant', content: 'Response 1' }
         ]
-        // No estimateTokens, no contextWindow, no usage
+        // No estimateUsage, no contextWindow, no usage
       };
 
       // Should fail because it can't trim without token info

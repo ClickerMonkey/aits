@@ -205,6 +205,7 @@ export type Resolved<T> = T extends Promise<infer U>
 
 /**
  * Accumulates usage statistics by adding values from one Usage object to another.
+ * Handles the nested structure matching ModelPricing.
  * 
  * @param target - The target Usage object to accumulate into.
  * @param add - The Usage object to add from.
@@ -215,27 +216,152 @@ export function accumulateUsage(target: Usage, add?: Usage) {
     return;
   }
 
-  target.cachedTokens = add.cachedTokens
-    ? (target.cachedTokens || 0) + add.cachedTokens
-    : target.cachedTokens;
-  target.cost = add.cost
-    ? (target.cost || 0) + add.cost
-    : target.cost;
-  target.inputTokens = add.inputTokens
-    ? (target.inputTokens || 0) + add.inputTokens
-    : target.inputTokens;
-  target.outputTokens = add.outputTokens
-    ? (target.outputTokens || 0) + add.outputTokens
-    : target.outputTokens;
-  target.reasoningTokens = add.reasoningTokens
-    ? (target.reasoningTokens || 0) + add.reasoningTokens
-    : target.reasoningTokens;
-  target.totalTokens = add.totalTokens
-    ? (target.totalTokens || 0) + add.totalTokens
-    : target.totalTokens;
-  target.seconds = add.seconds
-    ? (target.seconds || 0) + add.seconds
-    : target.seconds;
+  // Accumulate text usage
+  if (add.text) {
+    if (!target.text) {
+      target.text = {};
+    }
+    if (add.text.input !== undefined) {
+      target.text.input = (target.text.input || 0) + add.text.input;
+    }
+    if (add.text.output !== undefined) {
+      target.text.output = (target.text.output || 0) + add.text.output;
+    }
+    if (add.text.cached !== undefined) {
+      target.text.cached = (target.text.cached || 0) + add.text.cached;
+    }
+  }
+
+  // Accumulate audio usage
+  if (add.audio) {
+    if (!target.audio) {
+      target.audio = {};
+    }
+    if (add.audio.input !== undefined) {
+      target.audio.input = (target.audio.input || 0) + add.audio.input;
+    }
+    if (add.audio.output !== undefined) {
+      target.audio.output = (target.audio.output || 0) + add.audio.output;
+    }
+    if (add.audio.seconds !== undefined) {
+      target.audio.seconds = (target.audio.seconds || 0) + add.audio.seconds;
+    }
+  }
+
+  // Accumulate image usage
+  if (add.image) {
+    if (!target.image) {
+      target.image = { output: [] };
+    }
+    if (add.image.input !== undefined) {
+      target.image.input = (target.image.input || 0) + add.image.input;
+    }
+    if (add.image.output) {
+      if (!target.image.output) {
+        target.image.output = [];
+      }
+      // Merge image outputs by quality and size
+      for (const addOutput of add.image.output) {
+        const existing = target.image.output.find(
+          o => o.quality === addOutput.quality && 
+               o.size.width === addOutput.size.width && 
+               o.size.height === addOutput.size.height
+        );
+        if (existing) {
+          existing.count += addOutput.count;
+        } else {
+          target.image.output.push({ ...addOutput });
+        }
+      }
+    }
+  }
+
+  // Accumulate reasoning usage
+  if (add.reasoning) {
+    if (!target.reasoning) {
+      target.reasoning = {};
+    }
+    if (add.reasoning.input !== undefined) {
+      target.reasoning.input = (target.reasoning.input || 0) + add.reasoning.input;
+    }
+    if (add.reasoning.output !== undefined) {
+      target.reasoning.output = (target.reasoning.output || 0) + add.reasoning.output;
+    }
+    if (add.reasoning.cached !== undefined) {
+      target.reasoning.cached = (target.reasoning.cached || 0) + add.reasoning.cached;
+    }
+  }
+
+  // Accumulate embeddings usage
+  if (add.embeddings) {
+    if (!target.embeddings) {
+      target.embeddings = {};
+    }
+    if (add.embeddings.count !== undefined) {
+      target.embeddings.count = (target.embeddings.count || 0) + add.embeddings.count;
+    }
+    if (add.embeddings.tokens !== undefined) {
+      target.embeddings.tokens = (target.embeddings.tokens || 0) + add.embeddings.tokens;
+    }
+  }
+
+  // Accumulate cost
+  if (add.cost !== undefined) {
+    target.cost = (target.cost || 0) + add.cost;
+  }
+}
+
+/**
+ * Calculate total input tokens from a Usage object.
+ * Includes tokens from text, audio, image, reasoning input, and embeddings.
+ * 
+ * @param usage - The Usage object to calculate input tokens from
+ * @returns Total input tokens
+ */
+export function getInputTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.input || 0) + 
+         (usage.audio?.input || 0) + 
+         (usage.image?.input || 0) +
+         (usage.reasoning?.input || 0) +
+         (usage.embeddings?.tokens || 0);
+}
+
+/**
+ * Calculate total output tokens from a Usage object.
+ * Includes tokens from text, audio, and reasoning output.
+ * Note: image.output represents generated images (not tokens), so it's excluded.
+ * 
+ * @param usage - The Usage object to calculate output tokens from
+ * @returns Total output tokens
+ */
+export function getOutputTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.output || 0) + 
+         (usage.audio?.output || 0) + 
+         (usage.reasoning?.output || 0);
+}
+
+/**
+ * Calculate total tokens from a Usage object.
+ * Includes all tokens: input, output, cached from all modalities.
+ * Note: image.output represents generated images (not tokens), so it's excluded.
+ * 
+ * @param usage - The Usage object to calculate total tokens from
+ * @returns Total tokens
+ */
+export function getTotalTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.input || 0) + 
+         (usage.text?.output || 0) + 
+         (usage.text?.cached || 0) +
+         (usage.audio?.input || 0) + 
+         (usage.audio?.output || 0) +
+         (usage.image?.input || 0) +
+         (usage.reasoning?.input || 0) + 
+         (usage.reasoning?.output || 0) + 
+         (usage.reasoning?.cached || 0) +
+         (usage.embeddings?.tokens || 0);
 }
 
 /**

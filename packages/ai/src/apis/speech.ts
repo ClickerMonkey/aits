@@ -4,6 +4,7 @@
  * Provides text-to-speech functionality.
  */
 
+import type { Usage } from '@aits/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,
@@ -85,8 +86,20 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
   // OPTIONAL OVERRIDES
   // ============================================================================
 
-  protected estimateRequestTokens(request: SpeechRequest): number {
-    return Math.ceil(request.text.length / 4);
+  protected estimateRequestUsage(request: SpeechRequest): Usage {
+    const tokens = Math.ceil(request.text.length / 4);
+    // Estimate output audio duration (rough estimate: 150 words per minute, 4 chars per word)
+    const estimatedMinutes = (request.text.length / 4 / 150);
+    const estimatedSeconds = estimatedMinutes * 60;
+    
+    return {
+      text: {
+        input: tokens
+      },
+      audio: {
+        seconds: estimatedSeconds
+      }
+    };
   }
 
   protected responseToChunks(response: SpeechResponse): SpeechResponse[] {

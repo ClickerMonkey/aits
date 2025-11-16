@@ -153,12 +153,12 @@ export abstract class BaseAPI<
       // Run onModelSelected hook
       const finalSelected = (await hooks.onModelSelected?.(fullCtx, request, selected)) || selected;
 
-      // Estimate tokens
-      const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
-      const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
+      // Estimate usage
+      const estimatedUsage = this.estimateRequestUsage(request, finalSelected);
+      const estimatedCost = this.estimateRequestCost(estimatedUsage, finalSelected);
 
       // Run beforeRequest hook (hook can override provider config)
-      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedTokens, estimatedCost);
+      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedUsage, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -172,8 +172,8 @@ export abstract class BaseAPI<
       );
 
       // Calculate cost and extract usage
-      const usage = this.extractUsage(response, estimatedTokens);
-      const cost = this.calculateResponseCost(response, finalSelected, estimatedTokens);
+      const usage = this.extractUsage(response, estimatedUsage);
+      const cost = this.calculateResponseCost(response, finalSelected, estimatedUsage);
 
       // Run afterRequest hook
       await hooks.afterRequest?.(fullCtx, request, response, true, finalSelected, usage, cost);
@@ -225,12 +225,12 @@ export abstract class BaseAPI<
         ? (await hooks.onModelSelected(fullCtx, request, selected)) || selected
         : selected;
 
-      // Estimate tokens
-      const estimatedTokens = this.estimateRequestTokens(request, finalSelected);
-      const estimatedCost = this.estimateRequestCost(estimatedTokens, finalSelected);
+      // Estimate usage
+      const estimatedUsage = this.estimateRequestUsage(request, finalSelected);
+      const estimatedCost = this.estimateRequestCost(estimatedUsage, finalSelected);
 
       // Run beforeRequest hook
-      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedTokens, estimatedCost);
+      await hooks.beforeRequest?.(fullCtx, request, finalSelected, estimatedUsage, estimatedCost);
 
       // Get handler if available
       const handler = registry.getHandler(finalSelected.model.provider, finalSelected.model.id);
@@ -396,30 +396,28 @@ export abstract class BaseAPI<
   }
 
   /**
-   * Estimate tokens for the request
-   * (default: delegates to AI instance method)
+   * Estimate usage for the request
+   * (default: returns empty usage, subclasses should override)
    * @param request - The request to estimate
    * @param selected - The selected model and provider
    */
-  protected estimateRequestTokens(request: TRequest, selected: SelectedModelFor<T>): number {
-    return 0;
+  protected estimateRequestUsage(request: TRequest, selected: SelectedModelFor<T>): Usage {
+    return {};
   }
 
   /**
    * Estimate cost for a request before execution
    * 
-   * @param estimatedTokens - Estimated token count
+   * @param estimatedUsage - Estimated usage statistics
    * @param selected - The selected model and provider
    * @returns Estimated cost
    */
   protected estimateRequestCost(
-    estimatedTokens: number,
+    estimatedUsage: Usage,
     selected: SelectedModelFor<T>
   ): number {
-    const usage: Usage = { inputTokens: estimatedTokens, outputTokens: 0, totalTokens: estimatedTokens };
-    
     // If no cost provided, calculate it
-    return this.ai.calculateCost(selected.model, usage);
+    return this.ai.calculateCost(selected.model, estimatedUsage);
   }
 
   /**
@@ -427,15 +425,15 @@ export abstract class BaseAPI<
    * (default: extracts from response.cost or calculates from usage)
    * @param response - The response
    * @param selected - The selected model and provider
-   * @param estimatedTokens - Estimated token count
+   * @param estimatedUsage - Estimated usage statistics
    */
   protected calculateResponseCost(
     response: TResponse,
     selected: SelectedModelFor<T>,
-    estimatedTokens: number
+    estimatedUsage: Usage
   ): number {
     // Otherwise extract usage and check if cost is included
-    const usage = this.extractUsage(response, estimatedTokens);
+    const usage = this.extractUsage(response, estimatedUsage);
     if (usage.cost !== undefined) {
       return usage.cost;
     }
@@ -466,15 +464,15 @@ export abstract class BaseAPI<
    * Extract usage from response
    * (default: extracts from response.usage or uses estimate)
    * @param response - The response
-   * @param estimatedTokens - Estimated token count
+   * @param estimatedUsage - Estimated usage statistics
    */
-  protected extractUsage(response: TResponse, estimatedTokens: number): Usage {
+  protected extractUsage(response: TResponse, estimatedUsage: Usage): Usage {
     // Try to extract from response
     const usage = response.usage;
     if (usage) return usage;
 
     // Otherwise use estimate
-    return { inputTokens: estimatedTokens, outputTokens: 0, totalTokens: estimatedTokens };
+    return estimatedUsage;
   }
 
   /**

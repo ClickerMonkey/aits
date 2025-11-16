@@ -24,7 +24,7 @@ import type {
   TranscriptionResponse
 } from '@aits/ai';
 import { detectTier } from '@aits/ai';
-import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall } from '@aits/core';
+import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall, type Usage } from '@aits/core';
 import fs from 'fs';
 import OpenAI, { Uploadable } from 'openai';
 import { Stream } from 'openai/core/streaming';
@@ -174,6 +174,58 @@ export interface OpenAIConfig {
  * - `customizeSpeechParams(params, config)`: Modify speech params
  * - `customizeEmbeddingParams(params, config)`: Modify embedding params
  */
+
+/**
+ * Helper function to convert OpenAI-style usage to the new structured Usage format
+ */
+function convertOpenAIUsage(openaiUsage: {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number; audio_tokens?: number };
+  completion_tokens_details?: { reasoning_tokens?: number; audio_tokens?: number };
+}): Usage {
+  const usage: Usage = {};
+
+  // Text tokens (default category)
+  // Note: prompt_tokens already includes cached tokens, so we don't subtract them
+  // They're just reported separately in the details for pricing purposes
+  const textInput = (openaiUsage.prompt_tokens || 0) - 
+                   (openaiUsage.prompt_tokens_details?.audio_tokens || 0);
+  const textOutput = (openaiUsage.completion_tokens || 0) - 
+                    (openaiUsage.completion_tokens_details?.reasoning_tokens || 0) -
+                    (openaiUsage.completion_tokens_details?.audio_tokens || 0);
+  
+  if (textInput > 0 || textOutput > 0 || openaiUsage.prompt_tokens_details?.cached_tokens) {
+    usage.text = {};
+    // Only include non-cached input tokens
+    const nonCachedInput = textInput - (openaiUsage.prompt_tokens_details?.cached_tokens || 0);
+    if (nonCachedInput > 0) usage.text.input = nonCachedInput;
+    if (textOutput > 0) usage.text.output = textOutput;
+    if (openaiUsage.prompt_tokens_details?.cached_tokens) {
+      usage.text.cached = openaiUsage.prompt_tokens_details.cached_tokens;
+    }
+  }
+
+  // Reasoning tokens
+  if (openaiUsage.completion_tokens_details?.reasoning_tokens) {
+    usage.reasoning = {
+      output: openaiUsage.completion_tokens_details.reasoning_tokens
+    };
+  }
+
+  // Audio tokens
+  const audioInput = openaiUsage.prompt_tokens_details?.audio_tokens;
+  const audioOutput = openaiUsage.completion_tokens_details?.audio_tokens;
+  if (audioInput || audioOutput) {
+    usage.audio = {};
+    if (audioInput) usage.audio.input = audioInput;
+    if (audioOutput) usage.audio.output = audioOutput;
+  }
+
+  return usage;
+}
+
 export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> implements Provider<TConfig> {
   // Provider name for error messages and identification
   readonly name: string = 'openai';
@@ -949,7 +1001,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             toolCalls: [],
             finishReason: 'length',
             model,
-            usage: { inputTokens: details?.contextWindow, totalTokens: details?.contextWindow },
+            usage: { text: { input: details?.contextWindow } },
           };
         }
 
@@ -972,11 +1024,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : choice.finish_reason,
         refusal: choice.finish_reason === 'content_filter' ? choice.message.content || undefined : undefined,
         model,
-        usage: {
-          inputTokens: completion.usage?.prompt_tokens ?? -1,
-          outputTokens: completion.usage?.completion_tokens ?? -1,
-          totalTokens: completion.usage?.total_tokens ?? -1,
-        },
+        usage: completion.usage ? convertOpenAIUsage(completion.usage) : undefined,
       };
 
       this.augmentChatResponse(completion, response, effectiveConfig);
@@ -1069,7 +1117,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             toolCalls: [],
             finishReason: 'length',
             model,
-            usage: { inputTokens: details?.contextWindow, totalTokens: details?.contextWindow },
+            usage: { text: { input: details?.contextWindow } },
           };
         }
 
@@ -1093,11 +1141,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           content: delta?.content || undefined,
           finishReason: choice?.finish_reason as FinishReason | undefined,
           refusal: delta?.refusal ?? undefined,
-          usage: !chunk.usage ? undefined : {
-            inputTokens: chunk.usage.prompt_tokens,
-            outputTokens: chunk.usage.completion_tokens,
-            totalTokens: chunk.usage.total_tokens,
-          },
+          usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
         };
 
         // Handle tool calls
@@ -1373,11 +1417,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         revisedPrompt: img.revised_prompt || undefined,
       })),
       model,
-      usage: {
-        inputTokens: response.usage?.input_tokens || 0,
-        outputTokens: response.usage?.output_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
-      },
+      usage: response.usage ? convertOpenAIUsage(response.usage) : undefined,
     };
   }
   
@@ -1605,11 +1645,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         revisedPrompt: img.revised_prompt || undefined,
       })),
       model,
-      usage: {
-        inputTokens: response.usage?.input_tokens || 0,
-        outputTokens: response.usage?.output_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
-      },
+      usage: response.usage ? convertOpenAIUsage(response.usage) : undefined,
     };
   }
 
@@ -1825,15 +1861,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     return {
       text: response.text,
       model,
-      usage: {
-        ...(response.usage?.type === 'tokens' ? {
-          outputTokens: response.usage.output_tokens ?? 0,
-          inputTokens: response.usage.input_tokens ?? 0,
-          totalTokens: response.usage.total_tokens ?? 0,
-        }: {
-          seconds: response.usage?.seconds ?? 0,
-        }),
-      },
+      usage: response.usage?.type === 'tokens' ? convertOpenAIUsage(response.usage) : 
+             response.usage?.seconds ? { audio: { seconds: response.usage.seconds } } : undefined,
     };
   }
 
@@ -1916,11 +1945,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         case 'transcript.text.done':
           yield {
             text: chunk.text,
-            usage: !chunk.usage ? undefined : {
-              inputTokens: chunk.usage.input_tokens,
-              outputTokens: chunk.usage.output_tokens,
-              totalTokens: chunk.usage.total_tokens,
-            },
+            usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
             model,
           };
           break;
@@ -2048,9 +2073,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       model,
       usage: response.usage
         ? {
-            inputTokens: response.usage.prompt_tokens,
-            outputTokens: 0,
-            totalTokens: response.usage.total_tokens,
+            embeddings: {
+              count: response.data.length,
+              tokens: response.usage.prompt_tokens
+            }
           }
         : undefined,
     };

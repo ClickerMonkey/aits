@@ -290,14 +290,14 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
       if (!response.usage) {
         response.usage = {};
       }
+      if (!response.usage.text) {
+        response.usage.text = {};
+      }
       if (usage.completion_tokens) {
-        response.usage.outputTokens = usage.completion_tokens;
+        response.usage.text.output = usage.completion_tokens;
       }
       if (usage.prompt_tokens) {
-        response.usage.inputTokens = usage.prompt_tokens;
-      }
-      if (usage.total_tokens) {
-        response.usage.totalTokens = usage.total_tokens;
+        response.usage.text.input = usage.prompt_tokens;
       }
       if (usage.cost) {
         response.usage.cost = usage.cost;
@@ -316,14 +316,14 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
       if (!chunk.usage) {
         chunk.usage = {};
       }
+      if (!chunk.usage.text) {
+        chunk.usage.text = {};
+      }
       if (usage.completion_tokens) {
-        chunk.usage.outputTokens = usage.completion_tokens;
+        chunk.usage.text.output = usage.completion_tokens;
       }
       if (usage.prompt_tokens) {
-        chunk.usage.inputTokens = usage.prompt_tokens;
-      }
-      if (usage.total_tokens) {
-        chunk.usage.totalTokens = usage.total_tokens;
+        chunk.usage.text.input = usage.prompt_tokens;
       }
       if (usage.cost) {
         chunk.usage.cost = usage.cost;

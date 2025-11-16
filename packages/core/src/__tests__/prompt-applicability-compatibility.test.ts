@@ -239,10 +239,10 @@ describe('Prompt Final Coverage', () => {
       expect(result).toBe('success');
     });
 
-    it('should use estimateTokens when messages missing tokens', async () => {
+    it('should use estimateUsage when messages missing tokens', async () => {
       const prompt = new Prompt({
-        name: 'estimate-tokens',
-        description: 'Estimate tokens',
+        name: 'estimate-usage',
+        description: 'Estimate usage',
         content: 'Test'
       });
 
@@ -271,9 +271,9 @@ describe('Prompt Final Coverage', () => {
         messages: [
           { role: 'user', content: 'test message without tokens' }
         ],
-        estimateTokens: () => {
+        estimateUsage: () => {
           estimatorCalled = true;
-          return 10;
+          return { text: { input: 10 } };
         },
         maxOutputTokens: 500
       };

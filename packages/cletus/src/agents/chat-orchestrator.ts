@@ -1,3 +1,4 @@
+import { getTotalTokens } from '@aits/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -297,8 +298,8 @@ export async function runChatOrchestrator(
 
             case 'usage':
               discardedTokens = 0;
-              setReasoningTokens(chunk.usage.reasoningTokens || 0);
-              setOutputTokens(chunk.usage.totalTokens || 0);
+              setReasoningTokens((chunk.usage.reasoning?.output || 0) + (chunk.usage.reasoning?.input || 0));
+              setOutputTokens(getTotalTokens(chunk.usage));
               break;
           }
         }

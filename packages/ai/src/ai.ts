@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
+import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';
@@ -249,20 +249,20 @@ export class AI<T extends AIBaseTypes> {
   async buildCoreContext(requiredCtx: AIContextRequired<T>): Promise<Context<T>> {
     const ctx = await this.buildContext(requiredCtx);
 
-    if (ctx.executor && ctx.streamer && ctx.estimateTokens) {
+    if (ctx.executor && ctx.streamer && ctx.estimateUsage) {
       return ctx;
     }
 
     // Get executor and streamer from ChatAPI
     const execute = this.chat.createExecutor();
     const stream = this.chat.createStreamer();
-    const estimateTokens = this.estimateMessageTokens.bind(this);
+    const estimateUsage = this.estimateMessageUsage.bind(this);
 
     return {
       ...ctx,
       execute,
       stream,
-      estimateTokens,
+      estimateUsage,
     } as Context<T>;
   }
 
@@ -434,21 +434,31 @@ export class AI<T extends AIBaseTypes> {
   }
 
   /**
-   * Estimate tokens for a message (used by API classes)
+   * Estimate usage for a message (used by API classes and Prompts)
    * 
-   * @param message - Message to estimate tokens for
-   * @returns 
+   * @param message - Message to estimate usage for
+   * @returns Usage statistics structured to match ModelPricing
    */
-  estimateMessageTokens(message: Message): number {
+  estimateMessageUsage(message: Message): Usage {
+    const usage: Usage = {};
+
+    // If message has pre-calculated tokens, return as text input
     if (message.tokens !== undefined) {
-      return message.tokens;
+      return {
+        text: {
+          input: message.tokens
+        }
+      };
     }
 
-    let tokens = 0;
+    let textTokens = 0;
+    let imageTokens = 0;
+    let audioTokens = 0;
+    let fileTokens = 0;
 
     let addText = (text: string | undefined) => {
       if (text) {
-        tokens += Math.ceil(text.length / this.tokens.text.divisor);
+        textTokens += Math.ceil(text.length / this.tokens.text.divisor);
       }
     };
 
@@ -468,45 +478,88 @@ export class AI<T extends AIBaseTypes> {
         addText(content.type);
 
         const metrics = this.tokens[content.type || 'text'];
+        let contentTokens = 0;
 
         if (typeof content.content === 'string') {
           if (content.content.startsWith('data:')) {
-            // Base64 image
-            tokens += metrics.max
+            // Base64 data
+            contentTokens = metrics.max
               ? Math.min(metrics.max, Math.ceil(content.content.length / metrics.base64Divisor))
               : Math.ceil(content.content.length / metrics.base64Divisor);
           } else if (content.content.startsWith('http') && content.type !== 'text') {
             // URL - use fallback estimate
-            tokens += metrics.fallback;
+            contentTokens = metrics.fallback;
           } else {
             addText(content.content);
+            continue; // Already added as text
           }
         } else if (content.content instanceof Uint8Array) {
-          // Binary data - use fallback estimate
-          tokens += Math.ceil(content.content.byteLength / metrics.divisor);
+          // Binary data
+          contentTokens = Math.ceil(content.content.byteLength / metrics.divisor);
         } else if (content.content instanceof Blob) {
           // Blob data
-          tokens += Math.ceil(content.content.size / metrics.divisor);
+          contentTokens = Math.ceil(content.content.size / metrics.divisor);
         } else {
           // URL or Stream - use fallback estimate
-          tokens += metrics.fallback;
+          contentTokens = metrics.fallback;
+        }
+
+        // Categorize tokens by content type
+        switch (content.type) {
+          case 'image':
+            imageTokens += contentTokens;
+            break;
+          case 'audio':
+            audioTokens += contentTokens;
+            break;
+          case 'file':
+            fileTokens += contentTokens;
+            break;
+          default:
+            textTokens += contentTokens;
         }
       }
     }
 
-    return tokens;
+    // Build structured usage object
+    if (textTokens > 0) {
+      usage.text = { input: textTokens };
+    }
+    if (imageTokens > 0) {
+      usage.image = { input: imageTokens };
+    }
+    if (audioTokens > 0) {
+      usage.audio = { input: audioTokens };
+    }
+    // fileTokens are treated as text for now
+    if (fileTokens > 0) {
+      if (!usage.text) {
+        usage.text = {};
+      }
+      usage.text.input = (usage.text.input || 0) + fileTokens;
+    }
+
+    return usage;
   }
 
   /**
-   * Estimate tokens for a request (used by API classes)
+   * Estimate usage for a request (used by API classes)
    * @internal
    */
-  estimateRequestTokens(request: Request): number {
-    return request.messages.reduce((sum, msg) => sum + this.estimateMessageTokens(msg), 0);
+  estimateRequestUsage(request: Request): Usage {
+    const usage: Usage = {};
+    
+    for (const msg of request.messages) {
+      const msgUsage = this.estimateMessageUsage(msg);
+      accumulateUsage(usage, msgUsage);
+    }
+    
+    return usage;
   }
 
   /**
    * Calculate cost for a request (used by API classes)
+   * Matches the structure of Usage to ModelPricing for accurate cost calculation.
    * @internal
    */
   calculateCost(
@@ -525,36 +578,89 @@ export class AI<T extends AIBaseTypes> {
     
     let cost = 0;
 
-    if (usage.inputTokens && model.pricing.text?.input) {
-      const inputCost = (usage.inputTokens * model.pricing.text.input) / 1_000_000;
-      cost += inputCost;
+    // Text usage costs
+    if (usage.text && pricing.text) {
+      if (usage.text.input && pricing.text.input) {
+        cost += (usage.text.input * pricing.text.input) / 1_000_000;
+      }
+      if (usage.text.output && pricing.text.output) {
+        cost += (usage.text.output * pricing.text.output) / 1_000_000;
+      }
+      if (usage.text.cached) {
+        // Use cached pricing if available, otherwise fall back to input pricing
+        const cachedPrice = pricing.text.cached ?? pricing.text.input;
+        if (cachedPrice) {
+          cost += (usage.text.cached * cachedPrice) / 1_000_000;
+        }
+      }
     }
 
-    if (usage.outputTokens && model.pricing.text?.output) {
-      const outputCost = (usage.outputTokens * model.pricing.text.output) / 1_000_000;
-      cost += outputCost;
+    // Audio usage costs
+    if (usage.audio && pricing.audio) {
+      // Time-based pricing (per second)
+      if (usage.audio.seconds && pricing.audio.perSecond) {
+        cost += usage.audio.seconds * pricing.audio.perSecond;
+      }
+      // Token-based pricing
+      if (usage.audio.input && pricing.audio.input) {
+        cost += (usage.audio.input * pricing.audio.input) / 1_000_000;
+      }
+      if (usage.audio.output && pricing.audio.output) {
+        cost += (usage.audio.output * pricing.audio.output) / 1_000_000;
+      }
     }
 
-    if (usage.cachedTokens && model.pricing.text?.cached) {
-      const cachedCost = (usage.cachedTokens * model.pricing.text?.cached) / 1_000_000;
-      cost += cachedCost;
+    // Image usage costs
+    if (usage.image && pricing.image) {
+      // Input image tokens (for image analysis)
+      if (usage.image.input && pricing.image.input) {
+        cost += (usage.image.input * pricing.image.input) / 1_000_000;
+      }
+      // Output image costs (for image generation)
+      if (usage.image.output && pricing.image.output) {
+        for (const usageOutput of usage.image.output) {
+          // Find matching price for this quality/size
+          const priceEntry = pricing.image.output.find(p => p.quality === usageOutput.quality);
+          if (priceEntry) {
+            const sizeEntry = priceEntry.sizes.find(
+              s => s.width === usageOutput.size.width && s.height === usageOutput.size.height
+            );
+            if (sizeEntry) {
+              cost += sizeEntry.cost * usageOutput.count;
+            }
+          }
+        }
+      }
     }
 
-    if (usage.reasoningTokens && model.pricing.reasoning?.output) {
-      const reasoningCost = (usage.reasoningTokens * model.pricing.reasoning.output) / 1_000_000;
-      cost += reasoningCost;
+    // Reasoning usage costs
+    if (usage.reasoning && pricing.reasoning) {
+      if (usage.reasoning.input && pricing.reasoning.input) {
+        cost += (usage.reasoning.input * pricing.reasoning.input) / 1_000_000;
+      }
+      if (usage.reasoning.output && pricing.reasoning.output) {
+        cost += (usage.reasoning.output * pricing.reasoning.output) / 1_000_000;
+      }
+      if (usage.reasoning.cached) {
+        // Use cached pricing if available, otherwise fall back to input pricing
+        const cachedPrice = pricing.reasoning.cached ?? pricing.reasoning.input;
+        if (cachedPrice) {
+          cost += (usage.reasoning.cached * cachedPrice) / 1_000_000;
+        }
+      }
     }
 
-    if (usage.seconds && model.pricing.audio?.perSecond) {
-      const timeCost = usage.seconds * model.pricing.audio.perSecond;
-      cost += timeCost;
+    // Embeddings usage costs
+    if (usage.embeddings && pricing.embeddings) {
+      if (usage.embeddings.tokens && pricing.embeddings.cost) {
+        cost += (usage.embeddings.tokens * pricing.embeddings.cost) / 1_000_000;
+      }
     }
 
-    if (model.pricing.perRequest) {
-      cost += model.pricing.perRequest;
+    // Fixed cost per request
+    if (pricing.perRequest) {
+      cost += pricing.perRequest;
     }
-
-    // TODO non text input & output tokens
 
     return cost;
   }
