@@ -449,3 +449,58 @@ Do not return any additional text other than the matching description subset.`;
   ),
 });
 
+export const image_attach = operationOf<
+  { imagePath: string },
+  { attached: boolean }
+>({
+  mode: 'create',
+  signature: 'image_attach(imagePath: string)',
+  status: (input) => `Attaching image: ${path.basename(input.imagePath)}`,
+  analyze: async (input, ctx) => {
+    const { imagePath } = input;
+
+    // Check if path is absolute
+    if (!path.isAbsolute(imagePath)) {
+      return {
+        analysis: `This would fail - image path must be absolute. Received: "${imagePath}"`,
+        doable: false,
+      };
+    }
+
+    // Check if file exists and is readable
+    const readable = await fileIsReadable(imagePath);
+    if (!readable) {
+      return {
+        analysis: `This would fail - image file "${imagePath}" not found or not readable.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will attach the image at "${imagePath}" to the chat as a user message.`,
+      doable: true,
+    };
+  },
+  do: async (input, { chatMessage }) => {
+    const { imagePath } = input;
+    const imageLink = linkImage(imagePath);
+
+    // Add image to the chat message
+    if (chatMessage) {
+      chatMessage.content.push({ type: 'image', content: imageLink });
+    }
+
+    return { attached: true };
+  },
+  render: (op, config, showInput, showOutput) => renderOperation(
+    op,
+    `ImageAttach("${path.basename(op.input.imagePath)}")`,
+    (op) => {
+      if (op.output?.attached) {
+        return `Attached image: ${linkImage(op.input.imagePath)}`;
+      }
+      return null;
+    }
+  , showInput, showOutput),
+});
+

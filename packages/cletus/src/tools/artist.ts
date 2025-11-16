@@ -78,17 +78,32 @@ Example: Find images of people in photos:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_find', input }, ctx),
   });
 
+  const imageAttach = ai.tool({
+    name: 'image_attach',
+    description: 'Attach an image to the chat for the user to see',
+    instructions: `Use this to attach an image file to the chat conversation. The image will be added as a user message and displayed in the chat. Accepts absolute file paths.
+
+Example: Attach an image file:
+{ "imagePath": "/absolute/path/to/image.png" }`,
+    schema: z.object({
+      imagePath: z.string().describe('Absolute path to the image file to attach'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_attach', input }, ctx),
+  });
+
   return [
     imageGenerate,
     imageEdit,
     imageAnalyze,
     imageDescribe,
     imageFind,
+    imageAttach,
   ] as [
     typeof imageGenerate,
     typeof imageEdit,
     typeof imageAnalyze,
     typeof imageDescribe,
     typeof imageFind,
+    typeof imageAttach,
   ];
 }

@@ -4,7 +4,7 @@ import { glob } from 'glob';
 import path from 'path';
 import * as Diff from 'diff';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunkArray, paginateText } from "../common";
+import { abbreviate, chunkArray, linkFile, paginateText } from "../common";
 import { getAssetPath } from "../file-manager";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
@@ -1030,6 +1030,81 @@ export const dir_create = operationOf<
     (op) => {
       if (op.output) {
         return `Created directory ${op.output.path}`;
+      }
+      return null;
+    }
+  , showInput, showOutput),
+});
+
+export const file_attach = operationOf<
+  { filePath: string },
+  { attached: boolean }
+>({
+  mode: 'create',
+  signature: 'file_attach(filePath: string)',
+  status: (input) => `Attaching file: ${path.basename(input.filePath)}`,
+  analyze: async (input, { cwd }) => {
+    const { filePath } = input;
+    const fullPath = path.resolve(cwd, filePath);
+
+    // Check if file exists and is readable
+    const readable = await fileIsReadable(fullPath);
+    if (!readable) {
+      return {
+        analysis: `This would fail - file "${filePath}" not found or not readable.`,
+        doable: false,
+      };
+    }
+
+    // Check file type - only allow text, audio, or PDF
+    const fileType = await categorizeFile(fullPath, filePath);
+    const allowedTypes = ['text', 'pdf'];
+    
+    // Check for audio files by extension
+    const ext = path.extname(filePath).toLowerCase();
+    const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
+    const isAudio = audioExts.includes(ext);
+
+    if (!allowedTypes.includes(fileType) && !isAudio) {
+      return {
+        analysis: `This would fail - file type "${fileType}" is not allowed. Only text, audio, and PDF files can be attached.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will attach the ${isAudio ? 'audio' : fileType} file at "${filePath}" to the chat as a user message.`,
+      doable: true,
+    };
+  },
+  do: async (input, { cwd, chatMessage }) => {
+    const { filePath } = input;
+    const fullPath = path.resolve(cwd, filePath);
+    const fileLink = linkFile(fullPath, path.basename(filePath));
+
+    // Determine the content type
+    const fileType = await categorizeFile(fullPath, filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
+    const isAudio = audioExts.includes(ext);
+
+    // Add file to the chat message
+    if (chatMessage) {
+      if (isAudio) {
+        chatMessage.content.push({ type: 'audio', content: fileLink });
+      } else {
+        chatMessage.content.push({ type: 'file', content: fileLink });
+      }
+    }
+
+    return { attached: true };
+  },
+  render: (op, config, showInput, showOutput) => renderOperation(
+    op,
+    `FileAttach("${path.basename(op.input.filePath)}")`,
+    (op) => {
+      if (op.output?.attached) {
+        return `Attached file: ${path.basename(op.input.filePath)}`;
       }
       return null;
     }
