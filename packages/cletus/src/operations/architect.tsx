@@ -551,17 +551,16 @@ When managing types:
           description: 'Add, update, or remove fields on an existing or discovered type. For existing types, only new fields can be added.',
           schema: () => z.object({
             typeName: getAllTypeEnum().describe('Type name'),
-              fields: z.array(
-                z.union([
-                  createFieldSchema(),
-                  z.object({
-                    name: z.string().describe('Field name to remove'),
-                    remove: z.literal(true).describe('Set to true to remove this field'),
-                  })
-                ])
-              ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
-            });
-          },
+            fields: z.array(
+              z.union([
+                createFieldSchema(),
+                z.object({
+                  name: z.string().describe('Field name to remove'),
+                  remove: z.literal(true).describe('Set to true to remove this field'),
+                })
+              ])
+            ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
+          }),
           call: async (input) => {
             // Check if it's a discovered type
             const discoveredType = discoveredTypes.get(input.typeName);
@@ -718,6 +717,7 @@ When managing types:
         model: config.getData().user.models?.chat,
       }),
       excludeMessages: true,
+      dynamic: true,
     });
     
     // Pipeline architecture with two concurrent promises

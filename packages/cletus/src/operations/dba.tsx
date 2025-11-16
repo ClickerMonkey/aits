@@ -715,7 +715,6 @@ Fields:
         model: config.getData().user.models?.chat,
       }),
       excludeMessages: true,
-      dynamic: true,
     });
 
     
