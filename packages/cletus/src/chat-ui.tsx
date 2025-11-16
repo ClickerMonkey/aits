@@ -104,9 +104,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [savedInput, setSavedInput] = useState('');
-  const [showInput, setShowInput] = useState(false);
-  const [showOutput, setShowOutput] = useState(false);
-  const [showSystemMessages, setShowSystemMessages] = useState(true);
+  const [showInput, setShowInput] = useState(config.getData().user.showInput ?? false);
+  const [showOutput, setShowOutput] = useState(config.getData().user.showOutput ?? false);
+  const [showSystemMessages, setShowSystemMessages] = useState(config.getData().user.showSystemMessages ?? true);
   const [renderKey, setRenderKey] = useState(0);
   const [accumulatedUsage, setAccumulatedUsage] = useState<any>({});
   const [accumulatedCost, setAccumulatedCost] = useState(0);
@@ -264,6 +264,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       setShowInput(newShowInput);
       setRenderKey(k => k + 1); // Force re-render of Static content
       addSystemMessage(`✓ Operation input ${newShowInput ? 'shown' : 'hidden'}`);
+      config.save((cfg) => {
+        cfg.user.showInput = newShowInput;
+      });
       return;
     }
 
@@ -273,6 +276,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       setShowOutput(newShowOutput);
       setRenderKey(k => k + 1); // Force re-render of Static content
       addSystemMessage(`✓ Operation output ${newShowOutput ? 'shown' : 'hidden'}`);
+      config.save((cfg) => {
+        cfg.user.showOutput = newShowOutput;
+      });
       return;
     }
 
@@ -282,6 +288,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       setShowSystemMessages(newShowSystemMessages);
       setRenderKey(k => k + 1); // Force re-render of Static content
       addSystemMessage(`✓ System messages ${newShowSystemMessages ? 'shown' : 'hidden'}`);
+      config.save((cfg) => {
+        cfg.user.showSystemMessages = newShowSystemMessages;
+      });
       return;
     }
 
