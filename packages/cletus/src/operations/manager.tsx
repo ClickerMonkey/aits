@@ -142,6 +142,11 @@ export class OperationManager {
             : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
     }
 
+    // Add instructions after the message if they exist
+    if (def.instructions) {
+      op.message += `\n\n<instructions>\n${def.instructions}\n</instructions>`;
+    }
+
     this.onOperationUpdated?.(op, this.operations.indexOf(op));
 
     ctx.log(op);

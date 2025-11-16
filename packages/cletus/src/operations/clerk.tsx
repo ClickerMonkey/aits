@@ -58,6 +58,7 @@ export const file_summary = operationOf<
   mode: 'read',
   signature: 'file_summary(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Summarizing: ${path.basename(input.path)}`,
+  instructions: 'This is a summary of the file content. The original file content may have specific formatting and whitespace that is not preserved in the summary.',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
@@ -236,6 +237,7 @@ export const file_create = operationOf<
   mode: 'create',
   signature: 'file_create(path: string, content: string)',
   status: (input) => `Creating file: ${path.basename(input.path)}`,
+  instructions: 'Preserve content formatting (like whitespace) when creating files. Ensure proper line breaks and indentation are maintained.',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const exists = await fileIsReadable(fullPath);
@@ -576,6 +578,7 @@ export const file_read = operationOf<
   mode: 'read',
   signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Reading: ${path.basename(input.path)}`,
+  instructions: 'Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line). Content is stored in JSON so double quotes may be escaped - unescape them when presenting to the user.',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
@@ -727,6 +730,7 @@ export const file_edit = operationOf<
   mode: 'update',
   signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
   status: (input) => `Editing: ${paginateText(input.path, 100, -100)}`,
+  instructions: 'Preserve existing content formatting and structure. Maintain whitespace, indentation, and line breaks that are part of the original file unless explicitly requested to change them.',
   analyze: async (input, { cwd, ai }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);

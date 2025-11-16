@@ -106,6 +106,13 @@ export type OperationDefinition<TInput, TOutput> = {
    * A signature passed into the chat-agent's delegate prompt to identify this operation.
    */
   signature: string;
+
+  /**
+   * Optional instructions to be included with the operation result message.
+   * These instructions provide context-specific guidance to the LLM when processing operation results.
+   * For example, file_read might include instructions to respect spacing and formatting.
+   */
+  instructions?: string;
 };
 
 // Operation definition for a specific operation kind

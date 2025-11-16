@@ -179,8 +179,6 @@ You should first use tools to read/select information to build the plan. Don't a
 
 <rules>
 Files:
-- Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line).
-- Content is stored in JSON so double quotes may be escaped - unescape them when presenting to the user. IMPORTANT!!!
 - If you don't know the exact path to a file, use file_search to locate it first. Don't assume paths or necessarily believe the user entered path is correct.
 - Reread files if needed rather than making assumptions about their content.
 - If a file does not exist because you assumed the user gave a correct path, search for the file.
