@@ -4,16 +4,19 @@
  * Fetches model information from AWS Bedrock using the AWS SDK
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import type { ModelCapability, ModelInfo, ModelTier } from '@aits/ai';
 import {
   BedrockClient,
   ListFoundationModelsCommand,
   type FoundationModelSummary,
 } from '@aws-sdk/client-bedrock';
-import type { ModelInfo, ModelCapability, ModelTier } from '@aits/ai';
-import { detectTier } from '@aits/ai';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as url from 'url';
 import { writeModelTS } from '../codegen';
+
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Model pricing information (per million tokens)
@@ -354,7 +357,7 @@ export async function scrapeAWS(
 }
 
 // CLI execution
-if (require.main === module) {
+if (process.argv[1].endsWith('aws.ts')) {
   const args = process.argv.slice(2);
   const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
   const regionArg = args.find((arg) => arg.startsWith('--region='));

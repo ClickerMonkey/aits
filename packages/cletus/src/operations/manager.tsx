@@ -130,16 +130,24 @@ export class OperationManager {
     if (def.content) {
       op.message = def.content(op);
     } else {
-      // Use default formatting with formatValue instead of JSON.stringify
-      const inputDetails = `<input>\n${formatValue(op.input)}\n</input>`;
-
+      // Default message formatting
       op.message = op.status === 'doneError' || op.status === 'analyzeError'
-        ? `Operation ${op.type} failed: ${op.error}\n\n${inputDetails}`
+        ? `Operation ${op.type} failed: ${op.error}`
         : op.status === 'done'
-          ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${formatValue(op.output)}\n</output>`
+          ? `Operation ${op.type} completed successfully:`
           : op.status === 'analyzed'
-            ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
-            : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
+            ? `Operation ${op.type} requires approval: ${op.analysis}`
+            : `Operation ${op.type} cannot be performed: ${op.analysis}`;
+
+      // Add input details
+      if (op.input) {
+        op.message += `\n\n<input>\n${formatValue(op.input)}\n</input>`;
+      }
+
+      // Add output details if available
+      if (op.output) {
+        op.message += `\n\n<output>\n${formatValue(op.output)}\n</output>`;
+      }
     }
 
     // Add instructions after the message if they exist
