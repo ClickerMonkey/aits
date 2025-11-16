@@ -100,6 +100,8 @@ export interface PromptInput<
   toolsMax?: number;
   // A function/promise that returns an array of tool names to use, or false to indicate the prompt is not compatible with the context.
   retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
+  // If true, the prompt is re-resolved at the end of each iteration, allowing input, content, config, schema, and tools to change dynamically. If resolve returns undefined, iteration ends.
+  dynamic?: boolean;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
   metadata?: TMetadata;
   // A function/promise that returns metadata about the prompt to be passed during execution/streaming.
@@ -937,6 +939,31 @@ export class Prompt<
         }
       }
 
+      // Dynamic resolve - re-resolve prompt at end of iteration if enabled
+      if (this.input.dynamic) {
+        const dynamicResolved = await this.resolve(ctx, input);
+        if (dynamicResolved === undefined) {
+          // Prompt is no longer compatible with context, end iteration
+          break;
+        }
+
+        const { config: dynamicConfig, content: dynamicContent, tools: dynamicTools, toolObjects: dynamicToolObjects, responseFormat: dynamicResponseFormat, schema: dynamicSchema } = dynamicResolved;
+
+        // Update request with new resolved state
+        Object.assign(request, dynamicConfig);
+        request.messages[0].content = dynamicContent;
+        request.tools = dynamicTools;
+        request.responseFormat = dynamicResponseFormat;
+
+        // Update toolMap with new tool objects
+        toolMap.clear();
+        if (dynamicToolObjects) {
+          for (const { tool, definition } of dynamicToolObjects) {
+            toolMap.set(tool.name, { tool, definition } as any);
+          }
+        }
+      }
+
       // If we disabled tools because of hitting retry limits or max tool calls desired, remove them!
       if (disableTools) {
         delete request.tools;
@@ -1006,7 +1033,21 @@ export class Prompt<
     const toolNames = this.input.retool && retooling
       ? new Set(retooling)
       : new Set(this.input.tools?.map(t => t.name) || []);
-    const selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
+    let selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
+
+    // Check tool applicability
+    if (selectedTools) {
+      const applicabilityResults = await Promise.all(
+        selectedTools.map(async (tool) => ({
+          tool,
+          applicable: await tool.applicable(ctx)
+        }))
+      );
+      selectedTools = applicabilityResults
+        .filter(r => r.applicable)
+        .map(r => r.tool) as TTools;
+    }
+
     const toolInstructions = selectedTools
       ? (await Promise.all(selectedTools.map(t => t.compile(ctx)))).filter(t => !!t)
       : undefined;
