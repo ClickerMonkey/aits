@@ -1,5 +1,6 @@
 
 import { CletusAIContext } from "../ai";
+import { formatValue } from "../common";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
@@ -125,15 +126,21 @@ export class OperationManager {
       op.end = performance.now();
     }
 
-    const inputDetails = `<input>\n${JSON.stringify(op.input, undefined, 2)}\n</input>`
+    // Check if operation definition has a custom content formatter
+    if (def.content) {
+      op.message = def.content(op);
+    } else {
+      // Use default formatting with formatValue instead of JSON.stringify
+      const inputDetails = `<input>\n${formatValue(op.input)}\n</input>`;
 
-    op.message = op.status === 'doneError' || op.status === 'analyzeError'
-      ? `Operation ${op.type} failed: ${op.error}\n\n${inputDetails}`
-      : op.status === 'done'
-        ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${JSON.stringify(op.output, undefined, 2)}\n</output>`
-        : op.status === 'analyzed'
-          ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
-          : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
+      op.message = op.status === 'doneError' || op.status === 'analyzeError'
+        ? `Operation ${op.type} failed: ${op.error}\n\n${inputDetails}`
+        : op.status === 'done'
+          ? `Operation ${op.type} completed successfully:\n\n${inputDetails}\n\n<output>\n${formatValue(op.output)}\n</output>`
+          : op.status === 'analyzed'
+            ? `Operation ${op.type} requires approval: ${op.analysis}\n\n${inputDetails}`
+            : `Operation ${op.type} cannot be performed: ${op.analysis}\n\n${inputDetails}`;
+    }
 
     this.onOperationUpdated?.(op, this.operations.indexOf(op));
 

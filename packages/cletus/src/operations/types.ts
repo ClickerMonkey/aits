@@ -81,6 +81,16 @@ export type OperationDefinition<TInput, TOutput> = {
   do: (input: TInput, context: CletusAIContext) => Promise<TOutput>;
 
   /**
+   * Optional custom content formatter for operation messages sent to the LLM.
+   * If provided, this will be used to format the operation message instead of the default formatting.
+   * This allows operations to control how their input/output is represented in the LLM context.
+   *
+   * @param op - The operation to format
+   * @returns - Formatted string content for the LLM
+   */
+  content?: (op: OperationOf<TInput, TOutput>) => string;
+
+  /**
    * Optional custom renderer for displaying this operation in the UI.
    * If provided, this will be used instead of the default operation display.
    *

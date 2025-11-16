@@ -1,37 +1,20 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { COLORS } from "../constants";
-import { abbreviate, formatTime } from "../common";
+import { abbreviate, formatTime, formatValue as formatValueText } from "../common";
 import { Operation } from "../schemas";
 import { Markdown } from "../components/Markdown";
 
 /**
- * Format a value for display in operation input/output
- * - Arrays: JSON.stringify
- * - Non-objects (primitives): String(x)
- * - Objects: bullet list with hyphens, property values JSON.stringified
+ * Format a value for display in operation input/output (React wrapper)
+ * Uses the text-based formatValue from common.ts and wraps it in a Text component.
+ * 
+ * @param value - value to format
+ * @returns React component with formatted value
  */
 function formatValue(value: any): React.ReactNode {
-  // Arrays: use JSON.stringify
-  if (Array.isArray(value)) {
-    return <Text>{JSON.stringify(value, null, 2)}</Text>;
-  }
-  
-  // Non-objects (primitives): use String(x)
-  if (typeof value !== 'object' || value === null) {
-    return <Text>{String(value)}</Text>;
-  }
-  
-  // Objects: bullet list with hyphens
-  return (
-    <Box flexDirection="column">
-      {Object.entries(value).map(([key, val], i) => (
-        <Box key={i}>
-          <Text>- {key}: {JSON.stringify(val)}</Text>
-        </Box>
-      ))}
-    </Box>
-  );
+  const formatted = formatValueText(value);
+  return <Text>{formatted}</Text>;
 }
 
 /**
