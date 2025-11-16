@@ -103,6 +103,7 @@ export class ConfigFile extends JsonFile<Config> {
         openai: null,
         openrouter: null,
         replicate: null,
+        aws: null,
       },
       tavily: null,
       assistants: DEFAULT_ASSISTANTS,

@@ -36,6 +36,7 @@
   ],
   "dependencies": {
     "@aits/ai": "^0.1.0",
+    "@aits/aws": "^0.1.0",
     "@aits/core": "^0.1.0",
     "@aits/models": "^0.1.0",
     "@aits/openai": "^0.1.0",

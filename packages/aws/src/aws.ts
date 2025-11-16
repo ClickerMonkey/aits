@@ -424,9 +424,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         finishReason: this.mapAnthropicStopReason(responseBody.stop_reason),
         model: { id: modelId },
         usage: {
-          inputTokens: responseBody.usage?.input_tokens ?? -1,
-          outputTokens: responseBody.usage?.output_tokens ?? -1,
-          totalTokens: (responseBody.usage?.input_tokens ?? 0) + (responseBody.usage?.output_tokens ?? 0),
+          text: {
+            input: responseBody.usage?.input_tokens ?? -1,
+            output: responseBody.usage?.output_tokens ?? -1,
+          },
         },
       };
     } catch (error: any) {
@@ -562,9 +563,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
                 content: undefined,
                 finishReason: this.mapAnthropicStopReason(chunk.delta.stop_reason),
                 usage: {
-                  inputTokens,
-                  outputTokens: chunk.usage?.output_tokens || 0,
-                  totalTokens: inputTokens + (chunk.usage?.output_tokens || 0),
+                  text: {
+                    input: inputTokens,
+                    output: chunk.usage?.output_tokens || 0,
+                  },
                 },
               };
             }
@@ -717,9 +719,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         finishReason: responseBody.stop_reason === 'stop' ? 'stop' : 'length',
         model: { id: modelId },
         usage: {
-          inputTokens: responseBody.prompt_token_count ?? -1,
-          outputTokens: responseBody.generation_token_count ?? -1,
-          totalTokens: (responseBody.prompt_token_count ?? 0) + (responseBody.generation_token_count ?? 0),
+          text: {
+            input: responseBody.prompt_token_count ?? -1,
+            output: responseBody.generation_token_count ?? -1,
+          },
         },
       };
     } catch (error: any) {
@@ -812,9 +815,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         finishReason: responseBody.generations?.[0]?.finish_reason === 'COMPLETE' ? 'stop' : 'length',
         model: { id: modelId },
         usage: {
-          inputTokens: -1,
-          outputTokens: -1,
-          totalTokens: -1,
+          text: {
+            input: -1,
+            output: -1,
+          },
         },
       };
     } catch (error: any) {
@@ -974,8 +978,9 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         embeddings,
         model,
         usage: {
-          inputTokens: responseBody.inputTextTokenCount ?? -1,
-          totalTokens: responseBody.inputTextTokenCount ?? -1,
+          embeddings: {
+            tokens: responseBody.inputTextTokenCount ?? -1,
+          },
         },
       };
     } catch (error: any) {

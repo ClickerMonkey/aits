@@ -888,6 +888,10 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
         label: `Replicate ${providers.replicate ? '✅' : '❌'}`,
         value: 'replicate',
       },
+      {
+        label: `AWS Bedrock ${providers.aws ? '✅' : '❌'}`,
+        value: 'aws',
+      },
       { label: '← Back', value: '__back__' },
     ];
 
@@ -968,6 +972,65 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
   // Manage Provider Input
   if (view === 'manage-provider-input' && providerKey) {
+    // Special handling for AWS which uses environment variables
+    if (providerKey === 'aws') {
+      return (
+        <Box flexDirection="column" padding={1}>
+          <Box marginBottom={1}>
+            <Text bold color="cyan">
+              AWS Bedrock Configuration
+            </Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text dimColor>AWS Bedrock uses credentials from your environment or IAM roles.</Text>
+            <Text dimColor>Set the following environment variables:</Text>
+            <Text dimColor>  - AWS_REGION (e.g., us-east-1)</Text>
+            <Text dimColor>  - AWS_ACCESS_KEY_ID</Text>
+            <Text dimColor>  - AWS_SECRET_ACCESS_KEY</Text>
+            <Text dimColor>Or use IAM roles when running on AWS (EC2, ECS, Lambda).</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text>Currently configured: {config.getData().providers.aws ? 'Yes' : 'No'}</Text>
+          </Box>
+          <Box marginTop={1}>
+            <SelectInput
+              items={[
+                { label: 'Use environment credentials', value: 'env' },
+                { label: '← Back', value: '__back__' },
+              ]}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setView('manage-provider-action');
+                  return;
+                }
+                if (item.value === 'env') {
+                  const awsRegion = process.env.AWS_REGION;
+                  const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+                  const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+                  
+                  if (awsAccessKeyId && awsSecretAccessKey) {
+                    await config.save((data) => {
+                      data.providers.aws = {
+                        region: awsRegion,
+                        credentials: {
+                          accessKeyId: awsAccessKeyId,
+                          secretAccessKey: awsSecretAccessKey,
+                        },
+                      };
+                    });
+                    setMessage('✓ AWS configured with environment credentials!');
+                  } else {
+                    setMessage('⚠️ AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment');
+                  }
+                  setView('manage-providers');
+                }
+              }}
+            />
+          </Box>
+        </Box>
+      );
+    }
+
     const links: Record<string, string> = {
       openai: 'https://platform.openai.com/api-keys',
       openrouter: 'https://openrouter.ai/settings/keys',

@@ -16,6 +16,9 @@ type WizardStep =
   | 'replicate-env'
   | 'replicate-confirm'
   | 'replicate-input'
+  | 'aws-env'
+  | 'aws-confirm'
+  | 'aws-input'
   | 'tavily-env'
   | 'tavily-confirm'
   | 'tavily-input'
@@ -34,6 +37,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     openai: null,
     openrouter: null,
     replicate: null,
+    aws: null,
   });
   const [tavilyConfig, setTavilyConfig] = useState<{ apiKey: string } | null>(null);
   const [name, setName] = useState('');
@@ -56,6 +60,9 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   const replicateKey = process.env.REPLICATE_API_KEY;
+  const awsRegion = process.env.AWS_REGION;
+  const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
   const tavilyKey = process.env.TAVILY_API_KEY;
 
   // Reset input states when step changes
@@ -284,7 +291,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setProviders({ ...providers, replicate: { apiKey: replicateKey } });
             }
-            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
           }}
         />
       </Box>
@@ -311,7 +318,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setStep('replicate-input');
             } else {
-              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
             }
           }}
         />
@@ -347,7 +354,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
                 return;
               }
               setProviders({ ...providers, replicate: { apiKey } });
-              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
             }}
           />
         </Box>
@@ -359,6 +366,98 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
         <Box marginTop={1}>
           <Text dimColor>Enter to continue, ESC to skip</Text>
         </Box>
+      </Box>
+    );
+  }
+
+  // AWS - Environment Key Detected
+  if (step === 'aws-env' && awsAccessKeyId && awsSecretAccessKey) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text>AWS credentials detected in environment. Use them?</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              setProviders({
+                ...providers,
+                aws: {
+                  region: awsRegion,
+                  credentials: {
+                    accessKeyId: awsAccessKeyId,
+                    secretAccessKey: awsSecretAccessKey,
+                  },
+                },
+              });
+            }
+            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // AWS - Ask to Configure
+  if (step === 'aws-env' && !awsAccessKeyId) {
+    setStep('aws-confirm');
+  }
+
+  if (step === 'aws-confirm') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text>Would you like to configure AWS Bedrock?</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              setStep('aws-input');
+            } else {
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            }
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // AWS - Input Credentials (using environment variables approach for simplicity)
+  if (step === 'aws-input') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            AWS Bedrock Setup
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>AWS Bedrock uses credentials from your environment or IAM roles.</Text>
+          <Text dimColor>Set the following environment variables:</Text>
+          <Text dimColor>  - AWS_REGION (e.g., us-east-1)</Text>
+          <Text dimColor>  - AWS_ACCESS_KEY_ID</Text>
+          <Text dimColor>  - AWS_SECRET_ACCESS_KEY</Text>
+          <Text dimColor>Or use IAM roles when running on AWS (EC2, ECS, Lambda).</Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text>Press Enter to skip AWS configuration for now.</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Skip for now', value: 'skip' },
+          ]}
+          onSelect={() => {
+            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+          }}
+        />
       </Box>
     );
   }

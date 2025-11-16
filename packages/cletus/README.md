@@ -92,8 +92,8 @@ npm start
 When you run `cletus` for the first time, an interactive setup wizard will guide you through:
 
 1. **User Information** - Your name and pronouns
-2. **Provider Setup** - Configure AI providers (OpenAI, OpenRouter, Replicate)
-3. **API Keys** - Enter your API keys for each provider
+2. **Provider Setup** - Configure AI providers (OpenAI, OpenRouter, Replicate, AWS Bedrock)
+3. **API Keys** - Enter your API keys or credentials for each provider
 
 The configuration is saved to `~/.cletus/config.json` and can be modified later through the settings menu.
 
@@ -188,6 +188,31 @@ Cletus supports multiple AI providers:
     }
   }
 }
+```
+
+#### AWS Bedrock
+
+Access to Claude, Llama, Mistral, and other models via AWS Bedrock. Supports credential auto-discovery from environment variables or IAM roles.
+
+```json
+{
+  "providers": {
+    "aws": {
+      "region": "us-east-1",
+      "credentials": {
+        "accessKeyId": "AKIA...",
+        "secretAccessKey": "..."
+      }
+    }
+  }
+}
+```
+
+Alternatively, set environment variables (recommended):
+```bash
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
 ```
 
 #### Tavily (Web Search)
@@ -590,6 +615,7 @@ MIT © ClickerMonkey
 - [@aits/openai](../openai) - OpenAI provider
 - [@aits/openrouter](../openrouter) - OpenRouter provider
 - [@aits/replicate](../replicate) - Replicate provider
+- [@aits/aws](../aws) - AWS Bedrock provider
 
 ## Support
 
