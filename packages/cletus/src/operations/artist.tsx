@@ -112,7 +112,7 @@ export const image_generate = operationOf<
     (op) => {
       if (op.output) {
         const count = op.output.count;
-        return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"\n\t${op.output.images.map(linkImage).join(' - ')}`;
+        return `Generated **${count}** image${count !== 1 ? 's' : ''}: *"${abbreviate(op.input.prompt, 40)}"*\n${op.output.images.map(linkImage).join(' | ')}`;
       }
       return null;
     },
@@ -161,10 +161,10 @@ export const image_edit = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageEdit("${path.basename(op.input.path)}", "${abbreviate(op.input.prompt, 20)}")`,
+    `ImageEdit("${paginateText(op.input.path, 100, -100)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        return `Edited image saved to ${op.output.editedLink}`;
+        return `Edited **${linkFile(op.input.path)}** → saved to ${op.output.editedLink}`;
       }
       return null;
     },
@@ -272,10 +272,10 @@ export const image_describe = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageDescribe("${path.basename(op.input.path)}")`,
+    `ImageDescribe("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return abbreviate(op.output.description, 60);
+        return `${op.output.imageLink}: *${abbreviate(op.output.description, 60)}*`;
       }
       return null;
     },

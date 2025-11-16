@@ -119,7 +119,7 @@ export const file_summary = operationOf<
     `Summarize("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return abbreviate(op.output.summary, 60);
+        return `${linkFile(op.input.path)}: ${abbreviate(op.output.summary, 60)}`;
       }
       return null;
     },
@@ -227,7 +227,7 @@ export const file_index = operationOf<
     `Index("${op.input.glob}", ${op.input.index})`,
     (op) => {
       if (op.output) {
-        return `Indexed ${op.output.files.length} file${op.output.files.length !== 1 ? 's' : ''}, ${op.output.knowledge} knowledge entries`;
+        return `Indexed **${op.output.files.length}** file${op.output.files.length !== 1 ? 's' : ''}, **${op.output.knowledge}** knowledge entries`;
       }
       return null;
     }
@@ -275,7 +275,7 @@ export const file_create = operationOf<
     `Write("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created file with ${op.output.size} characters, ${op.output.lines} lines`;
+        return `Created ${linkFile(op.input.path)} with **${op.output.size.toLocaleString()}** characters, **${op.output.lines}** lines`;
       }
       return null;
     },
@@ -320,7 +320,7 @@ export const file_copy = operationOf<
     } else {
       if (await fileExists(targetPath)) {
         return {
-          analysis: `This would fail - target "${input.target}" already exists.`,
+          analysis: `This would fail - target ${linkFile(input.target)} already exists.`,
           doable: false,
         };
       }
@@ -392,14 +392,14 @@ export const file_move = operationOf<
         }
       } catch {
         return {
-          analysis: `This would fail - target directory "${input.target}" does not exist.`,
+          analysis: `This would fail - target directory ${linkFile(input.target)} does not exist.`,
           doable: false,
         };
       }
     }
 
     return {
-      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to "${input.target}".`,
+      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to ${linkFile(input.target)}.`,
       doable: true,
     };
   },
@@ -531,7 +531,7 @@ export const file_stats = operationOf<
     (op) => {
       if (op.output) {
         const sizeKB = (op.output.size / 1024).toFixed(1);
-        return `${op.output.type}, ${sizeKB} KB${op.output.lines ? `, ${op.output.lines} lines` : ''}`;
+        return `${linkFile(op.input.path)}: **${op.output.type}**, **${sizeKB} KB**${op.output.lines ? `, **${op.output.lines}** lines` : ''}`;
       }
       return null;
     },
@@ -671,7 +671,7 @@ export const file_read = operationOf<
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Read ${op.output.content.length} characters${op.output.truncated ? ' (truncated)' : ''}`;
+        return `Read ${linkFile(op.input.path)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
       }
       return null;
     },
