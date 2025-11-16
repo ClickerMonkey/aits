@@ -384,32 +384,25 @@ export const type_import = operationOf<
       existingTypeUpdates.set(existingType.name, [...existingType.fields]);
     }
     
-    // Define reusable field schema factory
-    const createFieldSchema = () => z.object({
-      name: z.string().describe('Field name (lowercase, no spaces)'),
-      friendlyName: z.string().describe('Field display name'),
-      type: z.enum(['string', 'number', 'boolean', 'date', 'enum', ...existingTypeNames] as [string, ...string[]]).describe('Field type'),
-      required: z.boolean().optional().describe('Is field required?'),
-      enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
-    });
-    
-    // Create extractor factory that generates tools with current state
-    const createExtractor = () => {
+    // Define reusable field schema factory (dynamic to include discovered types)
+    const createFieldSchema = () => {
       const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
       const allTypeNames = [...existingTypeNames, ...discoveredTypeNamesList];
       
-      // Dynamic enum schemas
-      const discoveredTypeEnum = discoveredTypeNamesList.length > 0 
-        ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
-        : z.string();
-      const allTypeEnum = allTypeNames.length > 0
-        ? z.enum(allTypeNames as [string, ...string[]])
-        : z.string();
-      
-      return ai.prompt({
-        name: 'type_extractor',
-        description: 'Extract and manage type definitions from text',
-        content: `You are an expert data modeling assistant. Your task is to extract structured type definitions from the provided text.
+      return z.object({
+        name: z.string().describe('Field name (lowercase, no spaces)'),
+        friendlyName: z.string().describe('Field display name'),
+        type: z.enum(['string', 'number', 'boolean', 'date', 'enum', ...allTypeNames] as [string, ...string[]]).describe('Field type'),
+        required: z.boolean().optional().describe('Is field required?'),
+        enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
+      });
+    };
+    
+    // Create the prompt with dynamic schemas
+    const extractor = ai.prompt({
+      name: 'type_extractor',
+      description: 'Extract and manage type definitions from text',
+      content: `You are an expert data modeling assistant. Your task is to extract structured type definitions from the provided text.
 
 <existingTypes>
 {{#if existingTypes.length}}
@@ -469,58 +462,72 @@ When managing types:
 <text>
 {{text}}
 </text>`,
-        tools: [
-          ai.tool({
-            name: 'add_discovered',
-            description: 'Add a new discovered type definition',
-            schema: z.object({
-              name: z.string().describe('Type name (lowercase, no spaces)'),
-              friendlyName: z.string().describe('Display name'),
-              description: z.string().optional().describe('Type description'),
-              fields: z.array(createFieldSchema()).describe('Field definitions'),
-              instanceCount: z.number().optional().describe('Estimated number of instances found'),
-            }),
-            call: async (input) => {
-              const existing = discoveredTypes.get(input.name);
-              if (existing) {
-                return { success: false, message: `Type "${input.name}" already discovered. Use update_discovered or update_fields instead.` };
-              }
-              
-              discoveredTypes.set(input.name, {
-                name: input.name,
-                friendlyName: input.friendlyName,
-                description: input.description,
-                fields: input.fields as TypeField[],
-                instanceCount: input.instanceCount || 1,
-              });
-              
-              return { success: true, message: `Added discovered type: ${input.friendlyName}` };
-            },
+      tools: [
+        ai.tool({
+          name: 'add_discovered',
+          description: 'Add a new discovered type definition',
+          schema: () => z.object({
+            name: z.string().describe('Type name (lowercase, no spaces)'),
+            friendlyName: z.string().describe('Display name'),
+            description: z.string().optional().describe('Type description'),
+            fields: z.array(createFieldSchema()).describe('Field definitions'),
+            instanceCount: z.number().optional().describe('Estimated number of instances found'),
           }),
-          ai.tool({
-            name: 'rename_discovered',
-            description: 'Rename a discovered type',
-            schema: z.object({
+          call: async (input) => {
+            const existing = discoveredTypes.get(input.name);
+            if (existing) {
+              return { success: false, message: `Type "${input.name}" already discovered. Use update_discovered or update_fields instead.` };
+            }
+            
+            discoveredTypes.set(input.name, {
+              name: input.name,
+              friendlyName: input.friendlyName,
+              description: input.description,
+              fields: input.fields as TypeField[],
+              instanceCount: input.instanceCount || 1,
+            });
+            
+            return { success: true, message: `Added discovered type: ${input.friendlyName}` };
+          },
+        }),
+        ai.tool({
+          name: 'rename_discovered',
+          description: 'Rename a discovered type',
+          schema: () => {
+            const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
+            const discoveredTypeEnum = discoveredTypeNamesList.length > 0 
+              ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
+              : z.string();
+            
+            return z.object({
               oldName: discoveredTypeEnum.describe('Current type name'),
               newName: z.string().describe('New type name (lowercase, no spaces)'),
-            }),
-            call: async (input) => {
-              const type = discoveredTypes.get(input.oldName);
-              if (!type) {
-                return { success: false, message: `Type "${input.oldName}" not found in discovered types.` };
-              }
-              
-              discoveredTypes.delete(input.oldName);
-              type.name = input.newName;
-              discoveredTypes.set(input.newName, type);
-              
-              return { success: true, message: `Renamed type from ${input.oldName} to ${input.newName}` };
-            },
-          }),
-          ai.tool({
-            name: 'update_fields',
-            description: 'Add, update, or remove fields on an existing or discovered type. For existing types, only new fields can be added.',
-            schema: z.object({
+            });
+          },
+          call: async (input) => {
+            const type = discoveredTypes.get(input.oldName);
+            if (!type) {
+              return { success: false, message: `Type "${input.oldName}" not found in discovered types.` };
+            }
+            
+            discoveredTypes.delete(input.oldName);
+            type.name = input.newName;
+            discoveredTypes.set(input.newName, type);
+            
+            return { success: true, message: `Renamed type from ${input.oldName} to ${input.newName}` };
+          },
+        }),
+        ai.tool({
+          name: 'update_fields',
+          description: 'Add, update, or remove fields on an existing or discovered type. For existing types, only new fields can be added.',
+          schema: () => {
+            const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
+            const allTypeNames = [...existingTypeNames, ...discoveredTypeNamesList];
+            const allTypeEnum = allTypeNames.length > 0
+              ? z.enum(allTypeNames as [string, ...string[]])
+              : z.string();
+            
+            return z.object({
               typeName: allTypeEnum.describe('Type name'),
               fields: z.array(
                 z.union([
@@ -531,138 +538,159 @@ When managing types:
                   })
                 ])
               ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
-            }),
-            call: async (input) => {
-              // Check if it's a discovered type
-              const discoveredType = discoveredTypes.get(input.typeName);
-              const isExistingType = existingTypeNames.includes(input.typeName);
-              
-              if (!discoveredType && !isExistingType) {
-                return { success: false, message: `Type "${input.typeName}" not found. Use add_discovered first for new types.` };
-              }
-              
-              // Get the fields list to modify
-              let targetFields: TypeField[];
-              if (discoveredType) {
-                targetFields = discoveredType.fields;
-              } else {
-                // For existing types, work with the update tracking map
-                targetFields = existingTypeUpdates.get(input.typeName)!;
-              }
-              
-              // Track added fields for existing types
-              const addedFieldsInImport = discoveredType ? [] : targetFields.filter(f => 
-                !existingTypes.find(t => t.name === input.typeName)?.fields.find(ef => ef.name === f.name)
-              ).map(f => f.name);
-              
-              let addedCount = 0;
-              let updatedCount = 0;
-              let removedCount = 0;
-              
-              for (const field of input.fields) {
-                if ('remove' in field && field.remove) {
-                  // Remove field
-                  const fieldIndex = targetFields.findIndex(f => f.name === field.name);
-                  if (fieldIndex !== -1) {
-                    // For existing types, only allow removal of fields added during import
-                    if (isExistingType && !discoveredType) {
-                      if (!addedFieldsInImport.includes(field.name)) {
-                        continue; // Skip removal of original fields on existing types
-                      }
+            });
+          },
+          call: async (input) => {
+            // Check if it's a discovered type
+            const discoveredType = discoveredTypes.get(input.typeName);
+            const isExistingType = existingTypeNames.includes(input.typeName);
+            
+            if (!discoveredType && !isExistingType) {
+              return { success: false, message: `Type "${input.typeName}" not found. Use add_discovered first for new types.` };
+            }
+            
+            // Get the fields list to modify
+            let targetFields: TypeField[];
+            if (discoveredType) {
+              targetFields = discoveredType.fields;
+            } else {
+              // For existing types, work with the update tracking map
+              targetFields = existingTypeUpdates.get(input.typeName)!;
+            }
+            
+            // Track added fields for existing types
+            const addedFieldsInImport = discoveredType ? [] : targetFields.filter(f => 
+              !existingTypes.find(t => t.name === input.typeName)?.fields.find(ef => ef.name === f.name)
+            ).map(f => f.name);
+            
+            let addedCount = 0;
+            let updatedCount = 0;
+            let removedCount = 0;
+            
+            for (const field of input.fields) {
+              if ('remove' in field && field.remove) {
+                // Remove field
+                const fieldIndex = targetFields.findIndex(f => f.name === field.name);
+                if (fieldIndex !== -1) {
+                  // For existing types, only allow removal of fields added during import
+                  if (isExistingType && !discoveredType) {
+                    if (!addedFieldsInImport.includes(field.name)) {
+                      continue; // Skip removal of original fields on existing types
                     }
-                    targetFields.splice(fieldIndex, 1);
-                    removedCount++;
+                  }
+                  targetFields.splice(fieldIndex, 1);
+                  removedCount++;
+                }
+              } else {
+                // Add or update field
+                const typedField = field as TypeField;
+                const existingFieldIndex = targetFields.findIndex(f => f.name === typedField.name);
+                
+                if (existingFieldIndex !== -1) {
+                  // Update existing field (only for discovered types)
+                  if (discoveredType) {
+                    targetFields[existingFieldIndex] = typedField;
+                    updatedCount++;
                   }
                 } else {
-                  // Add or update field
-                  const typedField = field as TypeField;
-                  const existingFieldIndex = targetFields.findIndex(f => f.name === typedField.name);
-                  
-                  if (existingFieldIndex !== -1) {
-                    // Update existing field (only for discovered types)
-                    if (discoveredType) {
-                      targetFields[existingFieldIndex] = typedField;
-                      updatedCount++;
-                    }
-                  } else {
-                    // Add new field
-                    targetFields.push(typedField);
-                    addedCount++;
-                  }
+                  // Add new field
+                  targetFields.push(typedField);
+                  addedCount++;
                 }
               }
-              
-              return { 
-                success: true, 
-                message: `Modified ${input.typeName}: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed` 
-              };
-            },
-          }),
-          ai.tool({
-            name: 'update_discovered',
-            description: 'Update properties of a discovered type',
-            schema: z.object({
+            }
+            
+            return { 
+              success: true, 
+              message: `Modified ${input.typeName}: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed` 
+            };
+          },
+        }),
+        ai.tool({
+          name: 'update_discovered',
+          description: 'Update properties of a discovered type',
+          schema: () => {
+            const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
+            const discoveredTypeEnum = discoveredTypeNamesList.length > 0 
+              ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
+              : z.string();
+            
+            return z.object({
               name: discoveredTypeEnum.describe('Type name'),
               friendlyName: z.string().optional().describe('New friendly name'),
               description: z.string().optional().describe('New description'),
-            }),
-            call: async (input) => {
-              const type = discoveredTypes.get(input.name);
-              if (!type) {
-                return { success: false, message: `Type "${input.name}" not found in discovered types.` };
-              }
-              
-              if (input.friendlyName) type.friendlyName = input.friendlyName;
-              if (input.description) type.description = input.description;
-              
-              return { success: true, message: `Updated type: ${input.name}` };
-            },
-          }),
-          ai.tool({
-            name: 'add_instances',
-            description: 'Track instance count for a type',
-            schema: z.object({
+            });
+          },
+          call: async (input) => {
+            const type = discoveredTypes.get(input.name);
+            if (!type) {
+              return { success: false, message: `Type "${input.name}" not found in discovered types.` };
+            }
+            
+            if (input.friendlyName) type.friendlyName = input.friendlyName;
+            if (input.description) type.description = input.description;
+            
+            return { success: true, message: `Updated type: ${input.name}` };
+          },
+        }),
+        ai.tool({
+          name: 'add_instances',
+          description: 'Track instance count for a type',
+          schema: () => {
+            const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
+            const discoveredTypeEnum = discoveredTypeNamesList.length > 0 
+              ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
+              : z.string();
+            
+            return z.object({
               typeName: discoveredTypeEnum.describe('Type name'),
               count: z.number().describe('Number of instances to add'),
-            }),
-            call: async (input) => {
-              const type = discoveredTypes.get(input.typeName);
-              if (!type) {
-                return { success: false, message: `Type "${input.typeName}" not found in discovered types.` };
-              }
-              
-              type.instanceCount += input.count;
-              
-              return { success: true, message: `Added ${input.count} instances to ${input.typeName}, total: ${type.instanceCount}` };
-            },
-          }),
-          ai.tool({
-            name: 'remove_discovered',
-            description: 'Remove a discovered type',
-            schema: z.object({
+            });
+          },
+          call: async (input) => {
+            const type = discoveredTypes.get(input.typeName);
+            if (!type) {
+              return { success: false, message: `Type "${input.typeName}" not found in discovered types.` };
+            }
+            
+            type.instanceCount += input.count;
+            
+            return { success: true, message: `Added ${input.count} instances to ${input.typeName}, total: ${type.instanceCount}` };
+          },
+        }),
+        ai.tool({
+          name: 'remove_discovered',
+          description: 'Remove a discovered type',
+          schema: () => {
+            const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
+            const discoveredTypeEnum = discoveredTypeNamesList.length > 0 
+              ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
+              : z.string();
+            
+            return z.object({
               name: discoveredTypeEnum.describe('Type name to remove'),
               reason: z.string().optional().describe('Reason for removal'),
-            }),
-            call: async (input) => {
-              discoveredTypes.delete(input.name);
-              return { success: true, message: `Removed type: ${input.name}${input.reason ? ` (${input.reason})` : ''}` };
-            },
-          }),
-        ],
-        input: ({ text }: { text: string }) => ({
-          text,
-          existingTypes,
-          discoveredTypes: Array.from(discoveredTypes.values()),
-          hints: hints?.join(', '),
-          maxTypes: max,
-          remainingSlots: max ? Math.max(0, max - discoveredTypes.size) : undefined,
+            });
+          },
+          call: async (input) => {
+            discoveredTypes.delete(input.name);
+            return { success: true, message: `Removed type: ${input.name}${input.reason ? ` (${input.reason})` : ''}` };
+          },
         }),
-        metadataFn: () => ({
-          model: config.getData().user.models?.chat,
-        }),
-        excludeMessages: true,
-      });
-    };
+      ],
+      input: ({ text }: { text: string }) => ({
+        text,
+        existingTypes,
+        discoveredTypes: Array.from(discoveredTypes.values()),
+        hints: hints?.join(', '),
+        maxTypes: max,
+        remainingSlots: max ? Math.max(0, max - discoveredTypes.size) : undefined,
+      }),
+      metadataFn: () => ({
+        model: config.getData().user.models?.chat,
+      }),
+      excludeMessages: true,
+    });
     
     // Pipeline architecture with two concurrent promises
     // Queue for parsed file data
@@ -779,7 +807,6 @@ When managing types:
             chatStatus(`Processing batch (${currentBatchFiles.length} files, ${currentBatch.length} chars)...`);
             
             try {
-              const extractor = createExtractor();
               await extractor.get('result', { text: currentBatch }, ctx);
             } catch (error) {
               log(`Warning: Failed to process batch: ${(error as Error).message}`);
@@ -812,7 +839,6 @@ When managing types:
         chatStatus(`Processing final batch (${currentBatchFiles.length} files, ${currentBatch.length} chars)...`);
         
         try {
-          const extractor = createExtractor();
           await extractor.get('result', { text: currentBatch }, ctx);
         } catch (error) {
           log(`Warning: Failed to process final batch: ${(error as Error).message}`);
