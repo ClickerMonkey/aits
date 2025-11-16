@@ -275,7 +275,7 @@ export const image_describe = operationOf<
     `ImageDescribe("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `${op.output.imageLink}: *${abbreviate(op.output.description, 60)}*`;
+        return `${op.output.link}: *${abbreviate(op.output.description, 60)}*`;
       }
       return null;
     },
