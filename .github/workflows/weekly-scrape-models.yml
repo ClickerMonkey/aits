@@ -75,3 +75,5 @@ jobs:
             automated
             dependencies
             models
+          committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
