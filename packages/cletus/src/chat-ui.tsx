@@ -107,6 +107,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showInput, setShowInput] = useState(false);
   const [showOutput, setShowOutput] = useState(false);
   const [renderKey, setRenderKey] = useState(0);
+  const [accumulatedUsage, setAccumulatedUsage] = useState<any>({});
+  const [accumulatedCost, setAccumulatedCost] = useState(0);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -147,6 +149,29 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       // Use current value to avoid race conditions
       chat.messages = getChatMessages();
     });
+  };
+
+  // Clear accumulated usage in AI context
+  const clearUsage = () => {
+    const defaultContext = ai.config.defaultContext;
+    if (defaultContext && defaultContext.usage) {
+      defaultContext.usage.accumulated = {};
+      defaultContext.usage.accumulatedCost = 0;
+    }
+    setAccumulatedUsage({});
+    setAccumulatedCost(0);
+  };
+
+  // Get current accumulated usage from AI context
+  const getUsage = () => {
+    const defaultContext = ai.config.defaultContext;
+    if (defaultContext && defaultContext.usage) {
+      return {
+        accumulated: defaultContext.usage.accumulated,
+        accumulatedCost: defaultContext.usage.accumulatedCost,
+      };
+    }
+    return { accumulated: {}, accumulatedCost: 0 };
   };
 
   // Convenience function to add system message
@@ -790,9 +815,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
           config,
           chatData: chatFileRef.current,
           signal: controller.signal,
+          clearUsage,
+          getUsage,
         },
         (event) => {
-          if (event.type !== 'elapsed' && event.type !== 'tokens'&& event.type !== 'pendingUpdate' && event.type !== 'status') {
+          if (event.type !== 'elapsed' && event.type !== 'tokens' && event.type !== 'usage' && event.type !== 'pendingUpdate' && event.type !== 'status') {
             logger.log(event);
           }
 
@@ -807,6 +834,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
             case 'tokens':
               setTokenCountDebounced(event.output + event.reasoning + event.discarded);
+              break;
+
+            case 'usage':
+              setAccumulatedUsage(event.accumulated);
+              setAccumulatedCost(event.accumulatedCost);
               break;
 
             case 'elapsed':
@@ -1171,6 +1203,14 @@ After installation and the SoX executable is in the path, restart Cletus and try
           {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
           {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
+          {accumulatedCost > 0 && (
+            <>
+              {' │ '}
+              <Text color="yellow">
+                ${accumulatedCost.toFixed(4)}
+              </Text>
+            </>
+          )}
           {isWaitingForResponse ? (
             <>
               {' │ '}

@@ -12,6 +12,7 @@ import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 import z from 'zod';
 import { loadPromptFiles } from './prompt-loader';
+import { Usage, accumulateUsage } from '@aits/core';
 
 /**
  * Cletus AI Context
@@ -27,6 +28,10 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
+  usage: {
+    accumulated: Usage;
+    accumulatedCost: number;
+  };
 }
 
 /**
@@ -92,6 +97,10 @@ export function createCletusAI(configFile: ConfigFile) {
         ops: new OperationManager('none'),
         log: logger.log.bind(logger),
         chatStatus: () => {},
+        usage: {
+          accumulated: {},
+          accumulatedCost: 0,
+        },
       },
       providedContext: async (ctx) => {
         if (ctx.userPrompt) {
@@ -136,6 +145,12 @@ export function createCletusAI(configFile: ConfigFile) {
       },
       afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
         logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}:\n${JSON.stringify(response, jsonReplacer, 2)}`);
+        
+        // Accumulate usage in context for tracking across requests
+        accumulateUsage(ctx.usage.accumulated, usage);
+        ctx.usage.accumulatedCost += cost;
+        
+        logger.log(`Cletus accumulated usage: ${JSON.stringify(ctx.usage.accumulated)}, total cost: ${ctx.usage.accumulatedCost}`);
       },
       onError: async (type, message, error, ctx, request) => {
         logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack}:\n${JSON.stringify(request, jsonReplacer, 2)}`);

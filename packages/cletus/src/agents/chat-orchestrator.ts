@@ -1,4 +1,4 @@
-import { getTotalTokens } from '@aits/core';
+import { getTotalTokens, Usage } from '@aits/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -18,6 +18,8 @@ export interface OrchestratorOptions {
   config: ConfigFile;
   chatData: ChatFile;
   signal: AbortSignal;
+  clearUsage: () => void;
+  getUsage: () => { accumulated: Usage; accumulatedCost: number };
 }
 
 /**
@@ -27,6 +29,7 @@ export type OrchestratorEvent =
   | { type: 'pendingUpdate'; pending: Message }
   | { type: 'update'; message: Message }
   | { type: 'tokens'; output: number; reasoning: number; discarded: number }
+  | { type: 'usage'; accumulated: Usage; accumulatedCost: number }
   | { type: 'elapsed'; ms: number }
   | { type: 'operations'; operations: Operation[]; summary: string }
   | { type: 'status'; status: string }
@@ -67,13 +70,17 @@ export async function runChatOrchestrator(
   options: OrchestratorOptions,
   onEvent: (event: OrchestratorEvent) => void,
 ): Promise<void> {
-  const { chatAgent, messages, chatMeta, config, chatData, signal } = options;
+  const { chatAgent, messages, chatMeta, config, chatData, signal, clearUsage, getUsage } = options;
 
   const startTime = Date.now();
   const loopTimeout = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
   const loopMax = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
 
   logger.log('orchestrator: starting');
+  
+  // Clear accumulated usage at the start of chat operations
+  clearUsage();
+  logger.log('orchestrator: cleared usage');
 
   // Start elapsed time updates
   const elapsedInterval = setInterval(() => {
@@ -321,6 +328,10 @@ export async function runChatOrchestrator(
 
         // Emit completion event
         onEvent({ type: 'complete', message: pending });
+        
+        // Emit accumulated usage and cost
+        const usage = getUsage();
+        onEvent({ type: 'usage', accumulated: usage.accumulated, accumulatedCost: usage.accumulatedCost });
       }      
 
       // Check for abort
