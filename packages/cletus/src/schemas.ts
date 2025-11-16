@@ -230,6 +230,7 @@ export const OperationKindSchema = z.enum([
   'type_info',
   'type_create',
   'type_update',
+  'type_import',
   // artist
   'image_generate',
   'image_edit',
