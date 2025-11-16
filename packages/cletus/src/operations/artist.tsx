@@ -112,7 +112,7 @@ export const image_generate = operationOf<
     (op) => {
       if (op.output) {
         const count = op.output.count;
-        return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"\n\t${op.output.images.map(linkImage).join(' - ')}`;
+        return `Generated **${count}** image${count !== 1 ? 's' : ''}: *"${abbreviate(op.input.prompt, 40)}"*\n${op.output.images.map(linkImage).join(' | ')}`;
       }
       return null;
     },
@@ -126,19 +126,19 @@ export const image_edit = operationOf<
 >({
   mode: 'update',
   signature: 'image_edit(path: string, prompt: string)',
-  status: (input) => `Editing image: ${path.basename(input.path)}`,
+  status: (input) => `Editing image: ${paginateText(input.path, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const fullImagePath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullImagePath)) {
       return {
-        analysis: `This would fail - image "${input.path}" not found or not readable.`,
+        analysis: `This would fail - image ${linkFile(input.path)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will edit image "${input.path}" with prompt: "${input.prompt}"`,
+      analysis: `This will edit image ${linkFile(input.path)} with prompt: "${input.prompt}"`,
       doable: true,
     };
   },
@@ -161,10 +161,10 @@ export const image_edit = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageEdit("${path.basename(op.input.path)}", "${abbreviate(op.input.prompt, 20)}")`,
+    `ImageEdit("${paginateText(op.input.path, 100, -100)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        return `Edited image saved to ${op.output.editedLink}`;
+        return `Edited **${linkFile(op.input.path)}** → saved to ${op.output.editedLink}`;
       }
       return null;
     },
@@ -239,19 +239,19 @@ export const image_describe = operationOf<
 >({
   mode: 'read',
   signature: 'image_describe(path: string)',
-  status: (input) => `Describing image: ${path.basename(input.path)}`,
+  status: (input) => `Describing image: ${paginateText(input.path, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullPath)) {
       return {
-        analysis: `This would fail - image "${input.path}" not found or not readable.`,
+        analysis: `This would fail - image ${linkFile(input.path)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will describe the image at "${input.path}"`,
+      analysis: `This will describe the image at ${linkFile(input.path)}`,
       doable: true,
     };
   },
@@ -272,10 +272,10 @@ export const image_describe = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageDescribe("${path.basename(op.input.path)}")`,
+    `ImageDescribe("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return abbreviate(op.output.description, 60);
+        return `${op.output.imageLink}: *${abbreviate(op.output.description, 60)}*`;
       }
       return null;
     },
@@ -443,7 +443,7 @@ export const image_attach = operationOf<
 >({
   mode: 'create',
   signature: 'image_attach({ path })',
-  status: ({ path: imagePath }) => `Attaching image: ${path.basename(imagePath)}`,
+  status: ({ path: imagePath }) => `Attaching image: ${paginateText(imagePath, 100, -100)}`,
   analyze: async ({ path: imagePath }, { cwd }) => {
     // Resolve path (supports both absolute and relative)
     const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);

@@ -60,7 +60,7 @@ export const file_summary = operationOf<
 >({
   mode: 'read',
   signature: 'file_summary(path: string, limit?: number, offset?: number, limitOffsetMode...)',
-  status: (input) => `Summarizing: ${path.basename(input.path)}`,
+  status: (input) => `Summarizing: ${paginateText(input.path, 100, -100)}`,
   instructions: 'This is a summary of the file content. The original file content may have specific formatting and whitespace that is not preserved in the summary.',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -68,7 +68,7 @@ export const file_summary = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file "${input.path}" not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
         doable: false,
       };
     }
@@ -76,7 +76,7 @@ export const file_summary = operationOf<
     const fileType = await categorizeFile(fullPath, fullPath);
     if (fileType === 'unknown') {
       return {
-        analysis: `This would fail - file "${input.path}" is of an unsupported type for summarization.`,
+        analysis: `This would fail - file ${linkFile(input.path)} is of an unsupported type for summarization.`,
         doable: false,
       };
     }
@@ -87,7 +87,7 @@ export const file_summary = operationOf<
       : Math.min(CONSTS.MAX_LINES, input.limit || CONSTS.MAX_LINES);
 
     return {
-      analysis: `This will read and summarize the ${fileType} file at "${input.path}" (first ${limit.toLocaleString()} ${limitOffsetMode}).`,
+      analysis: `This will read and summarize the ${fileType} file at ${linkFile(input.path)} (first ${limit.toLocaleString()} ${limitOffsetMode}).`,
       doable: true,
     };
   },
@@ -119,7 +119,7 @@ export const file_summary = operationOf<
     `Summarize("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return abbreviate(op.output.summary, 60);
+        return `${linkFile(op.input.path)}: ${abbreviate(op.output.summary, 60)}`;
       }
       return null;
     },
@@ -227,7 +227,7 @@ export const file_index = operationOf<
     `Index("${op.input.glob}", ${op.input.index})`,
     (op) => {
       if (op.output) {
-        return `Indexed ${op.output.files.length} file${op.output.files.length !== 1 ? 's' : ''}, ${op.output.knowledge} knowledge entries`;
+        return `Indexed **${op.output.files.length}** file${op.output.files.length !== 1 ? 's' : ''}, **${op.output.knowledge}** knowledge entries`;
       }
       return null;
     }
@@ -240,7 +240,7 @@ export const file_create = operationOf<
 >({
   mode: 'create',
   signature: 'file_create(path: string, content: string)',
-  status: (input) => `Creating file: ${path.basename(input.path)}`,
+  status: (input) => `Creating file: ${paginateText(input.path, 100, -100)}`,
   instructions: 'Preserve content formatting (like whitespace) when creating files. Ensure proper line breaks and indentation are maintained.',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -248,7 +248,7 @@ export const file_create = operationOf<
 
     if (exists) {
       return {
-        analysis: `This would fail - file "${input.path}" already exists.`,
+        analysis: `This would fail - file ${linkFile(input.path)} already exists.`,
         doable: false,
       };
     } 
@@ -257,7 +257,7 @@ export const file_create = operationOf<
     const lines = input.content.split('\n').length;
 
     return {
-      analysis: `This will create file "${input.path}" with ${size} characters (${lines} lines).`,
+      analysis: `This will create file ${linkFile(input.path)} with ${size} characters (${lines} lines).`,
       doable: true,
     };
   },
@@ -275,7 +275,7 @@ export const file_create = operationOf<
     `Write("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created file with ${op.output.size} characters, ${op.output.lines} lines`;
+        return `Created ${linkFile(op.input.path)} with **${op.output.size.toLocaleString()}** characters, **${op.output.lines}** lines`;
       }
       return null;
     },
@@ -289,7 +289,7 @@ export const file_copy = operationOf<
 >({
   mode: 'create',
   signature: 'file_copy(glob: string, target: string)',
-  status: (input) => `Copying: ${input.glob} → ${path.basename(input.target)}`,
+  status: (input) => `Copying: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const source = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
@@ -313,14 +313,14 @@ export const file_copy = operationOf<
       const { isDirectory } = await fileIsDirectory(targetPath);
       if (!isDirectory) {
         return {
-          analysis: `This would fail - target "${input.target}" must be a directory when copying multiple files.`,
+          analysis: `This would fail - target ${linkFile(input.target)} must be a directory when copying multiple files.`,
           doable: false,
         };
       }
     } else {
       if (await fileExists(targetPath)) {
         return {
-          analysis: `This would fail - target "${input.target}" already exists.`,
+          analysis: `This would fail - target ${linkFile(input.target)} already exists.`,
           doable: false,
         };
       }
@@ -354,7 +354,7 @@ export const file_copy = operationOf<
     (op) => {
       if (op.output) {
         const count = op.output.source.length;
-        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${path.basename(op.input.target)}`;
+        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${linkFile(op.input.target)}`;
       }
       return null;
     },
@@ -368,7 +368,7 @@ export const file_move = operationOf<
 >({
   mode: 'update',
   signature: 'file_move(glob: string, target: string)',
-  status: (input) => `Moving: ${input.glob} → ${path.basename(input.target)}`,
+  status: (input) => `Moving: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const files = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
@@ -386,20 +386,20 @@ export const file_move = operationOf<
         const targetStats = await fs.stat(targetPath);
         if (!targetStats.isDirectory()) {
           return {
-            analysis: `This would fail - target "${input.target}" must be a directory when moving multiple files.`,
+            analysis: `This would fail - target ${linkFile(input.target)} must be a directory when moving multiple files.`,
             doable: false,
           };
         }
       } catch {
         return {
-          analysis: `This would fail - target directory "${input.target}" does not exist.`,
+          analysis: `This would fail - target directory ${linkFile(input.target)} does not exist.`,
           doable: false,
         };
       }
     }
 
     return {
-      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to "${input.target}".`,
+      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to ${linkFile(input.target)}.`,
       doable: true,
     };
   },
@@ -457,7 +457,7 @@ export const file_move = operationOf<
     `Move("${op.input.glob}", "${op.input.target}")`,
     (op) => {
       if (op.output) {
-        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${path.basename(op.input.target)}`;
+        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${linkFile(op.input.target)}`;
       }
       return null;
     },
@@ -469,7 +469,7 @@ export const file_stats = operationOf<
   { path: string },
   { size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
 >({
-  status: (input) => `Getting stats: ${path.basename(input.path)}`,
+  status: (input) => `Getting stats: ${paginateText(input.path, 100, -100)}`,
   mode: 'local',
   signature: 'file_stats(path: string)',
   analyze: async (input, { cwd }) => {
@@ -478,13 +478,13 @@ export const file_stats = operationOf<
 
     if (!fileExists) {
       return {
-        analysis: `This would fail - path "${input.path}" not found or readable.`,
+        analysis: `This would fail - path ${linkFile(input.path)} not found or readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will get file statistics for "${input.path}".`,
+      analysis: `This will get file statistics for ${linkFile(input.path)}.`,
       doable: true,
     };
   },
@@ -531,7 +531,7 @@ export const file_stats = operationOf<
     (op) => {
       if (op.output) {
         const sizeKB = (op.output.size / 1024).toFixed(1);
-        return `${op.output.type}, ${sizeKB} KB${op.output.lines ? `, ${op.output.lines} lines` : ''}`;
+        return `${linkFile(op.input.path)}: **${op.output.type}**, **${sizeKB} KB**${op.output.lines ? `, **${op.output.lines}** lines` : ''}`;
       }
       return null;
     },
@@ -545,19 +545,19 @@ export const file_delete = operationOf<
 >({
   mode: 'delete',
   signature: 'file_delete(path: string)',
-  status: (input) => `Deleting: ${path.basename(input.path)}`,
+  status: (input) => `Deleting: ${paginateText(input.path, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
 
     const deletable = await fileIsWritable(fullPath);
     if (!deletable) {
       return {
-        analysis: `This would fail - "${input.path}" is not a file that can be deleted.`,
+        analysis: `This would fail - ${linkFile(input.path)} is not a file that can be deleted.`,
         doable: false,
       };
     }
     return {
-      analysis: `This will delete the file "${input.path}".`,
+      analysis: `This will delete the file ${linkFile(input.path)}.`,
       doable: true,
     };
   },
@@ -572,7 +572,7 @@ export const file_delete = operationOf<
     `Delete("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Deleted ${path.basename(op.input.path)}`;
+        return `Deleted ${linkFile(op.input.path)}`;
       }
       return null;
     },
@@ -586,7 +586,7 @@ export const file_read = operationOf<
 >({
   mode: 'read',
   signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
-  status: (input) => `Reading: ${path.basename(input.path)}`,
+  status: (input) => `Reading: ${paginateText(input.path, 100, -100)}`,
   instructions: 'Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line).',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
@@ -594,7 +594,7 @@ export const file_read = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file "${input.path}" not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
         doable: false,
       };
     }
@@ -602,7 +602,7 @@ export const file_read = operationOf<
     const type = await categorizeFile(fullPath, input.path);
     if (type === 'unknown') {
       return {
-        analysis: `This would fail - file "${input.path}" is of an unsupported type for reading.`,
+        analysis: `This would fail - file ${linkFile(input.path)} is of an unsupported type for reading.`,
         doable: false,
       };
     }
@@ -615,7 +615,7 @@ export const file_read = operationOf<
     const withLines = input.showLines ? ' with line numbers' : '';
 
     return {
-      analysis: `This will read the ${type} file "${input.path}" (first ${limit.toLocaleString()} ${limitOffsetMode})${withLines}.`,
+      analysis: `This will read the ${type} file ${linkFile(input.path)} (first ${limit.toLocaleString()} ${limitOffsetMode})${withLines}.`,
       doable: true,
     };
   },
@@ -671,7 +671,7 @@ export const file_read = operationOf<
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Read ${op.output.content.length} characters${op.output.truncated ? ' (truncated)' : ''}`;
+        return `Read ${linkFile(op.input.path)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
       }
       return null;
     },
@@ -759,7 +759,7 @@ export const file_edit = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file "${input.path}" not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
         doable: false,
       };
     }
@@ -767,7 +767,7 @@ export const file_edit = operationOf<
     const writable = await fileIsWritable(fullPath);
     if (!writable) {
       return {
-        analysis: `This would fail - file "${input.path}" is not writable.`,
+        analysis: `This would fail - file ${linkFile(input.path)} is not writable.`,
         doable: false,
       };
     }
@@ -775,7 +775,7 @@ export const file_edit = operationOf<
     const type = await categorizeFile(fullPath, input.path);
     if (type !== 'text') {
       return {
-        analysis: `This would fail - file "${input.path}" is not a text file (type: ${type}).`,
+        analysis: `This would fail - file ${linkFile(input.path)} is not a text file (type: ${type}).`,
         doable: false,
       };
     }
@@ -1010,26 +1010,26 @@ export const dir_create = operationOf<
 >({
   mode: 'create',
   signature: 'dir_create(path: string)',
-  status: (input) => `Creating directory: ${path.basename(input.path)}`,
+  status: (input) => `Creating directory: ${paginateText(input.path, 100, -100)}`,
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const { exists, isDirectory } = await fileIsDirectory(fullPath);
 
     if (exists && !isDirectory) {
       return {
-        analysis: `This would fail - "${input.path}" exists but is not a directory.`,
+        analysis: `This would fail - ${linkFile(input.path)} exists but is not a directory.`,
         doable: false,
       };
     }
     if (exists && isDirectory) {
       return {
-        analysis: `This would fail - directory "${input.path}" already exists.`,
+        analysis: `This would fail - directory ${linkFile(input.path)} already exists.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will create directory "${input.path}".`,
+      analysis: `This will create directory ${linkFile(input.path)}.`,
       doable: true,
     };
   },
@@ -1044,7 +1044,7 @@ export const dir_create = operationOf<
     `Dir("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created directory ${op.input.path}`;
+        return `Created directory ${linkFile(op.input.path)}`;
       }
       return null;
     },
@@ -1058,7 +1058,7 @@ export const file_attach = operationOf<
 >({
   mode: 'create',
   signature: 'file_attach({ path })',
-  status: ({ path: filePath }) => `Attaching file: ${path.basename(filePath)}`,
+  status: ({ path: filePath }) => `Attaching file: ${paginateText(filePath, 100, -100)}`,
   analyze: async ({ path: filePath }, { cwd }) => {
     const fullPath = path.resolve(cwd, filePath);
 
