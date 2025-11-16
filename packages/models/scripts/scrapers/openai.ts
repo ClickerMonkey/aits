@@ -603,7 +603,7 @@ export async function scrapeOpenAI(
 }
 
 // CLI execution
-if (require.main === module) {
+if (process.argv[1].endsWith('openai.ts')) {
   const args = process.argv.slice(2);
   const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
 

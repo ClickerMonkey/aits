@@ -1,4 +1,4 @@
-import { getTotalTokens, Usage, accumulateUsage } from '@aits/core';
+import { getInputTokens, getTotalTokens, Usage } from '@aits/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -301,10 +301,13 @@ export async function runChatOrchestrator(
               }
               break;
 
-            case 'requestTokens':
-              const lastUserMessage = messages.findLast((msg) => msg.role === 'user');
-              if (lastUserMessage && !lastUserMessage?.tokens) {
-                lastUserMessage.tokens = chunk.tokens;
+            case 'requestUsage':
+              const lastUserMessageIndex = messages.findLastIndex((msg) => msg.role === 'user');
+              const lastUserMessage = messages[lastUserMessageIndex];
+              if (lastUserMessage && !lastUserMessage?.usage) {
+                const previousTokens =  messages.slice(0, lastUserMessageIndex).reduce((sum, msg) => sum + (msg.tokens || 0), 0);
+                lastUserMessage.usage = chunk.usage;
+                lastUserMessage.tokens = getInputTokens(chunk.usage) - previousTokens;
                 onEvent({ type: 'update', message: lastUserMessage });
               }
               break;
@@ -340,7 +343,8 @@ export async function runChatOrchestrator(
             case 'usage':
               // Update current usage for this message
               currentUsage = chunk.usage;
-              pending.tokens = getTotalTokens(chunk.usage);
+              const previousTokens = messages.reduce((sum, msg) => sum + (msg.tokens || 0), 0);
+              pending.tokens = getTotalTokens(chunk.usage) - previousTokens;
               updateUsageEvent();
               break;
           }

@@ -6,10 +6,14 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as url from 'url';
 import Replicate from 'replicate';
 import type { ModelInfo, ModelCapability } from '@aits/ai';
 import { detectTier } from '@aits/ai';
 import { writeModelTS } from '../codegen';
+
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 interface ReplicateModelData {
   url: string;
@@ -427,7 +431,7 @@ export async function scrapeReplicate(
 }
 
 // CLI execution
-if (require.main === module) {
+if (process.argv[1].endsWith('replicate.ts')) {
   const args = process.argv.slice(2);
   const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
   const cacheDir = args.find((arg, i) => i > 0 && !arg.startsWith('--') && !args[i - 1].startsWith('--')) || path.join(__dirname, '../../cache');

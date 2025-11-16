@@ -197,16 +197,18 @@ export async function scrapeOpenRouter(
 }
 
 // CLI execution
-const args = process.argv.slice(2);
-const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
-const scrapeMetrics = args.includes('--metrics');
+if (process.argv[1].endsWith('openrouter.ts')) {
+  const args = process.argv.slice(2);
+  const outputDir = args.find((arg) => !arg.startsWith('--')) || path.join(__dirname, '../../data');
+  const scrapeMetrics = args.includes('--metrics');
 
-const concurrencyArg = args.find((arg) => arg.startsWith('--concurrency='));
-const concurrency = concurrencyArg
-  ? parseInt(concurrencyArg.split('=')[1], 10)
-  : 5;
+  const concurrencyArg = args.find((arg) => arg.startsWith('--concurrency='));
+  const concurrency = concurrencyArg
+    ? parseInt(concurrencyArg.split('=')[1], 10)
+    : 5;
 
-scrapeOpenRouter(outputDir, { metrics: scrapeMetrics, concurrency }).catch((error) => {
-  console.error('✗ OpenRouter scraping failed:', error);
-  process.exit(1);
-});
+  scrapeOpenRouter(outputDir, { metrics: scrapeMetrics, concurrency }).catch((error) => {
+    console.error('✗ OpenRouter scraping failed:', error);
+    process.exit(1);
+  });
+}

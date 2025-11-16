@@ -183,7 +183,7 @@ export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
   { type: 'textComplete', content: string, request: Request } |
   { type: 'complete', output: TOutput, request: Request } |
   { type: 'textReset', reason?: string, request: Request } |
-  { type: 'requestTokens', tokens: number, request: Request } |
+  { type: 'requestUsage', usage: Usage, request: Request } |
   { type: 'responseTokens', tokens: number, request: Request } |
   { type: 'usage', usage: Usage, request: Request };
 
@@ -528,7 +528,7 @@ export class Prompt<
     let lastError: string | undefined = undefined;
     let completeText: string = '';
     let maxIterations = outputRetries + forgetRetries + toolIterations + toolRetries + 1;
-    let requestTokensSent = false;
+    let requestUsageSent = false;
     let usage: Usage | undefined = undefined;
     let iterations = 0;
     let accumulatedUsage: Usage = {};
@@ -581,11 +581,11 @@ export class Prompt<
 
         if (chunk.usage) {
           usage = chunk.usage;
-          if (!requestTokensSent) {
+          if (!requestUsageSent) {
             // Calculate input tokens from usage structure
             const inputTokens = getInputTokens(chunk.usage);
-            yield emit({ type: 'requestTokens', tokens: inputTokens, request });
-            requestTokensSent = true;
+            yield emit({ type: 'requestUsage', usage: chunk.usage, request });
+            requestUsageSent = true;
           }
           accumulateUsage(accumulatedUsage, chunk.usage);
         }
@@ -1096,9 +1096,9 @@ export class Prompt<
     // ctx.messages structure: system -> (user -> assistant)[] -> user? -> assistant.tool_calls ->  tool[]
     
     // If we have any tokens defined, spread them out
-    // If we have no tokens defined & estimateTokens, estimate them
-    // If we have no tokens defined & no estimateTokens but we have usage.inputTokens, spread them out
-    // If we have no tokens defined & no estimateTokens & no usage.inputTokens, we can't trim
+    // If we have no tokens defined & estimateUsage, estimate them
+    // If we have no tokens defined & no estimateUsage but we have usage.text.input, spread them out
+    // If we have no tokens defined & no estimateUsage & no usage.text.input, we can't trim
 
     let messageTokens: number[] = [];
     const totalMessageTokens = request.messages.reduce((sum, t) => sum + (t.tokens || 0), 0);
@@ -1120,7 +1120,7 @@ export class Prompt<
         chunks[0].unshift(...currentChunk);
       }
       // Distribute tokens across messages in each chunk
-      // If we have usage input tokens, we add them to the last chunk (usage.inputTokens - totalMessageTokens)
+      // If we have usage input tokens, we add them to the last chunk (usage.text.input - totalMessageTokens)
       if (usage) {
         const usageInputTokens = getInputTokens(usage);
         if (usageInputTokens > 0) {
