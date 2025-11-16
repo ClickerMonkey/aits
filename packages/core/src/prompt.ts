@@ -1003,14 +1003,26 @@ export class Prompt<
   }
 
   /**
-   * Resolves tools for the current context, checking applicability if needed.
-   * 
-   * @param ctx - The context to resolve tools against.
+   * Prepares the prompt for execution by resolving all configuration, tools, and templates.
+   * Returns undefined if the prompt is not compatible with the given context.
+   *
+   * @param ctx - The context to prepare against.
    * @param input - The input to the prompt.
-   * @param checkApplicable - Whether to check tool applicability.
-   * @returns The resolved tools information or undefined.
+   * @returns The resolved prompt components or undefined if not compatible.
    */
-  private async resolveTools(ctx: Context<TContext, TMetadata>, input: TInput, checkApplicable: boolean) {
+  private async resolve(ctx: Context<TContext, TMetadata>, input: TInput) {
+    // Get config, if false is returned context is not compatible with prompt
+    const config = await this.config(input, ctx);
+    if (config === false) {
+      return undefined;
+    }
+
+    // Get prompt response schema, if false is returned context is not compatible with prompt
+    const schema = await this.schema(input, ctx);
+    if (schema === false) {
+      return undefined;
+    }
+
     // Determine if prompt can run based on tool compatibility with the context
     const retooling = await this.retool(input, ctx);
     if (retooling === false) {
@@ -1023,8 +1035,8 @@ export class Prompt<
       : new Set(this.input.tools?.map(t => t.name) || []);
     let selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
 
-    // Check tool applicability if requested
-    if (checkApplicable && selectedTools) {
+    // Check tool applicability
+    if (selectedTools) {
       const applicabilityResults = await Promise.all(
         selectedTools.map(async (tool) => ({
           tool,
@@ -1050,38 +1062,6 @@ export class Prompt<
     const toolObjects = selectedTools && toolInstructions
       ? selectedTools.map((tool, i) => ({ tool, definition: toolInstructions[i]![1] }))
       : [];
-
-    return { tools, toolObjects, instructions };
-  }
-
-  /**
-   * Prepares the prompt for execution by resolving all configuration, tools, and templates.
-   * Returns undefined if the prompt is not compatible with the given context.
-   *
-   * @param ctx - The context to prepare against.
-   * @param input - The input to the prompt.
-   * @returns The resolved prompt components or undefined if not compatible.
-   */
-  private async resolve(ctx: Context<TContext, TMetadata>, input: TInput) {
-    // Get config, if false is returned context is not compatible with prompt
-    const config = await this.config(input, ctx);
-    if (config === false) {
-      return undefined;
-    }
-
-    // Get prompt response schema, if false is returned context is not compatible with prompt
-    const schema = await this.schema(input, ctx);
-    if (schema === false) {
-      return undefined;
-    }
-
-    // Resolve tools with applicability checks
-    const toolsResolved = await this.resolveTools(ctx, input, true);
-    if (toolsResolved === undefined) {
-      return undefined;
-    }
-
-    const { tools, toolObjects, instructions } = toolsResolved;
 
     // Compute the input that is fed to the prompt's prompt content
     let contentInput: Record<string, any> = input;
