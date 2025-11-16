@@ -93,13 +93,48 @@ Example: Create a project tracking type:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_create', input }, ctx),
   });
 
+  const typeImport = ai.tool({
+    name: 'type_import',
+    description: 'Import and discover type definitions from files',
+    instructions: `Use this to extract type definitions from unstructured files. The tool will:
+1. Find files matching the glob pattern
+2. Process readable files (text, PDF, Excel, Word documents)
+3. Use AI to discover structured type definitions with fields
+4. Present discovered types for review without automatically adding them
+
+This is useful when the user wants to:
+- "extract all transaction data from all my files"
+- "can you convert this document to structured data"
+- "discover data types in my CSV files"
+- "analyze my JSON files and create type definitions"
+
+The discovered types are presented with field definitions and instance counts. The user can then review and selectively add types using type_create.
+
+Example 1: Discover all types from data files:
+{ "glob": "data/**/*.csv" }
+
+Example 2: Focus on specific types:
+{ "glob": "documents/**/*.txt", "hints": ["user", "transaction", "product"] }
+
+Example 3: Limit discovery to top types:
+{ "glob": "**/*.json", "max": 5 }`,
+    schema: z.object({
+      glob: z.string().describe('Glob pattern for files to analyze (e.g., "data/*.csv", "**/*.txt")'),
+      hints: z.array(z.string()).optional().describe('Optional type name hints to focus discovery (e.g., ["user", "order", "product"])'),
+      max: z.number().optional().describe('Maximum number of types to discover (default: unlimited)'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
+  });
+
   return [
     typeInfo,
     typeUpdate,
     typeCreate,
+    typeImport,
   ] as [
     typeof typeInfo,
     typeof typeUpdate,
     typeof typeCreate,
+    typeof typeImport,
   ];
 }
