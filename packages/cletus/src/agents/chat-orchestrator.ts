@@ -91,6 +91,7 @@ export async function runChatOrchestrator(
   let currentUsage: Usage = {};
   let messageUsage: Usage = {};
   let messageCost = 0;
+  let toolTokens = 0;
 
   const updateUsageEvent = () => {
     const accumulated = getUsage();
@@ -127,8 +128,9 @@ export async function runChatOrchestrator(
 
       logger.log(`orchestrator: loop iteration ${loopIteration}`);
       
-      // Reset current usage for this iteration
+      // Reset current usage and tool tokens for this iteration
       currentUsage = {};
+      toolTokens = 0;
 
       // Create pending assistant message
       const pending: Message = {
@@ -162,7 +164,8 @@ export async function runChatOrchestrator(
         if (!currentUsage.text) {
           currentUsage.text = {};
         }
-        currentUsage.text.output = estimatedTokens;
+        // Add both text tokens and accumulated tool tokens
+        currentUsage.text.output = estimatedTokens + toolTokens;
       };
 
       // Emit initial pending message
@@ -327,12 +330,10 @@ export async function runChatOrchestrator(
               break;
 
             case 'toolStart':
-              // Add to estimated output tokens for tool calls
-              const toolTokens = Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4);
-              if (!currentUsage.text) {
-                currentUsage.text = {};
-              }
-              currentUsage.text.output = (currentUsage.text.output || 0) + toolTokens;
+              // Increment tool tokens for tool calls
+              toolTokens += Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4);
+              // Update estimated text output to include tool tokens
+              updateEstimatedTextOutputTokens();
               updateUsageEvent();
               break;
 
