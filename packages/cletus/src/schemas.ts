@@ -96,6 +96,24 @@ export const ReplicateConfigSchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const AWSBedrockConfigSchema = z.object({
+  region: z.string().optional(),
+  credentials: z.object({
+    accessKeyId: z.string(),
+    secretAccessKey: z.string(),
+    sessionToken: z.string().optional(),
+  }).optional(),
+  modelFamilies: z.record(z.string(), z.object({
+    enabled: z.boolean().optional(),
+    modelIdMap: z.record(z.string(), z.string()).optional(),
+  })).optional(),
+  defaultModels: z.object({
+    chat: z.string().optional(),
+    imageGenerate: z.string().optional(),
+    embedding: z.string().optional(),
+  }).optional(),
+});
+
 export const TavilyConfigSchema = z.object({
   apiKey: z.string(),
 });
@@ -104,6 +122,7 @@ export const ProvidersSchema = z.object({
   openai: OpenAIConfigSchema.nullable(),
   openrouter: OpenRouterConfigSchema.nullable(),
   replicate: ReplicateConfigSchema.nullable(),
+  aws: AWSBedrockConfigSchema.nullable(),
 });
 
 // ============================================================================
@@ -364,6 +383,7 @@ export type User = z.infer<typeof UserSchema>;
 export type OpenAIConfig = z.infer<typeof OpenAIConfigSchema>;
 export type OpenRouterConfig = z.infer<typeof OpenRouterConfigSchema>;
 export type ReplicateConfig = z.infer<typeof ReplicateConfigSchema>;
+export type AWSBedrockConfig = z.infer<typeof AWSBedrockConfigSchema>;
 export type Providers = z.infer<typeof ProvidersSchema>;
 export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;

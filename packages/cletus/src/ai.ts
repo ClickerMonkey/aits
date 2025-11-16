@@ -3,6 +3,7 @@ import { models } from '@aits/models';
 import { OpenAIProvider } from '@aits/openai';
 import { OpenRouterProvider } from '@aits/openrouter';
 import { ReplicateProvider } from '@aits/replicate';
+import { AWSBedrockProvider } from '@aits/aws';
 import Handlebars from 'handlebars';
 import { ChatFile } from './chat';
 import { ConfigFile } from './config';
@@ -78,6 +79,7 @@ export function createCletusAI(configFile: ConfigFile) {
       },
     }) } : {}),
     ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),
+    ...(config.providers.aws ? { aws: new AWSBedrockProvider(config.providers.aws) } : {}),
   } as const;
 
   const jsonReplacer = (_key: string, value: any) => {
