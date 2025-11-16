@@ -178,6 +178,7 @@ export const TypeFieldSchema = z.object({
   default: z.union([z.string(), z.number(), z.boolean()]).optional(),
   required: z.boolean().optional(),
   enumOptions: z.array(z.string()).optional(),
+  onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional(),
 });
 
 export const TypeDefinitionSchema = z.object({
@@ -230,6 +231,7 @@ export const OperationKindSchema = z.enum([
   'type_info',
   'type_create',
   'type_update',
+  'type_delete',
   'type_import',
   // artist
   'image_generate',

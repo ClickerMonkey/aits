@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { CletusAIContext, transcribe } from "../ai";
-import { abbreviate, chunkArray, formatName, pluralize } from "../common";
+import { abbreviate, chunkArray, formatName, groupMap, pluralize } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
@@ -25,6 +25,312 @@ function getType(config: ConfigFile, typeName: string): TypeDefinition {
     throw new Error(`Data type not found: ${typeName}`);
   }
   return type;
+}
+
+/**
+ * Check if a field type is a reference to another type
+ */
+function isReferenceType(fieldType: string, config: ConfigFile): boolean {
+  const primitiveTypes = ['string', 'number', 'boolean', 'date', 'enum'];
+  if (primitiveTypes.includes(fieldType)) {
+    return false;
+  }
+  // Check if it's an existing type
+  return config.getData().types.some(t => t.name === fieldType);
+}
+
+/**
+ * Join related records for reference fields
+ * Optimized to minimize DataManager loads by loading each unique reference type once
+ */
+async function joinRelatedRecords(
+  records: any[],
+  type: TypeDefinition,
+  config: ConfigFile,
+  depth: number = 0,
+  maxDepth: number = 3
+): Promise<any[]> {
+  // Prevent infinite recursion
+  if (depth >= maxDepth || records.length === 0) {
+    return records;
+  }
+
+  // Find all reference fields
+  const referenceFields = type.fields.filter(f => isReferenceType(f.type, config));
+  
+  if (referenceFields.length === 0) {
+    return records;
+  }
+
+  // Group reference fields by type to minimize data manager loads
+  const refTypeMap = new Map<string, TypeField[]>();
+  for (const field of referenceFields) {
+    if (!refTypeMap.has(field.type)) {
+      refTypeMap.set(field.type, []);
+    }
+    refTypeMap.get(field.type)!.push(field);
+  }
+
+  // Load all unique reference types in parallel
+  const refDataMap = new Map<string, { type: TypeDefinition; manager: DataManager; records: Map<string, any> }>();
+  
+  await Promise.all(
+    Array.from(refTypeMap.keys()).map(async (refTypeName) => {
+      try {
+        const refType = getType(config, refTypeName);
+        const refDataManager = new DataManager(refTypeName);
+        await refDataManager.load();
+        
+        // Create a map of all records for quick lookup
+        const recordsMap = new Map<string, any>();
+        for (const record of refDataManager.getAll()) {
+          recordsMap.set(record.id, record);
+        }
+        
+        refDataMap.set(refTypeName, {
+          type: refType,
+          manager: refDataManager,
+          records: recordsMap,
+        });
+      } catch (error) {
+        // If we can't load the reference type, skip it
+      }
+    })
+  );
+
+  // Now join all records
+  const joinedRecords = records.map((record) => {
+    const joinedRecord = { ...record, fields: { ...record.fields } };
+
+    // Process each reference field
+    for (const field of referenceFields) {
+      const refId = record.fields[field.name];
+      
+      // Skip if field is null/undefined
+      if (refId === null || refId === undefined || refId === '') {
+        continue;
+      }
+
+      const refData = refDataMap.get(field.type);
+      if (refData) {
+        const refRecord = refData.records.get(refId as string);
+        if (refRecord) {
+          // Store for recursive joining
+          joinedRecord.fields[field.name] = refRecord;
+        }
+      }
+    }
+
+    return joinedRecord;
+  });
+
+  // Recursively join nested references for each unique reference type
+  for (const [refTypeName, refData] of refDataMap.entries()) {
+    // Collect all unique referenced records that need recursive joining
+    const recordsToJoin = new Set<any>();
+    
+    for (const record of joinedRecords) {
+      const fields = refTypeMap.get(refTypeName)!;
+      for (const field of fields) {
+        const refRecord = record.fields[field.name];
+        if (refRecord && typeof refRecord === 'object' && refRecord.id) {
+          recordsToJoin.add(refRecord);
+        }
+      }
+    }
+    
+    if (recordsToJoin.size > 0) {
+      // Recursively join nested references
+      const nestedJoined = await joinRelatedRecords(
+        Array.from(recordsToJoin),
+        refData.type,
+        config,
+        depth + 1,
+        maxDepth
+      );
+      
+      // Create a map for quick lookup
+      const nestedMap = new Map<string, any>();
+      for (const nested of nestedJoined) {
+        nestedMap.set(nested.id, nested);
+      }
+      
+      // Update the records with nested joins
+      for (const record of joinedRecords) {
+        const fields = refTypeMap.get(refTypeName)!;
+        for (const field of fields) {
+          const refRecord = record.fields[field.name];
+          if (refRecord && typeof refRecord === 'object' && refRecord.id) {
+            const nestedRecord = nestedMap.get(refRecord.id);
+            if (nestedRecord) {
+              record.fields[field.name] = nestedRecord;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return joinedRecords;
+}
+
+/**
+ * Find all records that reference specific records
+ * Optimized to minimize DataManager loads by batching operations
+ */
+async function findReferencingRecords(
+  targetTypeName: string,
+  targetRecordIds: string[],
+  config: ConfigFile
+): Promise<Array<{ typeName: string; records: any[]; field: TypeField; targetRecordId: string }>> {
+  const allTypes = config.getData().types;
+  const referencingData: Array<{ typeName: string; records: any[]; field: TypeField; targetRecordId: string }> = [];
+
+  // Find all types that have fields referencing the target type
+  const typesWithReferences = allTypes.filter(type => 
+    type.fields.some(f => f.type === targetTypeName)
+  );
+
+  // Load data managers for all referencing types at once
+  const typeDataMap = new Map<string, { type: TypeDefinition; records: any[] }>();
+  
+  await Promise.all(
+    typesWithReferences.map(async (type) => {
+      const dataManager = new DataManager(type.name);
+      await dataManager.load();
+      typeDataMap.set(type.name, {
+        type,
+        records: dataManager.getAll(),
+      });
+    })
+  );
+
+  // Now find all matching records
+  for (const [typeName, { type, records }] of typeDataMap.entries()) {
+    const referenceFields = type.fields.filter(f => f.type === targetTypeName);
+    
+    for (const field of referenceFields) {
+      for (const targetRecordId of targetRecordIds) {
+        const matchingRecords = records.filter(r => 
+          r.fields[field.name] === targetRecordId
+        );
+        
+        if (matchingRecords.length > 0) {
+          referencingData.push({
+            typeName,
+            records: matchingRecords,
+            field,
+            targetRecordId,
+          });
+        }
+      }
+    }
+  }
+
+  return referencingData;
+}
+
+/**
+ * Handle cascade delete logic for a set of records
+ * Returns statistics about cascaded deletes and setNull updates
+ * Optimized to minimize DataManager loads by batching operations
+ */
+async function handleCascadeDeletes(
+  typeName: string,
+  recordIds: string[],
+  config: ConfigFile,
+  ctx: CletusAIContext
+): Promise<{
+  cascadedDeletes: number;
+  setNullUpdates: number;
+  deletedIds: string[];
+  updatedIds: string[];
+}> {
+  let cascadedDeletes = 0;
+  let setNullUpdates = 0;
+  const deletedIds: string[] = [];
+  const updatedIds: string[] = [];
+
+  // Find all referencing records for all target records at once
+  const referencingData = await findReferencingRecords(typeName, recordIds, config);
+  
+  // Group referencing data by type and field to minimize data manager loads
+  const refTypeGroups = new Map<string, Map<string, Array<{ records: any[]; field: TypeField }>>>();
+  
+  for (const { typeName: refTypeName, records, field, targetRecordId } of referencingData) {
+    if (!refTypeGroups.has(refTypeName)) {
+      refTypeGroups.set(refTypeName, new Map());
+    }
+    const fieldMap = refTypeGroups.get(refTypeName)!;
+    const fieldKey = `${field.name}:${field.onDelete || 'restrict'}`;
+    
+    if (!fieldMap.has(fieldKey)) {
+      fieldMap.set(fieldKey, []);
+    }
+    fieldMap.get(fieldKey)!.push({ records, field });
+  }
+  
+  // Process each referencing type - load data manager once per type
+  for (const [refTypeName, fieldMap] of refTypeGroups.entries()) {
+    const refDataManager = new DataManager(refTypeName);
+    await refDataManager.load();
+    
+    for (const [fieldKey, groups] of fieldMap.entries()) {
+      const field = groups[0].field;
+      const onDelete = field.onDelete || 'restrict';
+      
+      // Collect all unique records to process
+      const recordsToProcess = new Map<string, any>();
+      for (const { records } of groups) {
+        for (const record of records) {
+          recordsToProcess.set(record.id, record);
+        }
+      }
+      const uniqueRecords = Array.from(recordsToProcess.values());
+      
+      if (onDelete === 'restrict') {
+        const refType = getType(config, refTypeName);
+        throw new Error(`Cannot delete record - ${refType.friendlyName} has ${uniqueRecords.length} referencing record(s) with onDelete=restrict`);
+      } else if (onDelete === 'cascade') {
+        // Delete all referencing records
+        for (const refRecord of uniqueRecords) {
+          await refDataManager.delete(refRecord.id);
+          deletedIds.push(`${refTypeName}:${refRecord.id}`);
+          cascadedDeletes++;
+        }
+      } else if (onDelete === 'setNull') {
+        // Set the reference field to null
+        for (const refRecord of uniqueRecords) {
+          await refDataManager.update(refRecord.id, { [field.name]: null });
+          updatedIds.push(`${refTypeName}:${refRecord.id}`);
+          setNullUpdates++;
+        }
+      }
+    }
+  }
+
+  // Group deleted and updated IDs by ref type name for batch knowledge update
+  const deletedByType = groupMap(deletedIds, id => id.split(':')[0], id => id.split(':')[1]);
+  const updatedByType = groupMap(updatedIds, id => id.split(':')[0], id => id.split(':')[1]);
+  
+  // Batch update knowledge base by type
+  for (const [refTypeName, recordIds] of deletedByType.entries()) {
+    try {
+      await updateKnowledge(ctx, refTypeName, [], recordIds);
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base for deleted records in ${refTypeName}: ${(e as Error).message}`);
+    }
+  }
+  
+  for (const [refTypeName, recordIds] of updatedByType.entries()) {
+    try {
+      await updateKnowledge(ctx, refTypeName, recordIds, []);
+    } catch (e) {
+      ctx.log(`Warning: failed to update knowledge base for updated records in ${refTypeName}: ${(e as Error).message}`);
+    }
+  }
+
+  return { cascadedDeletes, setNullUpdates, deletedIds, updatedIds };
 }
 
 
@@ -141,7 +447,7 @@ export const data_update = operationOf<
 
 export const data_delete = operationOf<
   { name: string; id: string },
-  { deleted: boolean, libraryKnowledgeUpdated: boolean }
+  { deleted: boolean, libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number }
 >({
   mode: 'delete',
   signature: 'data_delete(id: string)',
@@ -159,26 +465,77 @@ export const data_delete = operationOf<
       };
     }
 
+    // Check for referencing records
+    const referencingData = await findReferencingRecords(name, [id], config);
+    
+    if (referencingData.length > 0) {
+      const restrictions: string[] = [];
+      const cascades: string[] = [];
+      const setNulls: string[] = [];
+      
+      for (const { typeName, records, field } of referencingData) {
+        const refType = getType(config, typeName);
+        const onDelete = field.onDelete || 'restrict';
+        const count = records.length;
+        
+        if (onDelete === 'restrict') {
+          restrictions.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        } else if (onDelete === 'cascade') {
+          cascades.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        } else if (onDelete === 'setNull') {
+          setNulls.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        }
+      }
+      
+      if (restrictions.length > 0) {
+        return {
+          analysis: `This would fail - ${type.friendlyName} record "${id}" is referenced by: ${restrictions.join(', ')}. These fields have onDelete=restrict.`,
+          doable: false,
+        };
+      }
+      
+      let analysis = `This will delete ${type.friendlyName} record "${id}".`;
+      if (cascades.length > 0) {
+        analysis += ` Will cascade delete: ${cascades.join(', ')}.`;
+      }
+      if (setNulls.length > 0) {
+        analysis += ` Will set null in: ${setNulls.join(', ')}.`;
+      }
+      
+      return { analysis, doable: true };
+    }
+
     return {
       analysis: `This will delete ${type.friendlyName} record "${id}".`,
       doable: true,
     };
   },
   do: async ({ name, id }, ctx) => {
+    const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
+    
+    // Handle cascade deletes using reusable function
+    const { cascadedDeletes, setNullUpdates } = await handleCascadeDeletes(name, [id], config, ctx);
+    
+    // Delete the target record
     await dataManager.delete(id);
 
-    // Update knowledge base
+    // Update knowledge base for the deleted record
     let libraryKnowledgeUpdated = true;
     try {
-      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [], [id]); 
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [], [id]);
     } catch (e) {
       ctx.log(`Warning: failed to update knowledge base after deleting record: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
     }
 
-    return { deleted: true, libraryKnowledgeUpdated };
+    return { 
+      deleted: true, 
+      libraryKnowledgeUpdated,
+      cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
+      setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+    };
   },
   render: (op, config, showInput, showOutput) => {
     const type = getType(config, op.input.name);
@@ -188,7 +545,14 @@ export const data_delete = operationOf<
       `${formatName(type.friendlyName)}Delete("${op.input.id.slice(0, 8)}")`,
       (op) => {
         if (op.output?.deleted) {
-          return `Deleted record ID: ${op.input.id}`;
+          let msg = `Deleted record ID: ${op.input.id}`;
+          if (op.output.cascadedDeletes) {
+            msg += `, cascaded ${op.output.cascadedDeletes} record(s)`;
+          }
+          if (op.output.setNullUpdates) {
+            msg += `, set null in ${op.output.setNullUpdates} record(s)`;
+          }
+          return msg;
         }
         return null;
       },
@@ -222,7 +586,7 @@ export const data_select = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, offset, limit, orderBy }) => {
+  do: async ({ name, where, offset, limit, orderBy }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -249,10 +613,17 @@ export const data_select = operationOf<
 
     const recordOffset = offset || 0;
     const recordLimit = limit || (results.length - recordOffset);
+    
+    // Slice before joining to avoid loading unnecessary records
+    const slicedResults = results.slice(recordOffset, recordOffset + recordLimit);
+
+    // Join related records for reference fields
+    const type = getType(ctx.config, name);
+    const joinedResults = await joinRelatedRecords(slicedResults, type, ctx.config);
 
     return {
       count: results.length,
-      results: results.slice(recordOffset, recordOffset + recordLimit),
+      results: joinedResults,
     };
   },
   render: (op, config, showInput, showOutput) => {
@@ -349,7 +720,7 @@ export const data_update_many = operationOf<
 
 export const data_delete_many = operationOf<
   { name: string; where: WhereClause; limit?: number },
-  { deleted: number, libraryKnowledgeUpdated: boolean }
+  { deleted: number; libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number }
 >({
   mode: 'delete',
   signature: 'data_delete_many(where, limit?)',
@@ -370,6 +741,7 @@ export const data_delete_many = operationOf<
     };
   },
   do: async ({ name, where, limit }, ctx) => {
+    const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -385,6 +757,10 @@ export const data_delete_many = operationOf<
       return { deleted: 0, libraryKnowledgeUpdated: false };
     }
 
+    // Handle cascade deletes for all matching records using reusable function
+    const recordIds = matchingRecords.map(r => r.id);
+    const { cascadedDeletes, setNullUpdates } = await handleCascadeDeletes(name, recordIds, config, ctx);
+
     // Delete all matching records
     await Promise.all(matchingRecords.map((record) =>
       dataManager.delete(record.id)
@@ -393,13 +769,18 @@ export const data_delete_many = operationOf<
     // Also remove from knowledge base
     let libraryKnowledgeUpdated = true;
     try {
-      await updateKnowledge(ctx, name, [], matchingRecords.map(r => r.id)); 
+      await updateKnowledge(ctx, name, [], recordIds); 
     } catch (e) {
       ctx.log(`Warning: failed to update knowledge base after deleting records: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
     }
 
-    return { deleted: matchingRecords.length, libraryKnowledgeUpdated };
+    return { 
+      deleted: matchingRecords.length, 
+      libraryKnowledgeUpdated,
+      cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
+      setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+    };
   },
   render: (op, config, showInput, showOutput) => {
     const type = getType(config, op.input.name);
@@ -412,7 +793,14 @@ export const data_delete_many = operationOf<
       `${formatName(type.friendlyName)}DeleteMany(${params})`,
       (op) => {
         if (op.output) {
-          return `Deleted ${op.output.deleted} record(s)`;
+          let msg = `Deleted ${op.output.deleted} record(s)`;
+          if (op.output.cascadedDeletes) {
+            msg += `, cascaded ${op.output.cascadedDeletes} record(s)`;
+          }
+          if (op.output.setNullUpdates) {
+            msg += `, set null in ${op.output.setNullUpdates} record(s)`;
+          }
+          return msg;
         }
         return null;
       },
