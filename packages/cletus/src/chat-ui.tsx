@@ -249,6 +249,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       return;
     }
 
+    // Alt+C to cycle through chat modes
+    if (key.meta && input === 'c' && !isWaitingForResponse) {
+      const modes: ChatMode[] = ['none', 'read', 'create', 'update', 'delete'];
+      const currentIndex = modes.indexOf(chatMeta.mode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      const newMode = modes[nextIndex];
+      onChatUpdate({ mode: newMode });
+      setChatMeta({ ...chatMeta, mode: newMode });
+      addSystemMessage(`✓ Chat mode changed to: ${newMode}`);
+      return;
+    }
+
     // Alt+M to toggle agent mode
     if (key.meta && input === 'm' && !isWaitingForResponse) {
       const newAgentMode = chatMeta.agentMode === 'plan' ? 'default' : 'plan';
@@ -481,6 +493,7 @@ KEYBOARD SHORTCUTS:
 • Enter       - Send message
 • Ctrl+C      - Exit chat
 • ESC         - Interrupt AI response or stop transcription
+• Alt+C       - Cycle through chat modes
 • Alt+T       - Start/stop voice transcription
 • Alt+M       - Toggle agent mode (default/plan)
 • Alt+I       - Toggle operation input details
@@ -1121,6 +1134,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>ESC: interrupt</Text>
               </Box>
               <Box flexDirection="column" marginLeft={2}>
+                <Text dimColor>Alt+C: cycle chat mode</Text>
                 <Text dimColor>Alt+T: transcribe</Text>
                 <Text dimColor>Alt+M: toggle agent mode</Text>
                 <Text dimColor>Alt+I: toggle op input</Text>
