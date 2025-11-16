@@ -1,7 +1,7 @@
 /**
  * Main Model Scraper
  *
- * Coordinates scraping from all sources: OpenAI, OpenRouter, and Replicate
+ * Coordinates scraping from all sources: OpenAI, OpenRouter, Replicate, and AWS
  */
 
 import * as fs from 'fs/promises';
@@ -9,14 +9,16 @@ import * as path from 'path';
 import { scrapeOpenAI } from './scrapers/openai';
 import { scrapeOpenRouter } from './scrapers/openrouter';
 import { scrapeReplicate } from './scrapers/replicate';
+import { scrapeAWS } from './scrapers/aws';
 import { generateModelsIndexTS, generateMainIndexTS } from './codegen';
 
 interface ScraperOptions {
   outputDir?: string;
   cacheDir?: string;
-  sources?: ('openai' | 'openrouter' | 'replicate')[];
+  sources?: ('openai' | 'openrouter' | 'replicate' | 'aws')[];
   concurrency?: number;
   scrapeMetrics?: boolean;
+  awsRegion?: string;
 }
 
 /**
@@ -25,9 +27,10 @@ interface ScraperOptions {
 export async function scrapeAllModels(options: ScraperOptions = {}): Promise<void> {
   const outputDir = options.outputDir || path.join(__dirname, '../data');
   const cacheDir = options.cacheDir || path.join(__dirname, '../cache');
-  const sources = options.sources || ['openai', 'openrouter', 'replicate'];
+  const sources = options.sources || ['openai', 'openrouter', 'replicate', 'aws'];
   const concurrency = options.concurrency || 5;
   const scrapeMetrics = options.scrapeMetrics || false;
+  const awsRegion = options.awsRegion;
 
   console.log('========================================');
   console.log('Model Information Scraper');
@@ -78,6 +81,18 @@ export async function scrapeAllModels(options: ScraperOptions = {}): Promise<voi
       const message = error instanceof Error ? error.message : String(error);
       console.error(`\n✗ Replicate scraping failed: ${message}\n`);
       results.replicate = { success: false, error: message };
+    }
+  }
+
+  // Scrape AWS
+  if (sources.includes('aws')) {
+    try {
+      await scrapeAWS(outputDir, { region: awsRegion });
+      results.aws = { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`\n✗ AWS scraping failed: ${message}\n`);
+      results.aws = { success: false, error: message };
     }
   }
 
@@ -138,7 +153,7 @@ if (require.main === module) {
   const cacheDir = args.find((arg) => arg.startsWith('--cache='))?.split('=')[1];
   const sourcesArg = args.find((arg) => arg.startsWith('--sources='))?.split('=')[1];
   const sources = sourcesArg
-    ? (sourcesArg.split(',') as ('openai' | 'openrouter' | 'replicate')[])
+    ? (sourcesArg.split(',') as ('openai' | 'openrouter' | 'replicate' | 'aws')[])
     : undefined;
 
   const concurrencyArg = args.find((arg) => arg.startsWith('--concurrency='));
@@ -148,12 +163,18 @@ if (require.main === module) {
 
   const scrapeMetrics = args.includes('--metrics');
 
+  const awsRegionArg = args.find((arg) => arg.startsWith('--aws-region='));
+  const awsRegion = awsRegionArg
+    ? awsRegionArg.split('=')[1]
+    : undefined;
+
   scrapeAllModels({
     outputDir,
     cacheDir,
     sources,
     concurrency,
     scrapeMetrics,
+    awsRegion,
   }).catch((error) => {
     console.error('✗ Scraping failed:', error);
     process.exit(1);
