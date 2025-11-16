@@ -326,6 +326,16 @@ export async function runChatOrchestrator(
               updateUsageEvent();
               break;
 
+            case 'toolStart':
+              // Add to estimated output tokens for tool calls
+              const toolTokens = Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4);
+              if (!currentUsage.text) {
+                currentUsage.text = {};
+              }
+              currentUsage.text.output = (currentUsage.text.output || 0) + toolTokens;
+              updateUsageEvent();
+              break;
+
             case 'usage':
               // Update current usage for this message
               currentUsage = chunk.usage;
