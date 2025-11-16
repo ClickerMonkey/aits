@@ -253,7 +253,7 @@ console.log('Cost:', response.usage.cost);
 ### Function Calling
 
 ```typescript
-import { z } from 'zod';
+import z from 'zod';
 
 const response = await ai.chat.get([
   { role: 'user', content: 'What is the weather in Paris?' }

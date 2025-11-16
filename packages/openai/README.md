@@ -198,7 +198,7 @@ const response = await executor(
 #### Define and Use Tools
 
 ```typescript
-import { z } from 'zod';
+import z from 'zod';
 
 const response = await executor(
   {
@@ -297,7 +297,7 @@ const scientists = JSON.parse(response.content);
 #### Schema-based Structured Output
 
 ```typescript
-import { z } from 'zod';
+import z from 'zod';
 
 const PersonSchema = z.object({
   name: z.string(),
