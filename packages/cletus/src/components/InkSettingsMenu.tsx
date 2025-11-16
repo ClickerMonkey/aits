@@ -27,6 +27,7 @@ type SettingsView =
   | 'delete-memory'
   | 'delete-assistant'
   | 'delete-chat'
+  | 'delete-chat-options'
   | 'delete-type'
   | 'manage-providers'
   | 'manage-provider-action'
@@ -684,6 +685,79 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     );
   }
 
+  // Delete Chat Options (submenu for specific chat)
+  if (view === 'delete-chat-options') {
+    const chats = config.getChats();
+    const chat = chats.find((c) => c.id === selectedDeleteId);
+    
+    if (!chat) {
+      setView('delete-chat');
+      return null;
+    }
+
+    const chatIndex = chats.findIndex((c) => c.id === selectedDeleteId);
+    const hasOlderChats = chatIndex < chats.length - 1;
+    const olderCount = chats.length - chatIndex - 1;
+
+    const items = [
+      { label: `Delete this chat only`, value: 'single' },
+      ...(hasOlderChats ? [{ label: `Delete this chat and ${olderCount} older chat${olderCount !== 1 ? 's' : ''}`, value: 'and_older' }] : []),
+      { label: '← Cancel', value: '__cancel__' },
+    ];
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Delete: {abbreviate(chat.title, 50)}
+          </Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={(item) => {
+            if (item.value === '__cancel__') {
+              setView('delete-chat');
+              return;
+            }
+
+            const deleteChats = item.value === 'and_older' 
+              ? chats.slice(chatIndex)
+              : [chat];
+
+            const confirmMsg = item.value === 'and_older'
+              ? `Delete "${abbreviate(chat.title, 40)}" and ${deleteChats.length - 1} older chat${deleteChats.length - 1 !== 1 ? 's' : ''}?`
+              : `Delete "${abbreviate(chat.title, 50)}" and all its messages?`;
+
+            showConfirm(confirmMsg, async () => {
+              for (const chatToDelete of deleteChats) {
+                try {
+                  await fs.unlink(getChatPath(chatToDelete.id));
+                } catch (error: any) {
+                  if (error.code !== 'ENOENT') {
+                    console.error('Failed to delete chat messages:', error.message);
+                  }
+                }
+                await config.deleteChat(chatToDelete.id);
+              }
+              const deletedCount = deleteChats.length;
+              setMessage(`✓ ${deletedCount} chat${deletedCount !== 1 ? 's' : ''} deleted`);
+              
+              // Check if there are still chats remaining
+              const remainingChats = config.getChats();
+              if (remainingChats.length === 0) {
+                // No more chats, go back to main menu
+                handleBack();
+              } else {
+                // Stay in delete-chat view
+                setView('delete-chat');
+              }
+            });
+          }}
+        />
+      </Box>
+    );
+  }
+
   // Delete Chat
   if (view === 'delete-chat') {
     const chats = config.getChats();
@@ -695,6 +769,8 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     }
 
     const items = [
+      { label: '🗑️ Delete all chats', value: '__delete_all__' },
+      { label: '', value: '__separator__' },
       ...chats.map((chat) => ({
         label: chat.title,
         value: chat.id,
@@ -716,20 +792,29 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
               handleBack();
               return;
             }
-            const chat = chats.find((c) => c.id === item.value);
-            if (!chat) return;
-
-            showConfirm(`Delete "${chat.title}" and all its messages?`, async () => {
-              try {
-                await fs.unlink(getChatPath(chat.id));
-              } catch (error: any) {
-                if (error.code !== 'ENOENT') {
-                  console.error('Failed to delete chat messages:', error.message);
+            if (item.value === '__separator__') {
+              return;
+            }
+            if (item.value === '__delete_all__') {
+              showConfirm(`Delete ALL ${chats.length} chat${chats.length !== 1 ? 's' : ''} and their messages?`, async () => {
+                for (const chat of chats) {
+                  try {
+                    await fs.unlink(getChatPath(chat.id));
+                  } catch (error: any) {
+                    if (error.code !== 'ENOENT') {
+                      console.error('Failed to delete chat messages:', error.message);
+                    }
+                  }
+                  await config.deleteChat(chat.id);
                 }
-              }
-              await config.deleteChat(chat.id);
-              setMessage(`✓ Chat "${chat.title}" deleted`);
-            });
+                setMessage(`✓ All chats deleted`);
+              });
+              return;
+            }
+
+            // Single chat selected - show options submenu
+            setSelectedDeleteId(item.value);
+            setView('delete-chat-options');
           }}
         />
       </Box>
