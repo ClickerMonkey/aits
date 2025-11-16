@@ -578,7 +578,7 @@ export const file_read = operationOf<
   mode: 'read',
   signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Reading: ${path.basename(input.path)}`,
-  instructions: 'Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line). Content is stored in JSON so double quotes may be escaped - unescape them when presenting to the user.',
+  instructions: 'Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line).',
   analyze: async (input, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
