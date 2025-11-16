@@ -305,9 +305,9 @@ export async function runChatOrchestrator(
               const lastUserMessageIndex = messages.findLastIndex((msg) => msg.role === 'user');
               const lastUserMessage = messages[lastUserMessageIndex];
               if (lastUserMessage && !lastUserMessage?.usage) {
-                const previousTokens =  messages.slice(0, lastUserMessageIndex).reduce((sum, msg) => sum + (msg.tokens || 0), 0);
+                // const previousTokens =  messages.slice(0, lastUserMessageIndex).reduce((sum, msg) => sum + (msg.tokens || 0), 0);
                 lastUserMessage.usage = chunk.usage;
-                lastUserMessage.tokens = getInputTokens(chunk.usage) - previousTokens;
+                lastUserMessage.tokens = getInputTokens(chunk.usage)/* - previousTokens*/;
                 onEvent({ type: 'update', message: lastUserMessage });
               }
               break;

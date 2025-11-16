@@ -276,7 +276,7 @@ Current Todo: {{currentTodo.name}}
 {{#if todos.length}}
 Active Todos:
 {{#each todos}}
-{{@index}}. [{{#if this.done}}✓{{else}} {{/if}}] {{this.name}}
+{{this.id}}: [{{#if this.done}}✓{{else}} {{/if}}] {{this.name}}
 {{/each}}
 {{else}}
 No Todos.

@@ -106,7 +106,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
       ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}${simulateMode !== ctx.chat?.mode ? ` [${simulateMode} mode]` : ''}`);
 
       // Create a new OperationManager with the simulated mode if different from current mode
-      const effectiveOps = simulateMode !== ctx.chat?.mode
+      const effectiveOps = simulateMode !== ctx.chat?.mode && simulateMode !== 'none'
         ? new OperationManager(
             simulateMode,
             ctx.ops.operations,

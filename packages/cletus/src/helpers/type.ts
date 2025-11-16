@@ -82,7 +82,7 @@ export function buildFieldSchema(field: TypeField): z.ZodTypeAny {
   }
 
   if (!field.required) {
-    schema = schema.optional();
+    schema = schema.nullable();
   }
 
   if (field.default !== undefined) {

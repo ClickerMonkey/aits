@@ -1,6 +1,7 @@
 import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import path from 'path';
+import events from 'events'
 import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai';
 import { ChatFile } from './chat';
@@ -51,6 +52,7 @@ interface Command {
   name: CommandType;
   description: string;
   takesInput: boolean;
+  optionalInput?: boolean;
   placeholder?: string;
 }
 
@@ -67,7 +69,7 @@ const COMMANDS: Command[] = [
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
   { name: '/reset', description: 'Clear all todos', takesInput: false },
   { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
-  { name: '/cd', description: 'Change current working directory', takesInput: true, placeholder: 'directory path' },
+  { name: '/cd', description: 'Change current working directory', takesInput: true, optionalInput: true, placeholder: 'directory path' },
   { name: '/debug', description: 'Toggle debug logging', takesInput: false },
 ];
 
@@ -142,7 +144,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [setAccumulatedCostDebounced] = useAdaptiveDebounce(setAccumulatedCost);
 
   // Cached state for rendering & other logic.
-  const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length));
+  const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0]?.content?.length || pendingMessage.operations?.length));
   const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
   const operationApprovalPending = showApprovalMenu && !pendingMessage && !!lastAssistantMessage?.operations?.some((op) => op.status === 'analyzed');
   
@@ -440,9 +442,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   });
 
   const handleCommand = async (command: string) => {
-    const parts = command.split(' ');
-    const cmd = parts[0] as CommandType;
-    const args = parts.slice(1).join(' ');
+    const [cmd, args] = command.split(' ', 2);
 
     switch (cmd) {
       case '/quit':
@@ -608,7 +608,7 @@ TIP: Type '/' to see all available commands with descriptions!`,
 
       case '/cd':
         const cwd = ai.config.defaultContext!.cwd!;
-        if (args) {
+        if (args.trim()) {
           try {
             const resolvedPath = path.resolve(cwd, args);
 
@@ -809,6 +809,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
     // Create abort controller for this request
     const controller = new AbortController();
+    events.setMaxListeners(Number.POSITIVE_INFINITY, controller.signal);
     abortControllerRef.current = controller;
 
     return controller.signal;
@@ -837,6 +838,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
     // Create abort controller for this request
     const controller = new AbortController();
+    events.setMaxListeners(Number.POSITIVE_INFINITY, controller.signal);
     abortControllerRef.current = controller;
 
     try {
@@ -882,7 +884,9 @@ After installation and the SoX executable is in the path, restart Cletus and try
               break;
 
             case 'complete':
-              addMessage(event.message);
+              if (event.message.content.length > 0) {
+                addMessage(event.message);
+              }
               setPendingMessage(null);
               setShowApprovalMenu(true);
               setCurrentStatus('');
@@ -938,7 +942,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       }
 
       // If command requires input but none provided, don't execute
-      if (matchingCmd.takesInput && parts.length < 2) {
+      if (matchingCmd.takesInput && parts.length < 2 && !matchingCmd.optionalInput) {
         addSystemMessage(`❌ ${cmdName} requires input: ${matchingCmd.placeholder || 'value'}`);
         return; // Don't clear input, let them continue typing
       }
@@ -1043,12 +1047,12 @@ After installation and the SoX executable is in the path, restart Cletus and try
         ) : (
           <>
             <Static key={renderKey} items={visibleMessages}>
-              {(msg: Message) => (
-                <MessageDisplay key={`${renderKey}-${msg.created}`} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
+              {(msg: Message, i: number) => (
+                <MessageDisplay key={i} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay key={`${renderKey}-${lastMessage.created}`} message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
+              <MessageDisplay message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
             )}
             {showPendingMessage && (
               <MessageDisplay message={pendingMessage} config={config} showInput={showInput} showOutput={showOutput} />
@@ -1137,8 +1141,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>Alt+C: cycle chat mode</Text>
                 <Text dimColor>Alt+T: transcribe</Text>
                 <Text dimColor>Alt+M: toggle agent mode</Text>
-                <Text dimColor>Alt+I: toggle op input</Text>
-                <Text dimColor>Alt+O: toggle op output</Text>
+                <Text dimColor>Alt+I: toggle inputs</Text>
+                <Text dimColor>Alt+O: toggle outputs</Text>
                 <Text dimColor>Alt+S: toggle system msgs</Text>
                 <Text dimColor>Alt+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>

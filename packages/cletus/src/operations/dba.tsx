@@ -679,17 +679,50 @@ export const data_import = operationOf<
       }
       return true;
     });
+
+    log(`data_import: found ${files.length} files, ${importableFiles.length} importable`);
     
     chatStatus(`Found ${importableFiles.length} files to process`);
     
-    // Build zod schema for extraction
-    const recordSchema = buildFieldsSchema(type);
-    const arraySchema = z.array(recordSchema) as z.ZodType<object, object>;
+    // Create prompt for extraction
+    const extractor = ai.prompt({
+      name: 'extractor',
+      description: 'Extract structured data from text',
+      content: `You are an expert data extraction assistant. Your task is to extract structured data from unstructured text based on the provided type definition.
+Provide only the extracted data in JSON format as specified, without any additional commentary or explanation.
+    
+You are extracting all instances of {{type.friendlyName}} from the provided text.
+Return an array of objects with the fields defined above. If no instances are found, return an empty array.
+
+<typeInformation>
+Type: {{type.friendlyName}}
+{{#if type.description}}Description: {{type.description}}{{/if}}
+
+Fields:
+{{#each type.fields}}
+- {{this.name}} ({{this.type}}{{#if this.required}}, required{{/if}}{{#if this.enumOptions}}, options: {{this.enumOptions}}{{/if}}{{#if this.default}}, default: {{this.default}}{{/if}})
+{{/each}}
+</typeInformation>
+
+<text>
+{{text}}
+</text>`,
+      schema: z.object({ 
+        results: z.array(buildFieldsSchema(type)),
+      }),
+      input: ({ text }: { text: string }) => ({ type, text }),
+      metadataFn: () => ({
+        model: config.getData().user.models?.chat,
+      }),
+      excludeMessages: true,
+    });
+
     
     let allExtractedRecords: Record<string, any>[] = [];
     
     // Process files in parallel
     let filesProcessed = 0;
+    let filesExtracted = 0;
     let filesFailed = 0;
     await Promise.all(importableFiles.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
@@ -706,8 +739,9 @@ export const data_import = operationOf<
           transcriber: (image) => transcribe(ai, image),
         });
         
+        // Status update
         filesProcessed++;
-        chatStatus(`Processing file ${filesProcessed}/${importableFiles.length}: ${file.file}`);
+        chatStatus(`Processed/extracted ${filesProcessed}/${filesExtracted} out of ${pluralize(importableFiles.length, 'file')}`);
         
         // Group sections to minimize LLM calls (combine sections up to MAX_EXTRACTION_CHUNK_SIZE)
         const sectionGroups: string[] = [];
@@ -736,7 +770,9 @@ export const data_import = operationOf<
         // Extract data from grouped sections
         const extractedResults = await Promise.allSettled(sectionGroups.map(async (group, index) => {
           try {
-            return await extractDataFromText(ai, config, type, arraySchema, group);
+            const { results } = await extractor.get('result', { text: group }, ctx) || { results: [] };
+
+            return results;
           } catch (error) {
             log(`Warning: Failed to extract from section group in ${file.file}: ${(error as Error).message}`);
             return [];
@@ -745,11 +781,17 @@ export const data_import = operationOf<
 
         // Collect successful extractions
         allExtractedRecords.push(...extractedResults.flatMap(p => p.status === 'fulfilled' ? p.value : []));
+
+        // Status update
+        filesExtracted++;
+        chatStatus(`Processed/extracted ${filesProcessed}/${filesExtracted} out of ${pluralize(importableFiles.length, 'file')}`)
       } catch (error) {
         log(`Warning: Failed to process file ${file.file}: ${(error as Error).message}`);
         filesFailed++;
       }
     }));
+
+    log(`data_import: extracted ${allExtractedRecords.length} records from ${importableFiles.length} files`);
     
     // If no records extracted, return early
     if (allExtractedRecords.length === 0) {
@@ -767,6 +809,8 @@ export const data_import = operationOf<
     const uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
     chatStatus(`Importing data${uniqueFields.length > 0 ? ` using unique fields ${uniqueFields.join(', ')}` : ''}`);
     
+    log(`data_import: using unique fields: ${uniqueFields.join(', ')}`);
+
     // Merge data based on unique fields
     let imported = 0;
     let updated = 0;
@@ -1034,64 +1078,6 @@ const OPERATOR_MAP: Record<string, string> = {
 };
 
 /**
- * Extract data records from text using AI with structured output
- */
-async function extractDataFromText(
-  ai: CletusAIContext['ai'],
-  config: ConfigFile,
-  type: TypeDefinition,
-  arraySchema: z.ZodType<object, object>,
-  text: string
-): Promise<Record<string, any>[]> {
-  const models = config.getData().user.models;
-  const model = models?.chat;
-  
-  const fieldDescriptions = type.fields.map(field => {
-    let desc = `- ${field.name} (${field.type})`;
-    if (field.required) desc += ' [required]';
-    if (field.enumOptions) desc += ` [options: ${field.enumOptions.join(', ')}]`;
-    if (field.default !== undefined) desc += ` [default: ${field.default}]`;
-    return desc;
-  }).join('\n');
-  
-  const prompt = `Extract all instances of ${type.friendlyName} from the following text.
-
-Type: ${type.friendlyName}
-${type.description || ''}
-
-Fields:
-${fieldDescriptions}
-
-Text:
-${text}
-
-Return an array of objects with the fields defined above. If no instances are found, return an empty array.`;
-  
-  try {
-    const response = await ai.chat.get({
-      model,
-      messages: [
-        { role: 'system', content: 'You are a data extraction assistant. Extract structured data from text.' },
-        { role: 'user', content: prompt },
-      ],
-      responseFormat: arraySchema,
-    });
-    
-    // Parse JSON from content
-    const records = JSON.parse(response.content);
-    
-    if (!Array.isArray(records)) {
-      return [];
-    }
-    
-    return records;
-  } catch (error) {
-    // If structured output fails, return empty array
-    return [];
-  }
-}
-
-/**
  * Determine which fields should be used for uniqueness checking
  */
 async function determineUniqueFields(
@@ -1135,18 +1121,14 @@ Consider:
         { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields.' },
         { role: 'user', content: prompt },
       ],
-      responseFormat: z.array(z.string()),
+      responseFormat: z.object({ fields: z.array(z.string()) }),
     });
     
     // Parse JSON from content
-    const fields = JSON.parse(response.content);
-    
-    if (!Array.isArray(fields)) {
-      return [];
-    }
+    const results = JSON.parse(response.content) as { fields: string[] };
     
     // Validate that all fields exist in the type
-    const validFields = fields.filter(field => 
+    const validFields = results.fields.filter(field => 
       type.fields.some(f => f.name === field)
     );
     

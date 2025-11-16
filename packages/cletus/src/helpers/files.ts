@@ -498,7 +498,7 @@ async function processPdfFile(
     const embeddedChildren: ProcessResult['children'] = [];
 
     const canRenderPages = await hasPoppler();
-    const renderPages = canRenderPages && options.renderPages
+    const renderPages = canRenderPages && options.renderPages && options.transcriber;
 
     // Only extract text if we're NOT rendering pages (since we'll get markdown from rendered pages)
     if (!renderPages) {
@@ -542,6 +542,7 @@ async function processPdfFile(
           singleFile: false,
           resolutionXYAxis: 150,
           antialiasVectors: 'yes',
+          quiet: true,
         });
 
         // Find all generated PNG files

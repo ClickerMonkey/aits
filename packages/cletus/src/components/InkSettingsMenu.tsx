@@ -1066,7 +1066,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
               AWS Bedrock Configuration
             </Text>
           </Box>
-          <Box marginBottom={1}>
+          <Box marginBottom={1} flexDirection='column'>
             <Text dimColor>AWS Bedrock uses credentials from your environment or IAM roles.</Text>
             <Text dimColor>Set the following environment variables:</Text>
             <Text dimColor>  - AWS_REGION (e.g., us-east-1)</Text>
