@@ -20,6 +20,7 @@ import { COLORS } from './constants';
 import { fileIsDirectory } from './helpers/files';
 import { useAdaptiveDebounce, useSyncedState } from './hooks';
 import { set } from 'zod';
+import { getTotalTokens } from '@aits/core';
 
 
 interface ChatUIProps {
@@ -819,7 +820,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
           getUsage,
         },
         (event) => {
-          if (event.type !== 'elapsed' && event.type !== 'tokens' && event.type !== 'usage' && event.type !== 'pendingUpdate' && event.type !== 'status') {
+          if (event.type !== 'elapsed' && event.type !== 'usage' && event.type !== 'pendingUpdate' && event.type !== 'status') {
             logger.log(event);
           }
 
@@ -832,13 +833,10 @@ After installation and the SoX executable is in the path, restart Cletus and try
               updateMessage(event.message);
               break;
 
-            case 'tokens':
-              setTokenCountDebounced(event.output + event.reasoning + event.discarded);
-              break;
-
             case 'usage':
               setAccumulatedUsage(event.accumulated);
               setAccumulatedCost(event.accumulatedCost);
+              setTokenCountDebounced(getTotalTokens(event.current));
               break;
 
             case 'elapsed':

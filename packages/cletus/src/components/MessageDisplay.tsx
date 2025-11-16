@@ -96,7 +96,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
         </Box>
       )}
       {/* Display message cost and usage if available */}
-      {(message.cost !== undefined || message.usage) && (
+      {(showInput || showOutput) && (message.cost !== undefined || message.usage) && (
         <Box marginLeft={1} marginTop={0}>
           <Text dimColor>
             {message.cost !== undefined && message.cost > 0 && (

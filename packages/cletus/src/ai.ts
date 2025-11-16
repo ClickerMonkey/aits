@@ -149,8 +149,6 @@ export function createCletusAI(configFile: ConfigFile) {
         // Accumulate usage in context for tracking across requests
         accumulateUsage(ctx.usage.accumulated, usage);
         ctx.usage.accumulatedCost += cost;
-        
-        logger.log(`Cletus accumulated usage: ${JSON.stringify(ctx.usage.accumulated)}, total cost: ${ctx.usage.accumulatedCost}`);
       },
       onError: async (type, message, error, ctx, request) => {
         logger.log(`Cletus onError type=${type}, message=${message}, error=${error?.message}, stack=${error?.stack}:\n${JSON.stringify(request, jsonReplacer, 2)}`);
