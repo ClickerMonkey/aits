@@ -1,7 +1,7 @@
 {
   "name": "@aits/models",
   "version": "0.1.0",
-  "description": "Static model information scraped from OpenAI, OpenRouter, and Replicate",
+  "description": "Static model information scraped from OpenAI, OpenRouter, Replicate, and AWS Bedrock",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -12,9 +12,10 @@
     "scrape": "tsx scripts/scrape.ts",
     "scrape:openrouter": "tsx scripts/scrapers/openrouter.ts",
     "scrape:openai": "tsx scripts/scrapers/openai.ts",
-    "scrape:replicate": "tsx scripts/scrapers/replicate.ts"
+    "scrape:replicate": "tsx scripts/scrapers/replicate.ts",
+    "scrape:aws": "tsx scripts/scrapers/aws.ts"
   },
-  "keywords": ["ai", "models", "openai", "openrouter", "replicate"],
+  "keywords": ["ai", "models", "openai", "openrouter", "replicate", "aws", "bedrock"],
   "author": "ClickerMonkey",
   "license": "MIT",
   "repository": {
@@ -27,6 +28,7 @@
     "@aits/openrouter": "^0.1.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-bedrock": "^3.709.0",
     "@types/node": "^20.12.7",
     "puppeteer": "^23.11.1",
     "tsconfig-paths": "^4.2.0",

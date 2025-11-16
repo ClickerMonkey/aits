@@ -85,13 +85,15 @@ import type { ModelInfo } from '@aits/ai';
 import { openaiModels } from './openai';
 import { openrouterModels } from './openrouter';
 import { replicateModels } from './replicate';
+import { awsModels } from './aws';
 
-export { openaiModels, openrouterModels, replicateModels };
+export { openaiModels, openrouterModels, replicateModels, awsModels };
 
 export const models: ModelInfo[] = [
   ...openaiModels,
   ...openrouterModels,
   ...replicateModels,
+  ...awsModels,
 ];
 `;
 }
@@ -109,7 +111,7 @@ export function generateMainIndexTS(): string {
  * To regenerate, run: npm run scrape
  */
 
-export { models, openaiModels, openrouterModels, replicateModels } from './models';
+export { models, openaiModels, openrouterModels, replicateModels, awsModels } from './models';
 export { transformers } from './transformers';
 `;
 }
