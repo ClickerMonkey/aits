@@ -14,12 +14,12 @@ import { renderOperation } from "../helpers/render";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, processFile, searchFiles } from "../helpers/files";
 
 // Constants for file_attach operation
-const ALLOWED_FILE_TYPES = ['text', 'pdf'] as const;
-const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'] as const;
+const ALLOWED_FILE_TYPES = ['text', 'pdf'];
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
 
 function isAudioFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  return (AUDIO_EXTENSIONS as readonly string[]).includes(ext);
+  return AUDIO_EXTENSIONS.includes(ext);
 }
 
 export const file_search = operationOf<
@@ -1068,7 +1068,7 @@ export const file_attach = operationOf<
     const fileType = await categorizeFile(fullPath, filePath);
     const isAudio = isAudioFile(filePath);
 
-    if (!(ALLOWED_FILE_TYPES as readonly string[]).includes(fileType) && !isAudio) {
+    if (!ALLOWED_FILE_TYPES.includes(fileType) && !isAudio) {
       return {
         analysis: `This would fail - file type "${fileType}" is not allowed. Only text, audio, and PDF files can be attached.`,
         doable: false,
