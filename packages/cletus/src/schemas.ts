@@ -291,6 +291,8 @@ export const MessageSchema = z.object({
   content: z.array(MessageContentSchema),
   created: z.number(),
   tokens: z.number().optional(),
+  cost: z.number().optional(),
+  usage: z.any().optional(), // Usage type from @aits/core
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
 });

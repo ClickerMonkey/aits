@@ -1,4 +1,4 @@
-import { getTotalTokens, Usage } from '@aits/core';
+import { getTotalTokens, Usage, accumulateUsage } from '@aits/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -92,6 +92,8 @@ export async function runChatOrchestrator(
   let outputTokens = 0;
   let reasoningTokens = 0;
   let discardedTokens = 0;
+  let messageUsage: Usage = {};
+  let messageCost = 0;
 
   const setOutputTokens = (count: number) => {
     outputTokens = count;
@@ -191,6 +193,13 @@ export async function runChatOrchestrator(
       );
 
       logger.log('orchestrator: running chat agent');
+
+      // Capture starting usage and cost for this message
+      const startUsage = getUsage();
+      const startingUsage: Usage = JSON.parse(JSON.stringify(startUsage.accumulated));
+      const startingCost = startUsage.accumulatedCost;
+      messageUsage = {};
+      messageCost = 0;
 
       // Select random silly verb and emit status
       const randomVerb = sillyVerbs[Math.floor(Math.random() * sillyVerbs.length)];
@@ -326,12 +335,42 @@ export async function runChatOrchestrator(
           return v;
         }, 2)}`);
 
+        // Calculate message-specific usage and cost
+        const endUsage = getUsage();
+        messageUsage = {};
+        
+        // Calculate the difference in usage for this message
+        const endAccumulated = endUsage.accumulated;
+        
+        // Text usage
+        if (endAccumulated.text || startingUsage.text) {
+          messageUsage.text = {
+            input: (endAccumulated.text?.input || 0) - (startingUsage.text?.input || 0),
+            output: (endAccumulated.text?.output || 0) - (startingUsage.text?.output || 0),
+            cached: (endAccumulated.text?.cached || 0) - (startingUsage.text?.cached || 0),
+          };
+        }
+        
+        // Reasoning usage
+        if (endAccumulated.reasoning || startingUsage.reasoning) {
+          messageUsage.reasoning = {
+            input: (endAccumulated.reasoning?.input || 0) - (startingUsage.reasoning?.input || 0),
+            output: (endAccumulated.reasoning?.output || 0) - (startingUsage.reasoning?.output || 0),
+            cached: (endAccumulated.reasoning?.cached || 0) - (startingUsage.reasoning?.cached || 0),
+          };
+        }
+        
+        messageCost = endUsage.accumulatedCost - startingCost;
+        
+        // Add usage and cost to the pending message
+        pending.usage = messageUsage;
+        pending.cost = messageCost;
+
         // Emit completion event
         onEvent({ type: 'complete', message: pending });
         
         // Emit accumulated usage and cost
-        const usage = getUsage();
-        onEvent({ type: 'usage', accumulated: usage.accumulated, accumulatedCost: usage.accumulatedCost });
+        onEvent({ type: 'usage', accumulated: endUsage.accumulated, accumulatedCost: endUsage.accumulatedCost });
       }      
 
       // Check for abort
