@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import sharp from "sharp";
-import { abbreviate, chunkArray, cosineSimilarity, pluralize } from "../common";
+import { abbreviate, chunkArray, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
 import { getImagePath } from "../file-manager";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
@@ -450,40 +450,34 @@ Do not return any additional text other than the matching description subset.`;
 });
 
 export const image_attach = operationOf<
-  { imagePath: string },
+  { path: string },
   { attached: boolean }
 >({
   mode: 'create',
-  signature: 'image_attach(imagePath: string)',
-  status: (input) => `Attaching image: ${path.basename(input.imagePath)}`,
-  analyze: async (input, ctx) => {
-    const { imagePath } = input;
-
-    // Check if path is absolute
-    if (!path.isAbsolute(imagePath)) {
-      return {
-        analysis: `This would fail - image path must be absolute. Received: "${imagePath}"`,
-        doable: false,
-      };
-    }
+  signature: 'image_attach({ path })',
+  status: ({ path: imagePath }) => `Attaching image: ${path.basename(imagePath)}`,
+  analyze: async ({ path: imagePath }, { cwd }) => {
+    // Resolve path (supports both absolute and relative)
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
 
     // Check if file exists and is readable
-    const readable = await fileIsReadable(imagePath);
+    const readable = await fileIsReadable(fullPath);
     if (!readable) {
       return {
-        analysis: `This would fail - image file "${imagePath}" not found or not readable.`,
+        analysis: `This would fail - image file ${linkFile(imagePath)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will attach the image at "${imagePath}" to the chat as a user message.`,
+      analysis: `This will attach the image ${linkFile(imagePath)} to the chat as a user message.`,
       doable: true,
     };
   },
-  do: async (input, { chatMessage }) => {
-    const { imagePath } = input;
-    const imageLink = linkImage(imagePath);
+  do: async ({ path: imagePath }, { cwd, chatMessage }) => {
+    // Resolve path (supports both absolute and relative)
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
+    const imageLink = linkFile(fullPath);
 
     // Add image to the chat message
     if (chatMessage) {
@@ -494,10 +488,10 @@ export const image_attach = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageAttach("${path.basename(op.input.imagePath)}")`,
+    `ImageAttach("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output?.attached) {
-        return `Attached image: ${linkImage(op.input.imagePath)}`;
+        return `Attached image: ${linkFile(op.input.path)}`;
       }
       return null;
     }

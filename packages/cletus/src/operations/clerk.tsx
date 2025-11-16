@@ -11,16 +11,10 @@ import { KnowledgeEntry } from "../schemas";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
 import { renderOperation } from "../helpers/render";
-import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, processFile, searchFiles } from "../helpers/files";
+import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, isAudioFile, processFile, searchFiles } from "../helpers/files";
 
 // Constants for file_attach operation
 const ALLOWED_FILE_TYPES = ['text', 'pdf'];
-const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
-
-function isAudioFile(filePath: string): boolean {
-  const ext = path.extname(filePath).toLowerCase();
-  return AUDIO_EXTENSIONS.includes(ext);
-}
 
 export const file_search = operationOf<
   { glob: string; limit?: number, offset?: number },
@@ -1045,28 +1039,27 @@ export const dir_create = operationOf<
 });
 
 export const file_attach = operationOf<
-  { filePath: string },
+  { path: string },
   { attached: boolean }
 >({
   mode: 'create',
-  signature: 'file_attach(filePath: string)',
-  status: (input) => `Attaching file: ${path.basename(input.filePath)}`,
-  analyze: async (input, { cwd }) => {
-    const { filePath } = input;
+  signature: 'file_attach({ path })',
+  status: ({ path: filePath }) => `Attaching file: ${path.basename(filePath)}`,
+  analyze: async ({ path: filePath }, { cwd }) => {
     const fullPath = path.resolve(cwd, filePath);
 
     // Check if file exists and is readable
     const readable = await fileIsReadable(fullPath);
     if (!readable) {
       return {
-        analysis: `This would fail - file "${filePath}" not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(filePath)} not found or not readable.`,
         doable: false,
       };
     }
 
     // Check file type - only allow text, audio, or PDF
     const fileType = await categorizeFile(fullPath, filePath);
-    const isAudio = isAudioFile(filePath);
+    const isAudio = await isAudioFile(fullPath, filePath);
 
     if (!ALLOWED_FILE_TYPES.includes(fileType) && !isAudio) {
       return {
@@ -1076,17 +1069,16 @@ export const file_attach = operationOf<
     }
 
     return {
-      analysis: `This will attach the ${isAudio ? 'audio' : fileType} file at "${filePath}" to the chat as a user message.`,
+      analysis: `This will attach the ${isAudio ? 'audio' : fileType} file ${linkFile(filePath)} to the chat as a user message.`,
       doable: true,
     };
   },
-  do: async (input, { cwd, chatMessage }) => {
-    const { filePath } = input;
+  do: async ({ path: filePath }, { cwd, chatMessage }) => {
     const fullPath = path.resolve(cwd, filePath);
-    const fileLink = linkFile(fullPath, path.basename(filePath));
+    const fileLink = linkFile(fullPath);
 
     // Determine the content type
-    const isAudio = isAudioFile(filePath);
+    const isAudio = await isAudioFile(fullPath, filePath);
 
     // Add file to the chat message
     if (chatMessage) {
@@ -1101,10 +1093,10 @@ export const file_attach = operationOf<
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `FileAttach("${path.basename(op.input.filePath)}")`,
+    `FileAttach("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output?.attached) {
-        return `Attached file: ${path.basename(op.input.filePath)}`;
+        return `Attached file: ${linkFile(op.input.path)}`;
       }
       return null;
     }
