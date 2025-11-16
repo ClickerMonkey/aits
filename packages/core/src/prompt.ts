@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
 import z from 'zod';
 
-import { accumulateUsage, Fn, getChunksFromResponse, getModel, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateUsage, Fn, getChunksFromResponse, getInputTokens, getModel, getOutputTokens, getTotalTokens, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
 import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 
@@ -583,11 +583,7 @@ export class Prompt<
           usage = chunk.usage;
           if (!requestTokensSent) {
             // Calculate input tokens from usage structure
-            const inputTokens = (chunk.usage.text?.input || 0) + 
-                              (chunk.usage.audio?.input || 0) + 
-                              (chunk.usage.image?.input || 0) +
-                              (chunk.usage.reasoning?.input || 0) +
-                              (chunk.usage.embeddings?.tokens || 0);
+            const inputTokens = getInputTokens(chunk.usage);
             yield emit({ type: 'requestTokens', tokens: inputTokens, request });
             requestTokensSent = true;
           }
@@ -956,9 +952,7 @@ export class Prompt<
     yield emit({ type: 'textComplete', content: completeText, request });
 
     // Yield token usage if available
-    const outputTokens = (usage?.text?.output || 0) + 
-                        (usage?.audio?.output || 0) + 
-                        (usage?.reasoning?.output || 0);
+    const outputTokens = getOutputTokens(usage);
     if (outputTokens > 0) {
       yield emit({ type: 'responseTokens', tokens: outputTokens, request });
     }
@@ -1087,14 +1081,7 @@ export class Prompt<
   private forget(request: Request, ctx: Context<TContext, TMetadata>, usage?: Usage): Message[] {
     const model = getModel(request.model);
     // Calculate total tokens from usage structure
-    let totalTokens: number | undefined;
-    if (usage) {
-      totalTokens = (usage.text?.input || 0) + (usage.text?.output || 0) + (usage.text?.cached || 0) +
-                   (usage.audio?.input || 0) + (usage.audio?.output || 0) +
-                   (usage.image?.input || 0) +
-                   (usage.reasoning?.input || 0) + (usage.reasoning?.output || 0) + (usage.reasoning?.cached || 0) +
-                   (usage.embeddings?.tokens || 0);
-    }
+    const totalTokens = usage ? getTotalTokens(usage) : undefined;
     const contextWindow = model?.contextWindow ?? ctx.contextWindow ?? totalTokens;
 
     // We can't forget our past if we don't know the context window
@@ -1135,9 +1122,7 @@ export class Prompt<
       // Distribute tokens across messages in each chunk
       // If we have usage input tokens, we add them to the last chunk (usage.inputTokens - totalMessageTokens)
       if (usage) {
-        const usageInputTokens = (usage.text?.input || 0) + (usage.audio?.input || 0) + 
-                                (usage.image?.input || 0) + (usage.reasoning?.input || 0) + 
-                                (usage.embeddings?.tokens || 0);
+        const usageInputTokens = getInputTokens(usage);
         if (usageInputTokens > 0) {
           const overage = totalMessageTokens - usageInputTokens;
           if (overage > 0) {
@@ -1150,18 +1135,7 @@ export class Prompt<
       for (const msg of request.messages) {
         const msgUsage = ctx.estimateUsage(msg);
         // Calculate total tokens from structured usage
-        let totalTokens = 0;
-        if (msgUsage?.text?.input) totalTokens += msgUsage.text.input;
-        if (msgUsage?.text?.output) totalTokens += msgUsage.text.output;
-        if (msgUsage?.text?.cached) totalTokens += msgUsage.text.cached;
-        if (msgUsage?.audio?.input) totalTokens += msgUsage.audio.input;
-        if (msgUsage?.audio?.output) totalTokens += msgUsage.audio.output;
-        if (msgUsage?.image?.input) totalTokens += msgUsage.image.input;
-        if (msgUsage?.reasoning?.input) totalTokens += msgUsage.reasoning.input;
-        if (msgUsage?.reasoning?.output) totalTokens += msgUsage.reasoning.output;
-        if (msgUsage?.reasoning?.cached) totalTokens += msgUsage.reasoning.cached;
-        if (msgUsage?.embeddings?.tokens) totalTokens += msgUsage.embeddings.tokens;
-        msg.tokens = totalTokens;
+        msg.tokens = getTotalTokens(msgUsage);
       }
       messageTokens = request.messages.map(m => m.tokens!);
     } else if (usage?.text?.input) {

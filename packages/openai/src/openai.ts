@@ -188,8 +188,9 @@ function convertOpenAIUsage(openaiUsage: {
   const usage: Usage = {};
 
   // Text tokens (default category)
+  // Note: prompt_tokens already includes cached tokens, so we don't subtract them
+  // They're just reported separately in the details for pricing purposes
   const textInput = (openaiUsage.prompt_tokens || 0) - 
-                   (openaiUsage.prompt_tokens_details?.cached_tokens || 0) -
                    (openaiUsage.prompt_tokens_details?.audio_tokens || 0);
   const textOutput = (openaiUsage.completion_tokens || 0) - 
                     (openaiUsage.completion_tokens_details?.reasoning_tokens || 0) -
@@ -197,7 +198,9 @@ function convertOpenAIUsage(openaiUsage: {
   
   if (textInput > 0 || textOutput > 0 || openaiUsage.prompt_tokens_details?.cached_tokens) {
     usage.text = {};
-    if (textInput > 0) usage.text.input = textInput;
+    // Only include non-cached input tokens
+    const nonCachedInput = textInput - (openaiUsage.prompt_tokens_details?.cached_tokens || 0);
+    if (nonCachedInput > 0) usage.text.input = nonCachedInput;
     if (textOutput > 0) usage.text.output = textOutput;
     if (openaiUsage.prompt_tokens_details?.cached_tokens) {
       usage.text.cached = openaiUsage.prompt_tokens_details.cached_tokens;

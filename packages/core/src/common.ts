@@ -312,6 +312,57 @@ export function accumulateUsage(target: Usage, add?: Usage) {
 }
 
 /**
+ * Calculate total input tokens from a Usage object.
+ * Includes tokens from text, audio, image, reasoning input, and embeddings.
+ * 
+ * @param usage - The Usage object to calculate input tokens from
+ * @returns Total input tokens
+ */
+export function getInputTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.input || 0) + 
+         (usage.audio?.input || 0) + 
+         (usage.image?.input || 0) +
+         (usage.reasoning?.input || 0) +
+         (usage.embeddings?.tokens || 0);
+}
+
+/**
+ * Calculate total output tokens from a Usage object.
+ * Includes tokens from text, audio, and reasoning output.
+ * 
+ * @param usage - The Usage object to calculate output tokens from
+ * @returns Total output tokens
+ */
+export function getOutputTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.output || 0) + 
+         (usage.audio?.output || 0) + 
+         (usage.reasoning?.output || 0);
+}
+
+/**
+ * Calculate total tokens from a Usage object.
+ * Includes all tokens: input, output, cached from all modalities.
+ * 
+ * @param usage - The Usage object to calculate total tokens from
+ * @returns Total tokens
+ */
+export function getTotalTokens(usage?: Usage): number {
+  if (!usage) return 0;
+  return (usage.text?.input || 0) + 
+         (usage.text?.output || 0) + 
+         (usage.text?.cached || 0) +
+         (usage.audio?.input || 0) + 
+         (usage.audio?.output || 0) +
+         (usage.image?.input || 0) +
+         (usage.reasoning?.input || 0) + 
+         (usage.reasoning?.output || 0) + 
+         (usage.reasoning?.cached || 0) +
+         (usage.embeddings?.tokens || 0);
+}
+
+/**
  * Gets a Model object from either a string ID or a ModelInput object.
  * 
  * @param input - The model identifier or ModelInput object.

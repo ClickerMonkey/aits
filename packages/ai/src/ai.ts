@@ -586,8 +586,12 @@ export class AI<T extends AIBaseTypes> {
       if (usage.text.output && pricing.text.output) {
         cost += (usage.text.output * pricing.text.output) / 1_000_000;
       }
-      if (usage.text.cached && pricing.text.cached) {
-        cost += (usage.text.cached * pricing.text.cached) / 1_000_000;
+      if (usage.text.cached) {
+        // Use cached pricing if available, otherwise fall back to input pricing
+        const cachedPrice = pricing.text.cached ?? pricing.text.input;
+        if (cachedPrice) {
+          cost += (usage.text.cached * cachedPrice) / 1_000_000;
+        }
       }
     }
 
@@ -637,8 +641,12 @@ export class AI<T extends AIBaseTypes> {
       if (usage.reasoning.output && pricing.reasoning.output) {
         cost += (usage.reasoning.output * pricing.reasoning.output) / 1_000_000;
       }
-      if (usage.reasoning.cached && pricing.reasoning.cached) {
-        cost += (usage.reasoning.cached * pricing.reasoning.cached) / 1_000_000;
+      if (usage.reasoning.cached) {
+        // Use cached pricing if available, otherwise fall back to input pricing
+        const cachedPrice = pricing.reasoning.cached ?? pricing.reasoning.input;
+        if (cachedPrice) {
+          cost += (usage.reasoning.cached * cachedPrice) / 1_000_000;
+        }
       }
     }
 

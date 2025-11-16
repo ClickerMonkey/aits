@@ -319,8 +319,19 @@ export async function runChatOrchestrator(
 
             case 'usage':
               discardedTokens = 0;
-              setReasoningTokens(chunk.usage.reasoningTokens || 0);
-              setOutputTokens(chunk.usage.totalTokens || 0);
+              setReasoningTokens((chunk.usage.reasoning?.output || 0) + (chunk.usage.reasoning?.input || 0));
+              setOutputTokens(
+                (chunk.usage.text?.input || 0) + 
+                (chunk.usage.text?.output || 0) + 
+                (chunk.usage.text?.cached || 0) +
+                (chunk.usage.audio?.input || 0) + 
+                (chunk.usage.audio?.output || 0) +
+                (chunk.usage.image?.input || 0) +
+                (chunk.usage.reasoning?.input || 0) + 
+                (chunk.usage.reasoning?.output || 0) + 
+                (chunk.usage.reasoning?.cached || 0) +
+                (chunk.usage.embeddings?.tokens || 0)
+              );
               break;
           }
         }
