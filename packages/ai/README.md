@@ -57,7 +57,7 @@ const relevantInfo = ai.tool({
   schema: z.object({
     query: z.string(),
   }),
-  call: async ({ query }) => {
+  call: async ({ query }, refs, ctx) => {
     return await DB.getRelevantInfo(query, 10);
   }
 });
