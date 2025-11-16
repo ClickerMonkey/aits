@@ -59,6 +59,7 @@ If the knowledgeTemplate is updated and there are records for this type the data
               required: z.boolean().optional(),
               default: z.union([z.string(), z.number(), z.boolean()]).optional(),
               enumOptions: z.array(z.string()).optional(),
+              onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields'),
             })
           ])
         ).optional().describe('Field updates: set to null to delete, object to add/update'),
@@ -87,10 +88,26 @@ Example: Create a project tracking type:
           default: z.union([z.string(), z.number(), z.boolean()]).optional().describe('Default value'),
           required: z.boolean().optional().describe('Is field required?'),
           enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
+          onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields: restrict (default, prevent deletion), cascade (delete referencing records), setNull (set field to null)'),
         })
       ).describe('Field definitions'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_create', input }, ctx),
+  });
+
+  const typeDelete = ai.tool({
+    name: 'type_delete',
+    description: 'Delete a type definition',
+    instructions: `Use this to remove a type definition. This will fail if:
+- The type is referenced by other types (to prevent breaking references)
+- There are existing data records of this type (data must be deleted first)
+
+Example: Delete a type:
+{ "name": "task" }`,
+    schema: z.object({
+      name: z.string().describe('Type name to delete'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_delete', input }, ctx),
   });
 
   const typeImport = ai.tool({
@@ -130,11 +147,13 @@ Example 3: Limit discovery to top types:
     typeInfo,
     typeUpdate,
     typeCreate,
+    typeDelete,
     typeImport,
   ] as [
     typeof typeInfo,
     typeof typeUpdate,
     typeof typeCreate,
+    typeof typeDelete,
     typeof typeImport,
   ];
 }

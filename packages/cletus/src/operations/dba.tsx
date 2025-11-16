@@ -27,6 +27,116 @@ function getType(config: ConfigFile, typeName: string): TypeDefinition {
   return type;
 }
 
+/**
+ * Check if a field type is a reference to another type
+ */
+function isReferenceType(fieldType: string, config: ConfigFile): boolean {
+  const primitiveTypes = ['string', 'number', 'boolean', 'date', 'enum'];
+  if (primitiveTypes.includes(fieldType)) {
+    return false;
+  }
+  // Check if it's an existing type
+  return config.getData().types.some(t => t.name === fieldType);
+}
+
+/**
+ * Join related records for reference fields
+ */
+async function joinRelatedRecords(
+  records: any[],
+  type: TypeDefinition,
+  config: ConfigFile,
+  depth: number = 0,
+  maxDepth: number = 3
+): Promise<any[]> {
+  // Prevent infinite recursion
+  if (depth >= maxDepth) {
+    return records;
+  }
+
+  // Find all reference fields
+  const referenceFields = type.fields.filter(f => isReferenceType(f.type, config));
+  
+  if (referenceFields.length === 0) {
+    return records;
+  }
+
+  // Process each record
+  const joinedRecords = await Promise.all(records.map(async (record) => {
+    const joinedRecord = { ...record, fields: { ...record.fields } };
+
+    // Process each reference field
+    for (const field of referenceFields) {
+      const refId = record.fields[field.name];
+      
+      // Skip if field is null/undefined
+      if (refId === null || refId === undefined || refId === '') {
+        continue;
+      }
+
+      try {
+        // Load the referenced type's data
+        const refType = getType(config, field.type);
+        const refDataManager = new DataManager(field.type);
+        await refDataManager.load();
+        
+        const refRecord = refDataManager.getById(refId as string);
+        
+        if (refRecord) {
+          // Recursively join nested references
+          const [joinedRefRecord] = await joinRelatedRecords([refRecord], refType, config, depth + 1, maxDepth);
+          joinedRecord.fields[field.name] = joinedRefRecord;
+        }
+      } catch (error) {
+        // If we can't load the reference, keep the original ID
+        // This could happen if the referenced type no longer exists
+      }
+    }
+
+    return joinedRecord;
+  }));
+
+  return joinedRecords;
+}
+
+/**
+ * Find all records that reference a specific record
+ */
+async function findReferencingRecords(
+  targetTypeName: string,
+  targetRecordId: string,
+  config: ConfigFile
+): Promise<Array<{ typeName: string; records: any[]; field: TypeField }>> {
+  const allTypes = config.getData().types;
+  const referencingData: Array<{ typeName: string; records: any[]; field: TypeField }> = [];
+
+  // Check each type for fields that reference the target type
+  for (const type of allTypes) {
+    const referenceFields = type.fields.filter(f => f.type === targetTypeName);
+    
+    for (const field of referenceFields) {
+      // Load this type's data
+      const dataManager = new DataManager(type.name);
+      await dataManager.load();
+      
+      // Find records where this field equals the target record ID
+      const matchingRecords = dataManager.getAll().filter(r => 
+        r.fields[field.name] === targetRecordId
+      );
+      
+      if (matchingRecords.length > 0) {
+        referencingData.push({
+          typeName: type.name,
+          records: matchingRecords,
+          field: field,
+        });
+      }
+    }
+  }
+
+  return referencingData;
+}
+
 
 export const data_create = operationOf<
   { name: string; fields: Record<string, any> },
@@ -141,7 +251,7 @@ export const data_update = operationOf<
 
 export const data_delete = operationOf<
   { name: string; id: string },
-  { deleted: boolean, libraryKnowledgeUpdated: boolean }
+  { deleted: boolean, libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number }
 >({
   mode: 'delete',
   signature: 'data_delete(id: string)',
@@ -159,26 +269,123 @@ export const data_delete = operationOf<
       };
     }
 
+    // Check for referencing records
+    const referencingData = await findReferencingRecords(name, id, config);
+    
+    if (referencingData.length > 0) {
+      const restrictions: string[] = [];
+      const cascades: string[] = [];
+      const setNulls: string[] = [];
+      
+      for (const { typeName, records, field } of referencingData) {
+        const refType = getType(config, typeName);
+        const onDelete = field.onDelete || 'restrict';
+        const count = records.length;
+        
+        if (onDelete === 'restrict') {
+          restrictions.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        } else if (onDelete === 'cascade') {
+          cascades.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        } else if (onDelete === 'setNull') {
+          setNulls.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+        }
+      }
+      
+      if (restrictions.length > 0) {
+        return {
+          analysis: `This would fail - ${type.friendlyName} record "${id}" is referenced by: ${restrictions.join(', ')}. These fields have onDelete=restrict.`,
+          doable: false,
+        };
+      }
+      
+      let analysis = `This will delete ${type.friendlyName} record "${id}".`;
+      if (cascades.length > 0) {
+        analysis += ` Will cascade delete: ${cascades.join(', ')}.`;
+      }
+      if (setNulls.length > 0) {
+        analysis += ` Will set null in: ${setNulls.join(', ')}.`;
+      }
+      
+      return { analysis, doable: true };
+    }
+
     return {
       analysis: `This will delete ${type.friendlyName} record "${id}".`,
       doable: true,
     };
   },
   do: async ({ name, id }, ctx) => {
+    const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
+    
+    // Check for referencing records and handle cascade delete
+    const referencingData = await findReferencingRecords(name, id, config);
+    
+    let cascadedDeletes = 0;
+    let setNullUpdates = 0;
+    const deletedIds: string[] = [];
+    const updatedIds: string[] = [];
+    
+    for (const { typeName, records, field } of referencingData) {
+      const onDelete = field.onDelete || 'restrict';
+      
+      if (onDelete === 'restrict') {
+        const refType = getType(config, typeName);
+        throw new Error(`Cannot delete record - ${refType.friendlyName} has ${records.length} referencing record(s) with onDelete=restrict`);
+      } else if (onDelete === 'cascade') {
+        // Delete all referencing records
+        const refDataManager = new DataManager(typeName);
+        await refDataManager.load();
+        
+        for (const refRecord of records) {
+          await refDataManager.delete(refRecord.id);
+          deletedIds.push(`${typeName}:${refRecord.id}`);
+          cascadedDeletes++;
+        }
+      } else if (onDelete === 'setNull') {
+        // Set the reference field to null
+        const refDataManager = new DataManager(typeName);
+        await refDataManager.load();
+        
+        for (const refRecord of records) {
+          await refDataManager.update(refRecord.id, { [field.name]: null });
+          updatedIds.push(`${typeName}:${refRecord.id}`);
+          setNullUpdates++;
+        }
+      }
+    }
+    
+    // Delete the target record
     await dataManager.delete(id);
 
-    // Update knowledge base
+    // Update knowledge base for the deleted record
     let libraryKnowledgeUpdated = true;
     try {
-      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [], [id]); 
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, [], [id]);
+      
+      // Update knowledge for cascaded deletes
+      for (const deletedId of deletedIds) {
+        const [typeName, recordId] = deletedId.split(':');
+        await updateKnowledge(ctx, typeName, [], [recordId]);
+      }
+      
+      // Update knowledge for setNull updates
+      for (const updatedId of updatedIds) {
+        const [typeName, recordId] = updatedId.split(':');
+        await updateKnowledge(ctx, typeName, [recordId], []);
+      }
     } catch (e) {
       ctx.log(`Warning: failed to update knowledge base after deleting record: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
     }
 
-    return { deleted: true, libraryKnowledgeUpdated };
+    return { 
+      deleted: true, 
+      libraryKnowledgeUpdated,
+      cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
+      setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+    };
   },
   render: (op, config, showInput, showOutput) => {
     const type = getType(config, op.input.name);
@@ -188,7 +395,14 @@ export const data_delete = operationOf<
       `${formatName(type.friendlyName)}Delete("${op.input.id.slice(0, 8)}")`,
       (op) => {
         if (op.output?.deleted) {
-          return `Deleted record ID: ${op.input.id}`;
+          let msg = `Deleted record ID: ${op.input.id}`;
+          if (op.output.cascadedDeletes) {
+            msg += `, cascaded ${op.output.cascadedDeletes} record(s)`;
+          }
+          if (op.output.setNullUpdates) {
+            msg += `, set null in ${op.output.setNullUpdates} record(s)`;
+          }
+          return msg;
         }
         return null;
       },
@@ -222,7 +436,7 @@ export const data_select = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, offset, limit, orderBy }) => {
+  do: async ({ name, where, offset, limit, orderBy }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -249,10 +463,17 @@ export const data_select = operationOf<
 
     const recordOffset = offset || 0;
     const recordLimit = limit || (results.length - recordOffset);
+    
+    // Slice before joining to avoid loading unnecessary records
+    const slicedResults = results.slice(recordOffset, recordOffset + recordLimit);
+
+    // Join related records for reference fields
+    const type = getType(ctx.config, name);
+    const joinedResults = await joinRelatedRecords(slicedResults, type, ctx.config);
 
     return {
       count: results.length,
-      results: results.slice(recordOffset, recordOffset + recordLimit),
+      results: joinedResults,
     };
   },
   render: (op, config, showInput, showOutput) => {

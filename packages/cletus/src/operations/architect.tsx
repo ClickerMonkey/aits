@@ -332,6 +332,77 @@ export interface DiscoveredType {
   instanceCount: number;
 }
 
+export const type_delete = operationOf<
+  { name: string },
+  { name: string; deleted: boolean }
+>({
+  mode: 'delete',
+  signature: 'type_delete(name: string)',
+  status: (input) => `Deleting type: ${input.name}`,
+  analyze: async (input, { config }) => {
+    const types = config.getData().types;
+    const type = types.find((t) => t.name === input.name);
+    
+    if (!type) {
+      return {
+        analysis: `This would fail - type not found: ${input.name}`,
+        doable: false,
+      };
+    }
+
+    // Check if any other types reference this type
+    const referencingTypes = types.filter(t => 
+      t.fields.some(f => f.type === input.name)
+    );
+
+    if (referencingTypes.length > 0) {
+      const typeList = referencingTypes.map(t => t.friendlyName).join(', ');
+      return {
+        analysis: `This would fail - type "${type.friendlyName}" is referenced by: ${typeList}. Delete these references first.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will delete type "${type.friendlyName}".`,
+      doable: true,
+    };
+  },
+  do: async (input, { config }) => {
+    const types = config.getData().types;
+    const type = types.find((t) => t.name === input.name);
+    
+    if (!type) {
+      throw new Error(`Type not found: ${input.name}`);
+    }
+
+    // Check if any other types reference this type
+    const referencingTypes = types.filter(t => 
+      t.fields.some(f => f.type === input.name)
+    );
+
+    if (referencingTypes.length > 0) {
+      const typeList = referencingTypes.map(t => t.friendlyName).join(', ');
+      throw new Error(`Cannot delete type "${type.friendlyName}" - it is referenced by: ${typeList}`);
+    }
+
+    await config.save((data) => {
+      const index = data.types.findIndex((t) => t.name === input.name);
+      if (index !== -1) {
+        data.types.splice(index, 1);
+      }
+    });
+
+    return { name: input.name, deleted: true };
+  },
+  render: (op, config, showInput, showOutput) => renderOperation(
+    op,
+    `${formatName(op.input.name)}Delete()`,
+    (op) => op.output?.deleted ? `Deleted type: ${op.input.name}` : null,
+    showInput, showOutput
+  ),
+});
+
 export const type_import = operationOf<
   { glob: string; hints?: string[]; max?: number },
   { discovered: DiscoveredType[]; existingTypeUpdates: Map<string, TypeField[]>; filesProcessed: number }
@@ -411,6 +482,7 @@ export const type_import = operationOf<
         type: z.enum(['string', 'number', 'boolean', 'date', 'enum', ...allTypeNames] as [string, ...string[]]).describe('Field type'),
         required: z.boolean().optional().describe('Is field required?'),
         enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
+        onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields'),
       });
     };
     
@@ -551,17 +623,16 @@ When managing types:
           description: 'Add, update, or remove fields on an existing or discovered type. For existing types, only new fields can be added.',
           schema: () => z.object({
             typeName: getAllTypeEnum().describe('Type name'),
-              fields: z.array(
-                z.union([
-                  createFieldSchema(),
-                  z.object({
-                    name: z.string().describe('Field name to remove'),
-                    remove: z.literal(true).describe('Set to true to remove this field'),
-                  })
-                ])
-              ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
-            });
-          },
+            fields: z.array(
+              z.union([
+                createFieldSchema(),
+                z.object({
+                  name: z.string().describe('Field name to remove'),
+                  remove: z.literal(true).describe('Set to true to remove this field'),
+                })
+              ])
+            ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
+          }),
           call: async (input) => {
             // Check if it's a discovered type
             const discoveredType = discoveredTypes.get(input.typeName);
