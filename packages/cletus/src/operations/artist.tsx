@@ -1,14 +1,13 @@
 import { ImageGenerationResponse, ScoredModel } from "@aits/ai";
 import fs from 'fs/promises';
-import { glob } from 'glob';
 import path from 'path';
 import sharp from "sharp";
 import { abbreviate, chunkArray, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
-import { getImagePath } from "../file-manager";
-import { operationOf } from "./types";
 import { CONSTS } from "../constants";
-import { renderOperation } from "../helpers/render";
+import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
+import { renderOperation } from "../helpers/render";
+import { operationOf } from "./types";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
@@ -76,7 +75,7 @@ async function saveGeneratedImage(response: ImageGenerationResponse) {
 
 export const image_generate = operationOf<
   { prompt: string; n?: number },
-  { count: number; images: string[] }
+  { count: number; images: string[], links: string[] }
 >({
   mode: 'create',
   signature: 'image_generate(prompt: string, n?: number)',
@@ -99,18 +98,12 @@ export const image_generate = operationOf<
 
     // Save images to files and collect file URLs
     const imagePaths = await saveGeneratedImage(response);
-    const imageUrls = imagePaths.map(linkImage);
-
-    if (chatMessage) {
-      // Add image URLs to chat message
-      for (const imageUrl of imageUrls) {
-        chatMessage.content.push({ type: 'image', content: imageUrl });
-      }
-    }
+    const imageLinks = imagePaths.map(linkImage);
 
     return {
       count: imagePaths.length,
       images: imagePaths,
+      links: imageLinks,
     };
   },
   render: (op, config, showInput, showOutput) => renderOperation(
@@ -122,34 +115,35 @@ export const image_generate = operationOf<
         return `Generated ${count} image${count !== 1 ? 's' : ''}: "${abbreviate(op.input.prompt, 40)}"\n\t${op.output.images.map(linkImage).join(' - ')}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const image_edit = operationOf<
-  { prompt: string; imagePath: string },
-  { editedPath: string }
+  { prompt: string; path: string },
+  { editedLink: string }
 >({
   mode: 'update',
-  signature: 'image_edit(imagePath: string, prompt: string)',
-  status: (input) => `Editing image: ${path.basename(input.imagePath)}`,
+  signature: 'image_edit(path: string, prompt: string)',
+  status: (input) => `Editing image: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
-    const fullImagePath = resolveImage(cwd, input.imagePath);
+    const fullImagePath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullImagePath)) {
       return {
-        analysis: `This would fail - image "${input.imagePath}" not found or not readable.`,
+        analysis: `This would fail - image "${input.path}" not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will edit image "${input.imagePath}" with prompt: "${input.prompt}"`,
+      analysis: `This will edit image "${input.path}" with prompt: "${input.prompt}"`,
       doable: true,
     };
   },
   do: async (input, { ai, cwd, config, chatMessage }) => {
-    const image = await loadImageAsDataUrl(cwd, input.imagePath);
+    const image = await loadImageAsDataUrl(cwd, input.path);
 
     // Edit image
     const response = await ai.image.edit.get({
@@ -161,45 +155,36 @@ export const image_edit = operationOf<
     const edited = await saveGeneratedImage(response);
     const imageUrls = edited.map(linkImage);
 
-    if (chatMessage) {
-      // Add image URLs to chat message
-      for (const imageUrl of imageUrls) {
-        chatMessage.content.push({ type: 'image', content: imageUrl });
-      }
-    }
-
     return {
-      prompt: input.prompt,
-      originalPath: input.imagePath,
-      editedPath: imageUrls[0],
+      editedLink: imageUrls[0],
     };
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageEdit("${path.basename(op.input.imagePath)}", "${abbreviate(op.input.prompt, 20)}")`,
+    `ImageEdit("${path.basename(op.input.path)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        const fileLink = linkImage(op.output.editedPath);
-        return `Edited image saved to ${fileLink}`;
+        return `Edited image saved to ${op.output.editedLink}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const image_analyze = operationOf<
-  { prompt: string; imagePaths: string[]; maxCharacters?: number },
-  { analysis: string, imageLinks: string[] }
+  { prompt: string; paths: string[]; maxCharacters?: number },
+  { analysis: string, links: string[] }
 >({
   mode: 'read',
   signature: 'image_analyze(imagePaths: string[], prompt: string, maxCharacters?: number)',
-  status: (input) => `Analyzing ${input.imagePaths.length} image(s)`,
+  status: (input) => `Analyzing ${input.paths.length} image(s)`,
   analyze: async (input, { cwd }) => {
     const maxChars = input.maxCharacters || 2084;
-    const imageCount = input.imagePaths.length;
+    const imageCount = input.paths.length;
 
     // Check if all images exist
-    const imageChecks = await Promise.all(input.imagePaths.map(async (imagePath) => {
+    const imageChecks = await Promise.all(input.paths.map(async (imagePath) => {
       return await fileIsReadable(resolveImage(cwd, imagePath));
     }));
 
@@ -218,7 +203,7 @@ export const image_analyze = operationOf<
     };
   },
   do: async (input, { ai, cwd, config }) => {
-    const imageUrls = await Promise.all(input.imagePaths.map(async (imagePath) => {
+    const imageUrls = await Promise.all(input.paths.map(async (imagePath) => {
       return loadImageAsDataUrl(cwd, imagePath);
     }));
 
@@ -232,45 +217,46 @@ export const image_analyze = operationOf<
 
     return {
       analysis: response.content,
-      imageLinks: input.imagePaths.map(linkImage),
+      links: input.paths.map(linkImage),
     };
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageAnalyze(${pluralize(op.input.imagePaths.length, 'image')}, "${abbreviate(op.input.prompt, 20)}")`,
+    `ImageAnalyze(${pluralize(op.input.paths.length, paginateText(op.input.paths[0], 100, -100), 'images')}, "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
         return abbreviate(op.output.analysis, 60);
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const image_describe = operationOf<
-  { imagePath: string },
-  { imageLink: string; description: string }
+  { path: string },
+  { link: string; description: string }
 >({
   mode: 'read',
-  signature: 'image_describe(imagePath: string)',
-  status: (input) => `Describing image: ${path.basename(input.imagePath)}`,
+  signature: 'image_describe(path: string)',
+  status: (input) => `Describing image: ${path.basename(input.path)}`,
   analyze: async (input, { cwd }) => {
-    const fullPath = resolveImage(cwd, input.imagePath);
+    const fullPath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullPath)) {
       return {
-        analysis: `This would fail - image "${input.imagePath}" not found or not readable.`,
+        analysis: `This would fail - image "${input.path}" not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will describe the image at "${input.imagePath}"`,
+      analysis: `This will describe the image at "${input.path}"`,
       doable: true,
     };
   },
   do: async (input, { ai, cwd, config }) => {
-    const image = await loadImageAsDataUrl(cwd, input.imagePath);
+    const image = await loadImageAsDataUrl(cwd, input.path);
 
     // Describe image
     const response = await ai.image.analyze.get({
@@ -280,20 +266,21 @@ export const image_describe = operationOf<
     });
 
     return {
-      imageLink: linkImage(input.imagePath),
+      link: linkImage(input.path),
       description: response.content,
     };
   },
   render: (op, config, showInput, showOutput) => renderOperation(
     op,
-    `ImageDescribe("${path.basename(op.input.imagePath)}")`,
+    `ImageDescribe("${path.basename(op.input.path)}")`,
     (op) => {
       if (op.output) {
         return abbreviate(op.output.description, 60);
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const image_find = operationOf<
@@ -445,7 +432,8 @@ Do not return any additional text other than the matching description subset.`;
         return `Found ${resultCount} matching image${resultCount !== 1 ? 's' : ''} (searched ${searched})`;
       }
       return null;
-    }
+    },
+    showInput, showOutput
   ),
 });
 
@@ -494,7 +482,8 @@ export const image_attach = operationOf<
         return `Attached image: ${linkFile(op.input.path)}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 

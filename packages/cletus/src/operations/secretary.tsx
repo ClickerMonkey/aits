@@ -40,11 +40,12 @@ export const assistant_switch = operationOf<
     `AssistantSwitch("${op.input.name}")`,
     (op) => {
       if (op.output) {
-        return `Switched to assistant: ${op.output.assistant}`;
+        return `Switched to assistant: ${op.input.name}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const assistant_update = operationOf<
@@ -90,11 +91,12 @@ export const assistant_update = operationOf<
     `AssistantUpdate("${op.input.name}")`,
     (op) => {
       if (op.output) {
-        return `Updated assistant: ${op.output.name}`;
+        return `Updated assistant: ${op.input.name}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const assistant_add = operationOf<
@@ -136,11 +138,12 @@ export const assistant_add = operationOf<
     `AssistantAdd("${op.input.name}")`,
     (op) => {
       if (op.output) {
-        return `Created assistant: ${op.output.name}`;
+        return `Created assistant: ${op.input.name}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const memory_list = operationOf<
@@ -173,8 +176,9 @@ export const memory_list = operationOf<
         return `${count} memor${count !== 1 ? 'ies' : 'y'}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const memory_update = operationOf<
@@ -199,9 +203,10 @@ export const memory_update = operationOf<
     `MemoryUpdate("${abbreviate(op.input.content, 30)}")`,
     (op) => {
       if (op.output) {
-        return `Added: "${abbreviate(op.output.content, 50)}"`;
+        return `Added: "${abbreviate(op.input.content, 50)}"`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });

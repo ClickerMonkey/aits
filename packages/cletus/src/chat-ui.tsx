@@ -10,17 +10,16 @@ import { ModelSelector } from './components/ModelSelector';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
 import { ConfigFile } from './config';
 import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
+import { getTotalTokens } from '@aits/core';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent';
 import { runChatOrchestrator } from './agents/chat-orchestrator';
-import { logger } from './logger';
 import { COLORS } from './constants';
 import { fileIsDirectory } from './helpers/files';
 import { useAdaptiveDebounce, useSyncedState } from './hooks';
-import { set } from 'zod';
-import { getTotalTokens } from '@aits/core';
+import { logger } from './logger';
 
 
 interface ChatUIProps {
@@ -179,7 +178,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
   // Convenience function to add system message
   const addSystemMessage = (content: string) => {
-    addMessage({ role: 'system', content: [{ type: 'text', content }], created: Date.now() });
+    addMessage({ role: 'system', content: [{ type: 'text', content }], created: performance.now() });
   };
 
   // Load messages from file on mount
@@ -923,7 +922,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       role: 'user',
       name: config.getData().user.name,
       content: [{ type: 'text', content: inputValue }],
-      created: Date.now(),
+      created: performance.now(),
     });
 
     // Reset history navigation
@@ -1010,11 +1009,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
           <>
             <Static key={renderKey} items={visibleMessages}>
               {(msg: Message) => (
-                <MessageDisplay key={msg.created} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
+                <MessageDisplay key={`${renderKey}-${msg.created}`} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay key={lastMessage.created} message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
+              <MessageDisplay key={`${renderKey}-${lastMessage.created}`} message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
             )}
             {showPendingMessage && (
               <MessageDisplay message={pendingMessage} config={config} showInput={showInput} showOutput={showOutput} />

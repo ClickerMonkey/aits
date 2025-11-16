@@ -33,7 +33,7 @@ export class ChatFile extends JsonFile<ChatMessages> {
     await this.save((chat) => {
       chat.messages.push({
         ...message,
-        created: Date.now(),
+        created: performance.now(),
       });
     });
   }

@@ -136,8 +136,8 @@ export async function runChatOrchestrator(
       const pending: Message = {
         role: 'assistant',
         name: chatMeta.assistant,
-        content: [{ type: 'text', content: '' }],
-        created: Date.now(),
+        content: [],
+        created: performance.now(),
         operations: [],
       };
 

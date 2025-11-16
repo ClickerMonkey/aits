@@ -51,9 +51,9 @@ export function getElapsedTime(op: Operation): string {
 /**
  * Get summary text for an operation
  */
-export function getSummary(
-  op: Operation,
-  getSummaryText?: (op: Operation) => string | null
+export function getSummary<TOperation extends Operation>(
+  op: TOperation,
+  getSummaryText?: (op: TOperation) => string | null
 ): string {
   if (op.error) {
     return op.error;
@@ -84,10 +84,10 @@ export function getSummary(
  * @param showInput - Whether to show detailed input
  * @param showOutput - Whether to show detailed output
  */
-export function renderOperation(
-  op: Operation,
+export function renderOperation<TOperation extends Operation>(
+  op: TOperation,
   operationLabel: string,
-  getSummaryText?: (op: Operation) => string | null,
+  getSummaryText?: (op: TOperation) => string | null,
   showInput?: boolean,
   showOutput?: boolean
 ): React.ReactNode {
@@ -123,13 +123,13 @@ export function renderOperation(
         </>
       )}
       
-      {showOutput && op.output && (
+      {showOutput && (op.analysis || op.output) && (
         <>
           <Box marginLeft={2} marginTop={1}>
-            <Text bold dimColor>Output:</Text>
+            <Text bold dimColor>{op.output ? 'Output' : 'Analysis'}:</Text>
           </Box>
           <Box marginLeft={4} flexDirection="column">
-            {formatValue(op.output)}
+            {formatValue(op.output || op.analysis)}
           </Box>
         </>
       )}
