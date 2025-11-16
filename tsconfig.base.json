@@ -25,6 +25,7 @@
       "@aits/openai": ["./packages/openai/src/index.ts"],
       "@aits/openrouter": ["./packages/openrouter/src/index.ts"],
       "@aits/replicate": ["./packages/replicate/src/index.ts"],
+      "@aits/aws": ["./packages/aws/src/index.ts"],
       "@aits/models": ["./packages/models/src/index.ts"]
     }
   }
