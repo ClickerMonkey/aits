@@ -330,6 +330,7 @@ export function getInputTokens(usage?: Usage): number {
 /**
  * Calculate total output tokens from a Usage object.
  * Includes tokens from text, audio, and reasoning output.
+ * Note: image.output represents generated images (not tokens), so it's excluded.
  * 
  * @param usage - The Usage object to calculate output tokens from
  * @returns Total output tokens
@@ -344,6 +345,7 @@ export function getOutputTokens(usage?: Usage): number {
 /**
  * Calculate total tokens from a Usage object.
  * Includes all tokens: input, output, cached from all modalities.
+ * Note: image.output represents generated images (not tokens), so it's excluded.
  * 
  * @param usage - The Usage object to calculate total tokens from
  * @returns Total tokens
