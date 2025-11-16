@@ -1,5 +1,5 @@
 /**
- * Tests for toolsDynamic functionality in Prompt
+ * Tests for dynamic functionality in Prompt
  */
 
 import { z } from 'zod';
@@ -8,8 +8,8 @@ import { Tool } from '../tool';
 import { Context } from '../types';
 import { createMockExecutor } from './mocks/executor.mock';
 
-describe('Prompt toolsDynamic', () => {
-  it('should re-evaluate tools on each iteration when toolsDynamic is true', async () => {
+describe('Prompt dynamic', () => {
+  it('should re-resolve prompt at end of each iteration when dynamic is true', async () => {
     let callCount = 0;
     let toolApplicableCalls = 0;
 
@@ -21,8 +21,8 @@ describe('Prompt toolsDynamic', () => {
       call: (args) => `Called with: ${args.value}`,
       applicable: async () => {
         toolApplicableCalls++;
-        // Only applicable on first two checks (initial + first iteration)
-        return toolApplicableCalls <= 2;
+        // Only applicable on first check (initial resolve)
+        return toolApplicableCalls === 1;
       }
     });
 
@@ -40,7 +40,7 @@ describe('Prompt toolsDynamic', () => {
       description: 'Test dynamic tools',
       content: 'Test',
       tools: [conditionalTool, alwaysAvailableTool],
-      toolsDynamic: true
+      dynamic: true
     });
 
     const executor = jest.fn(async (request) => {
@@ -87,11 +87,11 @@ describe('Prompt toolsDynamic', () => {
     const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Done');
     expect(callCount).toBe(2);
-    // Should be called at least 3 times (initial + 2 iterations)
-    expect(toolApplicableCalls).toBeGreaterThanOrEqual(3);
+    // Should be called at least 2 times (initial + dynamic resolve at end of iteration 1)
+    expect(toolApplicableCalls).toBeGreaterThanOrEqual(2);
   });
 
-  it('should not re-evaluate tools when toolsDynamic is false', async () => {
+  it('should not re-resolve when dynamic is false', async () => {
     let callCount = 0;
     let toolApplicableCalls = 0;
 
@@ -112,7 +112,7 @@ describe('Prompt toolsDynamic', () => {
       description: 'Test static tools',
       content: 'Test',
       tools: [conditionalTool],
-      toolsDynamic: false // Explicitly false
+      dynamic: false // Explicitly false
     });
 
     const executor = jest.fn(async (request) => {
@@ -150,7 +150,7 @@ describe('Prompt toolsDynamic', () => {
     expect(toolApplicableCalls).toBe(1);
   });
 
-  it('should work with retool function and toolsDynamic', async () => {
+  it('should work with retool function and dynamic', async () => {
     let callCount = 0;
     let retoolCalls = 0;
 
@@ -175,11 +175,11 @@ describe('Prompt toolsDynamic', () => {
       description: 'Test retool with dynamic',
       content: 'Test',
       tools: [tool1, tool2],
-      toolsDynamic: true,
+      dynamic: true,
       retool: () => {
         retoolCalls++;
-        // First two calls: return both tools, third call onwards: return only tool2
-        return retoolCalls <= 2 ? ['tool1', 'tool2'] : ['tool2'];
+        // First call: return both tools, second call onwards: return only tool2
+        return retoolCalls === 1 ? ['tool1', 'tool2'] : ['tool2'];
       }
     });
 
@@ -224,7 +224,7 @@ describe('Prompt toolsDynamic', () => {
 
     const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Done');
-    expect(retoolCalls).toBeGreaterThanOrEqual(3);
+    expect(retoolCalls).toBeGreaterThanOrEqual(2);
   });
 
   it('should handle case when all tools become unavailable dynamically', async () => {
@@ -239,8 +239,8 @@ describe('Prompt toolsDynamic', () => {
       call: () => 'result',
       applicable: async () => {
         applicableCallCount++;
-        // Only available on first two checks (initial resolution + first iteration)
-        return applicableCallCount <= 2;
+        // Only available on first check (initial resolution)
+        return applicableCallCount === 1;
       }
     });
 
@@ -249,7 +249,7 @@ describe('Prompt toolsDynamic', () => {
       description: 'Test tools disappearing',
       content: 'Test',
       tools: [tool],
-      toolsDynamic: true
+      dynamic: true
     });
 
     const executor = jest.fn(async (request) => {
@@ -315,7 +315,7 @@ describe('Prompt toolsDynamic', () => {
       description: 'Test initial applicable',
       content: 'Test',
       tools: [tool]
-      // toolsDynamic not set, should still check applicable initially
+      // dynamic not set, should still check applicable initially
     });
 
     const executor = jest.fn(async () => ({
@@ -380,5 +380,120 @@ describe('Prompt toolsDynamic', () => {
 
     const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Done');
+  });
+
+  it('should dynamically update content when dynamic is true', async () => {
+    let callCount = 0;
+    let inputCalls = 0;
+
+    const prompt = new Prompt({
+      name: 'dynamic-content-test',
+      description: 'Test dynamic content',
+      content: 'Iteration {{iteration}}',
+      input: () => {
+        inputCalls++;
+        return { iteration: inputCalls };
+      },
+      dynamic: true
+    });
+
+    const executor = jest.fn(async (request) => {
+      callCount++;
+      
+      if (callCount === 1) {
+        expect(request.messages[0].content).toContain('Iteration 1');
+        return {
+          content: '',
+          finishReason: 'tool_calls' as const,
+          toolCalls: [],
+          model: 'model-abc',
+        };
+      }
+      
+      if (callCount === 2) {
+        // Content should have been updated by dynamic resolve
+        expect(request.messages[0].content).toContain('Iteration 2');
+        return {
+          content: 'Done',
+          finishReason: 'stop' as const,
+          model: 'model-abc',
+        };
+      }
+
+      return {
+        content: 'Done',
+        finishReason: 'stop' as const,
+        model: 'model-abc',
+      };
+    });
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    const result = await prompt.get('result', {}, ctx);
+    expect(result).toBe('Done');
+    expect(callCount).toBe(2);
+    expect(inputCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should stop iteration when dynamic resolve returns undefined', async () => {
+    let callCount = 0;
+    let retoolCalls = 0;
+
+    const tool = new Tool({
+      name: 'test-tool',
+      description: 'Test',
+      instructions: 'Test',
+      schema: z.object({}),
+      call: () => 'result'
+    });
+
+    const prompt = new Prompt({
+      name: 'stop-on-undefined-test',
+      description: 'Test stopping',
+      content: 'Test',
+      tools: [tool],
+      dynamic: true,
+      retool: () => {
+        retoolCalls++;
+        // Return false on second call to trigger undefined from resolve
+        return retoolCalls === 1 ? ['test-tool'] : false;
+      }
+    });
+
+    const executor = jest.fn(async (request) => {
+      callCount++;
+      
+      if (callCount === 1) {
+        return {
+          content: '',
+          finishReason: 'tool_calls' as const,
+          toolCalls: [{
+            id: 'call_1',
+            name: 'test-tool',
+            arguments: '{}'
+          }],
+          model: 'model-abc',
+        };
+      }
+
+      // Should not reach here since resolve returns undefined
+      return {
+        content: 'Should not reach',
+        finishReason: 'stop' as const,
+        model: 'model-abc',
+      };
+    });
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    // Should throw an error since result is undefined and not toolsOnly
+    await expect(prompt.get('result', {}, ctx)).rejects.toThrow();
+    expect(callCount).toBe(1); // Should only call executor once
   });
 });

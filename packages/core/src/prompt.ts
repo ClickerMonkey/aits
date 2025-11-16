@@ -100,8 +100,8 @@ export interface PromptInput<
   toolsMax?: number;
   // A function/promise that returns an array of tool names to use, or false to indicate the prompt is not compatible with the context.
   retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
-  // If true, tools/retool/applicable checks are done dynamically before each iteration instead of only once at the start
-  toolsDynamic?: boolean;
+  // If true, the prompt is re-resolved at the end of each iteration, allowing input, content, config, schema, and tools to change dynamically. If resolve returns undefined, iteration ends.
+  dynamic?: boolean;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
   metadata?: TMetadata;
   // A function/promise that returns metadata about the prompt to be passed during execution/streaming.
@@ -564,25 +564,6 @@ export class Prompt<
       let content = '';
       let disableTools = false;
 
-      // Dynamic tool resolution - re-check tools before each iteration if enabled
-      if (this.input.toolsDynamic && request.tools) {
-        const dynamicToolsResolved = await this.resolveTools(ctx, input, true);
-        if (dynamicToolsResolved) {
-          const { tools: dynamicTools, toolObjects: dynamicToolObjects } = dynamicToolsResolved;
-          
-          // Update request tools
-          request.tools = dynamicTools;
-          
-          // Update toolMap with new tool objects
-          toolMap.clear();
-          if (dynamicToolObjects) {
-            for (const { tool, definition } of dynamicToolObjects) {
-              toolMap.set(tool.name, { tool, definition } as any);
-            }
-          }
-        }
-      }
-
       const streamController = new AbortController();
       const streamAbort = () => streamController.abort();
 
@@ -954,6 +935,31 @@ export class Prompt<
             if (toolRetries === 0) {
               disableTools = true;
             }
+          }
+        }
+      }
+
+      // Dynamic resolve - re-resolve prompt at end of iteration if enabled
+      if (this.input.dynamic) {
+        const dynamicResolved = await this.resolve(ctx, input);
+        if (dynamicResolved === undefined) {
+          // Prompt is no longer compatible with context, end iteration
+          break;
+        }
+
+        const { config: dynamicConfig, content: dynamicContent, tools: dynamicTools, toolObjects: dynamicToolObjects, responseFormat: dynamicResponseFormat, schema: dynamicSchema } = dynamicResolved;
+
+        // Update request with new resolved state
+        Object.assign(request, dynamicConfig);
+        request.messages[0].content = dynamicContent;
+        request.tools = dynamicTools;
+        request.responseFormat = dynamicResponseFormat;
+
+        // Update toolMap with new tool objects
+        toolMap.clear();
+        if (dynamicToolObjects) {
+          for (const { tool, definition } of dynamicToolObjects) {
+            toolMap.set(tool.name, { tool, definition } as any);
           }
         }
       }
