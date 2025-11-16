@@ -95,6 +95,22 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
           })}
         </Box>
       )}
+      {/* Display message cost and usage if available */}
+      {(showInput || showOutput) && (message.cost !== undefined || message.usage) && (
+        <Box marginLeft={1} marginTop={0}>
+          <Text dimColor>
+            {message.cost !== undefined && message.cost > 0 && (
+              <>cost: ${message.cost.toFixed(5)}</>
+            )}
+            {message.usage?.text && (
+              <>
+                {message.cost !== undefined && message.cost > 0 ? ' │ ' : ''}
+                tokens: {(message.usage.text.input || 0) + (message.usage.text.output || 0)}
+              </>
+            )}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };
