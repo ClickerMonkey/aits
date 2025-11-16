@@ -53,6 +53,62 @@ export function abbreviate(text: string, maxLength: number, suffix: string = 'â€
 }
 
 /**
+ * Format a value for text display (high-level representation without JSON escaping)
+ * - Arrays: items on separate lines with hyphens
+ * - Non-objects (primitives): String(x)
+ * - Objects: bullet list with hyphens, property values without JSON escaping
+ * 
+ * @param value - value to format
+ * @returns formatted string
+ */
+export function formatValue(value: any): string {
+  // Handle null/undefined
+  if (value === null) {
+    return 'null';
+  }
+  if (value === undefined) {
+    return 'undefined';
+  }
+  
+  // Arrays: list items with hyphens
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return '[]';
+    }
+    return value.map((item, i) => {
+      const formatted = formatValue(item);
+      // For simple values, show on same line
+      if (typeof item !== 'object' || item === null) {
+        return `- ${formatted}`;
+      }
+      // For objects, indent their properties
+      return `- ${formatted.split('\n').join('\n  ')}`;
+    }).join('\n');
+  }
+  
+  // Non-objects (primitives): use String(x)
+  if (typeof value !== 'object') {
+    return String(value);
+  }
+  
+  // Objects: bullet list with hyphens
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return '{}';
+  }
+  
+  return entries.map(([key, val]) => {
+    const formatted = formatValue(val);
+    // For simple values, show on same line
+    if (typeof val !== 'object' || val === null) {
+      return `- ${key}: ${formatted}`;
+    }
+    // For complex values (objects/arrays), show on multiple lines
+    return `- ${key}:\n  ${formatted.split('\n').join('\n  ')}`;
+  }).join('\n');
+}
+
+/**
  * Pluralize a word based on count.
  * 
  * @param count - number of items
