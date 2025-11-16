@@ -23,7 +23,7 @@ const ModeLevels: Record<OperationMode, number> = {
  */
 export class OperationManager {
   public constructor(
-    public mode: ChatMode,
+    public mode: OperationMode,
     public operations: Operation[] = [],
     public onOperationAdded?: (op: Operation, index: number) => void,
     public onOperationUpdated?: (op: Operation, index: number) => void,

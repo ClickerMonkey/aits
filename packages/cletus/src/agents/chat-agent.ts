@@ -2,8 +2,9 @@ import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { createSubAgents } from './sub-agents';
 import { abbreviate } from '../common';
-import { Operations } from '../operations/types';
+import { Operations, OperationMode } from '../operations/types';
 import { ComponentOutput } from '@aits/core';
+import { OperationManager } from '../operations/manager';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -56,6 +57,15 @@ ${dbaTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 Choose the appropriate agent based on what the user wants done.
 The agent will NOT be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
 
+<simulateMode>
+Use the 'simulateMode' parameter to override the operation mode for this delegation:
+- When the user asks "what would happen if..." or wants to preview effects without executing operations, use a lower mode
+- For example, if in 'delete' mode but user wants to see what would be deleted without actually deleting, use 'read' mode
+- If in 'update' mode but user wants to preview changes without applying them, use 'read' mode  
+- The simulateMode defaults to the current chat mode, so only specify it when you need to downgrade for simulation purposes
+- Available modes depend on current mode: you can only use modes at or below the current mode level
+</simulateMode>
+
 <rules>
 - If the user requests an action around data types defined that can be accomplished with a database query like tool call - use the 'dba'.
 - If the user requests anything related to images, use the 'artist' agent.
@@ -71,20 +81,43 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
 </rules>
 `,
-    schema: ({ config }) => {
+    schema: ({ config, chat }) => {
+      // Get current chat mode, defaulting to 'none'
+      const currentMode = chat?.mode || 'none';
+      
+      // Build available modes based on current mode hierarchy
+      const modeHierarchy: OperationMode[] = ['local', 'none', 'read', 'create', 'update', 'delete'];
+      const currentModeIndex = modeHierarchy.indexOf(currentMode);
+      const availableModes = currentModeIndex === 0 
+        ? ['local'] as [OperationMode, ...OperationMode[]]
+        : modeHierarchy.slice(0, currentModeIndex + 1) as [OperationMode, ...OperationMode[]];
+      
       return z.object({
         agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', 'dba']).describe('Which sub-agent to use'),
         request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls.'),
         typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
+        simulateMode: z.enum(availableModes).default(currentMode).describe(`Mode override for this delegation. Current mode is '${currentMode}'. Use a lower mode (e.g., 'read' when in 'delete' mode) to simulate what would happen without actually executing destructive operations. This allows you to preview the effects before committing to them. Defaults to current mode.`),
       });
     },
     refs: subAgents,
-    call: async ({ agent, typeName, request }, [planner, librarian, clerk, secretary, architect, artist, internet, dba], ctx) => {
-      ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request);
+    call: async ({ agent, typeName, request, simulateMode }, [planner, librarian, clerk, secretary, architect, artist, internet, dba], ctx) => {
+      ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request + (simulateMode !== ctx.chat?.mode ? ` (simulating in ${simulateMode} mode)` : ''));
 
-      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}`);
+      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}${simulateMode !== ctx.chat?.mode ? ` [${simulateMode} mode]` : ''}`);
 
-      const operationProgress = ctx.ops.operations.length;
+      // Create a new OperationManager with the simulated mode if different from current mode
+      const effectiveOps = simulateMode !== ctx.chat?.mode
+        ? new OperationManager(
+            simulateMode,
+            ctx.ops.operations,
+            ctx.ops.onOperationAdded,
+            ctx.ops.onOperationUpdated
+          )
+        : ctx.ops;
+      
+      const operationProgress = effectiveOps.operations.length;
+      const contextWithMode = { ...ctx, ops: effectiveOps };
+      
       const tools = await (() => {
         if (agent === 'dba') {
           const types = ctx.config.getData().types;
@@ -93,7 +126,7 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
             throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
           }
           
-          return dba.get('tools', { request }, { ...ctx, type, messages: [] });
+          return dba.get('tools', { request }, { ...contextWithMode, type, messages: [] });
         } else {
           const subAgent = {
             planner,
@@ -109,7 +142,7 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
             throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
           }
 
-          return subAgent.get('tools', { request }, { ...ctx, messages: [] });
+          return subAgent.get('tools', { request }, { ...contextWithMode, messages: [] });
         }
       })();
 
@@ -117,9 +150,9 @@ The agent will NOT be fed the conversation and you need to provide a 'request' t
 
       const agentInstructions = !tools?.length
         ? `The ${agent} agent could not find any appropriate tools to handle the request. You should try a different agent or provide more details in the request and try again.`
-        : ctx.ops.automatedOperations(operationProgress)
+        : effectiveOps.automatedOperations(operationProgress)
           ? `The ${agent} agent was able to complete all operations without user approval. The agent loop will continue - DO NOT RESPOND to the user yet. No questions. You will enter an automated loop until interrupted.`
-          : ctx.ops.needsUserInput(operationProgress)
+          : effectiveOps.needsUserInput(operationProgress)
             ? `The ${agent} is handing operations off to the user for approval before proceeding. Present the operations clearly for approval - be concise but don't leave out any important details. DO NOT ask questions, the user will automatically be prompted for permission.`
             : `The ${agent} agent is in a state where it needs user input before proceeding. Wait for the user to respond. Ask questions that are needed to get tool calls correct.`;
 
