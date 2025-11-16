@@ -831,8 +831,13 @@ When managing types:
           }
           
           // Process sections smartly - add sections one by one, batching when needed
+          let isFirstSectionOfFile = true;
           for (const section of fileData.sections) {
-            const sectionContent = `\n\n=== File: ${fileData.file} ===\n${section}`;
+            // Only add file header for the first section of this file in the batch
+            const needsHeader = isFirstSectionOfFile || !currentBatchFiles.includes(fileData.file);
+            const sectionContent = needsHeader 
+              ? `\n\n=== File: ${fileData.file} ===\n${section}`
+              : `\n\n${section}`;
             
             // Check if adding this section would exceed batch size
             if (currentBatch.length > 0 && currentBatch.length + sectionContent.length > TYPE_IMPORT_CONSTS.BATCH_SIZE) {
@@ -845,14 +850,16 @@ When managing types:
                 log(`Warning: Failed to process batch: ${(error as Error).message}`);
               }
               
-              // Start new batch with this section
-              currentBatch = sectionContent;
+              // Start new batch with this section (needs header since it's a new batch)
+              currentBatch = `\n\n=== File: ${fileData.file} ===\n${section}`;
               currentBatchFiles = [fileData.file];
+              isFirstSectionOfFile = false;
             } else {
               currentBatch += sectionContent;
               if (!currentBatchFiles.includes(fileData.file)) {
                 currentBatchFiles.push(fileData.file);
               }
+              isFirstSectionOfFile = false;
             }
           }
           
