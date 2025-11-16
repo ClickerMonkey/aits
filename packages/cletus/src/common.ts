@@ -59,40 +59,32 @@ export function abbreviate(text: string, maxLength: number, suffix: string = 'â€
  * - Objects: bullet list with hyphens, property values without JSON escaping
  * 
  * @param value - value to format
- * @param depth - current indentation depth (default 0)
+ * @param alreadyIndented - whether content should be indented/hyphenated
  * @returns formatted string
  */
-export function formatValue(value: any, depth: number = 0): string {
+export function formatValue(value: any, alreadyIndented: boolean = false): string {
   // Handle null/undefined
   if (value === null) {
-    return 'null';
+    return `null`;
   }
   if (value === undefined) {
-    return 'undefined';
+    return `undefined`;
   }
-  
-  // Calculate indentation for the next level
-  const indent = '  '.repeat(depth + 1);
+
+  const hyphenPrefix = alreadyIndented ? '' : '- ';
   
   // Arrays: list items with hyphens
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return '[]';
+      return `[]`;
     }
-    return value.map((item, i) => {
-      const formatted = formatValue(item, depth + 1);
-      // For simple values, show on same line
-      if (typeof item !== 'object' || item === null) {
-        return `- ${formatted}`;
-      }
-      // For objects, indent their properties
-      return `- ${formatted.split('\n').join('\n' + indent)}`;
-    }).join('\n');
+    return '\n' + value.map((item, i) => `${hyphenPrefix}${formatValue(item, true).split('\n').join('\n  ')}`).join('\n');
   }
   
   // Non-objects (primitives): use String(x)
   if (typeof value !== 'object') {
-    return String(value);
+    const x = String(value);
+    return !alreadyIndented && x.includes('\n') ? `\n  ${x.split('\n').join('\n  ')}` : x;
   }
   
   // Objects: bullet list with hyphens
@@ -101,15 +93,7 @@ export function formatValue(value: any, depth: number = 0): string {
     return '{}';
   }
   
-  return entries.map(([key, val]) => {
-    const formatted = formatValue(val, depth + 1);
-    // For simple values, show on same line
-    if (typeof val !== 'object' || val === null) {
-      return `- ${key}: ${formatted}`;
-    }
-    // For complex values (objects/arrays), show on multiple lines
-    return `- ${key}:\n${indent}${formatted.split('\n').join('\n' + indent)}`;
-  }).join('\n');
+  return entries.map(([key, val]) => `${hyphenPrefix}${key}: ${formatValue(val).split('\n').join('\n  ')}`).join('\n');
 }
 
 /**

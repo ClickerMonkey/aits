@@ -34,8 +34,9 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
         return 'All todos cleared';
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
@@ -100,8 +101,9 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
         return `Added: "${op.output.name}"`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }>({
@@ -151,8 +153,9 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
         return 'Marked todo as done';
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
@@ -179,8 +182,9 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
         return op.output.todo ? `Found: "${op.output.todo.name}"` : 'Todo not found';
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }>({
@@ -222,8 +226,9 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
         return 'Removed todo';
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number }>({
@@ -258,6 +263,7 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
         return `Replaced with ${op.output.count} todo${op.output.count !== 1 ? 's' : ''}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });

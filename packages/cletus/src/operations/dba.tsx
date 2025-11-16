@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { CletusAIContext, transcribe } from "../ai";
-import { abbreviate, chunkArray, formatName } from "../common";
+import { abbreviate, chunkArray, formatName, pluralize } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
@@ -16,6 +16,7 @@ import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../hel
 import { searchFiles, processFile } from "../helpers/files";
 import { getAssetPath } from "../file-manager";
 import { buildFieldsSchema } from "../helpers/type";
+import { th } from "zod/v4/locales";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -72,8 +73,9 @@ export const data_create = operationOf<
           return `Created record ID: ${op.output.id}`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -128,11 +130,12 @@ export const data_update = operationOf<
       `${formatName(type.friendlyName)}Update(${fields.map(f => `"${f}"`).join(', ')})`,
       (op) => {
         if (op.output?.updated) {
-          return `Updated record ID: ${op.output.id}`;
+          return `Updated record ID: ${op.input.id}`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -185,11 +188,12 @@ export const data_delete = operationOf<
       `${formatName(type.friendlyName)}Delete("${op.input.id.slice(0, 8)}")`,
       (op) => {
         if (op.output?.deleted) {
-          return `Deleted record ID: ${op.output.id}`;
+          return `Deleted record ID: ${op.input.id}`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -267,8 +271,9 @@ export const data_select = operationOf<
           return `Returned ${op.output.results.length} of ${op.output.count} record(s)`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -336,8 +341,9 @@ export const data_update_many = operationOf<
           return `Updated ${op.output.updated} record(s)`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -409,8 +415,9 @@ export const data_delete_many = operationOf<
           return `Deleted ${op.output.deleted} record(s)`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 
@@ -569,10 +576,12 @@ export const data_aggregate = operationOf<
         if (op.output?.results) {
           const resultCount = op.output.results.length;
           const aggregations = op.input.select?.map((s: any) => s.function).join(', ') || 'aggregation';
-          return `${resultCount} result${resultCount !== 1 ? 's' : ''} (${aggregations})`;
+
+          return `${pluralize(resultCount, 'result')} (${aggregations})`;
         }
         return null;
-      }
+      },
+      showInput, showOutput
     );
   },
 });
@@ -614,13 +623,14 @@ export const data_index = operationOf<
         }
         return null;
       },
+      showInput, showOutput
     );
   },
 });
 
 export const data_import = operationOf<
   { name: string; glob: string; transcribeImages?: boolean },
-  { imported: number; updated: number; skipped: number; libraryKnowledgeUpdated: boolean }
+  { imported: number; failed: number; updated: number; updateSkippedNoChanges: number; libraryKnowledgeUpdated: boolean }
 >({
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
@@ -680,7 +690,8 @@ export const data_import = operationOf<
     
     // Process files in parallel
     let filesProcessed = 0;
-    await Promise.allSettled(importableFiles.map(async (file) => {
+    let filesFailed = 0;
+    await Promise.all(importableFiles.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       
       try {
@@ -723,19 +734,28 @@ export const data_import = operationOf<
         }
         
         // Extract data from grouped sections
-        for (const group of sectionGroups) {
+        const extractedResults = await Promise.allSettled(sectionGroups.map(async (group, index) => {
           try {
-            const extracted = await extractDataFromText(ai, config, type, arraySchema, group);
-            allExtractedRecords.push(...extracted);
+            return await extractDataFromText(ai, config, type, arraySchema, group);
           } catch (error) {
             log(`Warning: Failed to extract from section group in ${file.file}: ${(error as Error).message}`);
+            return [];
           }
-        }
+        }));
+
+        // Collect successful extractions
+        allExtractedRecords.push(...extractedResults.flatMap(p => p.status === 'fulfilled' ? p.value : []));
       } catch (error) {
         log(`Warning: Failed to process file ${file.file}: ${(error as Error).message}`);
+        filesFailed++;
       }
     }));
     
+    // If no records extracted, return early
+    if (allExtractedRecords.length === 0) {
+      return { imported: 0, updated: 0, failed: filesFailed, updateSkippedNoChanges: 0, libraryKnowledgeUpdated: false };
+    }
+
     chatStatus(`Extracted ${allExtractedRecords.length} potential records`);
     
     // Get sample records for uniqueness determination
@@ -743,19 +763,14 @@ export const data_import = operationOf<
     const sampleRecords = allExtractedRecords.slice(0, sampleSize);
     
     // Ask AI to determine unique fields
-    let uniqueFields: string[] = [];
-    if (allExtractedRecords.length > 0) {
-      chatStatus('Determining unique fields...');
-      uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
-    }
-    
-    chatStatus(`Using unique fields: ${uniqueFields.length > 0 ? uniqueFields.join(', ') : 'none (all records will be imported)'}`);
+    chatStatus('Determining unique fields...');
+    const uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
+    chatStatus(`Importing data${uniqueFields.length > 0 ? ` using unique fields ${uniqueFields.join(', ')}` : ''}`);
     
     // Merge data based on unique fields
-    const existingRecords = dataManager.getAll();
     let imported = 0;
     let updated = 0;
-    let skipped = 0;
+    let updateSkippedNoChanges = 0;
     const updatedIds: string[] = [];
     
     // Use single save operation for all changes
@@ -781,7 +796,7 @@ export const data_import = operationOf<
             updatedIds.push(existingRecord.id);
             updated++;
           } else {
-            skipped++;
+            updateSkippedNoChanges++;
           }
         } else {
           // Create new record
@@ -795,12 +810,6 @@ export const data_import = operationOf<
           });
           updatedIds.push(id);
           imported++;
-        }
-        
-        // Update progress periodically
-        const total = imported + updated + skipped;
-        if (total % 10 === 0) {
-          chatStatus(`Progress: ${total}/${allExtractedRecords.length} records processed`);
         }
       }
     });
@@ -816,7 +825,7 @@ export const data_import = operationOf<
       libraryKnowledgeUpdated = false;
     }
     
-    return { imported, updated, skipped, libraryKnowledgeUpdated };
+    return { imported, updated, updateSkippedNoChanges, libraryKnowledgeUpdated, failed: filesFailed };
   },
   render: (op, config, showInput, showOutput) => {
     const type = getType(config, op.input.name);
@@ -825,10 +834,11 @@ export const data_import = operationOf<
       `${formatName(type.friendlyName)}Import("${op.input.glob}")`,
       (op) => {
         if (op.output) {
-          return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.skipped} duplicate(s)`;
+          return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.updateSkippedNoChanges} duplicate(s)`;
         }
         return null;
       },
+      showInput, showOutput
     );
   },
 });
@@ -883,8 +893,9 @@ export const data_search = operationOf<
           return `Found ${count} result${count !== 1 ? 's' : ''}`;
         }
         return null;
-      }
-    , showInput, showOutput);
+      },
+      showInput, showOutput
+    );
   },
 });
 

@@ -119,7 +119,7 @@ export type OperationDefinition<TInput, TOutput> = {
 export type OperationDefinitionFor<K extends OperationKind> = OperationDefinition<OperationInputFor<K>, OperationOutputFor<K>>;
 
 // Helper to define an operation
-export function operationOf<TInput, TOutput>(def: Plus<OperationDefinition<TInput, TOutput>>): OperationDefinition<TInput, TOutput> {
+export function operationOf<TInput, TOutput, TExtension extends object = {}>(def: OperationDefinition<TInput, TOutput> & TExtension): OperationDefinition<TInput, TOutput> {
   return def;
 }
 

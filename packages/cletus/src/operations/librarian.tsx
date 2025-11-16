@@ -51,8 +51,9 @@ export const knowledge_search = operationOf<
         return `Found ${count} result${count !== 1 ? 's' : ''}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const knowledge_sources = operationOf<{}, { sources: string[] }>({
@@ -90,8 +91,9 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
         return `Listed ${count} source${count !== 1 ? 's' : ''}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const knowledge_add = operationOf<
@@ -135,8 +137,9 @@ export const knowledge_add = operationOf<
         return `Added: "${abbreviate(op.input.text, 50)}"`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 export const knowledge_delete = operationOf<
@@ -226,6 +229,7 @@ export const knowledge_delete = operationOf<
         return `Deleted ${op.output.deletedCount} entr${op.output.deletedCount !== 1 ? 'ies' : 'y'}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });

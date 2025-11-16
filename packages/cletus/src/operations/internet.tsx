@@ -62,8 +62,9 @@ export const web_search = operationOf<
         return `Found ${op.output.results.length} result${op.output.results.length !== 1 ? 's' : ''}`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });
 
 // ============================================================================
@@ -223,7 +224,8 @@ export const web_get_page = operationOf<
         return parts.join(', ');
       }
       return null;
-    }
+    },
+    showInput, showOutput
   ),
 });
 
@@ -342,6 +344,7 @@ export const web_api_call = operationOf<
         return `${op.output.status} ${op.output.statusText} (${op.output.body.length} bytes)`;
       }
       return null;
-    }
-  , showInput, showOutput),
+    },
+    showInput, showOutput
+  ),
 });

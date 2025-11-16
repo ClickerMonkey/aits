@@ -26,10 +26,10 @@ Example: Generate a landscape image:
     instructions: `Use this to modify an existing image. Provide a file path (relative or absolute path or[filename](filepath)) and a description of the edit. The edited image will be saved as a new file.
 
 Example: Add a sunset effect to an image:
-{ "prompt": "Add warm sunset colors and lighting", "imagePath": "images/photo.jpg" }`,
+{ "prompt": "Add warm sunset colors and lighting", "path": "images/photo.jpg" }`,
     schema: z.object({
       prompt: z.string().describe('Description of how to edit the image'),
-      imagePath: z.string().describe('Path to the image to edit (relative path or absolute path or [filename](filepath) URL)'),
+      path: z.string().describe('Path to the image to edit (relative path or absolute path or [filename](filepath) URL)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_edit', input }, ctx),
   });
@@ -40,10 +40,10 @@ Example: Add a sunset effect to an image:
     instructions: `Use this to understand what's in images or answer specific questions about them. Can analyze multiple images together for comparison.
 
 Example: Compare two designs:
-{ "prompt": "What are the main differences between these two UI designs?", "imagePaths": ["designs/v1.png", "designs/v2.png"] }`,
+{ "prompt": "What are the main differences between these two UI designs?", "paths": ["designs/v1.png", "designs/v2.png"] }`,
     schema: z.object({
       prompt: z.string().describe('Question or analysis request about the images'),
-      imagePaths: z.array(z.string()).describe('Paths to images to analyze (relative paths or absolute file or [filename](filepath))'),
+      paths: z.array(z.string()).describe('Paths to images to analyze (relative paths or absolute file or [filename](filepath))'),
       maxCharacters: z.number().optional().default(2084).describe('Maximum response length (maxCharacters/4 = maxTokens, default: 2084)'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_analyze', input }, ctx),
@@ -55,9 +55,9 @@ Example: Compare two designs:
     instructions: `Use this to generate a comprehensive description of an image's contents without a specific question.
 
 Example: Describe a screenshot:
-{ "imagePath": "screenshots/dashboard.png" }`,
+{ "path": "screenshots/dashboard.png" }`,
     schema: z.object({
-      imagePath: z.string().describe('Path to the image to describe (relative path or absolute path or [filename](filepath))'),
+      path: z.string().describe('Path to the image to describe (relative path or absolute path or [filename](filepath))'),
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_describe', input }, ctx),
   });
