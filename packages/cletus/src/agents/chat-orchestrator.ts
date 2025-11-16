@@ -152,6 +152,19 @@ export async function runChatOrchestrator(
         return newContent;
       };
 
+      // Helper function to estimate text output tokens from pending content
+      const updateEstimatedTextOutputTokens = () => {
+        const totalTextLength = pending.content
+          .filter(c => c.type === 'text' && c.operationIndex === undefined)
+          .reduce((sum, c) => sum + c.content.length, 0);
+        const estimatedTokens = Math.ceil(totalTextLength / 4);
+        
+        if (!currentUsage.text) {
+          currentUsage.text = {};
+        }
+        currentUsage.text.output = estimatedTokens;
+      };
+
       // Emit initial pending message
       onEvent({ type: 'pendingUpdate', pending });
 
@@ -247,16 +260,8 @@ export async function runChatOrchestrator(
                 const lastContent = getLastTextContent();
                 lastContent.content += chunk.content;
                 
-                // Estimate usage from current text length
-                const totalTextLength = pending.content
-                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
-                  .reduce((sum, c) => sum + c.content.length, 0);
-                const estimatedTokens = Math.ceil(totalTextLength / 4);
-                currentUsage = {
-                  text: {
-                    output: estimatedTokens,
-                  }
-                };
+                // Estimate text output tokens
+                updateEstimatedTextOutputTokens();
                 
                 onEvent({ type: 'pendingUpdate', pending });
                 onEvent({ type: 'status', status: '' });
@@ -269,16 +274,8 @@ export async function runChatOrchestrator(
                 const lastContent = getLastTextContent();
                 lastContent.content = chunk.content;
                 
-                // Estimate usage from current text length
-                const totalTextLength = pending.content
-                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
-                  .reduce((sum, c) => sum + c.content.length, 0);
-                const estimatedTokens = Math.ceil(totalTextLength / 4);
-                currentUsage = {
-                  text: {
-                    output: estimatedTokens,
-                  }
-                };
+                // Estimate text output tokens
+                updateEstimatedTextOutputTokens();
                 
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
@@ -292,7 +289,10 @@ export async function runChatOrchestrator(
                 if (last.operationIndex === undefined && last.type === 'text') {
                   last.content = '';
                 }
-                currentUsage = {};
+                // Reset only text output tokens
+                if (currentUsage.text) {
+                  currentUsage.text.output = 0;
+                }
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
               }
@@ -307,7 +307,23 @@ export async function runChatOrchestrator(
               break;
 
             case 'responseTokens':
+              // Add as estimated text output tokens
               pending.tokens = chunk.tokens;
+              if (!currentUsage.text) {
+                currentUsage.text = {};
+              }
+              currentUsage.text.output = chunk.tokens;
+              updateUsageEvent();
+              break;
+
+            case 'reason':
+              // Add reasoning token estimation to current usage
+              const reasoningTokens = Math.ceil(chunk.content.length / 4);
+              if (!currentUsage.reasoning) {
+                currentUsage.reasoning = {};
+              }
+              currentUsage.reasoning.output = reasoningTokens;
+              updateUsageEvent();
               break;
 
             case 'usage':
