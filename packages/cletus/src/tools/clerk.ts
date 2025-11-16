@@ -224,6 +224,19 @@ Example: Create a new feature directory:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_create', input }, ctx),
   });
 
+  const fileAttach = ai.tool({
+    name: 'file_attach',
+    description: 'Attach a text, audio, or PDF file to the chat for the user & AI assistant to see',
+    instructions: `Use this to attach a file to the chat conversation. The file will be added as a user message. Only text, audio, and PDF files are allowed. Path is relative to current working directory.
+
+Example: Attach a document:
+{ "path": "documents/report.pdf" }`,
+    schema: z.object({
+      path: z.string().describe('Relative path to the text, audio, or PDF file to attach'),
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_attach', input }, ctx),
+  });
+
   return [
     fileSearch,
     fileSummary,
@@ -237,6 +250,7 @@ Example: Create a new feature directory:
     fileEdit,
     textSearch,
     dirCreate,
+    fileAttach,
   ] as [
     typeof fileSearch,
     typeof fileSummary,
@@ -250,5 +264,6 @@ Example: Create a new feature directory:
     typeof fileEdit,
     typeof textSearch,
     typeof dirCreate,
+    typeof fileAttach,
   ];
 }

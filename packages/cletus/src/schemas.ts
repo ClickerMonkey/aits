@@ -214,6 +214,7 @@ export const OperationKindSchema = z.enum([
   'image_analyze',
   'image_describe',
   'image_find',
+  'image_attach',
   // clerk
   'file_search',
   'file_summary',
@@ -227,6 +228,7 @@ export const OperationKindSchema = z.enum([
   'file_edit',
   'text_search',
   'dir_create',
+  'file_attach',
   // dba
   'data_create',
   'data_update',

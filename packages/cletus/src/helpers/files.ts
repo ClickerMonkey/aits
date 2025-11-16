@@ -963,6 +963,15 @@ export async function detectExtension(
 }
 
 /**
+ * Check if a file is an audio file based on its extension
+ */
+export async function isAudioFile(filePath: string, fileName: string = filePath): Promise<boolean> {
+  const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'];
+  const ext = await detectExtension(filePath, fileName);
+  return AUDIO_EXTENSIONS.includes(ext);
+}
+
+/**
  * Detect MIME type from file content or fallback to file extension
  */
 export async function detectMimeType(

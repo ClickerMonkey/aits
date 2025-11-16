@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import sharp from "sharp";
-import { abbreviate, chunkArray, cosineSimilarity, pluralize } from "../common";
+import { abbreviate, chunkArray, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
 import { getImagePath } from "../file-manager";
 import { operationOf } from "./types";
 import { CONSTS } from "../constants";
@@ -447,5 +447,54 @@ Do not return any additional text other than the matching description subset.`;
       return null;
     }
   ),
+});
+
+export const image_attach = operationOf<
+  { path: string },
+  { attached: boolean }
+>({
+  mode: 'create',
+  signature: 'image_attach({ path })',
+  status: ({ path: imagePath }) => `Attaching image: ${path.basename(imagePath)}`,
+  analyze: async ({ path: imagePath }, { cwd }) => {
+    // Resolve path (supports both absolute and relative)
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
+
+    // Check if file exists and is readable
+    const readable = await fileIsReadable(fullPath);
+    if (!readable) {
+      return {
+        analysis: `This would fail - image file ${linkFile(imagePath)} not found or not readable.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will attach the image ${linkFile(imagePath)} to the chat as a user message.`,
+      doable: true,
+    };
+  },
+  do: async ({ path: imagePath }, { cwd, chatMessage }) => {
+    // Resolve path (supports both absolute and relative)
+    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
+    const imageLink = linkFile(fullPath);
+
+    // Add image to the chat message
+    if (chatMessage) {
+      chatMessage.content.push({ type: 'image', content: imageLink });
+    }
+
+    return { attached: true };
+  },
+  render: (op, config, showInput, showOutput) => renderOperation(
+    op,
+    `ImageAttach("${paginateText(op.input.path, 100, -100)}")`,
+    (op) => {
+      if (op.output?.attached) {
+        return `Attached image: ${linkFile(op.input.path)}`;
+      }
+      return null;
+    }
+  , showInput, showOutput),
 });
 
