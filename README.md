@@ -608,6 +608,22 @@ aits/
 └── tsconfig.json      # TypeScript configuration
 ```
 
+### Automation
+
+#### Weekly Model Scraper
+
+The repository includes an automated GitHub Action that runs weekly to keep model information up-to-date:
+
+- **Schedule**: Every Sunday at 00:00 UTC
+- **Manual Trigger**: Can be triggered manually via GitHub Actions UI
+- **What it does**: 
+  - Scrapes latest model information from OpenAI, OpenRouter, Replicate, and AWS Bedrock
+  - Collects performance metrics (latency, throughput, uptime)
+  - Updates pricing information
+  - Creates or updates a pull request with the changes
+
+The workflow is defined in `.github/workflows/weekly-scrape-models.yml` and automatically manages PRs on the `automated/weekly-model-scrape` branch.
+
 ## Best Practices
 
 1. **API Key Security** - Never hardcode API keys, use environment variables
