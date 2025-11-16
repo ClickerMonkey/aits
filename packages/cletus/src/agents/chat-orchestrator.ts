@@ -1,4 +1,4 @@
-import { getTotalTokens } from '@aits/core';
+import { getTotalTokens, Usage, accumulateUsage } from '@aits/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -18,6 +18,8 @@ export interface OrchestratorOptions {
   config: ConfigFile;
   chatData: ChatFile;
   signal: AbortSignal;
+  clearUsage: () => void;
+  getUsage: () => { accumulated: Usage; accumulatedCost: number };
 }
 
 /**
@@ -26,7 +28,7 @@ export interface OrchestratorOptions {
 export type OrchestratorEvent =
   | { type: 'pendingUpdate'; pending: Message }
   | { type: 'update'; message: Message }
-  | { type: 'tokens'; output: number; reasoning: number; discarded: number }
+  | { type: 'usage'; accumulated: Usage; accumulatedCost: number; current: Usage }
   | { type: 'elapsed'; ms: number }
   | { type: 'operations'; operations: Operation[]; summary: string }
   | { type: 'status'; status: string }
@@ -67,13 +69,17 @@ export async function runChatOrchestrator(
   options: OrchestratorOptions,
   onEvent: (event: OrchestratorEvent) => void,
 ): Promise<void> {
-  const { chatAgent, messages, chatMeta, config, chatData, signal } = options;
+  const { chatAgent, messages, chatMeta, config, chatData, signal, clearUsage, getUsage } = options;
 
   const startTime = Date.now();
   const loopTimeout = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
   const loopMax = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
 
   logger.log('orchestrator: starting');
+  
+  // Clear accumulated usage at the start of chat operations
+  clearUsage();
+  logger.log('orchestrator: cleared usage');
 
   // Start elapsed time updates
   const elapsedInterval = setInterval(() => {
@@ -82,27 +88,18 @@ export async function runChatOrchestrator(
     }
   }, 100);
 
-  let outputTokens = 0;
-  let reasoningTokens = 0;
-  let discardedTokens = 0;
+  let currentUsage: Usage = {};
+  let messageUsage: Usage = {};
+  let messageCost = 0;
 
-  const setOutputTokens = (count: number) => {
-    outputTokens = count;
-    updateTokenCount();
-  };
-
-  const setReasoningTokens = (count: number) => {
-    reasoningTokens = count;
-    updateTokenCount();
-  };
-
-  const addDiscardedTokens = (count: number) => {
-    discardedTokens += count;
-    updateTokenCount();
-  };
-
-  const updateTokenCount = () => {
-    onEvent({ type: 'tokens', output: outputTokens, reasoning: reasoningTokens, discarded: discardedTokens });
+  const updateUsageEvent = () => {
+    const accumulated = getUsage();
+    onEvent({ 
+      type: 'usage', 
+      accumulated: accumulated.accumulated, 
+      accumulatedCost: accumulated.accumulatedCost,
+      current: currentUsage 
+    });
   };
 
   try {
@@ -129,6 +126,9 @@ export async function runChatOrchestrator(
       loopIteration++;
 
       logger.log(`orchestrator: loop iteration ${loopIteration}`);
+      
+      // Reset current usage for this iteration
+      currentUsage = {};
 
       // Create pending assistant message
       const pending: Message = {
@@ -137,14 +137,6 @@ export async function runChatOrchestrator(
         content: [{ type: 'text', content: '' }],
         created: Date.now(),
         operations: [],
-      };
-
-      // Helper to update output token count
-      const updateOutputTokenCount = () => {
-        const totalTextLength = pending.content
-          .filter(c => c.type === 'text' && c.operationIndex === undefined)
-          .reduce((sum, c) => sum + c.content.length, 0);
-        setOutputTokens(Math.ceil(totalTextLength / 4));
       };
 
       // Helper to get or create the last text content entry (not tied to an operation)
@@ -184,6 +176,13 @@ export async function runChatOrchestrator(
       );
 
       logger.log('orchestrator: running chat agent');
+
+      // Capture starting usage and cost for this message
+      const startUsage = getUsage();
+      const startingUsage: Usage = JSON.parse(JSON.stringify(startUsage.accumulated));
+      const startingCost = startUsage.accumulatedCost;
+      messageUsage = {};
+      messageCost = 0;
 
       // Select random silly verb and emit status
       const randomVerb = sillyVerbs[Math.floor(Math.random() * sillyVerbs.length)];
@@ -247,9 +246,21 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content += chunk.content;
-                updateOutputTokenCount();
+                
+                // Estimate usage from current text length
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                const estimatedTokens = Math.ceil(totalTextLength / 4);
+                currentUsage = {
+                  text: {
+                    output: estimatedTokens,
+                  }
+                };
+                
                 onEvent({ type: 'pendingUpdate', pending });
                 onEvent({ type: 'status', status: '' });
+                updateUsageEvent();
               }
               break;
 
@@ -257,8 +268,20 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content = chunk.content;
-                updateOutputTokenCount();
+                
+                // Estimate usage from current text length
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                const estimatedTokens = Math.ceil(totalTextLength / 4);
+                currentUsage = {
+                  text: {
+                    output: estimatedTokens,
+                  }
+                };
+                
                 onEvent({ type: 'pendingUpdate', pending });
+                updateUsageEvent();
               }
               break;
 
@@ -269,9 +292,9 @@ export async function runChatOrchestrator(
                 if (last.operationIndex === undefined && last.type === 'text') {
                   last.content = '';
                 }
-                addDiscardedTokens(outputTokens);
-                setOutputTokens(0);
+                currentUsage = {};
                 onEvent({ type: 'pendingUpdate', pending });
+                updateUsageEvent();
               }
               break;
 
@@ -284,22 +307,14 @@ export async function runChatOrchestrator(
               break;
 
             case 'responseTokens':
-              setOutputTokens(chunk.tokens);
               pending.tokens = chunk.tokens;
               break;
 
-            case 'reason':
-              setReasoningTokens(Math.ceil(chunk.content.length / 4));
-              break;
-
-            case 'toolStart':
-              addDiscardedTokens(Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4));
-              break;
-
             case 'usage':
-              discardedTokens = 0;
-              setReasoningTokens((chunk.usage.reasoning?.output || 0) + (chunk.usage.reasoning?.input || 0));
-              setOutputTokens(getTotalTokens(chunk.usage));
+              // Update current usage for this message
+              currentUsage = chunk.usage;
+              pending.tokens = getTotalTokens(chunk.usage);
+              updateUsageEvent();
               break;
           }
         }
@@ -319,8 +334,42 @@ export async function runChatOrchestrator(
           return v;
         }, 2)}`);
 
+        // Calculate message-specific usage and cost
+        const endUsage = getUsage();
+        messageUsage = {};
+        
+        // Calculate the difference in usage for this message
+        const endAccumulated = endUsage.accumulated;
+        
+        // Text usage
+        if (endAccumulated.text || startingUsage.text) {
+          messageUsage.text = {
+            input: (endAccumulated.text?.input || 0) - (startingUsage.text?.input || 0),
+            output: (endAccumulated.text?.output || 0) - (startingUsage.text?.output || 0),
+            cached: (endAccumulated.text?.cached || 0) - (startingUsage.text?.cached || 0),
+          };
+        }
+        
+        // Reasoning usage
+        if (endAccumulated.reasoning || startingUsage.reasoning) {
+          messageUsage.reasoning = {
+            input: (endAccumulated.reasoning?.input || 0) - (startingUsage.reasoning?.input || 0),
+            output: (endAccumulated.reasoning?.output || 0) - (startingUsage.reasoning?.output || 0),
+            cached: (endAccumulated.reasoning?.cached || 0) - (startingUsage.reasoning?.cached || 0),
+          };
+        }
+        
+        messageCost = endUsage.accumulatedCost - startingCost;
+        
+        // Add usage and cost to the pending message
+        pending.usage = messageUsage;
+        pending.cost = messageCost;
+
         // Emit completion event
         onEvent({ type: 'complete', message: pending });
+        
+        // Emit final accumulated usage and cost
+        onEvent({ type: 'usage', accumulated: endUsage.accumulated, accumulatedCost: endUsage.accumulatedCost, current: messageUsage });
       }      
 
       // Check for abort
@@ -349,9 +398,7 @@ export async function runChatOrchestrator(
       // Push pending to current messages for context, continue loop
       currentMessages.push(await convertMessage(pending));
       loopIteration++;
-      outputTokens = 0;
-      reasoningTokens = 0;
-      discardedTokens = 0;
+      currentUsage = {};
     }
 
     logger.log('orchestrator: completing');

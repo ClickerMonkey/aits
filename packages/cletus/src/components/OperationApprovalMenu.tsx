@@ -20,6 +20,7 @@ interface OperationApprovalMenuProps {
   onMessageUpdate?: (message: Message) => void;
   onComplete: (result: CompletionResult | null) => void;
   onChatStatus?: (status: string) => void;
+  onUsageUpdate?: (accumulated: any, accumulatedCost: number) => void;
 }
 
 type MenuState = 'main' | 'approving-some' | 'processing' | 'complete';
@@ -41,6 +42,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
   onMessageUpdate,
   onComplete,
   onChatStatus,
+  onUsageUpdate,
 }) => {
   const [menuState, setMenuState] = useState<MenuState>('main');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -128,6 +130,11 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         } else if (op.status === 'doneError') {
           failed++;
         }
+      }
+
+      // Report usage after operations complete
+      if (onUsageUpdate && ctx.usage) {
+        onUsageUpdate(ctx.usage.accumulated, ctx.usage.accumulatedCost);
       }
 
       const elapsed = (performance.now() - startTime);

@@ -285,12 +285,49 @@ export const MessageContentSchema = z.object({
   operationIndex: z.number().optional(),
 });
 
+// Usage schema matching @aits/core Usage interface
+export const UsageSchema = z.object({
+  text: z.object({
+    input: z.number().optional(),
+    output: z.number().optional(),
+    cached: z.number().optional(),
+  }).optional(),
+  audio: z.object({
+    input: z.number().optional(),
+    output: z.number().optional(),
+    seconds: z.number().optional(),
+  }).optional(),
+  image: z.object({
+    input: z.number().optional(),
+    output: z.array(z.object({
+      quality: z.string(),
+      size: z.object({
+        width: z.number(),
+        height: z.number(),
+      }),
+      count: z.number(),
+    })).optional(),
+  }).optional(),
+  reasoning: z.object({
+    input: z.number().optional(),
+    output: z.number().optional(),
+    cached: z.number().optional(),
+  }).optional(),
+  embeddings: z.object({
+    count: z.number().optional(),
+    tokens: z.number().optional(),
+  }).optional(),
+  cost: z.number().optional(),
+}).optional();
+
 export const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
   name: z.string().optional(),
   content: z.array(MessageContentSchema),
   created: z.number(),
   tokens: z.number().optional(),
+  cost: z.number().optional(),
+  usage: UsageSchema,
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
 });
