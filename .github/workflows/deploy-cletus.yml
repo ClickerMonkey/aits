@@ -1,0 +1,129 @@
+name: Deploy Cletus
+
+on:
+  push:
+    branches:
+      - main
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # Only run if SSH secrets are configured
+    if: ${{ secrets.DEPLOY_SSH_HOST != '' && secrets.DEPLOY_SSH_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p $SSH_PORT -H $SSH_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Test SSH connection
+        id: ssh-test
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+        run: |
+          echo "Testing SSH connection to $SSH_USER@$SSH_HOST:$SSH_PORT..."
+          if ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "echo 'Connection successful'"; then
+            echo "reachable=true" >> $GITHUB_OUTPUT
+            echo "✅ SSH connection successful"
+          else
+            echo "reachable=false" >> $GITHUB_OUTPUT
+            echo "❌ SSH connection failed - machine may be unreachable"
+            exit 0
+          fi
+      
+      - name: Prepare deployment package
+        if: steps.ssh-test.outputs.reachable == 'true'
+        run: |
+          # Create a tarball of the repository (excluding node_modules, .git, etc.)
+          tar --exclude='.git' \
+              --exclude='node_modules' \
+              --exclude='dist' \
+              --exclude='coverage' \
+              --exclude='*.tsbuildinfo' \
+              --exclude='.env' \
+              --exclude='.env.local' \
+              -czf /tmp/aits-deploy.tar.gz .
+          echo "📦 Deployment package created"
+      
+      - name: Deploy to remote machine
+        if: steps.ssh-test.outputs.reachable == 'true'
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/aits' }}
+        run: |
+          echo "🚀 Deploying to $SSH_USER@$SSH_HOST:$DEPLOY_PATH"
+          
+          # Create deployment directory on remote machine
+          ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "mkdir -p $DEPLOY_PATH"
+          
+          # Copy the tarball to remote machine
+          scp -i ~/.ssh/deploy_key -P $SSH_PORT -o StrictHostKeyChecking=no /tmp/aits-deploy.tar.gz $SSH_USER@$SSH_HOST:$DEPLOY_PATH/
+          
+          # Extract and build on remote machine
+          ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+            cd $DEPLOY_PATH
+            
+            echo "📂 Extracting deployment package..."
+            tar -xzf aits-deploy.tar.gz
+            rm aits-deploy.tar.gz
+            
+            echo "📥 Installing dependencies..."
+            export PUPPETEER_SKIP_DOWNLOAD=true
+            npm install --legacy-peer-deps --production=false
+            
+            echo "🔨 Building all packages..."
+            npm run build
+            
+            echo "✅ Deployment completed successfully!"
+            echo "📊 Build summary:"
+            ls -lh packages/*/dist 2>/dev/null || echo "No dist directories found"
+          ENDSSH
+          
+          echo "✅ Deployment to remote machine completed"
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f /tmp/aits-deploy.tar.gz
+          echo "🧹 Cleanup completed"
+      
+      - name: Deployment status
+        if: steps.ssh-test.outputs.reachable != 'true'
+        run: |
+          echo "⚠️  Deployment skipped - SSH connection could not be established"
+          echo "This is expected if:"
+          echo "  - SSH secrets are not configured"
+          echo "  - Remote machine is not reachable"
+          echo "  - Network connectivity issues"
