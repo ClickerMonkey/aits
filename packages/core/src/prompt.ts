@@ -100,6 +100,8 @@ export interface PromptInput<
   toolsMax?: number;
   // A function/promise that returns an array of tool names to use, or false to indicate the prompt is not compatible with the context.
   retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
+  // If true, tools/retool/applicable checks are done dynamically before each iteration instead of only once at the start
+  toolsDynamic?: boolean;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
   metadata?: TMetadata;
   // A function/promise that returns metadata about the prompt to be passed during execution/streaming.
@@ -562,6 +564,25 @@ export class Prompt<
       let content = '';
       let disableTools = false;
 
+      // Dynamic tool resolution - re-check tools before each iteration if enabled
+      if (this.input.toolsDynamic && request.tools) {
+        const dynamicToolsResolved = await this.resolveTools(ctx, input, true);
+        if (dynamicToolsResolved) {
+          const { tools: dynamicTools, toolObjects: dynamicToolObjects } = dynamicToolsResolved;
+          
+          // Update request tools
+          request.tools = dynamicTools;
+          
+          // Update toolMap with new tool objects
+          toolMap.clear();
+          if (dynamicToolObjects) {
+            for (const { tool, definition } of dynamicToolObjects) {
+              toolMap.set(tool.name, { tool, definition } as any);
+            }
+          }
+        }
+      }
+
       const streamController = new AbortController();
       const streamAbort = () => streamController.abort();
 
@@ -976,6 +997,58 @@ export class Prompt<
   }
 
   /**
+   * Resolves tools for the current context, checking applicability if needed.
+   * 
+   * @param ctx - The context to resolve tools against.
+   * @param input - The input to the prompt.
+   * @param checkApplicable - Whether to check tool applicability.
+   * @returns The resolved tools information or undefined.
+   */
+  private async resolveTools(ctx: Context<TContext, TMetadata>, input: TInput, checkApplicable: boolean) {
+    // Determine if prompt can run based on tool compatibility with the context
+    const retooling = await this.retool(input, ctx);
+    if (retooling === false) {
+      return undefined;
+    }
+
+    // Extract tools, their instructions, and schemas.
+    const toolNames = this.input.retool && retooling
+      ? new Set(retooling)
+      : new Set(this.input.tools?.map(t => t.name) || []);
+    let selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
+
+    // Check tool applicability if requested
+    if (checkApplicable && selectedTools) {
+      const applicabilityResults = await Promise.all(
+        selectedTools.map(async (tool) => ({
+          tool,
+          applicable: await tool.applicable(ctx)
+        }))
+      );
+      selectedTools = applicabilityResults
+        .filter(r => r.applicable)
+        .map(r => r.tool) as TTools;
+    }
+
+    const toolInstructions = selectedTools
+      ? (await Promise.all(selectedTools.map(t => t.compile(ctx)))).filter(t => !!t)
+      : undefined;
+    const instructions = toolInstructions
+      ? toolInstructions.map(t => t![0]).join("\n\n")
+      : undefined;
+    const tools = toolInstructions
+      ? toolInstructions.map(t => t![1])
+      : undefined;
+
+    // Create toolObjects as array of { tool, definition } pairs
+    const toolObjects = selectedTools && toolInstructions
+      ? selectedTools.map((tool, i) => ({ tool, definition: toolInstructions[i]![1] }))
+      : [];
+
+    return { tools, toolObjects, instructions };
+  }
+
+  /**
    * Prepares the prompt for execution by resolving all configuration, tools, and templates.
    * Returns undefined if the prompt is not compatible with the given context.
    *
@@ -996,31 +1069,13 @@ export class Prompt<
       return undefined;
     }
 
-    // Determine if prompt can run based on tool compatibility with the context
-    const retooling = await this.retool(input, ctx);
-    if (retooling === false) {
+    // Resolve tools with applicability checks
+    const toolsResolved = await this.resolveTools(ctx, input, true);
+    if (toolsResolved === undefined) {
       return undefined;
     }
 
-    // Extract tools, their instructions, and schemas.
-    const toolNames = this.input.retool && retooling
-      ? new Set(retooling)
-      : new Set(this.input.tools?.map(t => t.name) || []);
-    const selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
-    const toolInstructions = selectedTools
-      ? (await Promise.all(selectedTools.map(t => t.compile(ctx)))).filter(t => !!t)
-      : undefined;
-    const instructions = toolInstructions
-      ? toolInstructions.map(t => t![0]).join("\n\n")
-      : undefined;
-    const tools = toolInstructions
-      ? toolInstructions.map(t => t![1])
-      : undefined;
-
-    // Create toolObjects as array of { tool, definition } pairs
-    const toolObjects = selectedTools && toolInstructions
-      ? selectedTools.map((tool, i) => ({ tool, definition: toolInstructions[i]![1] }))
-      : [];
+    const { tools, toolObjects, instructions } = toolsResolved;
 
     // Compute the input that is fed to the prompt's prompt content
     let contentInput: Record<string, any> = input;
