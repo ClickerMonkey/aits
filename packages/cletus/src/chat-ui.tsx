@@ -138,6 +138,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [setElapsedTimeDebounced] = useAdaptiveDebounce(setElapsedTime);
   const [setTokenCountDebounced] = useAdaptiveDebounce(setTokenCount);
   const [setCurrentStatusDebounced] = useAdaptiveDebounce(setCurrentStatus);
+  const [setAccumulatedUsageDebounced] = useAdaptiveDebounce(setAccumulatedUsage);
+  const [setAccumulatedCostDebounced] = useAdaptiveDebounce(setAccumulatedCost);
 
   // Cached state for rendering & other logic.
   const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0].content?.length || pendingMessage.operations?.length));
@@ -834,8 +836,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
               break;
 
             case 'usage':
-              setAccumulatedUsage(event.accumulated);
-              setAccumulatedCost(event.accumulatedCost);
+              setAccumulatedUsageDebounced(event.accumulated);
+              setAccumulatedCostDebounced(event.accumulatedCost);
               setTokenCountDebounced(getTotalTokens(event.current));
               break;
 
@@ -1156,6 +1158,10 @@ After installation and the SoX executable is in the path, restart Cletus and try
           onStart={handleOperationStart}
           onComplete={handleOperation}
           onChatStatus={setCurrentStatusDebounced}
+          onUsageUpdate={(accumulated, cost) => {
+            setAccumulatedUsage(accumulated);
+            setAccumulatedCost(cost);
+          }}
         />
       )}
 

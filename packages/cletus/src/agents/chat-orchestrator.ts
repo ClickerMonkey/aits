@@ -246,8 +246,21 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content += chunk.content;
+                
+                // Estimate usage from current text length
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                const estimatedTokens = Math.ceil(totalTextLength / 4);
+                currentUsage = {
+                  text: {
+                    output: estimatedTokens,
+                  }
+                };
+                
                 onEvent({ type: 'pendingUpdate', pending });
                 onEvent({ type: 'status', status: '' });
+                updateUsageEvent();
               }
               break;
 
@@ -255,7 +268,20 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content = chunk.content;
+                
+                // Estimate usage from current text length
+                const totalTextLength = pending.content
+                  .filter(c => c.type === 'text' && c.operationIndex === undefined)
+                  .reduce((sum, c) => sum + c.content.length, 0);
+                const estimatedTokens = Math.ceil(totalTextLength / 4);
+                currentUsage = {
+                  text: {
+                    output: estimatedTokens,
+                  }
+                };
+                
                 onEvent({ type: 'pendingUpdate', pending });
+                updateUsageEvent();
               }
               break;
 
@@ -266,7 +292,9 @@ export async function runChatOrchestrator(
                 if (last.operationIndex === undefined && last.type === 'text') {
                   last.content = '';
                 }
+                currentUsage = {};
                 onEvent({ type: 'pendingUpdate', pending });
+                updateUsageEvent();
               }
               break;
 
