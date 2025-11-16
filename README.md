@@ -226,7 +226,7 @@ console.log('Image URL:', imageResponse.images[0].url);
 ### Function Calling
 
 ```typescript
-import { z } from 'zod';
+import z from 'zod';
 
 const response = await ai.chat.get([
   { role: 'user', content: 'What is the weather in San Francisco?' }
