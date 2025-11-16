@@ -13,6 +13,14 @@ import { CONSTS } from "../constants";
 import { renderOperation } from "../helpers/render";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, processFile, searchFiles } from "../helpers/files";
 
+// Constants for file_attach operation
+const ALLOWED_FILE_TYPES = ['text', 'pdf'] as const;
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'] as const;
+
+function isAudioFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return AUDIO_EXTENSIONS.includes(ext as any);
+}
 
 export const file_search = operationOf<
   { glob: string; limit?: number, offset?: number },
@@ -1058,14 +1066,9 @@ export const file_attach = operationOf<
 
     // Check file type - only allow text, audio, or PDF
     const fileType = await categorizeFile(fullPath, filePath);
-    const allowedTypes = ['text', 'pdf'];
-    
-    // Check for audio files by extension
-    const ext = path.extname(filePath).toLowerCase();
-    const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
-    const isAudio = audioExts.includes(ext);
+    const isAudio = isAudioFile(filePath);
 
-    if (!allowedTypes.includes(fileType) && !isAudio) {
+    if (!ALLOWED_FILE_TYPES.includes(fileType as any) && !isAudio) {
       return {
         analysis: `This would fail - file type "${fileType}" is not allowed. Only text, audio, and PDF files can be attached.`,
         doable: false,
@@ -1083,10 +1086,7 @@ export const file_attach = operationOf<
     const fileLink = linkFile(fullPath, path.basename(filePath));
 
     // Determine the content type
-    const fileType = await categorizeFile(fullPath, filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
-    const isAudio = audioExts.includes(ext);
+    const isAudio = isAudioFile(filePath);
 
     // Add file to the chat message
     if (chatMessage) {
