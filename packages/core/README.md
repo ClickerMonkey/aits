@@ -40,7 +40,7 @@ All AI primitives implement the `Component` interface:
 
 ```typescript
 import { Prompt } from '@aits/core';
-import { z } from 'zod';
+import z from 'zod';
 
 const summarizer = new Prompt({
   name: 'summarize',
@@ -59,8 +59,8 @@ const summarizer = new Prompt({
 
 // Execute with a context that has an executor
 const result = await summarizer.get(
-  { text: 'Long article text...' },
   'result',
+  { text: 'Long article text...' },
   {
     execute: yourAIExecutor, // Executor function from a provider
     messages: []
@@ -75,19 +75,19 @@ console.log(result.keyPoints);
 
 ```typescript
 import { Tool } from '@aits/core';
-import { z } from 'zod';
+import z from 'zod';
 
 const weatherTool = new Tool({
   name: 'getWeather',
   description: 'Get current weather for a location',
-  instructions: 'Use this tool to get weather data for {{location}}',
+  instructions: 'Use this tool to get weather data',
   
   schema: z.object({
     location: z.string().describe('City name or coordinates'),
     units: z.enum(['celsius', 'fahrenheit']).default('celsius')
   }),
   
-  call: async (input) => {
+  call: async (input, refs, ctx) => {
     const response = await fetch(
       `https://api.weather.com/v1/${input.location}`
     );
@@ -130,8 +130,8 @@ Use the weather tool to check current conditions, then provide:
 
 // The AI will automatically call weatherTool if needed
 const advice = await travelAdvisor.get(
-  { destination: 'Paris' },
   'result',
+  { destination: 'Paris' },
   { execute: yourAIExecutor, messages: [] }
 );
 ```
@@ -141,8 +141,8 @@ const advice = await travelAdvisor.get(
 ```typescript
 // Stream content only
 for await (const chunk of summarizer.get(
-  { text: 'Long text...' },
   'streamContent',
+  { text: 'Long text...' },
   { stream: yourAIStreamer, messages: [] }
 )) {
   process.stdout.write(chunk);
@@ -150,8 +150,8 @@ for await (const chunk of summarizer.get(
 
 // Stream all events (including tool calls)
 for await (const event of summarizer.get(
-  { text: 'Long text...' },
   'stream',
+  { text: 'Long text...' },
   { stream: yourAIStreamer, messages: [] }
 )) {
   if (event.type === 'textPartial') {
@@ -186,8 +186,8 @@ const researchAgent = new Agent({
     const summaries = [];
     for (const result of searchResults) {
       const summary = await summarize.get(
-        { text: result.content },
         'result',
+        { text: result.content },
         ctx
       );
       summaries.push(summary);
@@ -195,8 +195,8 @@ const researchAgent = new Agent({
     
     // Step 3: Analyze and synthesize
     const analysis = await analyze.get(
-      { topic: input.topic, sources: summaries },
       'result',
+      { topic: input.topic, sources: summaries },
       ctx
     );
     
@@ -224,13 +224,13 @@ The `get` method supports different execution modes:
 
 ```typescript
 // Get structured result
-const result = await prompt.get(input, 'result', ctx);
+const result = await prompt.get('result', input, ctx);
 
 // Get tool outputs only
-const tools = await prompt.get(input, 'tools', ctx);
+const tools = await prompt.get('tools', input, ctx);
 
 // Stream everything
-for await (const event of prompt.get(input, 'stream', ctx)) {
+for await (const event of prompt.get('stream', input, ctx)) {
   // Handle different event types
 }
 ```
@@ -313,7 +313,7 @@ const validatedTool = new Tool({
     }
   },
   
-  call: async (input) => {
+  call: async (input, refs, ctx) => {
     // Place order
   }
 });
@@ -341,8 +341,8 @@ const runner = withEvents({
 });
 
 const result = await prompt.get(
-  { text: 'Hello' },
   'result',
+  { text: 'Hello' },
   {
     execute: yourAIExecutor,
     messages: [],
@@ -370,7 +370,7 @@ const context = {
 };
 
 // Prompt will automatically trim messages if needed
-const result = await prompt.get({ text: 'Query' }, 'result', context);
+const result = await prompt.get('result', { text: 'Query' }, context);
 ```
 
 ### Dynamic Reconfiguration
@@ -546,7 +546,7 @@ const output = await prompt.get({}); // { result: string }
 const tool = new Tool({
   name: 'math',
   schema: z.object({ a: z.number(), b: z.number() }),
-  call: (input) => {
+  call: (input, refs, ctx) => {
     // input is typed as { a: number, b: number }
     return input.a + input.b;
   }
