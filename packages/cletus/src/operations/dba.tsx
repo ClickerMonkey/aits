@@ -40,6 +40,63 @@ function isReferenceType(fieldType: string, config: ConfigFile): boolean {
 }
 
 /**
+ * Validate that related field values are valid instance IDs
+ * Optimized to minimize DataManager loads by loading each unique reference type once
+ */
+async function validateRelatedFields(
+  fields: Record<string, any>,
+  type: TypeDefinition,
+  config: ConfigFile
+): Promise<void> {
+  // Find all reference fields being set
+  const referenceFields = type.fields.filter(f => 
+    f.name in fields && isReferenceType(f.type, config)
+  );
+  
+  if (referenceFields.length === 0) {
+    return;
+  }
+
+  // Group reference fields by type to minimize data manager loads
+  const refTypeMap = new Map<string, TypeField[]>();
+  for (const field of referenceFields) {
+    if (!refTypeMap.has(field.type)) {
+      refTypeMap.set(field.type, []);
+    }
+    refTypeMap.get(field.type)!.push(field);
+  }
+
+  // Load all unique reference types in parallel and validate
+  await Promise.all(
+    Array.from(refTypeMap.entries()).map(async ([refTypeName, refFields]) => {
+      const refType = getType(config, refTypeName);
+      const refDataManager = new DataManager(refTypeName);
+      await refDataManager.load();
+      
+      // Create a set of all valid IDs for quick lookup
+      const validIds = new Set(refDataManager.getAll().map(r => r.id));
+      
+      // Validate each field referencing this type
+      for (const field of refFields) {
+        const refId = fields[field.name];
+        
+        // Skip if field is null/undefined/empty (these are allowed for non-required fields)
+        if (refId === null || refId === undefined || refId === '') {
+          continue;
+        }
+        
+        // Check if the reference ID is valid
+        if (!validIds.has(refId as string)) {
+          throw new Error(
+            `Invalid reference: field "${field.friendlyName}" references ${refType.friendlyName} with ID "${refId}", but no such record exists`
+          );
+        }
+      }
+    })
+  );
+}
+
+/**
  * Join related records for reference fields
  * Optimized to minimize DataManager loads by loading each unique reference type once
  */
@@ -350,6 +407,11 @@ export const data_create = operationOf<
     };
   },
   do: async ({ name, fields }, ctx) => {
+    const type = getType(ctx.config, name);
+    
+    // Validate related field values
+    await validateRelatedFields(fields, type, ctx.config);
+    
     const dataManager = new DataManager(name);
     await dataManager.load();
     const id = await dataManager.create(fields);
@@ -412,6 +474,11 @@ export const data_update = operationOf<
     };
   },
   do: async ({ name, id, fields }, ctx) => {
+    const type = getType(ctx.config, name);
+    
+    // Validate related field values
+    await validateRelatedFields(fields, type, ctx.config);
+    
     const dataManager = new DataManager(name);
     await dataManager.load();
     await dataManager.update(id, fields);
@@ -671,6 +738,11 @@ export const data_update_many = operationOf<
     };
   },
   do: async ({ name, limit, set, where }, ctx) => {
+    const type = getType(ctx.config, name);
+    
+    // Validate related field values
+    await validateRelatedFields(set, type, ctx.config);
+    
     const dataManager = new DataManager(name);
     await dataManager.load();
 
