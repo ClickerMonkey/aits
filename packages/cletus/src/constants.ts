@@ -20,6 +20,13 @@ export const COLORS = {
   STATUS_ANALYZED: 'yellow' as const, // Yellow circle for operations needing approval
   STATUS_IN_PROGRESS: 'rgb(255,165,0)' as const, // Orange circle for in-progress operations
 
+  // Menu Gradianet
+  MENU_GRADIENT: [
+    '#9d4edd',
+    'rgb(0,128,255)',
+    'rgb(255,165,0)',
+  ] as string[],
+
   // Operation approval menu colors
   APPROVAL_BORDER: 'yellow' as const,
   APPROVAL_SELECTED: 'cyan' as const,

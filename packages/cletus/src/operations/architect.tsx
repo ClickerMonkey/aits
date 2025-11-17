@@ -1,7 +1,7 @@
 import Handlebars from 'handlebars';
 import path from 'path';
 import { z } from 'zod';
-import { formatName } from "../common";
+import { formatName, pluralize } from "../common";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
@@ -457,34 +457,31 @@ export const type_import = operationOf<
     
     // Helper functions for dynamic schema generation
     const getDiscoveredTypeEnum = () => {
-      const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
-      return discoveredTypeNamesList.length > 0 
-        ? z.enum(discoveredTypeNamesList as [string, ...string[]]) 
-        : z.string();
+      const discoveredNames = Array.from(discoveredTypes.keys());
+      return discoveredNames.length ? z.enum(discoveredNames as [string, ...string[]]) : z.never();
+    };
+
+    // Get all type names (existing + discovered)
+    const getAllTypeNames = () => {
+      const discoveredNames = Array.from(discoveredTypes.keys());
+      return [...existingTypeNames, ...discoveredNames];
     };
     
+    // Dynamic enum of all type names
     const getAllTypeEnum = () => {
-      const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
-      const allTypeNames = [...existingTypeNames, ...discoveredTypeNamesList];
-      return allTypeNames.length > 0
-        ? z.enum(allTypeNames as [string, ...string[]])
-        : z.string();
+      const allNames = getAllTypeNames();
+      return allNames.length ? z.enum(allNames as [string, ...string[]]) : z.never();
     };
     
     // Define reusable field schema factory (dynamic to include discovered types)
-    const createFieldSchema = () => {
-      const discoveredTypeNamesList = Array.from(discoveredTypes.keys());
-      const allTypeNames = [...existingTypeNames, ...discoveredTypeNamesList];
-      
-      return z.object({
-        name: z.string().describe('Field name (lowercase, no spaces)'),
-        friendlyName: z.string().describe('Field display name'),
-        type: z.enum(['string', 'number', 'boolean', 'date', 'enum', ...allTypeNames] as [string, ...string[]]).describe('Field type'),
-        required: z.boolean().optional().describe('Is field required?'),
-        enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
-        onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields'),
-      });
-    };
+    const createFieldSchema = () => z.object({
+      name: z.string().describe('Field name (lowercase, no spaces)'),
+      friendlyName: z.string().describe('Field display name'),
+      type: z.enum(['string', 'number', 'boolean', 'date', 'enum', ...getAllTypeNames()] as [string, ...string[]]).describe('Field type'),
+      required: z.boolean().optional().describe('Is field required?'),
+      enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type)'),
+      onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields'),
+    });
     
     // Create the prompt with dynamic schemas
     const extractor = ai.prompt({
@@ -554,6 +551,7 @@ When managing types:
         ai.tool({
           name: 'add_discovered',
           description: 'Add a new discovered type definition. Only available if max types limit has not been reached.',
+          instructions: 'Create a new discovered type with the specified name, friendly name, description, fields, and optional instance count.',
           schema: () => z.object({
             name: z.string().describe('Type name (lowercase, no spaces)'),
             friendlyName: z.string().describe('Display name'),
@@ -595,6 +593,7 @@ When managing types:
         ai.tool({
           name: 'rename_discovered',
           description: 'Rename a discovered type',
+          instructions: 'Change the name of an existing discovered type. This is useful for resolving naming conflicts or improving clarity.',
           schema: () => z.object({
             oldName: getDiscoveredTypeEnum().describe('Current type name'),
             newName: z.string().describe('New type name (lowercase, no spaces)'),
@@ -621,6 +620,7 @@ When managing types:
         ai.tool({
           name: 'update_fields',
           description: 'Add, update, or remove fields on an existing or discovered type. For existing types, only new fields can be added.',
+          instructions: `Modify the fields of a specified type. For discovered types, you can add new fields, update existing fields, or remove fields. For existing types, you can only add new fields; updating or removing existing fields is not allowed.`,
           schema: () => z.object({
             typeName: getAllTypeEnum().describe('Type name'),
             fields: z.array(
@@ -633,6 +633,7 @@ When managing types:
               ])
             ).describe('Fields to add/update/remove. To remove, use {name: "fieldname", remove: true}'),
           }),
+          applicable: () => discoveredTypes.size > 0 || existingTypeNames.length > 0,
           call: async (input) => {
             // Check if it's a discovered type
             const discoveredType = discoveredTypes.get(input.typeName);
@@ -726,6 +727,7 @@ When managing types:
         ai.tool({
           name: 'update_discovered',
           description: 'Update properties of a discovered type',
+          instructions: 'Update the friendly name or description of a discovered type.',
           schema: () => z.object({
             name: getDiscoveredTypeEnum().describe('Type name'),
             friendlyName: z.string().optional().describe('New friendly name'),
@@ -747,6 +749,7 @@ When managing types:
         ai.tool({
           name: 'add_instances',
           description: 'Track instance count for a type',
+          instructions: 'Increment the instance count for the specified type by the given count. This is necessary for prioritizing important types during import.',
           schema: () => z.object({
             typeName: getDiscoveredTypeEnum().describe('Type name'),
             count: z.number().describe('Number of instances to add'),
@@ -766,6 +769,7 @@ When managing types:
         ai.tool({
           name: 'remove_discovered',
           description: 'Remove a discovered type',
+          instructions: 'Remove the specified discovered type, for example if it is too infrequent or not useful.',
           schema: () => z.object({
             name: getDiscoveredTypeEnum().describe('Type name to remove'),
             reason: z.string().optional().describe('Reason for removal'),
@@ -790,6 +794,8 @@ When managing types:
       }),
       excludeMessages: true,
       dynamic: true,
+      toolExecution: 'parallel',
+      toolsOnly: true,
     });
     
     // Pipeline architecture with two concurrent promises
@@ -803,11 +809,11 @@ When managing types:
     let queuedSize = 0;
     const maxQueueSize = TYPE_IMPORT_CONSTS.MAX_QUEUE_SIZE;
     let parsingComplete = false;
-    let parsingError: Error | null = null;
+    let parsingError = null as Error | null;
     
     // Promise resolvers for flow control
-    let queueHasSpace: (() => void) | null = null;
-    let queueHasData: (() => void) | null = null;
+    let queueHasSpace = null as (() => void) | null;
+    let queueHasData = null as (() => void) | null;
     
     // Parser promise - reads files and queues data
     const parserPromise = (async () => {
@@ -863,7 +869,7 @@ When managing types:
         parsingComplete = true;
         // Wake up processor if it's waiting
         if (queueHasData) {
-          const resolver = queueHasData;
+          const resolver = queueHasData!;
           queueHasData = null;
           resolver();
         }
@@ -1002,10 +1008,10 @@ When managing types:
         const parts = [];
         
         if (discoveredCount > 0) {
-          parts.push(`${discoveredCount} new type${discoveredCount !== 1 ? 's' : ''}`);
+          parts.push(`${pluralize(discoveredCount, 'new type')}`);
         }
         if (updatesCount > 0) {
-          parts.push(`${updatesCount} type update${updatesCount !== 1 ? 's' : ''}`);
+          parts.push(`${pluralize(updatesCount, 'type updaye')}`);
         }
         
         return parts.length > 0 

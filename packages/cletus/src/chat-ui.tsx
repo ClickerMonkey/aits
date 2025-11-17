@@ -112,6 +112,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [renderKey, setRenderKey] = useState(0);
   const [accumulatedUsage, setAccumulatedUsage] = useState<any>({});
   const [accumulatedCost, setAccumulatedCost] = useState(0);
+  const interceptingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
@@ -209,11 +210,21 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     };
   }, [chatMeta.title]);
 
+  // A handy function to briefly intercept input
+  const interceptInput = () => {
+    interceptingRef.current = true;
+  };
+  const interceptingInput = () => {
+    const intercepted = interceptingRef.current;
+    interceptingRef.current = false;
+    return intercepted;
+  };
+
   // Handle keyboard shortcuts
   useInput((input, key) => {
     // Don't handle input when approval menu is showing
     if (operationApprovalPending) {
-      return;
+      return interceptInput();
     }
 
     if (key.ctrl && input === 'c') {
@@ -226,7 +237,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         setShowExitPrompt(true);
         setExitOptionIndex(0);
       }
-      return;
+      return interceptInput();
     }
 
     // Shift+Enter to add newline
@@ -259,8 +270,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const newMode = modes[nextIndex];
       onChatUpdate({ mode: newMode });
       setChatMeta({ ...chatMeta, mode: newMode });
-      addSystemMessage(`✓ Chat mode changed to: ${newMode}`);
-      return;
+      return interceptInput();
     }
 
     // Alt+M to toggle agent mode
@@ -268,8 +278,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const newAgentMode = chatMeta.agentMode === 'plan' ? 'default' : 'plan';
       onChatUpdate({ agentMode: newAgentMode });
       setChatMeta({ ...chatMeta, agentMode: newAgentMode });
-      addSystemMessage(`✓ Agent mode changed to: ${newAgentMode}`);
-      return;
+      return interceptInput();
     }
 
     // Alt+I to toggle operation input details
@@ -277,11 +286,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const newShowInput = !showInput;
       setShowInput(newShowInput);
       setRenderKey(k => k + 1); // Force re-render of Static content
-      addSystemMessage(`✓ Operation input ${newShowInput ? 'shown' : 'hidden'}`);
       config.save((cfg) => {
         cfg.user.showInput = newShowInput;
       });
-      return;
+      return interceptInput();
     }
 
     // Alt+O to toggle operation output details
@@ -289,11 +297,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const newShowOutput = !showOutput;
       setShowOutput(newShowOutput);
       setRenderKey(k => k + 1); // Force re-render of Static content
-      addSystemMessage(`✓ Operation output ${newShowOutput ? 'shown' : 'hidden'}`);
       config.save((cfg) => {
         cfg.user.showOutput = newShowOutput;
       });
-      return;
+      return interceptInput();
     }
 
     // Alt+S to toggle system messages visibility
@@ -301,11 +308,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const newShowSystemMessages = !showSystemMessages;
       setShowSystemMessages(newShowSystemMessages);
       setRenderKey(k => k + 1); // Force re-render of Static content
-      addSystemMessage(`✓ System messages ${newShowSystemMessages ? 'shown' : 'hidden'}`);
       config.save((cfg) => {
         cfg.user.showSystemMessages = newShowSystemMessages;
       });
-      return;
+      return interceptInput();
     }
 
     // Alt+Up to navigate backwards through message history
@@ -972,6 +978,10 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
   // Handle input changes and command menu
   const handleInputChange = (value: string) => {
+    if (interceptingInput()) {
+      return
+    }
+
     setInputValue(value);
 
     // Show help menu when typing ?

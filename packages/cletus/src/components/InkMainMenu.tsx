@@ -8,6 +8,7 @@ import type { ChatMeta } from '../schemas';
 import { InkSettingsMenu } from './InkSettingsMenu';
 import Gradient from 'ink-gradient';
 import BigText from 'ink-big-text';
+import { COLORS } from '../constants';
 
 type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat-prompt' | 'create-chat-mode';
 
@@ -196,7 +197,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Gradient name="rainbow">
+      <Gradient colors={COLORS.MENU_GRADIENT}>
         <BigText text="cletus"/>
       </Gradient>
       
