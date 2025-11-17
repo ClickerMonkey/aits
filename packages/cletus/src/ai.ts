@@ -1,9 +1,9 @@
-import { AI, ContextInfer } from '@aits/ai';
-import { models } from '@aits/models';
-import { OpenAIProvider } from '@aits/openai';
-import { OpenRouterProvider } from '@aits/openrouter';
-import { ReplicateProvider } from '@aits/replicate';
-import { AWSBedrockProvider } from '@aits/aws';
+import { AI, ContextInfer } from '@aeye/ai';
+import { models } from '@aeye/models';
+import { OpenAIProvider } from '@aeye/openai';
+import { OpenRouterProvider } from '@aeye/openrouter';
+import { ReplicateProvider } from '@aeye/replicate';
+import { AWSBedrockProvider } from '@aeye/aws';
 import Handlebars from 'handlebars';
 import { ChatFile } from './chat';
 import { ConfigFile } from './config';
@@ -13,7 +13,7 @@ import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 import z from 'zod';
 import { loadPromptFiles } from './prompt-loader';
-import { Usage, accumulateUsage } from '@aits/core';
+import { Usage, accumulateUsage } from '@aeye/core';
 
 /**
  * Cletus AI Context
@@ -75,7 +75,7 @@ export function createCletusAI(configFile: ConfigFile) {
       defaultParams: {
         ...config.providers.openrouter.defaultParams,
         appName: 'cletus',
-        siteUrl: 'https://github.com/ClickerMonkey/aits',
+        siteUrl: 'https://github.com/ClickerMonkey/aeye',
       },
     }) } : {}),
     ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),

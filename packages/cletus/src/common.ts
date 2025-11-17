@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { CONSTS } from "./constants";
 import { Message, MessageContent } from "./schemas";
-import { Message as AIMessage, MessageContent as AIMessageContent } from "@aits/core";
+import { Message as AIMessage, MessageContent as AIMessageContent } from "@aeye/core";
 import { detectMimeType } from "./helpers/files";
 
 /**
@@ -93,7 +93,14 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
     return '{}';
   }
   
-  return entries.map(([key, val]) => `${hyphenPrefix}${key}: ${formatValue(val).split('\n').join('\n  ')}`).join('\n');
+  return entries.map(([key, val]) => {
+    const prefix = `${hyphenPrefix}${key}:`;
+    if (typeof val === 'object' && val !== null) {
+      return `${prefix}\n  ${formatValue(val, true).split('\n').join('\n  ')}`;
+    } else {
+      return `${prefix} ${formatValue(val).split('\n').join('\n  ')}`;
+    }
+  }).join('\n');
 }
 
 /**

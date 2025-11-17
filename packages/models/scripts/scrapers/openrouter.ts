@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as puppeteer from 'puppeteer';
 import * as url from 'url';
-import { fetchModels, fetchZDRModels, convertOpenRouterModel } from '@aits/openrouter';
+import { fetchModels, fetchZDRModels, convertOpenRouterModel } from '@aeye/openrouter';
 import { writeModelTS } from '../codegen';
 
 const __filename = url.fileURLToPath(import.meta.url);

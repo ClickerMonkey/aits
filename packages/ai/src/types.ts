@@ -27,10 +27,10 @@ import type {
   ModelInput,
   Model,
   Simplify,
-} from '@aits/core';
-import type { PromptInput } from '@aits/core';
-import type { ToolInput } from '@aits/core';
-import type { AgentInput } from '@aits/core';
+} from '@aeye/core';
+import type { PromptInput } from '@aeye/core';
+import type { ToolInput } from '@aeye/core';
+import type { AgentInput } from '@aeye/core';
 import { AI } from './ai';
 
 // ============================================================================

@@ -5,9 +5,9 @@
  * These tests make REAL API calls and require API keys in environment.
  */
 
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
-import { OpenRouterProvider } from '@aits/openrouter';
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
+import { OpenRouterProvider } from '@aeye/openrouter';
 import { getAPIKey, requireMinimumProviders, getAvailableProviders } from '../setup';
 
 const describeMultiProvider = requireMinimumProviders(2);

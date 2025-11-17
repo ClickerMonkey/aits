@@ -4,7 +4,7 @@
  * Provides image generation, editing, and analysis functionality.
  */
 
-import { getChunksFromResponse, getResponseFromChunks, ModelInput } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, ModelInput } from '@aeye/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,

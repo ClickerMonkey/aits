@@ -1,8 +1,8 @@
-# @aits - AI TypeScript Library
+# @aeye - AI TypeScript Library
 
 > **Multi-provider AI library with intelligent model selection, type-safe context management, and comprehensive provider support.**
 
-@aits (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
+@aeye (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
@@ -35,19 +35,19 @@
 
 ```bash
 # Install core packages
-npm install @aits/ai @aits/core zod
+npm install @aeye/ai @aeye/core zod
 
 # Install provider packages as needed
-npm install @aits/openai openai       # OpenAI
-npm install @aits/openrouter          # OpenRouter (multi-provider)
-npm install @aits/replicate replicate # Replicate
+npm install @aeye/openai openai       # OpenAI
+npm install @aeye/openrouter          # OpenRouter (multi-provider)
+npm install @aeye/replicate replicate # Replicate
 ```
 
 ### Basic Usage
 
 ```typescript
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
 
 // Create providers
 const openai = new OpenAIProvider({
@@ -78,9 +78,9 @@ for await (const chunk of ai.chat.stream([
 ### Multi-Provider Setup
 
 ```typescript
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
-import { OpenRouterProvider } from '@aits/openrouter';
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
+import { OpenRouterProvider } from '@aeye/openrouter';
 
 const openai = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
 const openrouter = new OpenRouterProvider({ apiKey: process.env.OPENROUTER_API_KEY! });
@@ -138,27 +138,27 @@ const response = await ai.chat.get([
 
 ### Core Packages
 
-#### [@aits/core](./packages/core)
-Core types and interfaces for the @aits framework. Defines the foundational types for requests, responses, providers, and streaming.
+#### [@aeye/core](./packages/core)
+Core types and interfaces for the @aeye framework. Defines the foundational types for requests, responses, providers, and streaming.
 
 ```bash
-npm install @aits/core
+npm install @aeye/core
 ```
 
-#### [@aits/ai](./packages/ai)
-Main AI library with intelligent model selection, context management, and comprehensive APIs. Built on top of @aits/core.
+#### [@aeye/ai](./packages/ai)
+Main AI library with intelligent model selection, context management, and comprehensive APIs. Built on top of @aeye/core.
 
 ```bash
-npm install @aits/ai @aits/core
+npm install @aeye/ai @aeye/core
 ```
 
 ### Provider Packages
 
-#### [@aits/openai](./packages/openai)
+#### [@aeye/openai](./packages/openai)
 OpenAI provider supporting GPT-4, GPT-3.5, DALL-E, Whisper, TTS, and embeddings. Serves as base class for OpenAI-compatible providers.
 
 ```bash
-npm install @aits/openai openai
+npm install @aeye/openai openai
 ```
 
 **Features:**
@@ -172,11 +172,11 @@ npm install @aits/openai openai
 - Function calling
 - Structured outputs
 
-#### [@aits/openrouter](./packages/openrouter)
+#### [@aeye/openrouter](./packages/openrouter)
 OpenRouter provider for unified access to multiple AI providers with automatic fallbacks and competitive pricing.
 
 ```bash
-npm install @aits/openrouter
+npm install @aeye/openrouter
 ```
 
 **Features:**
@@ -186,11 +186,11 @@ npm install @aits/openrouter
 - Zero Data Retention (ZDR) support
 - Provider routing preferences
 
-#### [@aits/replicate](./packages/replicate)
+#### [@aeye/replicate](./packages/replicate)
 Replicate provider with flexible adapter system for running open-source AI models.
 
 ```bash
-npm install @aits/replicate replicate
+npm install @aeye/replicate replicate
 ```
 
 **Features:**
@@ -204,8 +204,8 @@ npm install @aits/replicate replicate
 ### Image Generation
 
 ```typescript
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
 
 const openai = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -382,7 +382,7 @@ const response = await ai.chat.get(messages, {
 Create custom providers by implementing the `Provider` interface or extending existing providers:
 
 ```typescript
-import { OpenAIProvider, OpenAIConfig } from '@aits/openai';
+import { OpenAIProvider, OpenAIConfig } from '@aeye/openai';
 import OpenAI from 'openai';
 
 class CustomProvider extends OpenAIProvider {
@@ -402,7 +402,7 @@ class CustomProvider extends OpenAIProvider {
 Fetch models from external sources:
 
 ```typescript
-import { OpenRouterModelSource } from '@aits/openrouter';
+import { OpenRouterModelSource } from '@aeye/openrouter';
 
 const ai = AI.with()
   .providers({ openai })
@@ -443,7 +443,7 @@ const ai = AI.with()
 ### Provider Capability Detection
 
 ```typescript
-import { getProviderCapabilities } from '@aits/ai';
+import { getProviderCapabilities } from '@aeye/ai';
 
 const openai = new OpenAIProvider({ apiKey: '...' });
 const caps = getProviderCapabilities(openai);
@@ -520,7 +520,7 @@ interface ReplicateConfig {
 
 ## Cost Tracking
 
-@aits provides comprehensive cost tracking:
+@aeye provides comprehensive cost tracking:
 
 ```typescript
 const response = await ai.chat.get(messages);
@@ -540,7 +540,7 @@ console.log('Cost: $', response.usage.cost);
 ## Error Handling
 
 ```typescript
-import { ProviderError, RateLimitError } from '@aits/openai';
+import { ProviderError, RateLimitError } from '@aeye/openai';
 
 try {
   const response = await ai.chat.get(messages);
@@ -559,7 +559,7 @@ try {
 
 ## Model Capabilities
 
-@aits uses a capability system for model selection:
+@aeye uses a capability system for model selection:
 
 | Capability | Description | Example Providers |
 |------------|-------------|-------------------|
@@ -597,7 +597,7 @@ npm run clean
 ### Project Structure
 
 ```
-aits/
+aeye/
 ├── packages/
 │   ├── core/          # Core types and interfaces
 │   ├── ai/            # Main AI library
@@ -648,7 +648,7 @@ Contributions are welcome! Areas where we'd especially appreciate help:
 - **Testing** - Unit tests, integration tests
 - **Bug Fixes** - Issue reports and fixes
 
-Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## Related Projects
 
@@ -666,8 +666,8 @@ See [LICENSE](./LICENSE) for details.
 
 ## Support
 
-- **GitHub Issues**: https://github.com/ClickerMonkey/aits/issues
-- **Documentation**: https://github.com/ClickerMonkey/aits
+- **GitHub Issues**: https://github.com/ClickerMonkey/aeye/issues
+- **Documentation**: https://github.com/ClickerMonkey/aeye
 - **Examples**: See `/examples` directory (coming soon)
 
 ## Acknowledgments

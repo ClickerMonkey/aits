@@ -7,7 +7,7 @@
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 
 export const awsModels: ModelInfo[] = [{
   id: 'stability.stable-fast-upscale-v1:0',

@@ -2,11 +2,11 @@
  * Model Transformers
  *
  * Maps model IDs to their transformer implementations.
- * Transformers handle conversion between @aits request/response format
+ * Transformers handle conversion between @aeye request/response format
  * and provider-specific formats for models with non-standard APIs.
  */
 
-import type { ModelTransformer } from '@aits/ai';
+import type { ModelTransformer } from '@aeye/ai';
 
 /**
  * Registry of model transformers by model ID

@@ -194,7 +194,7 @@ describe('Tool', () => {
       const tool = new Tool({
         name: 'async-tool',
         description: 'Async operations',
-        instructions: 'Waits',
+        instructions: 'Waeye',
         schema: z.object({ delay: z.number() }),
         call: async (input) => {
           await new Promise(resolve => setTimeout(resolve, input.delay));

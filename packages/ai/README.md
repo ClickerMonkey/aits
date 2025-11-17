@@ -1,8 +1,8 @@
-# @aits/ai
+# @aeye/ai
 
 > **Multi-provider AI library with intelligent model selection, type-safe context management, and comprehensive hooks system.**
 
-The `@aits/ai` package is the main AI library built on `@aits/core`, providing a unified interface for working with multiple AI providers (OpenAI, Anthropic, Google, etc.) with automatic model selection, cost tracking, and extensible architecture.
+The `@aeye/ai` package is the main AI library built on `@aeye/core`, providing a unified interface for working with multiple AI providers (OpenAI, Anthropic, Google, etc.) with automatic model selection, cost tracking, and extensible architecture.
 
 ```ts
 const ai = AI.with<MyContext>()
@@ -141,21 +141,21 @@ console.log(`Quality rating: ${result.analysis.rating}/100`);
 ## Installation
 
 ```bash
-npm install @aits/ai @aits/core
+npm install @aeye/ai @aeye/core
 ```
 
 You'll also need provider packages:
 
 ```bash
-npm install @aits/openai @aits/anthropic  # etc.
+npm install @aeye/openai @aeye/anthropic  # etc.
 ```
 
 ## Quick Start
 
 ```typescript
-import { AI } from '@aits/ai';
-import { OpenAIProvider } from '@aits/openai';
-import { OpenRouterProvider } from '@aits/openrouter';
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
+import { OpenRouterProvider } from '@aeye/openrouter';
 
 // Create providers
 const openai = new OpenAIProvider({ apiKey: '123' });
@@ -188,7 +188,7 @@ for await (const chunk of ai.chat.stream([
 
 ## Architecture
 
-The `@aits/ai` library is structured around several key components:
+The `@aeye/ai` library is structured around several key components:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -924,7 +924,7 @@ await ai.chat.get(messages, {
 Enrich model information from external registries:
 
 ```typescript
-import { openRouterSource } from '@aits/openrouter';
+import { openRouterSource } from '@aeye/openrouter';
 
 const ai = AI.with()
   .providers({ openai, anthropic, openrouter })
@@ -949,7 +949,7 @@ const models = ai.models.list();
 Create custom provider implementations:
 
 ```typescript
-import { Provider } from '@aits/ai';
+import { Provider } from '@aeye/ai';
 
 const customProvider: Provider<CustomConfig> = {
   name: 'custom',
@@ -1149,9 +1149,9 @@ export interface AppMetadata {
 }
 
 // ai.ts
-import { AI } from '@aits/ai';
-import { openai } from '@aits/openai';
-import { anthropic } from '@aits/anthropic';
+import { AI } from '@aeye/ai';
+import { openai } from '@aeye/openai';
+import { anthropic } from '@aeye/anthropic';
 
 export const ai = AI.with<AppContext, AppMetadata>()
   .providers({ openai, anthropic })
@@ -1319,6 +1319,6 @@ MIT
 ---
 
 For more information, visit:
-- GitHub: https://github.com/yourusername/aits
-- Documentation: https://aits.dev
-- Discord: https://discord.gg/aits
+- GitHub: https://github.com/yourusername/aeye
+- Documentation: https://aeye.dev
+- Discord: https://discord.gg/aeye

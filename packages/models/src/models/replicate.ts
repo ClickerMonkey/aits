@@ -7,7 +7,7 @@
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 
 export const replicateModels: ModelInfo[] = [{
   id: 'ideogram-ai/ideogram-v2a',
@@ -3629,7 +3629,7 @@ export const replicateModels: ModelInfo[] = [{
   pricing: {},
   metadata: {
     owner: "philz1337x",
-    description: "High-precision image upscaler optimized for portraits and faces. One of the upscale modes powered by Clarity AI. X:https://x.com/philz1337x",
+    description: "High-precision image upscaler optimized for portraeye and faces. One of the upscale modes powered by Clarity AI. X:https://x.com/philz1337x",
     runCount: 83409,
     githubUrl: null,
     visibility: "public",

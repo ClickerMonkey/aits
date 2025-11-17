@@ -4,7 +4,7 @@
  * Fetches model information from AWS Bedrock using the AWS SDK
  */
 
-import type { ModelCapability, ModelInfo, ModelTier } from '@aits/ai';
+import type { ModelCapability, ModelInfo, ModelTier } from '@aeye/ai';
 import {
   BedrockClient,
   ListFoundationModelsCommand,

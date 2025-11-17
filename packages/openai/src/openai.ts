@@ -22,9 +22,9 @@ import type {
   TranscriptionChunk,
   TranscriptionRequest,
   TranscriptionResponse
-} from '@aits/ai';
-import { detectTier } from '@aits/ai';
-import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall, type Usage } from '@aits/core';
+} from '@aeye/ai';
+import { detectTier } from '@aeye/ai';
+import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall, type Usage } from '@aeye/core';
 import fs from 'fs';
 import OpenAI, { Uploadable } from 'openai';
 import { Stream } from 'openai/core/streaming';
@@ -87,7 +87,7 @@ export interface OpenAIConfig {
 // ============================================================================
 
 /**
- * OpenAI provider implementation for the @aits framework.
+ * OpenAI provider implementation for the @aeye framework.
  *
  * Supports the full range of OpenAI capabilities including:
  * - Chat completions with GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
@@ -104,7 +104,7 @@ export interface OpenAIConfig {
  *
  * @example Basic usage
  * ```typescript
- * import { OpenAIProvider } from '@aits/openai';
+ * import { OpenAIProvider } from '@aeye/openai';
  *
  * const provider = new OpenAIProvider({
  *   apiKey: process.env.OPENAI_API_KEY!,
@@ -273,7 +273,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert OpenAI's model format to @aits ModelInfo format.
+   * Convert OpenAI's model format to @aeye ModelInfo format.
    *
    * Subclasses can override this to enrich model metadata with
    * provider-specific information.
@@ -387,7 +387,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    *
    * @param params OpenAI chat completion parameters
    * @param config Provider configuration
-   * @param request Original @aits request
+   * @param request Original @aeye request
    * @returns Modified parameters
    */
   protected augmentChatRequest<TParams extends OpenAI.Chat.ChatCompletionCreateParams>(
@@ -416,7 +416,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * Augment chat response with provider-specific data.
    * 
    * @param openai OpenAI chat completion response
-   * @param response @aits response object to augment
+   * @param response @aeye response object to augment
    * @returns 
    */
   protected augmentChatResponse<TParams extends OpenAI.Chat.Completions.ChatCompletion>(
@@ -432,7 +432,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // ============================================================================
 
   /**
-   * Convert @aits MessageContent to OpenAI content string format.
+   * Convert @aeye MessageContent to OpenAI content string format.
    * @param x 
    * @param from 
    * @returns 
@@ -451,7 +451,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits MessageContent to OpenAI text content format.
+   * Convert @aeye MessageContent to OpenAI text content format.
    * @param x 
    * @param name 
    * @returns 
@@ -483,7 +483,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits MessageContent to OpenAI format.
+   * Convert @aeye MessageContent to OpenAI format.
    * @param x 
    * @param name 
    * @returns 
@@ -658,7 +658,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits ToolCall to OpenAI format.
+   * Convert @aeye ToolCall to OpenAI format.
    * @param x ToolCall object
    * @returns 
    */
@@ -690,12 +690,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits Request messages to OpenAI format.
+   * Convert @aeye Request messages to OpenAI format.
    *
    * Handles conversion of all message types (system, user, assistant, tool)
    * and content types (text, image, audio, file).
    *
-   * @param request @aits request object
+   * @param request @aeye request object
    * @returns Array of OpenAI-formatted messages
    */
   protected convertMessages(request: Request): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -754,11 +754,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits tool definitions to OpenAI format.
+   * Convert @aeye tool definitions to OpenAI format.
    *
    * Transforms Zod schemas into JSON Schema format required by OpenAI.
    *
-   * @param request @aits request object
+   * @param request @aeye request object
    * @returns Array of OpenAI-formatted tools or undefined
    */
   protected convertTools(request: Request): OpenAI.Chat.ChatCompletionTool[] | undefined {
@@ -775,11 +775,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits tool choice to OpenAI format.
+   * Convert @aeye tool choice to OpenAI format.
    *
    * Supports auto, required, none, and specific tool selection.
    *
-   * @param request @aits request object
+   * @param request @aeye request object
    * @returns OpenAI-formatted tool choice option or undefined
    */
   protected convertToolChoice(
@@ -801,11 +801,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
-   * Convert @aits response format to OpenAI format.
+   * Convert @aeye response format to OpenAI format.
    *
    * Supports text, JSON object mode, and structured output with Zod schemas.
    *
-   * @param request @aits request object
+   * @param request @aeye request object
    * @returns OpenAI-formatted response format or undefined
    */
   protected convertResponseFormat(

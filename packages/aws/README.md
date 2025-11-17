@@ -1,6 +1,6 @@
-# @aits/aws - AWS Bedrock Provider
+# @aeye/aws - AWS Bedrock Provider
 
-AWS Bedrock integration for the [@aits](https://github.com/ClickerMonkey/aits) framework, providing seamless access to Claude, Llama, Mistral, Cohere, Stability AI, and Amazon Titan models.
+AWS Bedrock integration for the [@aeye](https://github.com/ClickerMonkey/aeye) framework, providing seamless access to Claude, Llama, Mistral, Cohere, Stability AI, and Amazon Titan models.
 
 ## Features
 
@@ -30,7 +30,7 @@ AWS Bedrock integration for the [@aits](https://github.com/ClickerMonkey/aits) f
 ## Installation
 
 ```bash
-npm install @aits/aws @aits/ai @aits/core zod
+npm install @aeye/aws @aeye/ai @aeye/core zod
 ```
 
 ## Prerequisites
@@ -55,8 +55,8 @@ Ensure you have:
 ### Basic Chat Completion
 
 ```typescript
-import { AI } from '@aits/ai';
-import { AWSBedrockProvider } from '@aits/aws';
+import { AI } from '@aeye/ai';
+import { AWSBedrockProvider } from '@aeye/aws';
 
 // Create provider (credentials picked up automatically)
 const aws = new AWSBedrockProvider({
@@ -96,7 +96,7 @@ for await (const chunk of ai.chat.stream([
 ### Image Generation
 
 ```typescript
-import { AWSBedrockProvider } from '@aits/aws';
+import { AWSBedrockProvider } from '@aeye/aws';
 
 const aws = new AWSBedrockProvider({
   region: 'us-east-1',
@@ -144,7 +144,7 @@ console.log('Embedding dimensions:', embeddings.embeddings[0].length);
 ### Provider Configuration
 
 ```typescript
-import { AWSBedrockProvider, type AWSBedrockConfig } from '@aits/aws';
+import { AWSBedrockProvider, type AWSBedrockConfig } from '@aeye/aws';
 
 const config: AWSBedrockConfig = {
   // AWS region (defaults to AWS_REGION env var or 'us-east-1')
@@ -171,9 +171,9 @@ const provider = new AWSBedrockProvider(config);
 ### Using with Multiple Providers
 
 ```typescript
-import { AI } from '@aits/ai';
-import { AWSBedrockProvider } from '@aits/aws';
-import { OpenAIProvider } from '@aits/openai';
+import { AI } from '@aeye/ai';
+import { AWSBedrockProvider } from '@aeye/aws';
+import { OpenAIProvider } from '@aeye/openai';
 
 const aws = new AWSBedrockProvider({ region: 'us-east-1' });
 const openai = new OpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
@@ -330,7 +330,7 @@ import {
   AWSRateLimitError,
   AWSQuotaError,
   AWSContextWindowError,
-} from '@aits/aws';
+} from '@aeye/aws';
 
 try {
   const response = await ai.chat.get([
@@ -395,7 +395,7 @@ AWS_REGION=us-east-1
 
 - [AWS Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
 - [Model IDs Reference](https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html)
-- [@aits Framework](https://github.com/ClickerMonkey/aits)
+- [@aeye Framework](https://github.com/ClickerMonkey/aeye)
 - [AWS SDK for JavaScript](https://docs.aws.amazon.com/sdk-for-javascript/v3/)
 
 ## License
@@ -404,4 +404,4 @@ MIT - See [LICENSE](../../LICENSE) file for details.
 
 ## Contributing
 
-Issues and pull requests are welcome! See the [main repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Issues and pull requests are welcome! See the [main repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.

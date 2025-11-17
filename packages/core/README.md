@@ -1,4 +1,4 @@
-# @aits/core
+# @aeye/core
 
 Core primitives for building AI agents, tools, and prompts with TypeScript. Provides a type-safe, composable framework for creating sophisticated AI applications with structured inputs/outputs, tool calling, and context management.
 
@@ -16,7 +16,7 @@ Core primitives for building AI agents, tools, and prompts with TypeScript. Prov
 ## Installation
 
 ```bash
-npm install @aits/core zod handlebars
+npm install @aeye/core zod handlebars
 ```
 
 ## Core Concepts
@@ -39,7 +39,7 @@ All AI primitives implement the `Component` interface:
 ### Basic Prompt
 
 ```typescript
-import { Prompt } from '@aits/core';
+import { Prompt } from '@aeye/core';
 import z from 'zod';
 
 const summarizer = new Prompt({
@@ -74,7 +74,7 @@ console.log(result.keyPoints);
 ### Creating Tools
 
 ```typescript
-import { Tool } from '@aits/core';
+import { Tool } from '@aeye/core';
 import z from 'zod';
 
 const weatherTool = new Tool({
@@ -167,7 +167,7 @@ for await (const event of summarizer.get(
 ### Building Agents
 
 ```typescript
-import { Agent } from '@aits/core';
+import { Agent } from '@aeye/core';
 
 const researchAgent = new Agent({
   name: 'researcher',
@@ -322,7 +322,7 @@ const validatedTool = new Tool({
 ### Event Tracking
 
 ```typescript
-import { withEvents } from '@aits/core';
+import { withEvents } from '@aeye/core';
 
 const runner = withEvents({
   onStatus: (instance) => {
@@ -555,7 +555,7 @@ const tool = new Tool({
 
 ## Contributing
 
-Contributions are welcome! See the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! See the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## License
 
@@ -563,6 +563,6 @@ MIT © [ClickerMonkey](https://github.com/ClickerMonkey)
 
 ## Links
 
-- [GitHub Repository](https://github.com/ClickerMonkey/aits)
-- [Documentation](https://github.com/ClickerMonkey/aits/tree/main/packages/core)
-- [Issue Tracker](https://github.com/ClickerMonkey/aits/issues)
+- [GitHub Repository](https://github.com/ClickerMonkey/aeye)
+- [Documentation](https://github.com/ClickerMonkey/aeye/tree/main/packages/core)
+- [Issue Tracker](https://github.com/ClickerMonkey/aeye/issues)

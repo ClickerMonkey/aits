@@ -1,4 +1,4 @@
-import { getInputTokens, getTotalTokens, Usage } from '@aits/core';
+import { getInputTokens, getTotalTokens, Usage } from '@aeye/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';

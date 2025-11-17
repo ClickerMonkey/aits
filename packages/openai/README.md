@@ -1,6 +1,6 @@
-# @aits/openai
+# @aeye/openai
 
-OpenAI provider for the @aits (AI TypeScript) framework. This package provides a comprehensive integration with OpenAI's API, supporting the full range of capabilities including chat completions, image generation, speech synthesis, transcription, and embeddings.
+OpenAI provider for the @aeye (AI TypeScript) framework. This package provides a comprehensive integration with OpenAI's API, supporting the full range of capabilities including chat completions, image generation, speech synthesis, transcription, and embeddings.
 
 ## Features
 
@@ -20,13 +20,13 @@ OpenAI provider for the @aits (AI TypeScript) framework. This package provides a
 ## Installation
 
 ```bash
-npm install @aits/openai @aits/ai @aits/core openai zod
+npm install @aeye/openai @aeye/ai @aeye/core openai zod
 ```
 
 ## Quick Start
 
 ```typescript
-import { OpenAIProvider } from '@aits/openai';
+import { OpenAIProvider } from '@aeye/openai';
 
 // Create provider instance
 const provider = new OpenAIProvider({
@@ -55,7 +55,7 @@ console.log(response.content);
 ### Basic Configuration
 
 ```typescript
-import { OpenAIProvider, OpenAIConfig } from '@aits/openai';
+import { OpenAIProvider, OpenAIConfig } from '@aeye/openai';
 
 const config: OpenAIConfig = {
   apiKey: process.env.OPENAI_API_KEY!,
@@ -657,7 +657,7 @@ The `OpenAIProvider` class can be extended to support OpenAI-compatible APIs lik
 ### Example: Custom Provider
 
 ```typescript
-import { OpenAIProvider, OpenAIConfig } from '@aits/openai';
+import { OpenAIProvider, OpenAIConfig } from '@aeye/openai';
 import OpenAI from 'openai';
 
 interface CustomConfig extends OpenAIConfig {
@@ -787,7 +787,7 @@ const azureProvider = new AzureOpenAIProvider({
 The provider throws specific error types for different failure scenarios:
 
 ```typescript
-import { ProviderError, RateLimitError, ProviderAuthError } from '@aits/openai';
+import { ProviderError, RateLimitError, ProviderAuthError } from '@aeye/openai';
 
 try {
   const response = await executor(
@@ -822,7 +822,7 @@ try {
 
 ### OpenAIProvider
 
-Main provider class implementing the @aits Provider interface.
+Main provider class implementing the @aeye Provider interface.
 
 **Constructor**: `new OpenAIProvider(config: OpenAIConfig)`
 
@@ -897,10 +897,10 @@ Main provider class implementing the @aits Provider interface.
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core @aits framework types and interfaces
-- **[@aits/ai](../ai)**: AI abstractions and utilities
-- **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
-- **[@aits/openrouter](../openrouter)**: OpenRouter multi-provider gateway
+- **[@aeye/core](../core)**: Core @aeye framework types and interfaces
+- **[@aeye/ai](../ai)**: AI abstractions and utilities
+- **[@aeye/anthropic](../anthropic)**: Anthropic Claude provider
+- **[@aeye/openrouter](../openrouter)**: OpenRouter multi-provider gateway
 
 ## License
 
@@ -908,13 +908,13 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/ClickerMonkey/aits/issues
-- Documentation: https://github.com/ClickerMonkey/aits
+- GitHub Issues: https://github.com/ClickerMonkey/aeye/issues
+- Documentation: https://github.com/ClickerMonkey/aeye
 
 ## Changelog
 

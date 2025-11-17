@@ -5,7 +5,7 @@
  * Provider order ensures deterministic model resolution: first provider to return a model ID wins.
  */
 
-import { getModel } from '@aits/core';
+import { getModel } from '@aeye/core';
 import { detectTier } from './modelDetection';
 import type {
   AIBaseMetadata,
@@ -39,8 +39,8 @@ import type {
  *
  * @example Basic usage
  * ```typescript
- * import { OpenAIProvider } from '@aits/openai';
- * import { getProviderCapabilities } from '@aits/ai';
+ * import { OpenAIProvider } from '@aeye/openai';
+ * import { getProviderCapabilities } from '@aeye/ai';
  *
  * const openai = new OpenAIProvider({ apiKey: '...' });
  * const caps = getProviderCapabilities(openai);

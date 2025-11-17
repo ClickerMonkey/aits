@@ -7,7 +7,7 @@
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 import { openaiModels } from './openai';
 import { openrouterModels } from './openrouter';
 import { replicateModels } from './replicate';

@@ -1,7 +1,7 @@
 /**
- * @aits/aws - AWS Bedrock Provider
+ * @aeye/aws - AWS Bedrock Provider
  *
- * AWS Bedrock integration for the @aits framework.
+ * AWS Bedrock integration for the @aeye framework.
  * Supports Claude, Llama, Mistral, Cohere, Stability AI, and Amazon Titan models.
  */
 

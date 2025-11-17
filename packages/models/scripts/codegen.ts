@@ -4,7 +4,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 
 
 /**
@@ -49,7 +49,7 @@ export function generateModelTS(models: ModelInfo[], exportName: string): string
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 
 export const ${exportName}: ModelInfo[] = [${serialized}];
 `;
@@ -81,7 +81,7 @@ export function generateModelsIndexTS(): string {
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 import { openaiModels } from './openai';
 import { openrouterModels } from './openrouter';
 import { replicateModels } from './replicate';

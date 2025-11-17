@@ -1,4 +1,4 @@
-import { ModelInput } from "@aits/core";
+import { ModelInput } from "@aeye/core";
 import { ModelInfo } from "./types";
 
 /**

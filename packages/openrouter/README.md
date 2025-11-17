@@ -1,6 +1,6 @@
-# @aits/openrouter
+# @aeye/openrouter
 
-OpenRouter provider for the @aits (AI TypeScript) framework. OpenRouter provides unified access to multiple AI providers through a single API, with automatic fallbacks, routing optimization, and competitive pricing.
+OpenRouter provider for the @aeye (AI TypeScript) framework. OpenRouter provides unified access to multiple AI providers through a single API, with automatic fallbacks, routing optimization, and competitive pricing.
 
 ## Features
 
@@ -17,14 +17,14 @@ OpenRouter provider for the @aits (AI TypeScript) framework. OpenRouter provides
 ## Installation
 
 ```bash
-npm install @aits/openrouter @aits/openai @aits/ai @aits/core openai zod
+npm install @aeye/openrouter @aeye/openai @aeye/ai @aeye/core openai zod
 ```
 
 ## Quick Start
 
 ```typescript
-import { OpenRouterProvider } from '@aits/openrouter';
-import { AI } from '@aits/ai';
+import { OpenRouterProvider } from '@aeye/openrouter';
+import { AI } from '@aeye/ai';
 
 // Create provider instance
 const openrouter = new OpenRouterProvider({
@@ -56,7 +56,7 @@ console.log('Cost:', response.usage.cost); // Actual cost from OpenRouter
 ### Basic Configuration
 
 ```typescript
-import { OpenRouterProvider, OpenRouterConfig } from '@aits/openrouter';
+import { OpenRouterProvider, OpenRouterConfig } from '@aeye/openrouter';
 
 const config: OpenRouterConfig = {
   apiKey: process.env.OPENROUTER_API_KEY!,
@@ -278,7 +278,7 @@ const response = await ai.chat.get([
 OpenRouter provides a model source that can fetch all available models:
 
 ```typescript
-import { OpenRouterModelSource } from '@aits/openrouter';
+import { OpenRouterModelSource } from '@aeye/openrouter';
 
 const source = new OpenRouterModelSource({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -313,7 +313,7 @@ const response = await ai.chat.get(messages);
 
 ### OpenRouterConfig
 
-Extends `OpenAIConfig` from `@aits/openai`.
+Extends `OpenAIConfig` from `@aeye/openai`.
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -414,7 +414,7 @@ Models with ZDR support have the `zdr` capability tag.
 OpenRouter uses the same error types as the OpenAI provider:
 
 ```typescript
-import { ProviderError, RateLimitError } from '@aits/openrouter';
+import { ProviderError, RateLimitError } from '@aeye/openrouter';
 
 try {
   const response = await ai.chat.get(messages, {
@@ -479,7 +479,7 @@ try {
 
 ### OpenRouterProvider
 
-Extends `OpenAIProvider` from `@aits/openai`.
+Extends `OpenAIProvider` from `@aeye/openai`.
 
 **Constructor**: `new OpenRouterProvider(config: OpenRouterConfig)`
 
@@ -523,15 +523,15 @@ Model source for fetching OpenRouter models.
 - ❌ Transcription (not supported by OpenRouter)
 - ❌ Embeddings (not supported by OpenRouter)
 
-For image generation, speech, transcription, and embeddings, use provider-specific packages like `@aits/openai`, `@aits/anthropic`, etc.
+For image generation, speech, transcription, and embeddings, use provider-specific packages like `@aeye/openai`, `@aeye/anthropic`, etc.
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core @aits framework types and interfaces
-- **[@aits/ai](../ai)**: AI abstractions and utilities
-- **[@aits/openai](../openai)**: OpenAI provider (base class)
-- **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
-- **[@aits/google](../google)**: Google AI provider
+- **[@aeye/core](../core)**: Core @aeye framework types and interfaces
+- **[@aeye/ai](../ai)**: AI abstractions and utilities
+- **[@aeye/openai](../openai)**: OpenAI provider (base class)
+- **[@aeye/anthropic](../anthropic)**: Anthropic Claude provider
+- **[@aeye/google](../google)**: Google AI provider
 
 ## Links
 
@@ -546,11 +546,11 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/ClickerMonkey/aits/issues
-- Documentation: https://github.com/ClickerMonkey/aits
+- GitHub Issues: https://github.com/ClickerMonkey/aeye/issues
+- Documentation: https://github.com/ClickerMonkey/aeye
 - OpenRouter Discord: https://discord.gg/openrouter

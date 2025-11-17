@@ -4,7 +4,7 @@
  * Tests for the Image API covering generation, editing, and streaming.
  */
 
-import { models } from '@aits/models';
+import { models } from '@aeye/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { ImageGenerationRequest, ImageEditRequest } from '../types';

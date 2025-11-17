@@ -8,8 +8,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as url from 'url';
 import Replicate from 'replicate';
-import type { ModelInfo, ModelCapability } from '@aits/ai';
-import { detectTier } from '@aits/ai';
+import type { ModelInfo, ModelCapability } from '@aeye/ai';
+import { detectTier } from '@aeye/ai';
 import { writeModelTS } from '../codegen';
 
 const __filename = url.fileURLToPath(import.meta.url);

@@ -7,7 +7,7 @@
  * To regenerate, run: npm run scrape
  */
 
-import type { ModelInfo } from '@aits/ai';
+import type { ModelInfo } from '@aeye/ai';
 
 export const openrouterModels: ModelInfo[] = [{
   id: 'openai/gpt-5.1',

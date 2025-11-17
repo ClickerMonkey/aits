@@ -1,4 +1,4 @@
-import { getModel } from "@aits/core";
+import { getModel } from "@aeye/core";
 import Handlebars from "handlebars";
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';

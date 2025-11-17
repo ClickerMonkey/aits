@@ -10,10 +10,10 @@ module.exports = {
     '/dist/'
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!@aits/)'
+    'node_modules/(?!@aeye/)'
   ],
   moduleNameMapper: {
-    '^@aits/(.*)$': '<rootDir>/../$1/src'
+    '^@aeye/(.*)$': '<rootDir>/../$1/src'
   },
   testTimeout: 60000, // 60s timeout for integration tests
   setupFilesAfterEnv: ['<rootDir>/src/setup.ts']

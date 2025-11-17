@@ -4,7 +4,7 @@
  * Tests for Speech (TTS) and Transcribe (STT) APIs.
  */
 
-import { models } from '@aits/models';
+import { models } from '@aeye/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { SpeechRequest, TranscriptionRequest } from '../types';

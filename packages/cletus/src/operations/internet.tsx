@@ -338,7 +338,7 @@ export const web_api_call = operationOf<
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,
-    `WebApiCall(${op.input.method} "${abbreviate(op.input.url, 25)}")`,
+    `WebApiCall(${op.input.method} "${abbreviate(op.input.url, 60)}")`,
     (op) => {
       if (op.output) {
         return `${op.output.status} ${op.output.statusText} (${op.output.body.length} bytes)`;

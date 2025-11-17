@@ -3,7 +3,7 @@ import type { CletusAI } from '../ai';
 import { createSubAgents } from './sub-agents';
 import { abbreviate } from '../common';
 import { Operations, OperationMode } from '../operations/types';
-import { ComponentOutput } from '@aits/core';
+import { ComponentOutput } from '@aeye/core';
 import { OperationManager } from '../operations/manager';
 
 /**

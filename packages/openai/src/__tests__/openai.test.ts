@@ -6,7 +6,7 @@
  */
 
 import { OpenAIProvider } from '../openai';
-import { type Request, type ImageGenerationRequest, type TranscriptionRequest, type SpeechRequest, type EmbeddingRequest, type AIContextAny, AI } from '@aits/ai';
+import { type Request, type ImageGenerationRequest, type TranscriptionRequest, type SpeechRequest, type EmbeddingRequest, type AIContextAny, AI } from '@aeye/ai';
 import { z } from 'zod';
 
 // Mock the OpenAI SDK

@@ -6,7 +6,7 @@
  */
 
 import { OpenAIProvider } from '../openai';
-import type { Request, ImageGenerationRequest, TranscriptionRequest, SpeechRequest, EmbeddingRequest } from '@aits/ai';
+import type { Request, ImageGenerationRequest, TranscriptionRequest, SpeechRequest, EmbeddingRequest } from '@aeye/ai';
 import { getAPIKey, skipIfNoAPIKey } from './setup';
 
 const describeIntegration = skipIfNoAPIKey();

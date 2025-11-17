@@ -1,7 +1,7 @@
 {
-  "name": "@aits/ai",
+  "name": "@aeye/ai",
   "version": "0.1.0",
-  "description": "@aits AI - AI TypeScript library main functionality",
+  "description": "@aeye AI - AI TypeScript library main functionality",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,7 +22,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ClickerMonkey/aits.git",
+    "url": "https://github.com/ClickerMonkey/aeye.git",
     "directory": "packages/ai"
   },
   "files": [
@@ -31,7 +31,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@aits/core": "^0.1.0"
+    "@aeye/core": "^0.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -46,8 +46,8 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "homepage": "https://github.com/ClickerMonkey/aeye#readme",
   "bugs": {
-    "url": "https://github.com/ClickerMonkey/aits/issues"
+    "url": "https://github.com/ClickerMonkey/aeye/issues"
   }
 }

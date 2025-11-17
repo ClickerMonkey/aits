@@ -8,7 +8,7 @@ import { createCletusAI } from '../ai';
 import type { Providers } from '../schemas';
 import fs from 'fs/promises';
 import { getChatPath, getDataPath } from '../file-manager';
-import { ModelCapability } from '@aits/ai';
+import { ModelCapability } from '@aeye/ai';
 import { logger } from '../logger';
 import { abbreviate } from '../common';
 import { AUTONOMOUS } from '../constants';

@@ -4,7 +4,7 @@
  * Provides speech-to-text functionality.
  */
 
-import { ModelInput } from '@aits/core';
+import { ModelInput } from '@aeye/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,

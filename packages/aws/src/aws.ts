@@ -15,8 +15,8 @@ import type {
   ImageGenerationChunk,
   ModelInfo,
   Provider,
-} from '@aits/ai';
-import { detectTier } from '@aits/ai';
+} from '@aeye/ai';
+import { detectTier } from '@aeye/ai';
 import type {
   Chunk,
   Executor,
@@ -26,8 +26,8 @@ import type {
   Streamer,
   ToolCall,
   ModelInput,
-} from '@aits/core';
-import { getModel } from '@aits/core';
+} from '@aeye/core';
+import { getModel } from '@aeye/core';
 import {
   BedrockClient,
   ListFoundationModelsCommand,
@@ -97,7 +97,7 @@ export interface AWSBedrockConfig {
 // ============================================================================
 
 /**
- * AWS Bedrock provider implementation for the @aits framework.
+ * AWS Bedrock provider implementation for the @aeye framework.
  *
  * Supports the full range of AWS Bedrock capabilities including:
  * - Chat completions with Claude, Llama, Mistral, Cohere, and more
@@ -109,7 +109,7 @@ export interface AWSBedrockConfig {
  *
  * @example Basic usage
  * ```typescript
- * import { AWSBedrockProvider } from '@aits/aws';
+ * import { AWSBedrockProvider } from '@aeye/aws';
  *
  * const provider = new AWSBedrockProvider({
  *   region: 'us-east-1',
@@ -166,7 +166,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   }
 
   /**
-   * Convert AWS Bedrock model to @aits ModelInfo format
+   * Convert AWS Bedrock model to @aeye ModelInfo format
    */
   private convertModel(model: FoundationModelSummary): ModelInfo {
     const modelId = model.modelId || '';

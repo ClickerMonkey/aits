@@ -5,7 +5,7 @@
  * with comprehensive model metadata (pricing, capabilities, ZDR support).
  */
 
-import type { ModelInfo, ModelSource } from '@aits/ai';
+import type { ModelInfo, ModelSource } from '@aeye/ai';
 import { convertOpenRouterModel } from './openrouter';
 import { OpenRouterModel, ZDRModel } from './types';
 

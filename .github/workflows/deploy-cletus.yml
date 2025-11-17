@@ -70,7 +70,7 @@ jobs:
               --exclude='*.tsbuildinfo' \
               --exclude='.env' \
               --exclude='.env.local' \
-              -czf /tmp/aits-deploy.tar.gz .
+              -czf /tmp/aeye-deploy.tar.gz .
           echo "📦 Deployment package created"
       
       - name: Deploy to remote machine
@@ -79,7 +79,7 @@ jobs:
           SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/aits' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/aeye' }}
         run: |
           echo "🚀 Deploying to $SSH_USER@$SSH_HOST:$DEPLOY_PATH"
           
@@ -87,7 +87,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "mkdir -p $DEPLOY_PATH"
           
           # Copy the tarball to remote machine
-          scp -i ~/.ssh/deploy_key -P $SSH_PORT -o StrictHostKeyChecking=no /tmp/aits-deploy.tar.gz $SSH_USER@$SSH_HOST:$DEPLOY_PATH/
+          scp -i ~/.ssh/deploy_key -P $SSH_PORT -o StrictHostKeyChecking=no /tmp/aeye-deploy.tar.gz $SSH_USER@$SSH_HOST:$DEPLOY_PATH/
           
           # Extract and build on remote machine
           ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'ENDSSH'
@@ -95,8 +95,8 @@ jobs:
             cd $DEPLOY_PATH
             
             echo "📂 Extracting deployment package..."
-            tar -xzf aits-deploy.tar.gz
-            rm aits-deploy.tar.gz
+            tar -xzf aeye-deploy.tar.gz
+            rm aeye-deploy.tar.gz
             
             echo "📥 Installing dependencies..."
             export PUPPETEER_SKIP_DOWNLOAD=true
@@ -116,7 +116,7 @@ jobs:
         if: always()
         run: |
           rm -f ~/.ssh/deploy_key
-          rm -f /tmp/aits-deploy.tar.gz
+          rm -f /tmp/aeye-deploy.tar.gz
           echo "🧹 Cleanup completed"
       
       - name: Deployment status

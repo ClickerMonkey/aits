@@ -5,7 +5,7 @@
  * API surface creation, and basic functionality.
  */
 
-import { models } from '@aits/models';
+import { models } from '@aeye/models';
 import { AI } from '../ai';
 import { createMockProvider } from './mocks/provider.mock';
 import type { ModelInfo } from '../types';

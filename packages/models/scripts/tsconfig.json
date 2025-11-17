@@ -6,12 +6,12 @@
     "noEmit": true,
     "baseUrl": "../../..",
     "paths": {
-      "@aits/core": ["./packages/core/src"],
-      "@aits/ai": ["./packages/ai/src"],
-      "@aits/openai": ["./packages/openai/src"],
-      "@aits/openrouter": ["./packages/openrouter/src"],
-      "@aits/replicate": ["./packages/replicate/src"],
-      "@aits/models": ["./packages/models/src"]
+      "@aeye/core": ["./packages/core/src"],
+      "@aeye/ai": ["./packages/ai/src"],
+      "@aeye/openai": ["./packages/openai/src"],
+      "@aeye/openrouter": ["./packages/openrouter/src"],
+      "@aeye/replicate": ["./packages/replicate/src"],
+      "@aeye/models": ["./packages/models/src"]
     }
   },
   "include": ["scripts/**/*"],

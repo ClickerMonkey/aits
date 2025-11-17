@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aits/core';
+import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aeye/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';

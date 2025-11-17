@@ -1,4 +1,4 @@
-import { getModel } from "@aits/core";
+import { getModel } from "@aeye/core";
 import { abbreviate } from "../common";
 import { KnowledgeFile } from "../knowledge";
 import { operationOf } from "./types";

@@ -7,7 +7,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as puppeteer from 'puppeteer';
-import type { ModelInfo, ModelCapability, ModelTier, ModelParameter } from '@aits/ai';
+import type { ModelInfo, ModelCapability, ModelTier, ModelParameter } from '@aeye/ai';
 import { writeModelTS } from '../codegen';
 
 

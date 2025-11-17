@@ -11,7 +11,7 @@ import { ModelSelector } from './components/ModelSelector';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
 import { ConfigFile } from './config';
 import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
-import { getTotalTokens } from '@aits/core';
+import { getTotalTokens } from '@aeye/core';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';

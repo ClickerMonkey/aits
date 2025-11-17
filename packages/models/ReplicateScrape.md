@@ -4,7 +4,7 @@ I want you to consume one model chunk file at a time. They are in cache/replicat
 
 What you need to do is replace/create a src/replicate.ts file with all model handlers that make sense for each model. A model handler allows you to link a particular model ID with a set of supported functions. Like chat prediction, image generation, etc.
 
-Here's the shape of the ModelHandler from the `@aits/ai` package:
+Here's the shape of the ModelHandler from the `@aeye/ai` package:
 
 ```ts
 export interface ModelTransformer<TContext = {}> {

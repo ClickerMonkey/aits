@@ -25,8 +25,8 @@ import type {
   SpeechResponse,
   TranscriptionRequest,
   TranscriptionResponse,
-} from '@aits/ai';
-import { BaseChunk, BaseRequest, BaseResponse, getModel, type Executor, type Request, type Streamer, type Response } from '@aits/core';
+} from '@aeye/ai';
+import { BaseChunk, BaseRequest, BaseResponse, getModel, type Executor, type Request, type Streamer, type Response } from '@aeye/core';
 import Replicate from 'replicate';
 
 // ============================================================================

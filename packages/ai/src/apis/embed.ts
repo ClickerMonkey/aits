@@ -4,7 +4,7 @@
  * Provides text embedding functionality.
  */
 
-import type { Usage } from '@aits/core';
+import type { Usage } from '@aeye/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,

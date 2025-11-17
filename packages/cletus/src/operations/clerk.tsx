@@ -1,4 +1,4 @@
-import { getModel } from "@aits/core";
+import { getModel } from "@aeye/core";
 import * as Diff from 'diff';
 import { Box, Text } from "ink";
 import React from 'react';

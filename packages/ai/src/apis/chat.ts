@@ -35,7 +35,7 @@
  * ```
  */
 
-import { getChunksFromResponse, getResponseFromChunks, type Executor, type Streamer, type Usage } from '@aits/core';
+import { getChunksFromResponse, getResponseFromChunks, type Executor, type Streamer, type Usage } from '@aeye/core';
 import type { AI } from '../ai';
 import type {
   AIBaseTypes,

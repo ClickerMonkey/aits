@@ -1,4 +1,4 @@
-import { ImageGenerationResponse, ScoredModel } from "@aits/ai";
+import { ImageGenerationResponse, ScoredModel } from "@aeye/ai";
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from "sharp";

@@ -1,7 +1,7 @@
 {
-  "name": "@aits/test-integration",
+  "name": "@aeye/test-integration",
   "version": "0.1.0",
-  "description": "Integration tests for @aits multi-provider functionality",
+  "description": "Integration tests for @aeye multi-provider functionality",
   "type": "module",
   "private": true,
   "main": "dist/index.js",
@@ -12,11 +12,11 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@aits/core": "*",
-    "@aits/ai": "*",
-    "@aits/openai": "*",
-    "@aits/openrouter": "*",
-    "@aits/replicate": "*"
+    "@aeye/core": "*",
+    "@aeye/ai": "*",
+    "@aeye/openai": "*",
+    "@aeye/openrouter": "*",
+    "@aeye/replicate": "*"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

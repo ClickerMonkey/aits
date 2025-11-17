@@ -1,7 +1,7 @@
 {
-  "name": "@aits/openai",
+  "name": "@aeye/openai",
   "version": "0.1.0",
-  "description": "@aits OpenAI - OpenAI integration for @aits",
+  "description": "@aeye OpenAI - OpenAI integration for @aeye",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ClickerMonkey/aits.git",
+    "url": "https://github.com/ClickerMonkey/aeye.git",
     "directory": "packages/openai"
   },
   "files": [
@@ -33,8 +33,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@aits/ai": "^0.1.0",
-    "@aits/core": "^0.1.0",
+    "@aeye/ai": "^0.1.0",
+    "@aeye/core": "^0.1.0",
     "openai": "^6.6.0",
     "zod": "^4.1.12"
   },
@@ -50,8 +50,8 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  "homepage": "https://github.com/ClickerMonkey/aits#readme",
+  "homepage": "https://github.com/ClickerMonkey/aeye#readme",
   "bugs": {
-    "url": "https://github.com/ClickerMonkey/aits/issues"
+    "url": "https://github.com/ClickerMonkey/aeye/issues"
   }
 }

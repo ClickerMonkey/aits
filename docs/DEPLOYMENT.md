@@ -22,7 +22,7 @@ To enable automatic deployment, configure the following secrets in your GitHub r
 | `DEPLOY_SSH_USER` | SSH username for authentication | `deployer` or `ubuntu` | Yes |
 | `DEPLOY_SSH_KEY` | SSH private key for authentication | Contents of `~/.ssh/id_rsa` | Yes |
 | `DEPLOY_SSH_PORT` | SSH port (optional, defaults to 22) | `2222` | No |
-| `DEPLOY_PATH` | Deployment directory path (optional) | `~/aits` or `/opt/aits` | No |
+| `DEPLOY_PATH` | Deployment directory path (optional) | `~/aeye` or `/opt/aeye` | No |
 
 #### Setting Up Secrets
 
@@ -37,27 +37,27 @@ To enable automatic deployment, configure the following secrets in your GitHub r
 
 ```bash
 # Generate a new SSH key pair
-ssh-keygen -t ed25519 -C "github-deploy" -f ~/.ssh/aits_deploy_key
+ssh-keygen -t ed25519 -C "github-deploy" -f ~/.ssh/aeye_deploy_key
 
 # Or use RSA if ed25519 is not supported
-ssh-keygen -t rsa -b 4096 -C "github-deploy" -f ~/.ssh/aits_deploy_key
+ssh-keygen -t rsa -b 4096 -C "github-deploy" -f ~/.ssh/aeye_deploy_key
 ```
 
 #### 2. Add Public Key to Remote Machine
 
 ```bash
 # Copy public key to remote machine
-ssh-copy-id -i ~/.ssh/aits_deploy_key.pub user@remote-host
+ssh-copy-id -i ~/.ssh/aeye_deploy_key.pub user@remote-host
 
 # Or manually add to authorized_keys
-cat ~/.ssh/aits_deploy_key.pub | ssh user@remote-host 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys'
+cat ~/.ssh/aeye_deploy_key.pub | ssh user@remote-host 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys'
 ```
 
 #### 3. Add Private Key to GitHub Secrets
 
 ```bash
 # Display private key
-cat ~/.ssh/aits_deploy_key
+cat ~/.ssh/aeye_deploy_key
 
 # Copy the entire output (including -----BEGIN... and -----END... lines)
 # Paste into GitHub secret DEPLOY_SSH_KEY
@@ -107,7 +107,7 @@ When triggered, the workflow:
 After deployment, the remote machine will have:
 
 ```
-~/aits/                           # Default DEPLOY_PATH
+~/aeye/                           # Default DEPLOY_PATH
 ├── packages/
 │   ├── core/
 │   │   └── dist/                 # Built package
@@ -142,7 +142,7 @@ After deployment, you can run Cletus on the remote machine:
 ssh user@remote-host
 
 # Navigate to deployment directory
-cd ~/aits
+cd ~/aeye
 
 # Run Cletus
 ./packages/cletus/dist/index.js
@@ -198,7 +198,7 @@ Each deployment shows:
 - Verify npm is installed
 - Check disk space: `df -h`
 - Review build logs in GitHub Actions
-- SSH into remote machine and manually run: `cd ~/aits && npm run build`
+- SSH into remote machine and manually run: `cd ~/aeye && npm run build`
 
 #### Permission Denied
 
@@ -206,8 +206,8 @@ Each deployment shows:
 
 **Solutions**:
 - Verify the SSH user has write permissions to DEPLOY_PATH
-- Create directory manually: `ssh user@host "mkdir -p ~/aits"`
-- Change ownership: `ssh user@host "sudo chown -R $USER ~/aits"`
+- Create directory manually: `ssh user@host "mkdir -p ~/aeye"`
+- Change ownership: `ssh user@host "sudo chown -R $USER ~/aeye"`
 
 ### Manual Deployment
 
@@ -216,8 +216,8 @@ If automatic deployment fails, you can deploy manually:
 ```bash
 # 1. Clone repository on remote machine
 ssh user@remote-host
-git clone https://github.com/ClickerMonkey/aits.git ~/aits
-cd ~/aits
+git clone https://github.com/ClickerMonkey/aeye.git ~/aeye
+cd ~/aeye
 
 # 2. Install dependencies
 export PUPPETEER_SKIP_DOWNLOAD=true
@@ -256,7 +256,7 @@ The remote machine deployment does not set up environment variables. If your app
 ssh user@remote-host
 
 # Create .env file
-cd ~/aits/packages/cletus
+cd ~/aeye/packages/cletus
 cat > .env << EOF
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
@@ -307,4 +307,4 @@ For issues with deployment:
 1. Check GitHub Actions logs
 2. Review this documentation
 3. Test SSH connection manually
-4. Open an issue on [GitHub](https://github.com/ClickerMonkey/aits/issues)
+4. Open an issue on [GitHub](https://github.com/ClickerMonkey/aeye/issues)

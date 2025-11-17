@@ -1,8 +1,8 @@
-# @aits/cletus
+# @aeye/cletus
 
 > **Interactive CLI demo showcasing AITS capabilities - an AI-powered assistant with file management, data operations, and autonomous task execution.**
 
-Cletus is a terminal-based AI assistant built with the @aits library that demonstrates the power of multi-provider AI integration, tool calling, and context management. It features a beautiful TUI (Terminal User Interface) powered by React/Ink and provides specialized AI agents for different domains like file operations, data management, image generation, and web searching.
+Cletus is a terminal-based AI assistant built with the @aeye library that demonstrates the power of multi-provider AI integration, tool calling, and context management. It features a beautiful TUI (Terminal User Interface) powered by React/Ink and provides specialized AI agents for different domains like file operations, data management, image generation, and web searching.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
@@ -54,15 +54,15 @@ Cletus organizes its capabilities into specialized agents, each with domain-spec
 ### Global Installation
 
 ```bash
-npm install -g @aits/cletus
+npm install -g @aeye/cletus
 ```
 
 ### From Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/ClickerMonkey/aits.git
-cd aits/packages/cletus
+git clone https://github.com/ClickerMonkey/aeye.git
+cd aeye/packages/cletus
 
 # Install dependencies
 npm install
@@ -601,7 +601,7 @@ npm run typecheck
 
 ## Contributing
 
-Contributions are welcome! Please see the main [AITS repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome! Please see the main [AITS repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## License
 
@@ -609,16 +609,16 @@ MIT © ClickerMonkey
 
 ## Related Packages
 
-- [@aits/ai](../ai) - Core AI library
-- [@aits/core](../core) - Shared utilities and types
-- [@aits/models](../models) - Model registry and definitions
-- [@aits/openai](../openai) - OpenAI provider
-- [@aits/openrouter](../openrouter) - OpenRouter provider
-- [@aits/replicate](../replicate) - Replicate provider
-- [@aits/aws](../aws) - AWS Bedrock provider
+- [@aeye/ai](../ai) - Core AI library
+- [@aeye/core](../core) - Shared utilities and types
+- [@aeye/models](../models) - Model registry and definitions
+- [@aeye/openai](../openai) - OpenAI provider
+- [@aeye/openrouter](../openrouter) - OpenRouter provider
+- [@aeye/replicate](../replicate) - Replicate provider
+- [@aeye/aws](../aws) - AWS Bedrock provider
 
 ## Support
 
-- [GitHub Issues](https://github.com/ClickerMonkey/aits/issues)
-- [Discussions](https://github.com/ClickerMonkey/aits/discussions)
-- [Documentation](https://github.com/ClickerMonkey/aits#readme)
+- [GitHub Issues](https://github.com/ClickerMonkey/aeye/issues)
+- [Discussions](https://github.com/ClickerMonkey/aeye/discussions)
+- [Documentation](https://github.com/ClickerMonkey/aeye#readme)

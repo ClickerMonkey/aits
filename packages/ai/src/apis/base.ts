@@ -5,7 +5,7 @@
  * Implements the template method pattern to eliminate code duplication.
  */
 
-import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, getModel } from '@aits/core';
+import { accumulateUsage, BaseChunk, BaseRequest, BaseResponse, getModel } from '@aeye/core';
 import type { AI } from '../ai';
 import { isModelInfo } from '../common';
 import type {

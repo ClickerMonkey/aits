@@ -8,7 +8,7 @@
 import { describe, it, expect } from '@jest/globals';
 
 // Import types for testing
-import type { ModelInfo, ModelCapability } from '@aits/ai';
+import type { ModelInfo, ModelCapability } from '@aeye/ai';
 
 describe('AWS Bedrock Scraper', () => {
   describe('Model Pricing Data', () => {

@@ -11,10 +11,10 @@ module.exports = {
     '/dist/'
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!@aits/)'
+    'node_modules/(?!@aeye/)'
   ],
   moduleNameMapper: {
-    '^@aits/(.*)$': '<rootDir>/../$1/src'
+    '^@aeye/(.*)$': '<rootDir>/../$1/src'
   },
   collectCoverageFrom: [
     'src/**/*.ts',

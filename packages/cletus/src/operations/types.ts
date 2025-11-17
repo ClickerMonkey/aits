@@ -2,7 +2,7 @@ import React from "react";
 import { CletusAI, CletusAIContext } from "../ai";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 
-import { Plus } from "@aits/core";
+import { Plus } from "@aeye/core";
 import * as architect from './architect';
 import * as artist from './artist';
 import * as clerk from './clerk';

@@ -6,7 +6,7 @@
  */
 
 import { OpenRouterProvider } from '../openrouter';
-import type { Request } from '@aits/ai';
+import type { Request } from '@aeye/ai';
 import { getAPIKey, skipIfNoAPIKey } from './setup';
 
 const describeIntegration = skipIfNoAPIKey();

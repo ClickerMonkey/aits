@@ -1,4 +1,4 @@
-import { AnyTool, Names, Tuple } from '@aits/core';
+import { AnyTool, Names, Tuple } from '@aeye/core';
 import type { CletusAI, CletusAIContext, CletusContext } from '../ai';
 import { Operations } from '../operations/types';
 import { createArchitectTools } from '../tools/architect';

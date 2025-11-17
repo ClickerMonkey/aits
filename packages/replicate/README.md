@@ -1,6 +1,6 @@
-# @aits/replicate
+# @aeye/replicate
 
-Replicate provider for the @aits (AI TypeScript) framework. This package provides integration with Replicate's platform for running AI models in the cloud.
+Replicate provider for the @aeye (AI TypeScript) framework. This package provides integration with Replicate's platform for running AI models in the cloud.
 
 ## Features
 
@@ -14,19 +14,19 @@ Replicate provider for the @aits (AI TypeScript) framework. This package provide
 ## Installation
 
 ```bash
-npm install @aits/replicate @aits/ai @aits/core replicate zod
+npm install @aeye/replicate @aeye/ai @aeye/core replicate zod
 ```
 
 ## Important Note
 
-**Replicate has no consistent API** - each model has its own input/output schema. This means you need to register model adapters for each model you want to use. The @aits framework provides a flexible adapter system to handle this.
+**Replicate has no consistent API** - each model has its own input/output schema. This means you need to register model adapters for each model you want to use. The @aeye framework provides a flexible adapter system to handle this.
 
 ## Quick Start
 
 ```typescript
-import { ReplicateProvider } from '@aits/replicate';
-import { AI } from '@aits/ai';
-import { createLlama3Adapter } from '@aits/replicate';
+import { ReplicateProvider } from '@aeye/replicate';
+import { AI } from '@aeye/ai';
+import { createLlama3Adapter } from '@aeye/replicate';
 
 // Create provider with adapters
 const replicate = new ReplicateProvider({
@@ -56,7 +56,7 @@ console.log(response.content);
 ### Basic Configuration
 
 ```typescript
-import { ReplicateProvider, ReplicateConfig } from '@aits/replicate';
+import { ReplicateProvider, ReplicateConfig } from '@aeye/replicate';
 
 const config: ReplicateConfig = {
   apiKey: process.env.REPLICATE_API_KEY!,
@@ -84,7 +84,7 @@ const provider = new ReplicateProvider({
 
 ## Model Adapters
 
-Model adapters translate between the @aits standard interface and each model's specific input/output format.
+Model adapters translate between the @aeye standard interface and each model's specific input/output format.
 
 ### Using Built-in Adapters
 
@@ -93,7 +93,7 @@ import {
   createLlama3Adapter,
   createSDXLAdapter,
   createWhisperAdapter,
-} from '@aits/replicate';
+} from '@aeye/replicate';
 
 const provider = new ReplicateProvider({
   apiKey: process.env.REPLICATE_API_KEY!,
@@ -115,11 +115,11 @@ const provider = new ReplicateProvider({
 TODO-FIX example
 
 ```typescript
-import { ModelTransformer } from '@aits/ai';
-import type { Request, Response } from '@aits/core';
+import { ModelTransformer } from '@aeye/ai';
+import type { Request, Response } from '@aeye/core';
 
 const myCustomAdapter: ModelTransformer = {
-  // Convert @aits request to model-specific input
+  // Convert @aeye request to model-specific input
   transformRequest: (request: Request) => {
     return {
       prompt: request.messages[request.messages.length - 1].content,
@@ -129,7 +129,7 @@ const myCustomAdapter: ModelTransformer = {
     };
   },
 
-  // Convert model output to @aits response
+  // Convert model output to @aeye response
   transformResponse: (output: unknown): Response => {
     const result = output as { text: string; tokens_used?: number };
 
@@ -168,8 +168,8 @@ const provider = new ReplicateProvider({
 ### Chat Completions
 
 ```typescript
-import { AI } from '@aits/ai';
-import { ReplicateProvider, createLlama3Adapter } from '@aits/replicate';
+import { AI } from '@aeye/ai';
+import { ReplicateProvider, createLlama3Adapter } from '@aeye/replicate';
 
 const replicate = new ReplicateProvider({
   apiKey: process.env.REPLICATE_API_KEY!,
@@ -209,7 +209,7 @@ for await (const chunk of ai.chat.stream([
 ### Image Generation
 
 ```typescript
-import { createSDXLAdapter } from '@aits/replicate';
+import { createSDXLAdapter } from '@aeye/replicate';
 
 const replicate = new ReplicateProvider({
   apiKey: process.env.REPLICATE_API_KEY!,
@@ -235,7 +235,7 @@ console.log('Generated image URL:', imageResponse.images[0].url);
 ### Audio Transcription
 
 ```typescript
-import { createWhisperAdapter } from '@aits/replicate';
+import { createWhisperAdapter } from '@aeye/replicate';
 import fs from 'fs';
 
 const replicate = new ReplicateProvider({
@@ -334,10 +334,10 @@ for await (const model of results) {
 
 ```typescript
 interface ModelTransformer {
-  // Convert @aits request to model input
+  // Convert @aeye request to model input
   transformRequest: (request: Request) => Record<string, unknown>;
 
-  // Convert model output to @aits response
+  // Convert model output to @aeye response
   transformResponse: (output: unknown) => Response;
 
   // Optional: convert stream chunks
@@ -463,8 +463,8 @@ To use a specific version, append the version ID:
 Here's a complete example of creating an adapter:
 
 ```typescript
-import { ModelTransformer } from '@aits/ai';
-import type { Request, Response, Chunk } from '@aits/core';
+import { ModelTransformer } from '@aeye/ai';
+import type { Request, Response, Chunk } from '@aeye/core';
 
 export function createMyModelAdapter(): ModelTransformer {
   return {
@@ -570,11 +570,11 @@ Popular model categories:
 
 ## Related Packages
 
-- **[@aits/core](../core)**: Core @aits framework types and interfaces
-- **[@aits/ai](../ai)**: AI abstractions and utilities
-- **[@aits/openai](../openai)**: OpenAI provider
-- **[@aits/anthropic](../anthropic)**: Anthropic Claude provider
-- **[@aits/openrouter](../openrouter)**: Multi-provider gateway
+- **[@aeye/core](../core)**: Core @aeye framework types and interfaces
+- **[@aeye/ai](../ai)**: AI abstractions and utilities
+- **[@aeye/openai](../openai)**: OpenAI provider
+- **[@aeye/anthropic](../anthropic)**: Anthropic Claude provider
+- **[@aeye/openrouter](../openrouter)**: Multi-provider gateway
 
 ## Links
 
@@ -590,7 +590,7 @@ MIT
 
 ## Contributing
 
-Contributions are welcome, especially new model adapters! Please see the main [@aits repository](https://github.com/ClickerMonkey/aits) for contribution guidelines.
+Contributions are welcome, especially new model adapters! Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ### Contributing Adapters
 
@@ -605,6 +605,6 @@ To contribute a new model adapter:
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/ClickerMonkey/aits/issues
-- Documentation: https://github.com/ClickerMonkey/aits
+- GitHub Issues: https://github.com/ClickerMonkey/aeye/issues
+- Documentation: https://github.com/ClickerMonkey/aeye
 - Replicate Discord: https://discord.gg/replicate

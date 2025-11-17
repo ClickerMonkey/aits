@@ -312,7 +312,7 @@ export const MessageContentSchema = z.object({
   operationIndex: z.number().optional(),
 });
 
-// Usage schema matching @aits/core Usage interface
+// Usage schema matching @aeye/core Usage interface
 export const UsageSchema = z.object({
   text: z.object({
     input: z.number().optional(),

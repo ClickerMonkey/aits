@@ -4,10 +4,10 @@
  * Provider for OpenRouter API with provider-specific routing and fallback options.
  */
 
-import type { ModelCapability, ModelInfo, ModelParameter, ModelTokenizer, Provider } from '@aits/ai';
-import { detectTier } from '@aits/ai';
-import type { Chunk, Request, Response } from '@aits/core';
-import { OpenAIConfig, OpenAIProvider } from '@aits/openai';
+import type { ModelCapability, ModelInfo, ModelParameter, ModelTokenizer, Provider } from '@aeye/ai';
+import { detectTier } from '@aeye/ai';
+import type { Chunk, Request, Response } from '@aeye/core';
+import { OpenAIConfig, OpenAIProvider } from '@aeye/openai';
 import OpenAI from 'openai';
 import { fetchModels, fetchZDRModels } from './source';
 import { OpenRouterChatChunk, OpenRouterChatRequest, OpenRouterChatResponse, OpenRouterModel } from './types';
