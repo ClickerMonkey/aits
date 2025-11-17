@@ -3,8 +3,9 @@ import SyntaxHighlight from "ink-syntax-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
 import { Link } from "./Link";
+import { logger } from "../logger";
 
-type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; url?: string };
+type LineSegment = { text: string;  url?: string; styles?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; } };
 
 /**
 * Parse inline markdown formatting and return text segments with styles
@@ -15,13 +16,13 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
 
   // Step 1: Find all code segments (highest priority)
   const codeSegments: Array<{ start: number; end: number; content: string }> = [];
-  const codeRegex = /`([^`]+)`/g;
+  const codeRegex = /`(([^`]|\\`)+)`/g;
   let match;
   while ((match = codeRegex.exec(text)) !== null) {
     codeSegments.push({
       start: match.index,
       end: match.index + match[0].length,
-      content: match[1]
+      content: match[1].replace(/\\`/g, '`') // Unescape backticks
     });
   }
 
@@ -44,7 +45,7 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
     protectedRanges.push({
       start: code.start,
       end: code.end,
-      segment: { text: code.content, backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND }
+      segment: { text: code.content, styles:{ backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND } }
     });
   }
 
@@ -52,7 +53,7 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
     protectedRanges.push({
       start: link.start,
       end: link.end,
-      segment: { text: link.text, url: link.url, underline: true, color: COLORS.MARKDOWN_LINK }
+      segment: { text: link.text, url: link.url }
     });
   }
 
@@ -103,19 +104,24 @@ const applyFormatting = (text: string): LineSegment[] => {
   const segments: LineSegment[] = [];
   const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'strikethrough'; isStart: boolean; length: number }> = [];
 
-  // Find bold (**text**)
   let match;
+  
+  // Find bold (**text**) - check first to handle ***text*** correctly
   const boldRegex = /\*\*(.+?)\*\*/g;
   while ((match = boldRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'bold', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'bold', isStart: false, length: 2 });
   }
 
-  // Find italic (*text*)
-  const italicRegex = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
+  // Find italic - single * or _ (but not part of ** or __)
+  // Use negative lookbehind/lookahead to avoid matching doubled delimiters
+  const italicRegex = /(?<!\*)(\*)(?!\*)(.+?)(?<!\*)(\*)(?!\*)|(?<!_)(_)(?!_)(.+?)(?<!_)(_)(?!_)/g;
   while ((match = italicRegex.exec(text)) !== null) {
-    markers.push({ index: match.index, type: 'italic', isStart: true, length: 1 });
-    markers.push({ index: match.index + match[0].length - 1, type: 'italic', isStart: false, length: 1 });
+    // match[1] and match[2] for *, match[4] and match[5] for _
+    const startIndex = match[1] ? match.index : match.index;
+    const content = match[2] || match[5];
+    markers.push({ index: startIndex, type: 'italic', isStart: true, length: 1 });
+    markers.push({ index: startIndex + content.length + 1, type: 'italic', isStart: false, length: 1 });
   }
 
   // Find underline (__text__)
@@ -141,7 +147,7 @@ const applyFormatting = (text: string): LineSegment[] => {
   markers.sort((a, b) => a.index - b.index);
 
   // Process text with formatting
-  const activeFormats = { bold: false, italic: false, underline: false, strikethrough: false };
+  const activeStyles = { bold: false, italic: false, underline: false, strikethrough: false };
   let lastPos = 0;
 
   markers.forEach((marker) => {
@@ -149,17 +155,12 @@ const applyFormatting = (text: string): LineSegment[] => {
     if (marker.index > lastPos) {
       const segment = text.substring(lastPos, marker.index);
       if (segment) {
-        segments.push({ text: segment, ...activeFormats });
+        segments.push({ text: segment, styles: { ...activeStyles } });
       }
     }
 
     // Toggle format
-    if (marker.isStart) {
-      activeFormats[marker.type] = true;
-    } else {
-      activeFormats[marker.type] = false;
-    }
-
+    activeStyles[marker.type] = marker.isStart;
     lastPos = marker.index + marker.length;
   });
 
@@ -167,9 +168,11 @@ const applyFormatting = (text: string): LineSegment[] => {
   if (lastPos < text.length) {
     const segment = text.substring(lastPos);
     if (segment) {
-      segments.push({ text: segment, ...activeFormats });
+      segments.push({ text: segment, styles: { ...activeStyles } });
     }
   }
+
+  logger.log(`applyFormatting('${text}') => ${JSON.stringify(segments, null, 2)}`);
 
   return segments;
 };
@@ -241,17 +244,19 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       result.push(
         <Box 
           key={`blockquote-${i}`} 
-          marginLeft={nestingLevel * 2}
+          marginLeft={nestingLevel}
           paddingLeft={1}
           paddingRight={1}
-          backgroundColor="rgb(40,40,40)"
+          backgroundColor={COLORS.MARKDOWN_BLOCKQUOTE}
+          borderStyle='bold'
+          borderLeft={true}
+          borderTop={false}
+          borderBottom={false}
+          borderRight={false}
+          flexGrow={1}
+          flexDirection='column'
         >
-          <Box paddingRight={1} borderLeft borderColor={COLORS.MARKDOWN_BLOCKQUOTE}>
-            <Text> </Text>
-          </Box>
-          <Box flexDirection="column" flexGrow={1}>
-            {renderMarkdownContent(blockLines.join('\n'), nestingLevel + 1)}
-          </Box>
+          {renderMarkdownContent(blockLines.join('\n'), nestingLevel + 1)}
         </Box>
       );
 
@@ -346,8 +351,10 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
     return Math.max(headerWidth, dataWidth, 3) + 2; // +2 for padding
   });
 
+  const totalWidth = colWidths.reduce((a, b) => a + b + 1, 0);
+
   return (
-    <Box key={`table-${key}`} flexDirection="column" marginTop={1} marginBottom={1}>
+    <Box key={`table-${key}`} flexDirection="column" marginTop={1} marginBottom={1} borderStyle='round' flexShrink={1}>
       {/* Header row */}
       <Box>
         {headerCells.map((header, colIdx) => {
@@ -356,15 +363,7 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
             <Box key={colIdx} width={colWidths[colIdx]} paddingLeft={1} paddingRight={1}>
               <Text bold>
                 {segments.map((seg, segIdx) => (
-                  <Text 
-                    key={segIdx}
-                    bold={seg.bold || true}
-                    italic={seg.italic}
-                    underline={seg.underline}
-                    strikethrough={seg.strikethrough}
-                    backgroundColor={seg.backgroundColor}
-                    color={seg.color}
-                  >
+                  <Text key={segIdx} {...seg.styles}>
                     {seg.text}
                   </Text>
                 ))}
@@ -399,15 +398,7 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
               >
                 <Text>
                   {segments.map((seg, segIdx) => (
-                    <Text 
-                      key={segIdx}
-                      bold={seg.bold}
-                      italic={seg.italic}
-                      underline={seg.underline}
-                      strikethrough={seg.strikethrough}
-                      backgroundColor={seg.backgroundColor}
-                      color={seg.color}
-                    >
+                    <Text key={segIdx} {...seg.styles}>
                       {seg.text}
                     </Text>
                   ))}
@@ -462,17 +453,17 @@ const renderLine = (line: string, key: number, nestingLevel: number = 0): React.
 
   return (
     <Box key={key} flexWrap='wrap'>
-      {segments.map((seg, j) => {
-        if (seg.url) {
-          return <Link key={j} url={seg.url}>{seg.text}</Link>;
-        } else {
-          return (
-            <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
+      <Text>
+        {segments.map((seg, j) => (
+          seg.url ? (
+            <Link key={j} url={seg.url}>{seg.text}</Link>
+          ) : (
+            <Text key={j} {...seg.styles}>
               {seg.text}
             </Text>
-          );
-        }
-      })}
+          )
+        ))}
+      </Text>
     </Box>
   );
 };

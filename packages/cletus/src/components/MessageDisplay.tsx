@@ -52,7 +52,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
   return (
     <Box flexDirection="column" marginBottom={1} flexGrow={1}>
       <Box>
-        <Text color={circleColor as any}>● </Text>
+        <Text color={circleColor}>● </Text>
         <Text bold color={color}>
           {prefix}:
         </Text>
