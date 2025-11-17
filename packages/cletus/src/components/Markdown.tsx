@@ -1,4 +1,4 @@
-import { Box, Text } from "ink";
+import { Box, Text, TextProps } from "ink";
 import SyntaxHighlight from "ink-syntax-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
@@ -349,26 +349,15 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
     return Math.max(headerWidth, dataWidth, 3) + 2; // +2 for padding
   });
 
-  const totalWidth = colWidths.reduce((a, b) => a + b + 1, 0);
-
   return (
     <Box key={`table-${key}`} flexDirection="column" marginTop={1} marginBottom={1} borderStyle='round' flexShrink={1}>
       {/* Header row */}
       <Box>
-        {headerCells.map((header, colIdx) => {
-          const segments = parseInlineFormatting(header);
-          return (
-            <Box key={colIdx} width={colWidths[colIdx]} paddingLeft={1} paddingRight={1}>
-              <Text bold>
-                {segments.map((seg, segIdx) => (
-                  <Text key={segIdx} {...seg.styles}>
-                    {seg.text}
-                  </Text>
-                ))}
-              </Text>
-            </Box>
-          );
-        })}
+        {headerCells.map((header, colIdx) => (
+          <Box key={colIdx} width={colWidths[colIdx]} paddingLeft={1} paddingRight={1}>
+            {renderInline(header, { bold: true })}
+          </Box>
+        ))}
       </Box>
       
       {/* Separator line */}
@@ -384,7 +373,6 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
       {dataRows.map((row, rowIdx) => (
         <Box key={rowIdx}>
           {row.map((cell, colIdx) => {
-            const segments = parseInlineFormatting(cell);
             const alignment = alignments[colIdx] || 'left';
             return (
               <Box 
@@ -394,13 +382,7 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
                 paddingRight={1}
                 justifyContent={alignment === 'center' ? 'center' : alignment === 'right' ? 'flex-end' : 'flex-start'}
               >
-                <Text>
-                  {segments.map((seg, segIdx) => (
-                    <Text key={segIdx} {...seg.styles}>
-                      {seg.text}
-                    </Text>
-                  ))}
-                </Text>
+                {renderInline(cell)}
               </Box>
             );
           })}
@@ -447,25 +429,43 @@ const renderLine = (line: string, key: number, nestingLevel: number = 0): React.
   }
   
   // Regular text with inline formatting
-  const segments = parseInlineFormatting(line);
-
   return (
     <Box key={key} flexWrap='wrap'>
-      <Text>
-        {segments.map((seg, j) => (
-          seg.url ? (
-            <Link key={j} url={seg.url}>{seg.text}</Link>
-          ) : (
-            <Text key={j} {...seg.styles}>
-              {seg.text}
-            </Text>
-          )
-        ))}
-      </Text>
+      {renderInline(line)}
     </Box>
   );
 };
 
+/**
+ * Render text with inline formatting
+ * 
+ * @param line - text line to render
+ * @param props - additional TextProps
+ * @returns Text component with formatting applied
+ */
+const renderInline = (line: string, props?: TextProps) => {
+  const segments = parseInlineFormatting(line);
+
+  return (
+    <Text {...props}>
+      {segments.map((seg, j) => (
+        seg.url ? (
+          <Link key={j} url={seg.url}>{seg.text}</Link>
+        ) : (
+          <Text key={j} {...seg.styles}>
+            {seg.text}
+          </Text>
+        )
+      ))}
+    </Text>
+  );
+};
+
+/**
+ *
+ * @param param0 
+ * @returns 
+ */
 export const Markdown: React.FC<{ children: string }> = ({ children }) => {
   return (
     <Box flexDirection="column">
