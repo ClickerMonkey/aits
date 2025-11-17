@@ -478,54 +478,9 @@ const renderLine = (line: string, key: number, nestingLevel: number = 0): React.
 };
 
 export const Markdown: React.FC<{ children: string }> = ({ children }) => {
-  const lines = children.split('\n');
-  
-  // Break up into code and non-code sections
-  type GroupType = 'code' | 'text';
-  type Group = { type: GroupType; language?: string; padding: number, content: string[] };
-  
-  const groups: Group[] = [];
-  let currentGroup: Group | null = null;
-  let inCodeBlock = false;
-  lines.forEach((line) => {
-    if (line.trim().startsWith('```')) {
-      inCodeBlock = !inCodeBlock;
-      if (inCodeBlock) {
-        const language = line.trim().substring(3).trim() || undefined;
-        currentGroup = { type: 'code', language, content: [], padding: line.indexOf('`') };
-        groups.push(currentGroup);
-      } else {
-        currentGroup = null;
-      }
-    } else {
-      if (inCodeBlock) {
-        currentGroup!.content.push(line);
-      } else {
-        if (currentGroup && currentGroup.type === 'text') {
-          currentGroup.content.push(line);
-        } else {
-          currentGroup = { type: 'text', content: [line], padding: 0 };
-          groups.push(currentGroup);
-        }
-      }
-    }
-  });  
-  
   return (
     <Box flexDirection="column">
-    {groups.map((group, gi) => {
-      if (group.type === 'code') {
-        return (
-          <SyntaxHighlight key={gi} code={group.content.join('\n')} language={group.language} />
-        );
-      } else {
-        return (
-          <React.Fragment key={gi}>
-            {renderMarkdownContent(group.content.join('\n'))}
-          </React.Fragment>
-        );
-      }
-    })}
+      {renderMarkdownContent(children)}
     </Box>
   );
 };
