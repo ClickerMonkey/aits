@@ -122,8 +122,8 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           const content = message.content.find((c) => c.operationIndex === operationIndex);
           if (content) {
             content.content = op.message || '';
+            onMessageUpdate?.(message);
           }
-          onMessageUpdate?.(message);
         }
       );
 
@@ -207,6 +207,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         const content = message.content.find((c) => c.operationIndex === idx);
         if (content) {
           content.content = operations[idx].message || '';
+          onMessageUpdate?.(message);
         }
       }
 
@@ -307,8 +308,8 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
             const content = message.content.find((c) => c.operationIndex === operationIndex);
             if (content) {
               content.content = op.message || '';
+              onMessageUpdate?.(message);
             }
-            onMessageUpdate?.(message);
           }
         );
         const ctx = await getContext(sessionSignal);
@@ -336,6 +337,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           const content = message.content.find((c) => c.operationIndex === idx);
           if (content) {
             content.content = operations[idx].message || '';
+            onMessageUpdate?.(message);
           }
         }
 
