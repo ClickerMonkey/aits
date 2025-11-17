@@ -172,8 +172,6 @@ const applyFormatting = (text: string): LineSegment[] => {
     }
   }
 
-  logger.log(`applyFormatting('${text}') => ${JSON.stringify(segments, null, 2)}`);
-
   return segments;
 };
 
