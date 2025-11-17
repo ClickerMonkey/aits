@@ -1,6 +1,6 @@
 # Deployment Documentation
 
-This document describes the automated deployment process for the AITS project.
+This document describes the automated deployment process for the @aeye project.
 
 ## GitHub Action: Deploy Cletus
 

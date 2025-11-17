@@ -1,7 +1,7 @@
 {
   "name": "@aeye/cletus",
   "version": "0.1.0",
-  "description": "Interactive CLI demo showcasing AITS capabilities",
+  "description": "Interactive CLI demo showcasing @aeye capabilities",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

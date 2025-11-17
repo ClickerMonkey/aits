@@ -1,6 +1,6 @@
 # @aeye/cletus
 
-> **Interactive CLI demo showcasing AITS capabilities - an AI-powered assistant with file management, data operations, and autonomous task execution.**
+> **Interactive CLI demo showcasing @aeye capabilities - an AI-powered assistant with file management, data operations, and autonomous task execution.**
 
 Cletus is a terminal-based AI assistant built with the @aeye library that demonstrates the power of multi-provider AI integration, tool calling, and context management. It features a beautiful TUI (Terminal User Interface) powered by React/Ink and provides specialized AI agents for different domains like file operations, data management, image generation, and web searching.
 
@@ -601,7 +601,7 @@ npm run typecheck
 
 ## Contributing
 
-Contributions are welcome! Please see the main [AITS repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
+Contributions are welcome! Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) for contribution guidelines.
 
 ## License
 

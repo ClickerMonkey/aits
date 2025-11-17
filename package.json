@@ -26,7 +26,8 @@
     "generate:models": "node scripts/generate-static-models.js",
     "update:openai-pricing": "node scripts/update-openai-pricing.js",
     "update:provider-pricing": "node scripts/update-provider-pricing.js",
-    "update:openai-models": "node scripts/update-openai-models.js"
+    "update:openai-models": "node scripts/update-openai-models.js",
+    "release": "npm publish --workspaces --access public"
   },
   "keywords": [
     "ai",
