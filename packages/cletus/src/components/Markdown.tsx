@@ -299,9 +299,8 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
   // Calculate column widths
   const colWidths = headerCells.map((header, colIdx) => {
     const headerWidth = header.length;
-    const dataWidth = Math.max(
-      ...dataRows.map(row => (row[colIdx] || '').length)
-    );
+    const dataWidths = dataRows.map(row => (row[colIdx] || '').length);
+    const dataWidth = dataWidths.length > 0 ? Math.max(...dataWidths) : 0;
     return Math.max(headerWidth, dataWidth, 3) + 2; // +2 for padding
   });
 
