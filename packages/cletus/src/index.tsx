@@ -6,6 +6,7 @@ import { InkChatView } from './components/InkChatView';
 import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
+import { configExists } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
@@ -17,12 +18,14 @@ const App = () => {
   // Check if config exists
   React.useEffect(() => {
     async function checkConfig() {
-      const cfg = new ConfigFile();
-      try {
+      const exists = await configExists();
+      if (exists) {
+        // Config exists, load it
+        const cfg = new ConfigFile();
         await cfg.load();
         setConfig(cfg);
         setView('main');
-      } catch (error) {
+      } else {
         // Config doesn't exist, show init wizard
         setView('init');
       }
