@@ -178,6 +178,275 @@ const applyFormatting = (text: string): LineSegment[] => {
 /**
 * Simple markdown-aware text renderer for Ink
 */
+/**
+ * Recursively render content that may contain markdown, including nested block quotes
+ */
+const renderMarkdownContent = (content: string, nestingLevel: number = 0): React.ReactNode[] => {
+  const lines = content.split('\n');
+  const result: React.ReactNode[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Detect block quote with nesting level
+    const blockquoteMatch = line.match(/^((?:>\s?)+)(.*)$/);
+    if (blockquoteMatch) {
+      const [, quoteMarkers, quoteText] = blockquoteMatch;
+      const quoteLevel = (quoteMarkers.match(/>/g) || []).length;
+      
+      // Collect all consecutive lines at the same or deeper quote level
+      const blockLines: string[] = [quoteText];
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j];
+        const nextMatch = nextLine.match(/^((?:>\s?)+)(.*)$/);
+        if (nextMatch) {
+          const nextQuoteLevel = (nextMatch[1].match(/>/g) || []).length;
+          if (nextQuoteLevel >= quoteLevel) {
+            // Remove the outer quote level markers
+            const remainingMarkers = '> '.repeat(nextQuoteLevel - quoteLevel);
+            blockLines.push(remainingMarkers + nextMatch[2]);
+            j++;
+          } else {
+            break;
+          }
+        } else {
+          // Empty line or non-quote line breaks the block
+          break;
+        }
+      }
+
+      // Render the block quote
+      result.push(
+        <Box 
+          key={`blockquote-${i}`} 
+          marginLeft={nestingLevel * 2}
+          paddingLeft={1}
+          paddingRight={1}
+          backgroundColor="rgb(40,40,40)"
+        >
+          <Box paddingRight={1}>
+            <Text bold color={COLORS.MARKDOWN_BLOCKQUOTE}>│</Text>
+          </Box>
+          <Box flexDirection="column" flexGrow={1}>
+            {renderMarkdownContent(blockLines.join('\n'), nestingLevel + 1)}
+          </Box>
+        </Box>
+      );
+
+      i = j;
+      continue;
+    }
+
+    // Detect markdown table
+    const isTableRow = line.trim().match(/^\|(.+)\|$/);
+    if (isTableRow) {
+      // Collect all consecutive table rows
+      const tableLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim().match(/^\|(.+)\|$/)) {
+        tableLines.push(lines[j]);
+        j++;
+      }
+
+      // Parse and render the table
+      result.push(renderTable(tableLines, i));
+      i = j;
+      continue;
+    }
+
+    // Render regular line
+    result.push(renderLine(line, i, nestingLevel));
+    i++;
+  }
+
+  return result;
+};
+
+/**
+ * Render a markdown table
+ */
+const renderTable = (tableLines: string[], key: number): React.ReactNode => {
+  if (tableLines.length < 2) return null;
+
+  // Parse header
+  const headerCells = tableLines[0]
+    .split('|')
+    .map(cell => cell.trim())
+    .filter(cell => cell !== '');
+
+  // Parse separator (second line) to detect alignment
+  const separatorCells = tableLines[1]
+    .split('|')
+    .map(cell => cell.trim())
+    .filter(cell => cell !== '');
+  
+  const alignments = separatorCells.map(sep => {
+    if (sep.startsWith(':') && sep.endsWith(':')) return 'center';
+    if (sep.endsWith(':')) return 'right';
+    return 'left';
+  });
+
+  // Parse data rows
+  const dataRows = tableLines.slice(2).map(line => 
+    line
+      .split('|')
+      .map(cell => cell.trim())
+      .filter(cell => cell !== '')
+  );
+
+  // Calculate column widths
+  const colWidths = headerCells.map((header, colIdx) => {
+    const headerWidth = header.length;
+    const dataWidth = Math.max(
+      ...dataRows.map(row => (row[colIdx] || '').length)
+    );
+    return Math.max(headerWidth, dataWidth, 3) + 2; // +2 for padding
+  });
+
+  return (
+    <Box key={`table-${key}`} flexDirection="column" marginTop={1} marginBottom={1}>
+      {/* Header row */}
+      <Box>
+        {headerCells.map((header, colIdx) => {
+          const segments = parseInlineFormatting(header);
+          return (
+            <Box key={colIdx} width={colWidths[colIdx]} paddingLeft={1} paddingRight={1}>
+              <Text bold>
+                {segments.map((seg, segIdx) => (
+                  <Text 
+                    key={segIdx}
+                    bold={seg.bold || true}
+                    italic={seg.italic}
+                    underline={seg.underline}
+                    strikethrough={seg.strikethrough}
+                    backgroundColor={seg.backgroundColor}
+                    color={seg.color}
+                  >
+                    {seg.text}
+                  </Text>
+                ))}
+              </Text>
+            </Box>
+          );
+        })}
+      </Box>
+      
+      {/* Separator line */}
+      <Box>
+        {headerCells.map((_, colIdx) => (
+          <Box key={colIdx} width={colWidths[colIdx]}>
+            <Text color="gray">{'─'.repeat(colWidths[colIdx])}</Text>
+          </Box>
+        ))}
+      </Box>
+
+      {/* Data rows */}
+      {dataRows.map((row, rowIdx) => (
+        <Box key={rowIdx}>
+          {row.map((cell, colIdx) => {
+            const segments = parseInlineFormatting(cell);
+            const alignment = alignments[colIdx] || 'left';
+            return (
+              <Box 
+                key={colIdx} 
+                width={colWidths[colIdx]} 
+                paddingLeft={1} 
+                paddingRight={1}
+                justifyContent={alignment === 'center' ? 'center' : alignment === 'right' ? 'flex-end' : 'flex-start'}
+              >
+                <Text>
+                  {segments.map((seg, segIdx) => (
+                    <Text 
+                      key={segIdx}
+                      bold={seg.bold}
+                      italic={seg.italic}
+                      underline={seg.underline}
+                      strikethrough={seg.strikethrough}
+                      backgroundColor={seg.backgroundColor}
+                      color={seg.color}
+                    >
+                      {seg.text}
+                    </Text>
+                  ))}
+                </Text>
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+/**
+ * Render a single line of markdown
+ */
+const renderLine = (line: string, key: number, nestingLevel: number = 0): React.ReactNode => {
+  // Heading
+  const headingMatch = line.match(/^(\s*)([#]+)\s+(.*)/);
+  if (headingMatch) {
+    const [, leadingSpaces, hashes, headingText] = headingMatch;
+    const level = Math.min(hashes.length - 1, COLORS.MAKRDOWN_HEADINGS.length - 1);
+    const style = COLORS.MAKRDOWN_HEADINGS[level];
+    if (leadingSpaces) {
+      return (
+        <Box key={key} marginLeft={leadingSpaces.length}>
+          <Text {...style}>{headingText}</Text>
+        </Box>
+      );
+    } else {
+      return <Text key={key} {...style}>{headingText}</Text>;
+    }
+  }
+  
+  // Code block markers (skip them)
+  if (line.startsWith('```')) {
+    return null;
+  }
+  
+  // Bullet list
+  if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+    line = line.replace(/^(\s*)([-*])(\s+)/, '$1•$3')
+  }
+  
+  // Empty line
+  if (line.trim() === '') {
+    return <Text key={key}> </Text>;
+  }
+  
+  // Regular text with inline formatting
+  const segments = parseInlineFormatting(line);
+  const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
+
+  return (
+    <Box key={key} flexWrap='wrap'>
+      {segmentsGrouped.map((segGroup, j) => {
+        if (segGroup[0].url) {
+          return (
+            <React.Fragment key={j}>
+              {segGroup.map((seg, k) => (
+                <Link key={k} url={seg.url!}>{seg.text}</Link>
+              ))}
+            </React.Fragment>
+          );
+        } else {
+          return (
+            <Text key={j}>
+              {segGroup.map((seg, k) => (
+                <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
+                  {seg.text}
+                </Text>
+              ))}
+            </Text>
+          );
+        }
+      })}
+    </Box>
+  );
+};
+
 export const Markdown: React.FC<{ children: string }> = ({ children }) => {
   const lines = children.split('\n');
   
@@ -222,105 +491,7 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
       } else {
         return (
           <React.Fragment key={gi}>
-            {group.content.map((line, i) => {
-              // Block quote
-              const blockquoteMatch = line.match(/^(\s*)>\s+(.*)$/);
-              if (blockquoteMatch) {
-                const [, leadingSpaces, quoteText] = blockquoteMatch;
-                const segments = parseInlineFormatting(quoteText);
-                const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
-
-                return (
-                  <Box key={i} marginLeft={(leadingSpaces?.length || 0) + 2} borderStyle='single' borderLeft={true} borderColor={COLORS.MARKDOWN_BLOCKQUOTE} paddingLeft={1}>
-                    <Text color={COLORS.MARKDOWN_BLOCKQUOTE}>
-                      {segmentsGrouped.map((segGroup, j) => {
-                        if (segGroup[0].url) {
-                          return (
-                            <React.Fragment key={j}>
-                              {segGroup.map((seg, k) => (
-                                <Link key={k} url={seg.url!}>{seg.text}</Link>
-                              ))}
-                            </React.Fragment>
-                          );
-                        } else {
-                          return (
-                            <React.Fragment key={j}>
-                              {segGroup.map((seg, k) => (
-                                <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor}>
-                                  {seg.text}
-                                </Text>
-                              ))}
-                            </React.Fragment>
-                          );
-                        }
-                      })}
-                    </Text>
-                  </Box>
-                );
-              }
-
-              // Heading
-              const headingMatch = line.match(/^(\s*)([#]+)\s+(.*)/);
-              if (headingMatch) {
-                const [, leadingSpaces, hashes, headingText] = headingMatch;
-                const level = Math.min(hashes.length - 1, COLORS.MAKRDOWN_HEADINGS.length - 1);
-                const style = COLORS.MAKRDOWN_HEADINGS[level];
-                if (leadingSpaces) {
-                  return (
-                    <Box key={i} marginLeft={leadingSpaces.length}>
-                      <Text {...style}>{headingText}</Text>
-                    </Box>
-                  );
-                } else {
-                  return <Text key={i} {...style}>{headingText}</Text>;
-                }
-              }
-              
-              // Code block
-              if (line.startsWith('```')) {
-                return null; // Skip code fence markers for now
-              }
-              
-              // Bullet list
-              if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-                line = line.replace(/^(\s*)([-*])(\s+)/, '$1•$3')
-              }
-              
-              // Empty line
-              if (line.trim() === '') {
-                return <Text key={i}> </Text>;
-              }
-              
-              // Regular text with inline formatting
-              const segments = parseInlineFormatting(line);
-              const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
-
-              return (
-                <Box key={i} flexWrap='wrap'>
-                  {segmentsGrouped.map((segGroup, j) => {
-                    if (segGroup[0].url) {
-                      return (
-                        <React.Fragment key={j}>
-                          {segGroup.map((seg, k) => (
-                            <Link key={k} url={seg.url!}>{seg.text}</Link>
-                          ))}
-                        </React.Fragment>
-                      );
-                    } else {
-                      return (
-                        <Text key={j}>
-                          {segGroup.map((seg, k) => (
-                            <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
-                              {seg.text}
-                            </Text>
-                          ))}
-                        </Text>
-                      );
-                    }
-                  })}
-                </Box>
-              );
-            })}
+            {renderMarkdownContent(group.content.join('\n'))}
           </React.Fragment>
         );
       }
