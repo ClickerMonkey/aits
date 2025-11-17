@@ -113,7 +113,19 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       const sessionSignal = onStart?.() || undefined;
 
       const operations = message.operations || [];
-      const manager = new OperationManager('none');
+      const manager = new OperationManager(
+        'none',
+        operations,
+        undefined,
+        (op, operationIndex) => {
+          // Update the message content when operation is executed
+          const content = message.content.find((c) => c.operationIndex === operationIndex);
+          if (content) {
+            content.content = op.message || '';
+            onMessageUpdate?.(message);
+          }
+        }
+      );
 
       const ctx = await getContext(sessionSignal);
 
@@ -190,6 +202,13 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       for (const idx of indices) {
         operations[idx].status = 'rejected';
         operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+        
+        // Update the message content
+        const content = message.content.find((c) => c.operationIndex === idx);
+        if (content) {
+          content.content = operations[idx].message || '';
+          onMessageUpdate?.(message);
+        }
       }
 
       // Generate summary message
@@ -280,7 +299,19 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         const sessionSignal = onStart?.() || undefined;
 
         const operations = message.operations || [];
-        const manager = new OperationManager('none');
+        const manager = new OperationManager(
+          'none',
+          operations,
+          undefined,
+          (op, operationIndex) => {
+            // Update the message content when operation is executed
+            const content = message.content.find((c) => c.operationIndex === operationIndex);
+            if (content) {
+              content.content = op.message || '';
+              onMessageUpdate?.(message);
+            }
+          }
+        );
         const ctx = await getContext(sessionSignal);
 
         let success = 0;
@@ -301,6 +332,13 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         for (const idx of rejected) {
           operations[idx].status = 'rejected';
           operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+          
+          // Update the message content
+          const content = message.content.find((c) => c.operationIndex === idx);
+          if (content) {
+            content.content = operations[idx].message || '';
+            onMessageUpdate?.(message);
+          }
         }
 
         const elapsed = (performance.now() - startTime);
