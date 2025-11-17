@@ -142,8 +142,8 @@ export function createCletusAI(configFile: ConfigFile) {
       },
       models,
     }).withHooks({
-      beforeRequest: async (ctx, request, selected, tokens, cost) => {
-        logger.log(`Cletus beforeRequest model=${selected.model.id}, tokens=~${tokens}, cost=~${cost}:\n${JSON.stringify(request, jsonReplacer, 2)}`);
+      beforeRequest: async (ctx, request, selected, usage, cost) => {
+        logger.log(`Cletus beforeRequest model=${selected.model.id}, usage=~${JSON.stringify(usage)}, cost=~${cost}:\n${JSON.stringify(request, jsonReplacer, 2)}`);
       },
       afterRequest: async (ctx, request, response, responseComplete, selected, usage, cost) => {
         logger.log(`Cletus afterRequest model=${selected.model.id}, usage=${JSON.stringify(usage)}, cost=${cost}:\n${JSON.stringify(response, jsonReplacer, 2)}`);

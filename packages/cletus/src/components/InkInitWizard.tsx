@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
@@ -70,6 +70,18 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     setApiKey('');
     setError(null);
   }, [step]);
+
+  // Handle Ctrl+C to exit wizard at any step
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c') {
+      if (step === 'complete') {
+        // Already complete, do nothing
+        return;
+      }
+      // Exit the setup process
+      process.exit(0);
+    }
+  });
 
   // OpenAI - Environment Key Detected
   if (step === 'openai-env' && openaiKey) {

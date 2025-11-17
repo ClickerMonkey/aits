@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import React, { useState, useEffect } from 'react';
@@ -37,6 +37,22 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
       setCustomPrompt('');
     }
   }, [view]);
+
+  // Handle Ctrl+C to cancel/go back
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c') {
+      if (view === 'settings') {
+        // Let settings menu handle it
+        return;
+      } else if (view === 'menu') {
+        // On main menu, exit
+        onExit();
+      } else {
+        // On any sub-view, go back to main menu
+        setView('menu');
+      }
+    }
+  });
 
   // Settings View
   if (view === 'settings') {

@@ -382,6 +382,49 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     (input, key) => {
       if (isProcessing || approvableOperations.length === 0) return;
 
+      // Handle Ctrl+C to reject and cancel
+      if (key.ctrl && input === 'c') {
+        if (menuState === 'main') {
+          // Reject all operations
+          rejectOperations(approvableOperations.map(({ idx }) => idx));
+        } else if (menuState === 'approving-some') {
+          // Reject remaining operations and process what we have so far
+          const approved: number[] = [];
+          const rejected: number[] = [];
+
+          // Process decisions made so far
+          operationDecisions.forEach((decision, idx) => {
+            if (decision === 'approve') {
+              approved.push(idx);
+            } else {
+              rejected.push(idx);
+            }
+          });
+
+          // Reject all remaining operations that haven't been decided
+          for (let i = currentOperationIndex; i < approvableOperations.length; i++) {
+            rejected.push(approvableOperations[i].idx);
+          }
+
+          // Process both approved and rejected
+          if (approved.length > 0 || rejected.length > 0) {
+            setIsProcessing(true);
+            setMenuState('processing');
+
+            const operations = message.operations || [];
+
+            // Mark rejected operations
+            for (const idx of rejected) {
+              operations[idx].status = 'rejected';
+              operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+            }
+
+            rejectOperations(rejected);
+          }
+        }
+        return;
+      }
+
       if (menuState === 'main') {
         // Main menu navigation
         const menuOptions = hasMultipleOperations ? 3 : 2;

@@ -109,10 +109,22 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     }
   }, [view]);
 
-  // Handle ESC key for add-memory view
+  // Handle ESC and Ctrl+C keys
   useInput((input, key) => {
     if (key.escape && view === 'add-memory') {
       handleBack();
+    }
+    if (key.ctrl && input === 'c') {
+      if (view === 'menu') {
+        // On main settings menu, go back
+        onExit();
+      } else if (view === 'confirm') {
+        // On confirm dialog, cancel
+        handleBack();
+      } else {
+        // On any other view, go back to menu
+        handleBack();
+      }
     }
   });
 

@@ -253,6 +253,23 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   // Handle keyboard input
   useInput((input, key) => {
+    // Handle Ctrl+C as cancel
+    if (key.ctrl && input === 'c') {
+      if (editingWeight) {
+        setEditingWeight(null);
+        setWeightInput('');
+      } else if (mode === 'models' && filterText) {
+        setFilterText('');
+      } else if (mode === 'models') {
+        // Ctrl+C in models mode - go back to weights
+        setMode('weights');
+      } else {
+        // Ctrl+C in weights mode - cancel
+        onCancel();
+      }
+      return;
+    }
+
     if (key.escape) {
       if (editingWeight) {
         setEditingWeight(null);
