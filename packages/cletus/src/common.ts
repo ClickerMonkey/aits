@@ -96,7 +96,7 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
   return entries.map(([key, val]) => {
     const prefix = `${hyphenPrefix}${key}:`;
     if (typeof val === 'object' && val !== null) {
-      return `${prefix}\n  ${formatValue(val, true).split('\n').join('\n  ')}`;
+      return `${prefix}\n  ${formatValue(val).split('\n').join('\n  ')}`;
     } else {
       return `${prefix} ${formatValue(val).split('\n').join('\n  ')}`;
     }

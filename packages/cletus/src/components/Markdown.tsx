@@ -302,11 +302,7 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
                       return (
                         <React.Fragment key={j}>
                           {segGroup.map((seg, k) => (
-                            <Link key={k} url={seg.url!}>
-                              <Text bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
-                                {seg.text}
-                              </Text>
-                            </Link>
+                            <Link key={k} url={seg.url!}>{seg.text}</Link>
                           ))}
                         </React.Fragment>
                       );
