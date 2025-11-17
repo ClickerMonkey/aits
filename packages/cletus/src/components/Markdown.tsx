@@ -203,7 +203,9 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       
       // Render the code block
       result.push(
-        <SyntaxHighlight key={`code-${i}`} code={codeLines.join('\n')} language={language} />
+        <Box key={`codeblock-${i}`} flexGrow={1} backgroundColor={COLORS.MARKDOWN_CODE_BACKGROUND} paddingX={1}>
+          <SyntaxHighlight key={`code-${i}`} code={codeLines.join('\n')} language={language} />
+        </Box>
       );
       
       i = j + 1; // Skip the closing ```
@@ -279,6 +281,15 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       continue;
     }
 
+    // Detect horizontal rule
+    if (line.trim().match(/^(-{3,}|\*{3,}|_{3,})$/)) {
+      result.push(
+        <Box key={`hr-${i}`} width="100%" borderStyle="bold" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderBottomDimColor />
+      );  
+      i++;
+      continue;
+    }
+
     // Render regular line
     result.push(renderLine(line, i, nestingLevel));
     i++;
@@ -342,50 +353,75 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
   const dataRows = tableLines.slice(2).map(line => splitTableCells(line));
 
   // Calculate column widths
-  const colWidths = headerCells.map((header, colIdx) => {
+  const columnWidths = headerCells.map((header, colIdx) => {
     const headerWidth = header.length;
     const dataWidths = dataRows.map(row => (row[colIdx] || '').length);
     const dataWidth = dataWidths.length > 0 ? Math.max(...dataWidths) : 0;
-    return Math.max(headerWidth, dataWidth, 3) + 2; // +2 for padding
+    return Math.max(headerWidth, dataWidth, 3);
   });
 
+  const minWidth = Math.min(...columnWidths);
+  const maxAllowedWidth = minWidth * 3; // max ratio
+  const constrainedWidths = columnWidths.map(x => Math.min(x, maxAllowedWidth));
+  const totalWidth = constrainedWidths.reduce((sum, w) => sum + w, 0);
+  const percentages = constrainedWidths.map(w => (w / totalWidth) * 100);
+
+  // ┌─┬─┐
+  // │ │ │
+  // ├─┼─┤
+  // └─┴─┘
+
+  const getStyles = (firstX: boolean, firstY: boolean, lastX: boolean, lastY: boolean) => {
+    return {
+      topLeft: firstX && firstY ? '┌' : firstY ? '┬' : firstX ? '├' : '┼',
+      top: '─',
+      topRight: lastX && firstY ? '┐' : firstY ? '┬' : lastX ? '┤' : '┼',
+      right: '│',
+      bottomRight: lastX && lastY ? '┘' : lastY ? '┴' : lastX ? '┤' : '┼',
+      bottom: '─',
+      bottomLeft: firstX && lastY ? '└' : lastY ? '┴' : firstX ? '├' : '┼',
+      left: '│',
+    };
+  }
+
   return (
-    <Box key={`table-${key}`} flexDirection="column" marginTop={1} marginBottom={1} borderStyle='round' flexShrink={1}>
-      {/* Header row */}
-      <Box>
-        {headerCells.map((header, colIdx) => (
-          <Box key={colIdx} width={colWidths[colIdx]} paddingLeft={1} paddingRight={1}>
-            {renderInline(header, { bold: true })}
+    <Box flexDirection="column" width="100%" key={`table-${key}`} >
+      {/* Header Row */}
+      <Box width="100%" key="header">
+        {headerCells.map((header, i) => (
+          <Box 
+            key={i}
+            width={`${percentages[i]}%`}
+            borderStyle={getStyles(i === 0, true, i === headerCells.length - 1, false)}
+            borderLeft={i === 0}
+            borderRight
+            borderTop
+            borderBottom
+            paddingX={1}
+          >
+            <Text bold wrap="wrap">{renderInline(header)}</Text>
           </Box>
         ))}
       </Box>
       
-      {/* Separator line */}
-      <Box>
-        {headerCells.map((_, colIdx) => (
-          <Box key={colIdx} width={colWidths[colIdx]}>
-            <Text color="gray">{'─'.repeat(colWidths[colIdx])}</Text>
-          </Box>
-        ))}
-      </Box>
-
-      {/* Data rows */}
-      {dataRows.map((row, rowIdx) => (
-        <Box key={rowIdx}>
-          {row.map((cell, colIdx) => {
-            const alignment = alignments[colIdx] || 'left';
-            return (
-              <Box 
-                key={colIdx} 
-                width={colWidths[colIdx]} 
-                paddingLeft={1} 
-                paddingRight={1}
-                justifyContent={alignment === 'center' ? 'center' : alignment === 'right' ? 'flex-end' : 'flex-start'}
-              >
-                {renderInline(cell)}
-              </Box>
-            );
-          })}
+      {/* Data Rows */}
+      {dataRows.map((row, rowIndex) => (
+        <Box key={rowIndex} width="100%">
+          {row.map((col, i) => (
+            <Box 
+              key={i}
+              width={`${percentages[i]}%`}
+              borderStyle={getStyles(i === 0, false, i === row.length - 1, rowIndex === dataRows.length - 1)}
+              borderLeft={i === 0}
+              borderRight
+              borderBottom
+              borderTop={false}
+              paddingX={1}
+              justifyContent={alignments[i] === 'center' ? 'center' : alignments[i] === 'right' ? 'flex-end' : 'flex-start'}
+            >
+              <Text wrap="wrap">{renderInline(col)}</Text>
+            </Box>
+          ))}
         </Box>
       ))}
     </Box>

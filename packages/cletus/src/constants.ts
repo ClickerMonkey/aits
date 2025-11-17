@@ -56,9 +56,9 @@ export const COLORS = {
     { color: 'rgb(0,95,95)', bold: true },
     { color: 'rgb(0,60,60)', bold: false },
   ] as const,
-  MARKDOWN_CODE_BACKGROUND: 'rgb(40,40,40)' as const,
-  MARKDOWN_LINK: 'rgb(15, 101, 187)' as const,
-  MARKDOWN_BLOCKQUOTE: 'rgb(60,60,60)' as const,
+  MARKDOWN_CODE_BACKGROUND: 'rgb(25,25,25)' as const,
+  MARKDOWN_LINK: 'rgb(15,101,187)' as const,
+  MARKDOWN_BLOCKQUOTE: 'rgb(30,30,30)' as const,
 
   // Other UI elements
   DIM_TEXT: 'gray' as const,
