@@ -12,6 +12,7 @@ import { operationOf } from "./types";
 import { CONSTS } from "../constants";
 import { renderOperation } from "../helpers/render";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, isAudioFile, processFile, searchFiles } from "../helpers/files";
+import { logger } from "../logger";
 
 // Constants for file_attach operation
 const ALLOWED_FILE_TYPES = ['text', 'pdf'];

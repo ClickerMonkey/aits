@@ -159,6 +159,34 @@ export function chunkArray<T>(array: T[], chunkSize: number): T[][] {
 }
 
 /**
+ * Chunk an array based on a predicate function.
+ * 
+ * @param array - input array
+ * @param newChunk - function to determine if a new chunk should start
+ * @returns 
+ */
+export function chunk<T>(array: T[], newChunk: (prev: T, next: T, i: number) => boolean): T[][] {
+  const chunks: T[][] = [];
+  let currentChunk: T[] = [];
+  for (let i = 0; i < array.length; i++) {
+    if (currentChunk.length === 0) {
+      currentChunk.push(array[i]);
+    } else {
+      if (newChunk(currentChunk[currentChunk.length - 1], array[i], i)) {
+        chunks.push(currentChunk);
+        currentChunk = [array[i]];
+      } else {
+        currentChunk.push(array[i]);
+      }
+    }
+  }
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+  return chunks;
+}
+
+/**
  * Paginate text by characters or lines. Never returns more than 64k characters. 
  * In line mode it doesn't return more than 1k lines.
  * 
