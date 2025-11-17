@@ -1,7 +1,6 @@
 import { Box, Text } from "ink";
 import SyntaxHighlight from "ink-syntax-highlight";
 import React from 'react';
-import { chunk } from '../common';
 import { COLORS } from "../constants";
 import { Link } from "./Link";
 
@@ -189,6 +188,27 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
   while (i < lines.length) {
     const line = lines[i];
 
+    // Detect code block
+    if (line.trim().startsWith('```')) {
+      const language = line.trim().substring(3).trim() || undefined;
+      const codeLines: string[] = [];
+      let j = i + 1;
+      
+      // Collect code block content
+      while (j < lines.length && !lines[j].trim().startsWith('```')) {
+        codeLines.push(lines[j]);
+        j++;
+      }
+      
+      // Render the code block
+      result.push(
+        <SyntaxHighlight key={`code-${i}`} code={codeLines.join('\n')} language={language} />
+      );
+      
+      i = j + 1; // Skip the closing ```
+      continue;
+    }
+
     // Detect block quote with nesting level
     const blockquoteMatch = line.match(/^((?:>\s?)+)(.*)$/);
     if (blockquoteMatch) {
@@ -226,8 +246,8 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
           paddingRight={1}
           backgroundColor="rgb(40,40,40)"
         >
-          <Box paddingRight={1}>
-            <Text bold color={COLORS.MARKDOWN_BLOCKQUOTE}>│</Text>
+          <Box paddingRight={1} borderLeft borderColor={COLORS.MARKDOWN_BLOCKQUOTE}>
+            <Text> </Text>
           </Box>
           <Box flexDirection="column" flexGrow={1}>
             {renderMarkdownContent(blockLines.join('\n'), nestingLevel + 1)}
@@ -265,22 +285,49 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
 };
 
 /**
+ * Split table row by pipes, handling escaped pipes (\|)
+ */
+const splitTableCells = (line: string): string[] => {
+  const cells: string[] = [];
+  let currentCell = '';
+  let i = 0;
+  
+  while (i < line.length) {
+    if (line[i] === '\\' && i + 1 < line.length && line[i + 1] === '|') {
+      // Escaped pipe - add the pipe to the cell
+      currentCell += '|';
+      i += 2;
+    } else if (line[i] === '|') {
+      // Unescaped pipe - cell separator
+      cells.push(currentCell.trim());
+      currentCell = '';
+      i++;
+    } else {
+      currentCell += line[i];
+      i++;
+    }
+  }
+  
+  // Add the last cell
+  if (currentCell || cells.length > 0) {
+    cells.push(currentCell.trim());
+  }
+  
+  // Filter out empty first/last cells (from leading/trailing pipes)
+  return cells.filter((cell, idx) => cell !== '' || (idx !== 0 && idx !== cells.length - 1));
+};
+
+/**
  * Render a markdown table
  */
 const renderTable = (tableLines: string[], key: number): React.ReactNode => {
   if (tableLines.length < 2) return null;
 
   // Parse header
-  const headerCells = tableLines[0]
-    .split('|')
-    .map(cell => cell.trim())
-    .filter(cell => cell !== '');
+  const headerCells = splitTableCells(tableLines[0]);
 
   // Parse separator (second line) to detect alignment
-  const separatorCells = tableLines[1]
-    .split('|')
-    .map(cell => cell.trim())
-    .filter(cell => cell !== '');
+  const separatorCells = splitTableCells(tableLines[1]);
   
   const alignments = separatorCells.map(sep => {
     if (sep.startsWith(':') && sep.endsWith(':')) return 'center';
@@ -289,12 +336,7 @@ const renderTable = (tableLines: string[], key: number): React.ReactNode => {
   });
 
   // Parse data rows
-  const dataRows = tableLines.slice(2).map(line => 
-    line
-      .split('|')
-      .map(cell => cell.trim())
-      .filter(cell => cell !== '')
-  );
+  const dataRows = tableLines.slice(2).map(line => splitTableCells(line));
 
   // Calculate column widths
   const colWidths = headerCells.map((header, colIdx) => {
@@ -417,27 +459,16 @@ const renderLine = (line: string, key: number, nestingLevel: number = 0): React.
   
   // Regular text with inline formatting
   const segments = parseInlineFormatting(line);
-  const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
 
   return (
     <Box key={key} flexWrap='wrap'>
-      {segmentsGrouped.map((segGroup, j) => {
-        if (segGroup[0].url) {
-          return (
-            <React.Fragment key={j}>
-              {segGroup.map((seg, k) => (
-                <Link key={k} url={seg.url!}>{seg.text}</Link>
-              ))}
-            </React.Fragment>
-          );
+      {segments.map((seg, j) => {
+        if (seg.url) {
+          return <Link key={j} url={seg.url}>{seg.text}</Link>;
         } else {
           return (
-            <Text key={j}>
-              {segGroup.map((seg, k) => (
-                <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
-                  {seg.text}
-                </Text>
-              ))}
+            <Text key={j} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
+              {seg.text}
             </Text>
           );
         }
