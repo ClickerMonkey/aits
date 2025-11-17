@@ -1,11 +1,34 @@
-# @aeye - AI TypeScript Library
+# @aeye - AI
 
 > **Multi-provider AI library with intelligent model selection, type-safe context management, and comprehensive provider support.**
 
 @aeye (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
+To see a complex example of a CLI agent built with aeye - `npm i --global @aeye/cletus` and run `cletus`!
+
+```ts
+import { AI } from '@aeye/ai';
+import { OpenAIProvider } from '@aeye/openai';
+
+const openai = new OpenAIProvider({});
+const ai = AI.with<MyContext>().providers({ openai }).create({ /* config */ })
+
+const myTool = ai.tool({ /* name, description, instructions, schema, call, + */ });
+const myPrompt = ai.prompt({ /* name, description, content, schema?, config, tools, metadata, + */ });
+const myAgent = ai.agent({ /* name, description, refs, call, + */ });
+
+myTool.run(input, ctx?); // same signature with myPrompt & myAgent
+myPrompt.get('tools', input, ctx?); // prompts can have tool results, results, streaming, etc through get
+
+ai.chat.get(request, ctx?) // or stream
+ai.image.generate(request, ctx?) // or stream
+ai.image.edit.get(request, ctx?) // or stream
+ai.image.analyze.get(request, ctx?) // or stream
+ai.speech.get(request, ctx?) // or stream
+ai.transcribe.get(request, ctx?) // or stream
+ai.embed.get(request, ctx?)
+ai.models.list() // get(id), search(criteria), select(criteria), refresh()
+```
 
 ## Features
 
