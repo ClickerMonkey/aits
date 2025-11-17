@@ -53,8 +53,8 @@ export function getElapsedTime(op: Operation): string {
  */
 export function getSummary<TOperation extends Operation>(
   op: TOperation,
-  getSummaryText?: (op: TOperation) => string | null
-): string {
+  getSummaryText?: (op: TOperation) => React.ReactNode | string | null
+): string | React.ReactNode {
   if (op.error) {
     return op.error;
   }
@@ -87,7 +87,7 @@ export function getSummary<TOperation extends Operation>(
 export function renderOperation<TOperation extends Operation>(
   op: TOperation,
   operationLabel: string,
-  getSummaryText?: (op: TOperation) => string | null,
+  getSummaryText?: (op: TOperation) => React.ReactNode | string | null,
   showInput?: boolean,
   showOutput?: boolean
 ): React.ReactNode {
@@ -96,21 +96,29 @@ export function renderOperation<TOperation extends Operation>(
   const summary = getSummary(op, getSummaryText);
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexGrow={1}>
       <Box>
         <Text color={statusColor as any}>● </Text>
         <Text>{operationLabel} </Text>
         <Text dimColor>[{statusLabel}] </Text>
         <Text dimColor>({elapsed})</Text>
       </Box>
-      <Box marginLeft={2}>
-        <Text>{' → '}</Text>
-        {op.error ? (
-          <Text color={COLORS.ERROR_TEXT}>{summary}</Text>
+      
+      {typeof summary === 'string' ? (
+        op.error ? (
+          <Box marginLeft={2} flexGrow={1}>
+            <Text>{' → '}</Text>
+            <Text color={COLORS.ERROR_TEXT}>{summary}</Text>
+          </Box>
         ) : (
-          <Markdown>{summary}</Markdown>
-        )}
-      </Box>
+          <Box marginLeft={2} flexGrow={1}>
+            <Text>{' → '}</Text>
+            <Markdown>{summary}</Markdown>
+          </Box>
+        )
+      ) : (
+        summary
+      )}
       
       {showInput && (
         <>

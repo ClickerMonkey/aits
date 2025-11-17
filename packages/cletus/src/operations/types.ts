@@ -1,5 +1,5 @@
 import React from "react";
-import { CletusAIContext } from "../ai";
+import { CletusAI, CletusAIContext } from "../ai";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 
 import { Plus } from "@aits/core";
@@ -100,7 +100,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param showOutput - Whether to show detailed output
    * @returns - React component to display
    */
-  render?: (op: OperationOf<TInput, TOutput>, config: ConfigFile, showInput?: boolean, showOutput?: boolean) => React.ReactNode;
+  render?: (op: OperationOf<TInput, TOutput>, ai: CletusAI, showInput?: boolean, showOutput?: boolean) => React.ReactNode;
 
   /**
    * A signature passed into the chat-agent's delegate prompt to identify this operation.

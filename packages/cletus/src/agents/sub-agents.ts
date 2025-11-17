@@ -40,6 +40,16 @@ export function createSubAgents(ai: CletusAI) {
     }
   }
 
+  const requestPrompt = `You have been given the following request to perform by Cletus. 
+It is VERY IMPORTANT you follow this request. 
+Cletus will execute and receive the results and decide what to do next. 
+That's why it's VERY important to strictly follow the request because Cletus is relying on you to only do what is needed. 
+If you can't "see" something - trust that Cletus has.
+
+<cletusRequest>
+{{request}}
+</cletusRequest>`
+
   // Planner sub-agent
   const planner = ai.prompt({
     name: 'planner',
@@ -48,12 +58,7 @@ export function createSubAgents(ai: CletusAI) {
 
 Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.
 
-You have been given the following request to perform by the chat agent, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 <userInformation>
 {{userPrompt}}
@@ -74,12 +79,7 @@ Do ONLY this part of the request, Cletus will handle other parts with other agen
 
 Your role is to help search, add, and delete knowledge entries to assist with user requests.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 Knowledge sources can be formatted as:
 - {dataType}:{id} - Knowledge from data records
@@ -107,12 +107,7 @@ Knowledge sources can be formatted as:
 
 Your role is to help search, read, create, modify, and organize files within the project directory.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
     
 <IMPORTANT>
 - All file operations are relative to the current working directory: {{cwd}}
@@ -139,12 +134,7 @@ Do ONLY this part of the request, Cletus will handle other parts with other agen
 
 Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 Available Assistants: {{assistants}}
 
@@ -176,12 +166,7 @@ Available Assistants: {{assistants}}
     
 Your role is to help create and modify type definitions while maintaining data integrity.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 - Never change field names or types (except to make more flexible like string)
@@ -208,12 +193,7 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
 
 Your role is to help with all image-related requests including creation, modification, and understanding visual content.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 Generated images are saved to .cletus/images/ and linked in chat messages via [filename](filepath) syntax.
 You can generate new images, edit existing ones, analyze images, describe them, or find images matching descriptions.
@@ -238,12 +218,7 @@ You can generate new images, edit existing ones, analyze images, describe them, 
 
 Your role is to help with web searches, fetching web page content, and making REST API calls.
 
-You have been given the following request to perform by Cletus, the conversation follows.
-It is VERY IMPORTANT you follow this request - it came from Cletus based on user input. A conversation follows but Cletus has already determined you are the right agent for this part of the request. 
-Do ONLY this part of the request, Cletus will handle other parts with other agents.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
 
 You can:
 - Search the web using Tavily API (requires API key to be configured)

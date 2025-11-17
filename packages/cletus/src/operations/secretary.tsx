@@ -35,7 +35,7 @@ export const assistant_switch = operationOf<
     await config.updateChat(chat.id, { assistant: input.name });
     return { switched: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `AssistantSwitch("${op.input.name}")`,
     (op) => {
@@ -86,7 +86,7 @@ export const assistant_update = operationOf<
 
     return { updated: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `AssistantUpdate("${op.input.name}")`,
     (op) => {
@@ -133,7 +133,7 @@ export const assistant_add = operationOf<
 
     return { created: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `AssistantAdd("${op.input.name}")`,
     (op) => {
@@ -167,7 +167,7 @@ export const memory_list = operationOf<
       created: new Date(m.created).toLocaleString(),
     }))};
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     'MemoryList()',
     (op) => {
@@ -198,7 +198,7 @@ export const memory_update = operationOf<
     await config.addMemory(input.content);
     return { added: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `MemoryUpdate("${abbreviate(op.input.content, 30)}")`,
     (op) => {

@@ -42,7 +42,7 @@ export const knowledge_search = operationOf<
       })),
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeSearch("${abbreviate(op.input.query, 25)}")`,
     (op) => {
@@ -82,7 +82,7 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
 
     return { sources: Array.from(sources) };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     'KnowledgeSources()',
     (op) => {
@@ -129,7 +129,7 @@ export const knowledge_add = operationOf<
 
     return { source, added: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeAdd("${abbreviate(op.input.text, 30)}")`,
     (op) => {
@@ -221,7 +221,7 @@ export const knowledge_delete = operationOf<
 
     return { deletedCount };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `KnowledgeDelete("${op.input.sourcePattern}")`,
     (op) => {

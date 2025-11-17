@@ -381,5 +381,23 @@ export function unlinkFile(link: string): { filename: string; filepath: string} 
  * @returns 
  */
 export function linkFile(filepath: string, filename: string = path.basename(filepath)): string {
-  return `[${filename}](${filepath})`;
+  return `[${filename}](${fileProtocol(filepath)})`;
+}
+
+/**
+ * Ensures a path is in file protocol format.
+ * 
+ * @param path 
+ * @returns 
+ */
+export function fileProtocol(path: string): string {
+  path = path.replace(/\\/g, '/');
+  if (!path.startsWith('file:///')) {
+    if (path.startsWith('/')) {
+      path = `file://${path}`;
+    } else {
+      path = `file:///${path}`;
+    }
+  }
+  return path;
 }

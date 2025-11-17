@@ -1022,7 +1022,6 @@ After installation and the SoX executable is in the path, restart Cletus and try
 
   // Show model selector if requested
   if (showModelSelector) {
-    const ai = createCletusAI(config);
     const currentModelId = chatMeta.model || config.getData().user.models?.chat;
 
     return (
@@ -1046,7 +1045,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
   }
 
   return (
-    <Box flexDirection="column" height="100%" width="100%">
+    <Box flexDirection="column" height="100%" flexGrow={1}>
       
       {/* Messages Area */}
       <Box flexDirection="column" flexGrow={1} marginBottom={1}>
@@ -1058,14 +1057,14 @@ After installation and the SoX executable is in the path, restart Cletus and try
           <>
             <Static key={renderKey} items={visibleMessages}>
               {(msg: Message, i: number) => (
-                <MessageDisplay key={i} message={msg} config={config} showInput={showInput} showOutput={showOutput}/>
+                <MessageDisplay key={i} message={msg} ai={ai} showInput={showInput} showOutput={showOutput}/>
               )}
             </Static>
             {lastMessage && (
-              <MessageDisplay message={lastMessage} config={config} showInput={showInput} showOutput={showOutput} />
+              <MessageDisplay message={lastMessage} ai={ai} showInput={showInput} showOutput={showOutput} />
             )}
             {showPendingMessage && (
-              <MessageDisplay message={pendingMessage} config={config} showInput={showInput} showOutput={showOutput} />
+              <MessageDisplay message={pendingMessage} ai={ai} showInput={showInput} showOutput={showOutput} />
             )}
           </>
         )}

@@ -55,7 +55,7 @@ export const type_info = operationOf<
     
     return { type: type || null };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `${formatName(op.input.name)}Info()`,
     (op) => {
@@ -229,7 +229,7 @@ export const type_update = operationOf<
 
     return { name: input.name, updated: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `${formatName(op.input.name)}Update(${Object.keys(op.input.update).join(', ')})`,
     (op) => op.output?.updated ? 'Updated type successfully' : null,
@@ -308,7 +308,7 @@ export const type_create = operationOf<
 
     return { type: input, created: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `${formatName(op.input.name)}Create(fields: [${op.input.fields.map(f => f.friendlyName).join(', ')}])`,
     (op) => op.output?.created ? `Created type: ${op.output.type.friendlyName}` : null,
@@ -395,7 +395,7 @@ export const type_delete = operationOf<
 
     return { name: input.name, deleted: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `${formatName(op.input.name)}Delete()`,
     (op) => op.output?.deleted ? `Deleted type: ${op.input.name}` : null,
@@ -998,7 +998,7 @@ When managing types:
       filesProcessed: importableFiles.length,
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `TypeImport("${op.input.glob}"${op.input.hints ? `, hints=[${op.input.hints.join(',')}]` : ''}${op.input.max ? `, max=${op.input.max}` : ''})`,
     (op) => {

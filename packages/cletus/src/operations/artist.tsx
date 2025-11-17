@@ -106,7 +106,7 @@ export const image_generate = operationOf<
       links: imageLinks,
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageGenerate("${abbreviate(op.input.prompt, 30)}", n=${op.input.n || 1})`,
     (op) => {
@@ -132,13 +132,13 @@ export const image_edit = operationOf<
 
     if (!await fileIsReadable(fullImagePath)) {
       return {
-        analysis: `This would fail - image ${linkFile(input.path)} not found or not readable.`,
+        analysis: `This would fail - image ${linkFile(fullImagePath)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will edit image ${linkFile(input.path)} with prompt: "${input.prompt}"`,
+      analysis: `This will edit image ${linkFile(fullImagePath)} with prompt: "${input.prompt}"`,
       doable: true,
     };
   },
@@ -159,12 +159,12 @@ export const image_edit = operationOf<
       editedLink: imageUrls[0],
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageEdit("${paginateText(op.input.path, 100, -100)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        return `Edited **${linkFile(op.input.path)}** → saved to ${op.output.editedLink}`;
+        return `Edited **${op.input.path}** → saved to ${op.output.editedLink}`;
       }
       return null;
     },
@@ -220,7 +220,7 @@ export const image_analyze = operationOf<
       links: input.paths.map(linkImage),
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageAnalyze(${pluralize(op.input.paths.length, paginateText(op.input.paths[0], 100, -100), 'images')}, "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
@@ -245,17 +245,18 @@ export const image_describe = operationOf<
 
     if (!await fileIsReadable(fullPath)) {
       return {
-        analysis: `This would fail - image ${linkFile(input.path)} not found or not readable.`,
+        analysis: `This would fail - image ${linkFile(fullPath)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will describe the image at ${linkFile(input.path)}`,
+      analysis: `This will describe the image at ${linkFile(fullPath)}`,
       doable: true,
     };
   },
   do: async (input, { ai, cwd, config }) => {
+    const fullPath = resolveImage(cwd, input.path);
     const image = await loadImageAsDataUrl(cwd, input.path);
 
     // Describe image
@@ -266,11 +267,11 @@ export const image_describe = operationOf<
     });
 
     return {
-      link: linkImage(input.path),
+      link: linkImage(fullPath),
       description: response.content,
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageDescribe("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
@@ -422,7 +423,7 @@ Do not return any additional text other than the matching description subset.`;
       };
     }
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageFind("${abbreviate(op.input.query, 50)}", "${op.input.glob}")`,
     (op) => {
@@ -439,7 +440,7 @@ Do not return any additional text other than the matching description subset.`;
 
 export const image_attach = operationOf<
   { path: string },
-  { attached: boolean }
+  { fullPath: string, attached: boolean }
 >({
   mode: 'create',
   signature: 'image_attach({ path })',
@@ -452,19 +453,19 @@ export const image_attach = operationOf<
     const readable = await fileIsReadable(fullPath);
     if (!readable) {
       return {
-        analysis: `This would fail - image file ${linkFile(imagePath)} not found or not readable.`,
+        analysis: `This would fail - image file ${linkFile(fullPath)} not found or not readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will attach the image ${linkFile(imagePath)} to the chat as a user message.`,
+      analysis: `This will attach the image ${linkFile(fullPath)} to the chat as a user message.`,
       doable: true,
     };
   },
   do: async ({ path: imagePath }, { cwd, chatMessage }) => {
     // Resolve path (supports both absolute and relative)
-    const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
+    const fullPath = resolveImage(cwd, imagePath);
     const imageLink = linkFile(fullPath);
 
     // Add image to the chat message
@@ -472,14 +473,14 @@ export const image_attach = operationOf<
       chatMessage.content.push({ type: 'image', content: imageLink });
     }
 
-    return { attached: true };
+    return { fullPath, attached: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `ImageAttach("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output?.attached) {
-        return `Attached image: ${linkFile(op.input.path)}`;
+        return `Attached image: ${linkFile(op.output.fullPath)}`;
       }
       return null;
     },

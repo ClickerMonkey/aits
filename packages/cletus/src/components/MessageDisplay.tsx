@@ -5,11 +5,12 @@ import { COLORS } from '../constants';
 import { Operations } from '../operations/types';
 import type { Message } from '../schemas';
 import { Markdown } from './Markdown';
+import { CletusAI } from '../ai';
 
 
 interface MessageDisplayProps {
   message: Message;
-  config: ConfigFile;
+  ai: CletusAI;
   showInput?: boolean;
   showOutput?: boolean;
 }
@@ -17,7 +18,7 @@ interface MessageDisplayProps {
 /**
  * Component for rendering a chat message with consistent styling
  */
-export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config, showInput = false, showOutput = false }) => {
+export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, showInput = false, showOutput = false }) => {
   const isUser = message.role === 'user';
   const color = message.role === 'user' 
     ? COLORS.USER
@@ -49,7 +50,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
   const visibleContent = mappedContent.filter(c => (c.content.trim().length > 0 || c.operation) && c.type === 'text');
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" marginBottom={1} flexGrow={1}>
       <Box>
         <Text color={circleColor as any}>● </Text>
         <Text bold color={color}>
@@ -57,7 +58,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
         </Text>
       </Box>
       {isUser ? (
-        <Box borderStyle={'round'} flexDirection="row" paddingX={1}>
+        <Box borderStyle={'round'} flexDirection="row" paddingX={1} flexGrow={1}>
           <Box width={1}><Text>&gt;</Text></Box>
           <Box flexDirection="column" marginLeft={1} flexGrow={1}>
             {message.content.map((part, i) => (
@@ -66,14 +67,14 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
           </Box>
         </Box>
       ) : (
-        <Box flexDirection="column" marginLeft={1}>
+        <Box flexDirection="column" marginLeft={1} flexGrow={1}>
           {visibleContent.map((c, i) => {
             if (c.operation) {
               const operationDef = Operations[c.operation.type];
               if (operationDef?.render) {
                 return (
-                  <Box key={i} marginBottom={1}>
-                    {operationDef.render(c.operation, config, showInput, showOutput)}
+                  <Box key={i} marginBottom={1} flexGrow={1}>
+                    {operationDef.render(c.operation, ai, showInput, showOutput)}
                   </Box>
                 );
               } else {
@@ -87,7 +88,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, config,
               }
             } else {
               return (
-                <Box key={i} marginBottom={1}>
+                <Box key={i} marginBottom={1} flexGrow={1}>
                   <Markdown>{c.content}</Markdown>
                 </Box>
               );

@@ -1,5 +1,5 @@
-import Handlebars from "handlebars";
 import { getModel } from "@aits/core";
+import Handlebars from "handlebars";
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -8,15 +8,14 @@ import { abbreviate, chunkArray, formatName, groupMap, pluralize } from "../comm
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
+import { getAssetPath } from "../file-manager";
+import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
+import { processFile, searchFiles } from "../helpers/files";
+import { renderOperation } from "../helpers/render";
+import { buildFieldsSchema } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
-import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
-import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
-import { searchFiles, processFile } from "../helpers/files";
-import { getAssetPath } from "../file-manager";
-import { buildFieldsSchema } from "../helpers/type";
-import { th } from "zod/v4/locales";
 
 
 function getType(config: ConfigFile, typeName: string): TypeDefinition {
@@ -427,8 +426,8 @@ export const data_create = operationOf<
 
     return { id, libraryKnowledgeUpdated };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const firstField = Object.keys(op.input.fields)[0];
     const additionalCount = Object.keys(op.input.fields).length - 1;
     const more = additionalCount > 0 ? `, +${additionalCount} more` : '';
@@ -494,8 +493,8 @@ export const data_update = operationOf<
 
     return { updated: true, libraryKnowledgeUpdated };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const fields = type.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
     
     return renderOperation(
@@ -604,8 +603,8 @@ export const data_delete = operationOf<
       setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
     };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
 
     return renderOperation(
       op,
@@ -693,8 +692,8 @@ export const data_select = operationOf<
       results: joinedResults,
     };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const offset = op.input.offset ? `offset=${op.input.offset}` : '';
@@ -769,8 +768,8 @@ export const data_update_many = operationOf<
 
     return { updated: matchingRecords.length, libraryKnowledgeUpdated };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const set = 'set=' + Object.keys(op.input.set).join(',');
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
@@ -854,8 +853,8 @@ export const data_delete_many = operationOf<
       setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
     };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const params = [where, limit].filter(p => p).join(', ');
@@ -1020,8 +1019,8 @@ export const data_aggregate = operationOf<
 
     return { results };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const having = op.input.having ? `having=${whereString(op.input.having)}` : ''
     const groupBy = op.input.groupBy ? `groupBy=${op.input.groupBy.join(',')}` : ''
@@ -1072,8 +1071,8 @@ export const data_index = operationOf<
 
     return { libraryKnowledgeUpdated };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
       `${formatName(type.friendlyName)}Index()`,
@@ -1331,8 +1330,8 @@ Fields:
     
     return { imported, updated, updateSkippedNoChanges, libraryKnowledgeUpdated, failed: filesFailed };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
       `${formatName(type.friendlyName)}Import("${op.input.glob}")`,
@@ -1386,8 +1385,8 @@ export const data_search = operationOf<
       })),
     };
   },
-  render: (op, config, showInput, showOutput) => {
-    const type = getType(config, op.input.name);
+  render: (op, ai, showInput, showOutput) => {
+    const type = getType(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
       `${formatName(type.friendlyName)}Search("${abbreviate(op.input.query, 20)}")`,

@@ -1,21 +1,109 @@
 import { Box, Text } from "ink";
-import Link from "ink-link";
 import SyntaxHighlight from "ink-syntax-highlight";
 import React from 'react';
+import { chunk } from '../common';
 import { COLORS } from "../constants";
-import { chunk, group as groupBy } from '../common';
+import { Link } from "./Link";
 
-type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean, backgroundColor?: string, color?: string; url?: string };
+type LineSegment = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; url?: string };
 
 /**
 * Parse inline markdown formatting and return text segments with styles
+* Priority: code and links are extracted first, then formatting is applied to remaining text
 */
 const parseInlineFormatting = (text: string): LineSegment[] => {
+  if (!text) return [];
+
+  // Step 1: Find all code segments (highest priority)
+  const codeSegments: Array<{ start: number; end: number; content: string }> = [];
+  const codeRegex = /`([^`]+)`/g;
+  let match;
+  while ((match = codeRegex.exec(text)) !== null) {
+    codeSegments.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      content: match[1]
+    });
+  }
+
+  // Step 2: Find all link segments (second priority)
+  const linkSegments: Array<{ start: number; end: number; text: string; url: string }> = [];
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  while ((match = linkRegex.exec(text)) !== null) {
+    linkSegments.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      text: match[1],
+      url: match[2]
+    });
+  }
+
+  // Step 3: Create a map of protected ranges (code and links)
+  const protectedRanges: Array<{ start: number; end: number; segment: LineSegment }> = [];
+
+  for (const code of codeSegments) {
+    protectedRanges.push({
+      start: code.start,
+      end: code.end,
+      segment: { text: code.content, backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND }
+    });
+  }
+
+  for (const link of linkSegments) {
+    protectedRanges.push({
+      start: link.start,
+      end: link.end,
+      segment: { text: link.text, url: link.url, underline: true, color: COLORS.MARKDOWN_LINK }
+    });
+  }
+
+  // Sort protected ranges by start position
+  protectedRanges.sort((a, b) => a.start - b.start);
+
+  // Step 4: Identify formattable ranges (text not in code or links)
+  const formattableRanges: Array<{ start: number; end: number }> = [];
+  let lastEnd = 0;
+
+  for (const range of protectedRanges) {
+    if (range.start > lastEnd) {
+      formattableRanges.push({ start: lastEnd, end: range.start });
+    }
+    lastEnd = range.end;
+  }
+
+  if (lastEnd < text.length) {
+    formattableRanges.push({ start: lastEnd, end: text.length });
+  }
+
+  // Step 5: Apply formatting (bold, italic, underline, strikethrough) to formattable ranges
+  const formattedRanges: Array<{ start: number; segments: LineSegment[] }> = [];
+
+  for (const range of formattableRanges) {
+    const rangeText = text.substring(range.start, range.end);
+    const segments = applyFormatting(rangeText);
+    formattedRanges.push({ start: range.start, segments });
+  }
+
+  // Step 6: Merge all segments in order
+  const allRanges: Array<{ start: number; segments: LineSegment[] }> = [];
+
+  for (const range of protectedRanges) {
+    allRanges.push({ start: range.start, segments: [range.segment] });
+  }
+
+  allRanges.push(...formattedRanges);
+  allRanges.sort((a, b) => a.start - b.start);
+
+  return allRanges.flatMap(r => r.segments);
+};
+
+/**
+* Apply bold, italic, underline, and strikethrough formatting to text
+*/
+const applyFormatting = (text: string): LineSegment[] => {
   const segments: LineSegment[] = [];
-  
-  // Find all formatting markers in order
-  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'code' | 'link'; isStart: boolean; length: number }> = [];
-  
+  const markers: Array<{ index: number; type: 'bold' | 'italic' | 'underline' | 'strikethrough'; isStart: boolean; length: number }> = [];
+
   // Find bold (**text**)
   let match;
   const boldRegex = /\*\*(.+?)\*\*/g;
@@ -23,86 +111,67 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
     markers.push({ index: match.index, type: 'bold', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'bold', isStart: false, length: 2 });
   }
-  
+
   // Find italic (*text*)
   const italicRegex = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
   while ((match = italicRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'italic', isStart: true, length: 1 });
     markers.push({ index: match.index + match[0].length - 1, type: 'italic', isStart: false, length: 1 });
   }
-  
+
   // Find underline (__text__)
   const underlineRegex = /__(.+?)__/g;
   while ((match = underlineRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'underline', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'underline', isStart: false, length: 2 });
   }
-  
-  // Find code (`text`)
-  const codeRegex = /`(.+?)`/g;
-  while ((match = codeRegex.exec(text)) !== null) {
-    markers.push({ index: match.index, type: 'code', isStart: true, length: 1 });
-    markers.push({ index: match.index + match[0].length - 1, type: 'code', isStart: false, length: 1 });
+
+  // Find strikethrough (~~text~~)
+  const strikethroughRegex = /~~(.+?)~~/g;
+  while ((match = strikethroughRegex.exec(text)) !== null) {
+    markers.push({ index: match.index, type: 'strikethrough', isStart: true, length: 2 });
+    markers.push({ index: match.index + match[0].length - 2, type: 'strikethrough', isStart: false, length: 2 });
   }
-  
-  // Find links [text](url) and treat as plain text for now
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  while ((match = linkRegex.exec(text)) !== null) {
-    markers.push({ index: match.index, type: 'link', isStart: true, length: 0 });
-    markers.push({ index: match.index + match[0].length, type: 'link', isStart: false, length: 0 });
-  }
-  
+
   // If no formatting found, return plain text
   if (markers.length === 0) {
     return [{ text }];
   }
-  
+
   // Sort markers by position
   markers.sort((a, b) => a.index - b.index);
-  
+
   // Process text with formatting
-  const activeFormats = { bold: false, italic: false, underline: false, code: false, link: false };
+  const activeFormats = { bold: false, italic: false, underline: false, strikethrough: false };
   let lastPos = 0;
-  
-  const addSegment = (text: string) => {
-    if (activeFormats.code) {
-      segments.push({ text, backgroundColor: COLORS.MARKDOWN_CODE_BACKGROUND });
-    } else if (activeFormats.link) {
-      const [, name, url] = text.match(/\[([^\]]+)\]\(([^)]+)\)/) || [];
-      if (name && url) {
-        segments.push({ text: name, url, underline: true, color: COLORS.MARKDOWN_LINK }); 
-      } else {
-        segments.push({ text, underline: true, color: COLORS.MARKDOWN_LINK });
-      }
-    } else {
-      segments.push({ text, ...activeFormats });
-    }
-  };
-  
+
   markers.forEach((marker) => {
     // Add text before this marker
     if (marker.index > lastPos) {
       const segment = text.substring(lastPos, marker.index);
       if (segment) {
-        addSegment(segment);
+        segments.push({ text: segment, ...activeFormats });
       }
     }
-    
+
     // Toggle format
     if (marker.isStart) {
       activeFormats[marker.type] = true;
     } else {
       activeFormats[marker.type] = false;
     }
-    
+
     lastPos = marker.index + marker.length;
   });
-  
+
   // Add remaining text
   if (lastPos < text.length) {
-    addSegment(text.substring(lastPos));
+    const segment = text.substring(lastPos);
+    if (segment) {
+      segments.push({ text: segment, ...activeFormats });
+    }
   }
-  
+
   return segments;
 };
 
@@ -154,6 +223,42 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
         return (
           <React.Fragment key={gi}>
             {group.content.map((line, i) => {
+              // Block quote
+              const blockquoteMatch = line.match(/^(\s*)>\s+(.*)$/);
+              if (blockquoteMatch) {
+                const [, leadingSpaces, quoteText] = blockquoteMatch;
+                const segments = parseInlineFormatting(quoteText);
+                const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
+
+                return (
+                  <Box key={i} marginLeft={(leadingSpaces?.length || 0) + 2} borderStyle='single' borderLeft={true} borderColor={COLORS.MARKDOWN_BLOCKQUOTE} paddingLeft={1}>
+                    <Text color={COLORS.MARKDOWN_BLOCKQUOTE}>
+                      {segmentsGrouped.map((segGroup, j) => {
+                        if (segGroup[0].url) {
+                          return (
+                            <React.Fragment key={j}>
+                              {segGroup.map((seg, k) => (
+                                <Link key={k} url={seg.url!}>{seg.text}</Link>
+                              ))}
+                            </React.Fragment>
+                          );
+                        } else {
+                          return (
+                            <React.Fragment key={j}>
+                              {segGroup.map((seg, k) => (
+                                <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor}>
+                                  {seg.text}
+                                </Text>
+                              ))}
+                            </React.Fragment>
+                          );
+                        }
+                      })}
+                    </Text>
+                  </Box>
+                );
+              }
+
               // Heading
               const headingMatch = line.match(/^(\s*)([#]+)\s+(.*)/);
               if (headingMatch) {
@@ -189,7 +294,7 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
               // Regular text with inline formatting
               const segments = parseInlineFormatting(line);
               const segmentsGrouped = chunk(segments, (a, b) => !a.url !== !b.url);
-              
+
               return (
                 <Box key={i} flexWrap='wrap'>
                   {segmentsGrouped.map((segGroup, j) => {
@@ -198,7 +303,7 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
                         <React.Fragment key={j}>
                           {segGroup.map((seg, k) => (
                             <Link key={k} url={seg.url!}>
-                              <Text bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor} color={seg.color}>
+                              <Text bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
                                 {seg.text}
                               </Text>
                             </Link>
@@ -209,7 +314,7 @@ export const Markdown: React.FC<{ children: string }> = ({ children }) => {
                       return (
                         <Text key={j}>
                           {segGroup.map((seg, k) => (
-                            <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} backgroundColor={seg.backgroundColor} color={seg.color}>
+                            <Text key={k} bold={seg.bold} italic={seg.italic} underline={seg.underline} strikethrough={seg.strikethrough} backgroundColor={seg.backgroundColor} color={seg.color}>
                               {seg.text}
                             </Text>
                           ))}

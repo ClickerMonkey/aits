@@ -1,18 +1,20 @@
 import { getModel } from "@aits/core";
+import * as Diff from 'diff';
+import { Box, Text } from "ink";
+import React from 'react';
 import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
-import * as Diff from 'diff';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunkArray, linkFile, paginateText } from "../common";
+import { abbreviate, chunk, chunkArray, fileProtocol, linkFile, paginateText, pluralize } from "../common";
+import { COLORS, CONSTS } from "../constants";
 import { getAssetPath } from "../file-manager";
+import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, isAudioFile, processFile, searchFiles } from "../helpers/files";
+import { renderOperation } from "../helpers/render";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
 import { operationOf } from "./types";
-import { CONSTS } from "../constants";
-import { renderOperation } from "../helpers/render";
-import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, isAudioFile, processFile, searchFiles } from "../helpers/files";
-import { logger } from "../logger";
+import { Link } from "../components/Link";
 
 // Constants for file_attach operation
 const ALLOWED_FILE_TYPES = ['text', 'pdf'];
@@ -34,7 +36,7 @@ export const file_search = operationOf<
 
     return { glob: input.glob, count: files.length, files: files.slice(offset, limit) };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Files("${op.input.glob}")`,
     (op) => {
@@ -57,7 +59,7 @@ export const file_summary = operationOf<
     extractImages?: boolean, 
     transcribeImages?: boolean,
   },
-  { size: number; truncated: boolean; summary: string; }
+  { size: number; truncated: boolean; summary: string; fullPath: string }
 >({
   mode: 'read',
   signature: 'file_summary(path: string, limit?: number, offset?: number, limitOffsetMode...)',
@@ -69,7 +71,7 @@ export const file_summary = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} not found or not readable.`,
         doable: false,
       };
     }
@@ -77,7 +79,7 @@ export const file_summary = operationOf<
     const fileType = await categorizeFile(fullPath, fullPath);
     if (fileType === 'unknown') {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} is of an unsupported type for summarization.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} is of an unsupported type for summarization.`,
         doable: false,
       };
     }
@@ -88,7 +90,7 @@ export const file_summary = operationOf<
       : Math.min(CONSTS.MAX_LINES, input.limit || CONSTS.MAX_LINES);
 
     return {
-      analysis: `This will read and summarize the ${fileType} file at ${linkFile(input.path)} (first ${limit.toLocaleString()} ${limitOffsetMode}).`,
+      analysis: `This will read and summarize the ${fileType} file at ${linkFile(fullPath)} (first ${limit.toLocaleString()} ${limitOffsetMode}).`,
       doable: true,
     };
   },
@@ -113,14 +115,15 @@ export const file_summary = operationOf<
       size,
       truncated: size > Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
       summary: summarized.description!,
+      fullPath,
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Summarize("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `${linkFile(op.input.path)}: ${abbreviate(op.output.summary, 60)}`;
+        return `${linkFile(op.output.fullPath)}: ${abbreviate(op.output.summary, 60)}`;
       }
       return null;
     },
@@ -223,7 +226,7 @@ export const file_index = operationOf<
       knowledge: knowledge.length,
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Index("${op.input.glob}", ${op.input.index})`,
     (op) => {
@@ -237,7 +240,7 @@ export const file_index = operationOf<
 
 export const file_create = operationOf<
   { path: string; content: string },
-  { size: number, lines: number }
+  { fullPath: string; size: number, lines: number }
 >({
   mode: 'create',
   signature: 'file_create(path: string, content: string)',
@@ -249,7 +252,7 @@ export const file_create = operationOf<
 
     if (exists) {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} already exists.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} already exists.`,
         doable: false,
       };
     } 
@@ -258,7 +261,7 @@ export const file_create = operationOf<
     const lines = input.content.split('\n').length;
 
     return {
-      analysis: `This will create file ${linkFile(input.path)} with ${size} characters (${lines} lines).`,
+      analysis: `This will create file ${linkFile(fullPath)} with ${size} characters (${lines} lines).`,
       doable: true,
     };
   },
@@ -269,14 +272,14 @@ export const file_create = operationOf<
 
     const lines = input.content.split('\n').length;
 
-    return { size: input.content.length, lines };
+    return { fullPath, size: input.content.length, lines };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Write("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created ${linkFile(op.input.path)} with **${op.output.size.toLocaleString()}** characters, **${op.output.lines}** lines`;
+        return `Created ${linkFile(op.output.fullPath)} with **${op.output.size.toLocaleString()}** characters, **${op.output.lines}** lines`;
       }
       return null;
     },
@@ -286,7 +289,7 @@ export const file_create = operationOf<
 
 export const file_copy = operationOf<
   { glob: string; target: string },
-  { source: string[] }
+  { fullTarget: string, source: string[] }
 >({
   mode: 'create',
   signature: 'file_copy(glob: string, target: string)',
@@ -314,14 +317,14 @@ export const file_copy = operationOf<
       const { isDirectory } = await fileIsDirectory(targetPath);
       if (!isDirectory) {
         return {
-          analysis: `This would fail - target ${linkFile(input.target)} must be a directory when copying multiple files.`,
+          analysis: `This would fail - target ${linkFile(targetPath)} must be a directory when copying multiple files.`,
           doable: false,
         };
       }
     } else {
       if (await fileExists(targetPath)) {
         return {
-          analysis: `This would fail - target ${linkFile(input.target)} already exists.`,
+          analysis: `This would fail - target ${linkFile(targetPath)} already exists.`,
           doable: false,
         };
       }
@@ -336,26 +339,26 @@ export const file_copy = operationOf<
   },
   do: async (input, { cwd }) => {
     const source = await glob(input.glob, { cwd });
-    const target = path.resolve(cwd, input.target);
+    const fullTarget = path.resolve(cwd, input.target);
 
-    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.mkdir(path.dirname(fullTarget), { recursive: true });
 
     await Promise.all(source.map(async (file) => {
       const sourcePath = path.resolve(cwd, file);
-      const targetPath = path.join(target, path.basename(file));
+      const targetPath = path.join(fullTarget, path.basename(file));
 
       await fs.copyFile(sourcePath, targetPath);
     }));
 
-    return { source };
+    return { fullTarget, source };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Copy("${op.input.glob}", "${op.input.target}")`,
     (op) => {
       if (op.output) {
         const count = op.output.source.length;
-        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${linkFile(op.input.target)}`;
+        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${linkFile(op.output.fullTarget)}`;
       }
       return null;
     },
@@ -365,7 +368,7 @@ export const file_copy = operationOf<
 
 export const file_move = operationOf<
   { glob: string; target: string },
-  { count: number; files: string[] }
+  { targetPath: string, count: number; files: string[] }
 >({
   mode: 'update',
   signature: 'file_move(glob: string, target: string)',
@@ -387,20 +390,20 @@ export const file_move = operationOf<
         const targetStats = await fs.stat(targetPath);
         if (!targetStats.isDirectory()) {
           return {
-            analysis: `This would fail - target ${linkFile(input.target)} must be a directory when moving multiple files.`,
+            analysis: `This would fail - target ${linkFile(targetPath)} must be a directory when moving multiple files.`,
             doable: false,
           };
         }
       } catch {
         return {
-          analysis: `This would fail - target directory ${linkFile(input.target)} does not exist.`,
+          analysis: `This would fail - target directory ${linkFile(targetPath)} does not exist.`,
           doable: false,
         };
       }
     }
 
     return {
-      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to ${linkFile(input.target)}.`,
+      analysis: `This will move ${files.length} file(s) matching "${input.glob}" to ${linkFile(targetPath)}.`,
       doable: true,
     };
   },
@@ -451,14 +454,14 @@ export const file_move = operationOf<
 
     chatStatus(`Moved ${filesMoved === files.length ? 'all' : filesMoved} files.`);
 
-    return { count: files.length, files };
+    return { targetPath, count: files.length, files };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Move("${op.input.glob}", "${op.input.target}")`,
     (op) => {
       if (op.output) {
-        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${linkFile(op.input.target)}`;
+        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${linkFile(op.output.targetPath)}`;
       }
       return null;
     },
@@ -468,7 +471,7 @@ export const file_move = operationOf<
 
 export const file_stats = operationOf<
   { path: string },
-  { size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
+  { fullPath: string, size: number; created: string; modified: string; accessed: string, type: string, mode: number, lines?: number, characters?: number }
 >({
   status: (input) => `Getting stats: ${paginateText(input.path, 100, -100)}`,
   mode: 'local',
@@ -479,13 +482,13 @@ export const file_stats = operationOf<
 
     if (!fileExists) {
       return {
-        analysis: `This would fail - path ${linkFile(input.path)} not found or readable.`,
+        analysis: `This would fail - path ${linkFile(fullPath)} not found or readable.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will get file statistics for ${linkFile(input.path)}.`,
+      analysis: `This will get file statistics for ${linkFile(fullPath)}.`,
       doable: true,
     };
   },
@@ -516,6 +519,7 @@ export const file_stats = operationOf<
     const type = typeAnalysis.find(([is]) => is)?.[1] || 'unknown'
 
     return {
+      fullPath,
       size: stats.size,
       created: stats.birthtime.toISOString(),
       modified: stats.mtime.toISOString(),
@@ -526,13 +530,13 @@ export const file_stats = operationOf<
       characters
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `FileStats("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
         const sizeKB = (op.output.size / 1024).toFixed(1);
-        return `${linkFile(op.input.path)}: **${op.output.type}**, **${sizeKB} KB**${op.output.lines ? `, **${op.output.lines}** lines` : ''}`;
+        return `${linkFile(op.output.fullPath)}: **${op.output.type}**, **${sizeKB} KB**${op.output.lines ? `, **${op.output.lines}** lines` : ''}`;
       }
       return null;
     },
@@ -553,12 +557,12 @@ export const file_delete = operationOf<
     const deletable = await fileIsWritable(fullPath);
     if (!deletable) {
       return {
-        analysis: `This would fail - ${linkFile(input.path)} is not a file that can be deleted.`,
+        analysis: `This would fail - ${linkFile(fullPath)} is not a file that can be deleted.`,
         doable: false,
       };
     }
     return {
-      analysis: `This will delete the file ${linkFile(input.path)}.`,
+      analysis: `This will delete the file ${linkFile(fullPath)}.`,
       doable: true,
     };
   },
@@ -568,12 +572,12 @@ export const file_delete = operationOf<
 
     return { deleted: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Delete("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Deleted ${linkFile(op.input.path)}`;
+        return `Deleted ${op.input.path}`;
       }
       return null;
     },
@@ -583,7 +587,7 @@ export const file_delete = operationOf<
 
 export const file_read = operationOf<
   { path: string, limit?: number, offset?: number, limitOffsetMode?: 'lines' | 'characters', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean, showLines?: boolean },
-  { content: string; truncated: boolean }
+  { fullPath: string; content: string; truncated: boolean }
 >({
   mode: 'read',
   signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
@@ -595,7 +599,7 @@ export const file_read = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} not found or not readable.`,
         doable: false,
       };
     }
@@ -603,7 +607,7 @@ export const file_read = operationOf<
     const type = await categorizeFile(fullPath, input.path);
     if (type === 'unknown') {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} is of an unsupported type for reading.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} is of an unsupported type for reading.`,
         doable: false,
       };
     }
@@ -616,7 +620,7 @@ export const file_read = operationOf<
     const withLines = input.showLines ? ' with line numbers' : '';
 
     return {
-      analysis: `This will read the ${type} file ${linkFile(input.path)} (first ${limit.toLocaleString()} ${limitOffsetMode})${withLines}.`,
+      analysis: `This will read the ${type} file ${linkFile(fullPath)} (first ${limit.toLocaleString()} ${limitOffsetMode})${withLines}.`,
       doable: true,
     };
   },
@@ -663,16 +667,17 @@ export const file_read = operationOf<
     content = paginateText(content, input.limit, input.offset, limitOffsetMode);
 
     return {
+      fullPath,
       content: content,
       truncated: content.length === Math.min(CONSTS.MAX_CHARACTERS, input.limitOffsetMode === 'lines' ? CONSTS.MAX_CHARACTERS : input.limit || CONSTS.MAX_CHARACTERS),
     };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Read ${linkFile(op.input.path)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
+        return `Read ${linkFile(op.output.fullPath)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
       }
       return null;
     },
@@ -694,15 +699,7 @@ export const file_edit = operationOf<
   mode: 'update',
   signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
   status: (input) => `Editing: ${paginateText(input.path, 100, -100)}`,
-  instructions: 'Preserve existing content formatting and structure. Maintain whitespace, indentation, and line breaks that are part of the original file unless explicitly requested to change them.',
-  /**
-   * Generate the new file content and diff based on the edit request
-   * 
-   * @param input - operation input
-   * @param fileContent - current full file content
-   * @param ai - CletusAI instance
-   * @returns 
-   */
+  instructions: 'Do NOT show the diff to the user, it will be rendered separately.',
   async diff(
     input: { path: string; request: string; offset?: number; limit?: number },
     fileContent: string,
@@ -720,11 +717,12 @@ export const file_edit = operationOf<
       messages: [
         { 
           role: 'system', 
-          content: 'You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.'
+          content: `You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.
+          <request>${input.request}</request>`
         },
         { 
           role: 'user', 
-          content: `Current content:\n\`\`\`\n${paginatedContent}\n\`\`\`\n\nRequest: ${input.request}\n\nProvide the edited content:` 
+          content: paginatedContent, 
         },
       ],
     }, {
@@ -745,7 +743,8 @@ export const file_edit = operationOf<
       fileContent,
       newFileContent,
       'before',
-      'after'
+      'after',
+      { ignoreWhitespace: true, stripTrailingCr: true, context: 3 },
     );
 
     return {
@@ -760,7 +759,7 @@ export const file_edit = operationOf<
 
     if (!readable) {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} not found or not readable.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} not found or not readable.`,
         doable: false,
       };
     }
@@ -768,7 +767,7 @@ export const file_edit = operationOf<
     const writable = await fileIsWritable(fullPath);
     if (!writable) {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} is not writable.`,
+        analysis: `This would fail - file ${linkFile(fullPath)} is not writable.`,
         doable: false,
       };
     }
@@ -776,7 +775,7 @@ export const file_edit = operationOf<
     const type = await categorizeFile(fullPath, input.path);
     if (type !== 'text') {
       return {
-        analysis: `This would fail - file ${linkFile(input.path)} is not a text file (type: ${type}).`,
+        analysis: `This would fail - file ${linkFile(fullPath)} is not a text file (type: ${type}).`,
         doable: false,
       };
     }
@@ -797,18 +796,110 @@ export const file_edit = operationOf<
     const fileContent = await fs.readFile(fullPath, 'utf-8');
     
     // Generate new content and diff
-    const { newFileContent, diff, changed } = await this.diff(input, fileContent, ai);
+    const { newFileContent, diff } = await this.diff(input, fileContent, ai);
 
     // Write the new content back to the file
     await fs.writeFile(fullPath, newFileContent, 'utf-8');
 
     return diff;
   },
-  render: (op, config, showInput) => renderOperation(
+  render: (op, ai, showInput) => renderOperation(
     op,
     `Edit("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
-      return op.output ? `\n${op.output}` : op.analysis || 'No changes made';
+      // diff format:
+      // Index: [filename]
+      // ===================================================================
+      // --- [filename]     before
+      // +++ [filename]     after
+      // @@ -old_index,old_lines +new_index,new_lines @@
+      // [+- ]line
+      // \ ignore
+      const lineStyles = {
+        '+': { backgroundColor: 'rgb(46, 121, 46)' },
+        '-': { backgroundColor: 'rgb(96, 21, 21)' },
+        ' ': {},
+      } as const;
+
+      // render format:
+      // [gray line number] [+- ] content
+      // ... divider
+      let additions = 0;
+      let subtractions = 0;
+      const diffLines = op.analysis ? op.analysis.split('\n') : [];
+      const relevantLines = diffLines.slice(4).filter(line => !line.startsWith('\\'));
+      const changeSetLines = chunk(relevantLines, (_, line) => line.startsWith('@@'));
+      const changeSets = changeSetLines.map((setLines, setLinesIndex) => {
+        const [, lineStartText, lineCountText] = /^@@ -\d+,\d+ \+(\d+),(\d+) @@$/.exec(setLines[0]) || [];
+        const lineStart = parseInt(lineStartText, 10);
+        const lineCount = parseInt(lineCountText, 10);
+        const linePadding = (lineStart + lineCount).toString().length + 1;
+        const lines = setLines.slice(1);
+        const lineNumbers: string[] = [];
+        let currentLineNumber = lineStart;
+        let removed = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.startsWith('-')) {
+            removed++;
+            subtractions++;
+          } else {
+            currentLineNumber -= removed;
+            removed = 0;
+            additions++;
+          }
+          lineNumbers.push(currentLineNumber.toFixed(0).padStart(linePadding, ' '));
+          currentLineNumber++;
+        }
+        // Trim empty lines at start and end
+        while (lines.length > 0 && lines[0].trim() === '') {
+          lines.shift();
+          lineNumbers.shift();
+        }
+        while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+          lines.pop();
+          lineNumbers.pop();
+        }
+
+        return (
+          <Box flexDirection="column" key={setLinesIndex}>
+            {lines.map((line, lineIndex) => (
+              <Box key={lineIndex} flexDirection="row">
+                <Text color="gray">{lineNumbers[lineIndex]} </Text>
+                <Text {...lineStyles[line[0] as '+' | '-' | ' ']}>
+                  {line}
+                </Text>
+              </Box>
+            ))}
+          </Box>
+        );
+      });
+
+      const changeSetsGrouped = changeSets.map((set, index) => (
+        <React.Fragment key={index}>
+          {index > 0 && (<Box><Text>...</Text></Box>)}
+          {set}
+        </React.Fragment>
+      ));
+
+      const fullPath = path.resolve(ai.config.defaultContext!.cwd!, op.input.path);
+      const url = fileProtocol(fullPath);
+      
+      const boxStyle = op.output 
+        ? {} 
+        : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
+
+      return (
+        <Box {...boxStyle} flexDirection="column" flexGrow={1}>
+          <Box marginLeft={2} flexGrow={1}>
+            <Text>{'→ '}</Text>
+            <Text>{op.output ? 'Updated ' : 'Edit '}</Text>
+            <Link url={url}>{op.input.path}</Link>
+            <Text> with {pluralize(additions, 'addition')} and {pluralize(subtractions, 'removal')}</Text>
+          </Box>
+          {changeSetsGrouped}
+        </Box>
+      );
     },
     showInput,
     false,
@@ -983,7 +1074,7 @@ export const text_search = operationOf<
         return { searched: results.length, matches: pagedResults.map(r => ({ file: r.file, matches: r.matches })) };
     }
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Search("${abbreviate(op.input.regex, 20)}", "${op.input.glob}")`,
     (op) => {
@@ -1007,7 +1098,7 @@ export const text_search = operationOf<
 
 export const dir_create = operationOf<
   { path: string },
-  { created: boolean }
+  { fullPath: string, created: boolean }
 >({
   mode: 'create',
   signature: 'dir_create(path: string)',
@@ -1018,19 +1109,19 @@ export const dir_create = operationOf<
 
     if (exists && !isDirectory) {
       return {
-        analysis: `This would fail - ${linkFile(input.path)} exists but is not a directory.`,
+        analysis: `This would fail - ${linkFile(fullPath)} exists but is not a directory.`,
         doable: false,
       };
     }
     if (exists && isDirectory) {
       return {
-        analysis: `This would fail - directory ${linkFile(input.path)} already exists.`,
+        analysis: `This would fail - directory ${linkFile(fullPath)} already exists.`,
         doable: false,
       };
     }
 
     return {
-      analysis: `This will create directory ${linkFile(input.path)}.`,
+      analysis: `This will create directory ${input.path}.`,
       doable: true,
     };
   },
@@ -1038,14 +1129,14 @@ export const dir_create = operationOf<
     const fullPath = path.resolve(cwd, input.path);
     await fs.mkdir(fullPath, { recursive: true });
 
-    return { created: true };
+    return { fullPath, created: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Dir("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Created directory ${linkFile(op.input.path)}`;
+        return `Created directory ${linkFile(op.output.fullPath)}`;
       }
       return null;
     },
@@ -1055,7 +1146,7 @@ export const dir_create = operationOf<
 
 export const file_attach = operationOf<
   { path: string },
-  { attached: boolean }
+  { fullPath: string, attached: boolean }
 >({
   mode: 'create',
   signature: 'file_attach({ path })',
@@ -1104,14 +1195,14 @@ export const file_attach = operationOf<
       }
     }
 
-    return { attached: true };
+    return { fullPath, attached: true };
   },
-  render: (op, config, showInput, showOutput) => renderOperation(
+  render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `FileAttach("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output?.attached) {
-        return `Attached file: ${linkFile(op.input.path)}`;
+        return `Attached file: ${linkFile(op.output.fullPath)}`;
       }
       return null;
     },
