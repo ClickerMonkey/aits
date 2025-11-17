@@ -216,7 +216,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
       <Gradient colors={COLORS.MENU_GRADIENT}>
         <BigText text="cletus"/>
       </Gradient>
-      
+
       <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
         <Text bold color="cyan">
           Cletus - Select a chat or start a new one

@@ -1,0 +1,29 @@
+# Source files (not needed in published package)
+src/
+*.tsx
+*.ts
+!*.d.ts
+
+# Build config
+esbuild.config.cjs
+tsconfig.json
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+__tests__/
+*.test.ts
+*.test.tsx
+coverage/
+.nyc_output/
+
+# Misc
+.env
+.env.*
+*.log
+node_modules/
+.DS_Store
