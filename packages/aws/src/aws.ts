@@ -77,11 +77,14 @@ import { AWSError, AWSAuthError, AWSRateLimitError, AWSQuotaError, AWSContextWin
  * Hook called before a request is made to the provider.
  * 
  * @template TRequest - The request type
+ * @template TCommand - The AWS command type
  * @param request - The request object
+ * @param command - The AWS SDK command being sent
  * @param ctx - The context object
  */
-export type PreRequestHook<TRequest = any> = (
+export type PreRequestHook<TRequest = any, TCommand = any> = (
   request: TRequest,
+  command: TCommand,
   ctx: AIContextAny
 ) => void | Promise<void>;
 
@@ -89,13 +92,16 @@ export type PreRequestHook<TRequest = any> = (
  * Hook called after a response is received from the provider.
  * 
  * @template TRequest - The request type
+ * @template TCommand - The AWS command type
  * @template TResponse - The response type
  * @param request - The request object
+ * @param command - The AWS SDK command that was sent
  * @param response - The response object
  * @param ctx - The context object
  */
-export type PostRequestHook<TRequest = any, TResponse = any> = (
+export type PostRequestHook<TRequest = any, TCommand = any, TResponse = any> = (
   request: TRequest,
+  command: TCommand,
   response: TResponse,
   ctx: AIContextAny
 ) => void | Promise<void>;
@@ -106,18 +112,18 @@ export type PostRequestHook<TRequest = any, TResponse = any> = (
 export interface AWSBedrockHooks {
   // Chat completion hooks
   chat?: {
-    preRequest?: PreRequestHook<Request>;
-    postRequest?: PostRequestHook<Request, Response>;
+    preRequest?: PreRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand>;
+    postRequest?: PostRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand, Response>;
   };
   // Image generation hooks
   imageGenerate?: {
-    preRequest?: PreRequestHook<ImageGenerationRequest>;
-    postRequest?: PostRequestHook<ImageGenerationRequest, ImageGenerationResponse>;
+    preRequest?: PreRequestHook<ImageGenerationRequest, InvokeModelCommand>;
+    postRequest?: PostRequestHook<ImageGenerationRequest, InvokeModelCommand, ImageGenerationResponse>;
   };
   // Embedding hooks
   embed?: {
-    preRequest?: PreRequestHook<EmbeddingRequest>;
-    postRequest?: PostRequestHook<EmbeddingRequest, EmbeddingResponse>;
+    preRequest?: PreRequestHook<EmbeddingRequest, InvokeModelCommand>;
+    postRequest?: PostRequestHook<EmbeddingRequest, InvokeModelCommand, EmbeddingResponse>;
   };
 }
 
@@ -447,6 +453,9 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
@@ -468,7 +477,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         }
       }
 
-      return {
+      const result: Response = {
         content,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason: this.mapAnthropicStopReason(responseBody.stop_reason),
@@ -480,6 +489,11 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           },
         },
       };
+
+      // Call post-request hook with command
+      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+
+      return result;
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
@@ -531,6 +545,9 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       
       if (!response.body) {
@@ -539,6 +556,8 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
       let inputTokens = 0;
       let outputTokens = 0;
+      let accumulatedContent = '';
+      let finishReason: any = undefined;
       
       // Track tool calls similar to OpenAI implementation
       type ToolCallItem = { id: string; name: string; arguments: string; named: boolean; finished: boolean };
@@ -549,6 +568,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
           
           if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+            accumulatedContent += chunk.delta.text;
             yield {
               content: chunk.delta.text,
               finishReason: undefined,
@@ -609,13 +629,15 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
             inputTokens = chunk.message.usage.input_tokens || 0;
           } else if (chunk.type === 'message_delta') {
             if (chunk.delta?.stop_reason) {
+              finishReason = this.mapAnthropicStopReason(chunk.delta.stop_reason);
+              outputTokens = chunk.usage?.output_tokens || 0;
               yield {
                 content: undefined,
-                finishReason: this.mapAnthropicStopReason(chunk.delta.stop_reason),
+                finishReason,
                 usage: {
                   text: {
                     input: inputTokens,
-                    output: chunk.usage?.output_tokens || 0,
+                    output: outputTokens,
                   },
                 },
               };
@@ -623,6 +645,26 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           }
         }
       }
+
+      // Call post-request hook with accumulated response
+      const toolCalls = Array.from(toolCallsMap.values()).map(tc => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+      }));
+      
+      await this.config.hooks?.chat?.postRequest?.(request, command, {
+        content: accumulatedContent,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        finishReason,
+        model: { id: modelId },
+        usage: {
+          text: {
+            input: inputTokens,
+            output: outputTokens,
+          },
+        },
+      }, ctx);
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
@@ -760,10 +802,13 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-      return {
+      const result: Response = {
         content: responseBody.generation || '',
         toolCalls: [],
         finishReason: responseBody.stop_reason === 'stop' ? 'stop' : 'length',
@@ -775,6 +820,11 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           },
         },
       };
+
+      // Call post-request hook with command
+      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+
+      return result;
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
@@ -856,10 +906,13 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-      return {
+      const result: Response = {
         content: responseBody.generations?.[0]?.text || '',
         toolCalls: [],
         finishReason: responseBody.generations?.[0]?.finish_reason === 'COMPLETE' ? 'stop' : 'length',
@@ -871,6 +924,11 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           },
         },
       };
+
+      // Call post-request hook with command
+      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+
+      return result;
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
@@ -974,6 +1032,9 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await effectiveConfig.hooks?.imageGenerate?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
@@ -983,10 +1044,15 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         revisedPrompt: undefined,
       })) || [];
 
-      return {
+      const result = {
         images,
         model,
       };
+
+      // Call post-request hook with command
+      await effectiveConfig.hooks?.imageGenerate?.postRequest?.(request, command, result, ctx);
+
+      return result;
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
@@ -1018,13 +1084,16 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         body: JSON.stringify(body),
       });
 
+      // Call pre-request hook with command
+      await effectiveConfig.hooks?.embed?.preRequest?.(request, command, ctx);
+
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
       // Handle multiple texts if provided
       const embeddings = request.texts.map(() => responseBody.embedding);
 
-      return {
+      const result = {
         embeddings,
         model,
         usage: {
@@ -1033,6 +1102,11 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           },
         },
       };
+
+      // Call post-request hook with command
+      await effectiveConfig.hooks?.embed?.postRequest?.(request, command, result, ctx);
+
+      return result;
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
