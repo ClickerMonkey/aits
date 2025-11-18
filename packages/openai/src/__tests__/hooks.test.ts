@@ -86,14 +86,26 @@ describe('OpenAIProvider Hooks', () => {
       const executor = provider.createExecutor();
       const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
-      // Check that pre-request hook was called
+      // Check that pre-request hook was called with params
       expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(request, ctxDefault, { model: 'gpt-4' });
+      expect(preRequestHook).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({
+          model: 'gpt-4',
+          messages: expect.any(Array)
+        }),
+        ctxDefault,
+        { model: 'gpt-4' }
+      );
 
-      // Check that post-request hook was called
+      // Check that post-request hook was called with params
       expect(postRequestHook).toHaveBeenCalledTimes(1);
       expect(postRequestHook).toHaveBeenCalledWith(
         request,
+        expect.objectContaining({
+          model: 'gpt-4',
+          messages: expect.any(Array)
+        }),
         expect.objectContaining({
           content: 'Hi there!',
           finishReason: 'stop'
@@ -158,14 +170,28 @@ describe('OpenAIProvider Hooks', () => {
         chunks.push(chunk);
       }
 
-      // Check that pre-request hook was called
+      // Check that pre-request hook was called with params
       expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(request, ctxDefault, { model: 'gpt-4' });
+      expect(preRequestHook).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({
+          model: 'gpt-4',
+          messages: expect.any(Array),
+          stream: true
+        }),
+        ctxDefault,
+        { model: 'gpt-4' }
+      );
 
-      // Check that post-request hook was called after streaming completed
+      // Check that post-request hook was called after streaming completed with params
       expect(postRequestHook).toHaveBeenCalledTimes(1);
       expect(postRequestHook).toHaveBeenCalledWith(
         request,
+        expect.objectContaining({
+          model: 'gpt-4',
+          messages: expect.any(Array),
+          stream: true
+        }),
         expect.objectContaining({
           content: 'Hi there!',
           finishReason: 'stop'
@@ -201,14 +227,25 @@ describe('OpenAIProvider Hooks', () => {
 
       const response = await provider.generateImage!(request, ctxDefault);
 
-      // Check that pre-request hook was called
+      // Check that pre-request hook was called with params
       expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(request, ctxDefault);
+      expect(preRequestHook).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({
+          model: expect.any(String),
+          prompt: 'A beautiful landscape'
+        }),
+        ctxDefault
+      );
 
-      // Check that post-request hook was called
+      // Check that post-request hook was called with params
       expect(postRequestHook).toHaveBeenCalledTimes(1);
       expect(postRequestHook).toHaveBeenCalledWith(
         request,
+        expect.objectContaining({
+          model: expect.any(String),
+          prompt: 'A beautiful landscape'
+        }),
         expect.objectContaining({
           images: expect.arrayContaining([
             expect.objectContaining({

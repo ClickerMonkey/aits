@@ -5,7 +5,8 @@ Provider hooks allow you to intercept and log requests and responses for debuggi
 ## Overview
 
 Hooks are configured on the provider's config object and receive all arguments from the outer function call, including:
-- The request object
+- The request object (the high-level @aeye request)
+- The params object (the provider-specific parameters sent to the API)
 - The response object (post-request hook only)
 - The context object
 - The metadata object (when applicable)
@@ -21,34 +22,39 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, ctx, metadata) => {
+      preRequest: async (request, params, ctx, metadata) => {
         console.log('[OpenAI] Chat request:', {
-          model: metadata?.model || 'default',
+          model: params.model,
           messageCount: request.messages.length,
+          temperature: params.temperature,
+          maxTokens: params.max_completion_tokens,
           timestamp: new Date().toISOString()
         });
       },
-      postRequest: async (request, response, ctx, metadata) => {
+      postRequest: async (request, params, response, ctx, metadata) => {
         console.log('[OpenAI] Chat response:', {
           model: response.model?.id,
           tokens: response.usage?.text,
           finishReason: response.finishReason,
+          paramsUsed: params.model,
           timestamp: new Date().toISOString()
         });
       }
     },
     imageGenerate: {
-      preRequest: async (request, ctx) => {
+      preRequest: async (request, params, ctx) => {
         console.log('[OpenAI] Image generation request:', {
-          prompt: request.prompt,
-          size: request.size,
+          prompt: params.prompt,
+          model: params.model,
+          size: params.size,
           timestamp: new Date().toISOString()
         });
       },
-      postRequest: async (request, response, ctx) => {
+      postRequest: async (request, params, response, ctx) => {
         console.log('[OpenAI] Image generation response:', {
           imageCount: response.images.length,
           hasUrls: response.images.some(img => img.url),
+          paramsUsed: params.model,
           timestamp: new Date().toISOString()
         });
       }
@@ -82,12 +88,12 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, ctx, metadata) => {
+      preRequest: async (request, params, ctx, metadata) => {
         metrics.totalRequests++;
         // You could also add the request to a queue or database
-        console.log(`Request #${metrics.totalRequests}`);
+        console.log(`Request #${metrics.totalRequests} to model ${params.model}`);
       },
-      postRequest: async (request, response, ctx, metadata) => {
+      postRequest: async (request, params, response, ctx, metadata) => {
         // Track token usage
         if (response.usage?.text) {
           const input = response.usage.text.input || 0;
@@ -118,27 +124,30 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, ctx, metadata) => {
+      preRequest: async (request, params, ctx, metadata) => {
         // Validate request before sending
         if (!request.messages || request.messages.length === 0) {
           throw new Error('Request must have at least one message');
         }
         
-        // Log to external monitoring service
+        // Log to external monitoring service with OpenAI params
         await fetch('https://monitoring.example.com/api/log', {
           method: 'POST',
           body: JSON.stringify({
             type: 'openai_request',
             timestamp: new Date().toISOString(),
-            model: metadata?.model
+            model: params.model,
+            temperature: params.temperature,
+            maxTokens: params.max_completion_tokens
           })
         });
       },
-      postRequest: async (request, response, ctx, metadata) => {
+      postRequest: async (request, params, response, ctx, metadata) => {
         // Check for content filter issues
         if (response.finishReason === 'content_filter') {
           console.warn('Content filtered:', {
-            refusal: response.refusal
+            refusal: response.refusal,
+            modelUsed: params.model
           });
         }
         
@@ -161,12 +170,16 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, ctx, metadata) => {
-        console.log('[Stream Start]', new Date().toISOString());
+      preRequest: async (request, params, ctx, metadata) => {
+        console.log('[Stream Start]', {
+          model: params.model,
+          timestamp: new Date().toISOString()
+        });
       },
-      postRequest: async (request, response, ctx, metadata) => {
+      postRequest: async (request, params, response, ctx, metadata) => {
         // Called after streaming completes with accumulated response
         console.log('[Stream Complete]', {
+          model: params.model,
           totalContent: response.content?.length,
           timestamp: new Date().toISOString()
         });
