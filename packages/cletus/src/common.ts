@@ -341,20 +341,37 @@ export async function convertMessage(msg: Message): Promise<AIMessage> {
     role: msg.role,
     name: msg.name,
     tokens: msg.tokens,
-    content: await Promise.all(msg.content.map(convertMessageContent)),
+    content: await Promise.all(msg.content.map((mc) => convertMessageContent(mc, msg.created))),
   };
 }
 
 /**
  * 
- * @param content 
+ * @param messageContent - The message content to convert
+ * @param messageTimestamp - The timestamp of the message (for operation output storage)
  * @returns 
  */
-async function convertMessageContent(messageContent: MessageContent): Promise<AIMessageContent> {
-  const { type, content } = messageContent;
+async function convertMessageContent(messageContent: MessageContent, messageTimestamp: number): Promise<AIMessageContent> {
+  const { type, content, operationIndex } = messageContent;
+  
+  // Handle text content
   if (type === 'text') {
+    // Check if this is an operation message that needs truncation
+    if (operationIndex !== undefined && content.length > CONSTS.OPERATION_MESSAGE_TRUNCATE_LIMIT) {
+      // Generate the truncation message
+      const operationKey = `${messageTimestamp}-${operationIndex}`;
+      const truncationMessage = `\n\nThe output of the operation has been truncated for length. To get the full output call 'getOperationOutput("${operationKey}")'`;
+      const maxContentLength = CONSTS.OPERATION_MESSAGE_TRUNCATE_LIMIT - truncationMessage.length;
+      
+      // Return truncated content
+      const truncatedContent = content.slice(0, maxContentLength) + truncationMessage;
+      return { type, content: truncatedContent };
+    }
+    
     return { type, content };
   }
+  
+  // Handle image content
   if (content.startsWith('http://') || content.startsWith('https://')) {
     return { type, content: new URL(content) };
   }
