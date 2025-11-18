@@ -73,6 +73,54 @@ import { AWSError, AWSAuthError, AWSRateLimitError, AWSQuotaError, AWSContextWin
  * };
  * ```
  */
+/**
+ * Hook called before a request is made to the provider.
+ * 
+ * @template TRequest - The request type
+ * @param request - The request object
+ * @param ctx - The context object
+ */
+export type PreRequestHook<TRequest = any> = (
+  request: TRequest,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hook called after a response is received from the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TResponse - The response type
+ * @param request - The request object
+ * @param response - The response object
+ * @param ctx - The context object
+ */
+export type PostRequestHook<TRequest = any, TResponse = any> = (
+  request: TRequest,
+  response: TResponse,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hooks for different operation types.
+ */
+export interface AWSBedrockHooks {
+  // Chat completion hooks
+  chat?: {
+    preRequest?: PreRequestHook<Request>;
+    postRequest?: PostRequestHook<Request, Response>;
+  };
+  // Image generation hooks
+  imageGenerate?: {
+    preRequest?: PreRequestHook<ImageGenerationRequest>;
+    postRequest?: PostRequestHook<ImageGenerationRequest, ImageGenerationResponse>;
+  };
+  // Embedding hooks
+  embed?: {
+    preRequest?: PreRequestHook<EmbeddingRequest>;
+    postRequest?: PostRequestHook<EmbeddingRequest, EmbeddingResponse>;
+  };
+}
+
 export interface AWSBedrockConfig {
   // AWS region (e.g., 'us-east-1', 'us-west-2')
   region?: string;
@@ -90,6 +138,8 @@ export interface AWSBedrockConfig {
     imageGenerate?: ModelInput;
     embedding?: ModelInput;
   };
+  // Hooks for intercepting requests and responses
+  hooks?: AWSBedrockHooks;
 }
 
 // ============================================================================

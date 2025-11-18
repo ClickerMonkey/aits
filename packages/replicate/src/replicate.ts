@@ -33,6 +33,59 @@ import Replicate from 'replicate';
 // Configuration
 // ============================================================================
 
+/**
+ * Hook called before a request is made to the provider.
+ * 
+ * @template TRequest - The request type
+ * @param request - The request object
+ * @param ctx - The context object
+ */
+export type PreRequestHook<TRequest = any> = (
+  request: TRequest,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hook called after a response is received from the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TResponse - The response type
+ * @param request - The request object
+ * @param response - The response object
+ * @param ctx - The context object
+ */
+export type PostRequestHook<TRequest = any, TResponse = any> = (
+  request: TRequest,
+  response: TResponse,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hooks for different operation types.
+ */
+export interface ReplicateHooks {
+  // Chat completion hooks
+  chat?: {
+    preRequest?: PreRequestHook<Request>;
+    postRequest?: PostRequestHook<Request, Response>;
+  };
+  // Image generation hooks
+  imageGenerate?: {
+    preRequest?: PreRequestHook<ImageGenerationRequest>;
+    postRequest?: PostRequestHook<ImageGenerationRequest, ImageGenerationResponse>;
+  };
+  // Transcription hooks
+  transcribe?: {
+    preRequest?: PreRequestHook<TranscriptionRequest>;
+    postRequest?: PostRequestHook<TranscriptionRequest, TranscriptionResponse>;
+  };
+  // Embedding hooks
+  embed?: {
+    preRequest?: PreRequestHook<EmbeddingRequest>;
+    postRequest?: PostRequestHook<EmbeddingRequest, EmbeddingResponse>;
+  };
+}
+
 export interface ReplicateConfig {
   apiKey: string;
   baseUrl?: string;
@@ -41,6 +94,10 @@ export interface ReplicateConfig {
    * Map of model ID (owner/name) to transformer
    */
   transformers?: Record<string, ModelTransformer>;
+  /**
+   * Hooks for intercepting requests and responses
+   */
+  hooks?: ReplicateHooks;
 }
 
 // ============================================================================
