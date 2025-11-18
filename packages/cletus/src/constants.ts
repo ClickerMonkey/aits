@@ -77,6 +77,7 @@ export const CONSTS = {
   MAX_CHARACTERS: 64_000,
   MAX_LINES: 1_000,
   MAX_EXTRACTION_CHUNK_SIZE: 64_000, // Maximum size for data extraction to minimize LLM calls
+  OPERATION_MESSAGE_TRUNCATE_LIMIT: 1000, // Maximum size for operation messages before truncation
 } as const;
 
 /**

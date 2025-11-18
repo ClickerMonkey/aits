@@ -5,6 +5,7 @@ import { abbreviate } from '../common';
 import { Operations, OperationMode } from '../operations/types';
 import { ComponentOutput } from '@aeye/core';
 import { OperationManager } from '../operations/manager';
+import { createUtilityTools } from '../tools/utility';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -12,6 +13,9 @@ import { OperationManager } from '../operations/manager';
 export function createChatAgent(ai: CletusAI) {
   // Create all sub-agents
   const subAgents = createSubAgents(ai);
+  
+  // Create utility tools
+  const utilityTools = createUtilityTools(ai);
 
   const [
     { refs: plannerTools }, 
@@ -219,7 +223,7 @@ Files:
 - Do not ask the user to locate a file unless you've already tried searching for it.
 </rules>
 `,
-    tools: [delegate],
+    tools: [delegate, ...utilityTools],
     toolsMax: 50,
     metadata: {
       weights: {

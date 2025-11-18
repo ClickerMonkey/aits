@@ -84,7 +84,13 @@ export class OperationManager {
     const statusMsg = def.status ? def.status(op.input) : `Processing operation: ${op.type}`;
     ctx.chatStatus(statusMsg);
 
-    return this.execute(op, doNow, ctx);
+    const result = await this.execute(op, doNow, ctx);
+    
+    // Update status after operation completes
+    const operationTypeName = op.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    ctx.chatStatus(`Analyzing ${operationTypeName} results...`);
+    
+    return result;
   }
 
   /**
