@@ -37,6 +37,8 @@ export interface ToolInput<
   input?: Fn<Record<string, any>, [Context<TContext, TMetadata>]>;
   /** Zod schema defining the tool's input parameters */
   schema: Fn<ZodType<TParams> | undefined, [Context<TContext, TMetadata>]>;
+  /** Whether to require AI to strictly follow the schema. True bu default. */
+  strict?: boolean;
   /** References to other components (tools, prompts, agents) that this tool utilizes */
   refs?: TRefs;
   /** The function that implements the tool's behavior */
@@ -205,6 +207,7 @@ export class Tool<
         name: this.input.name,
         description,
         parameters: schema,
+        strict: this.input.strict ?? true,
       },
     ] as const;
   }

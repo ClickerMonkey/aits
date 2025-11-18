@@ -18,16 +18,16 @@ const ctxDefault: AIContextAny = { ai: AI.with().providers({}).create({}), metad
 
 describe('OpenAIProvider Hooks', () => {
   let provider: OpenAIProvider;
-  let preRequestHook: jest.Mock;
-  let postRequestHook: jest.Mock;
+  let beforeRequestHook: jest.Mock;
+  let afterRequestHook: jest.Mock;
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
 
     // Create mock hooks
-    preRequestHook = jest.fn();
-    postRequestHook = jest.fn();
+    beforeRequestHook = jest.fn();
+    afterRequestHook = jest.fn();
 
     // Create mock OpenAI instance
     mockOpenAI = {
@@ -54,8 +54,8 @@ describe('OpenAIProvider Hooks', () => {
         apiKey: 'test-api-key',
         hooks: {
           chat: {
-            preRequest: preRequestHook,
-            postRequest: postRequestHook
+            beforeRequest: beforeRequestHook,
+            afterRequest: afterRequestHook
           }
         }
       });
@@ -87,8 +87,8 @@ describe('OpenAIProvider Hooks', () => {
       const response = await executor(request, ctxDefault, { model: 'gpt-4' });
 
       // Check that pre-request hook was called with params
-      expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(
+      expect(beforeRequestHook).toHaveBeenCalledTimes(1);
+      expect(beforeRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: 'gpt-4',
@@ -99,8 +99,8 @@ describe('OpenAIProvider Hooks', () => {
       );
 
       // Check that post-request hook was called with params
-      expect(postRequestHook).toHaveBeenCalledTimes(1);
-      expect(postRequestHook).toHaveBeenCalledWith(
+      expect(afterRequestHook).toHaveBeenCalledTimes(1);
+      expect(afterRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: 'gpt-4',
@@ -122,8 +122,8 @@ describe('OpenAIProvider Hooks', () => {
         apiKey: 'test-api-key',
         hooks: {
           chat: {
-            preRequest: preRequestHook,
-            postRequest: postRequestHook
+            beforeRequest: beforeRequestHook,
+            afterRequest: afterRequestHook
           }
         }
       });
@@ -171,8 +171,8 @@ describe('OpenAIProvider Hooks', () => {
       }
 
       // Check that pre-request hook was called with params
-      expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(
+      expect(beforeRequestHook).toHaveBeenCalledTimes(1);
+      expect(beforeRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: 'gpt-4',
@@ -184,8 +184,8 @@ describe('OpenAIProvider Hooks', () => {
       );
 
       // Check that post-request hook was called after streaming completed with params
-      expect(postRequestHook).toHaveBeenCalledTimes(1);
-      expect(postRequestHook).toHaveBeenCalledWith(
+      expect(afterRequestHook).toHaveBeenCalledTimes(1);
+      expect(afterRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: 'gpt-4',
@@ -208,8 +208,8 @@ describe('OpenAIProvider Hooks', () => {
         apiKey: 'test-api-key',
         hooks: {
           imageGenerate: {
-            preRequest: preRequestHook,
-            postRequest: postRequestHook
+            beforeRequest: beforeRequestHook,
+            afterRequest: afterRequestHook
           }
         }
       });
@@ -228,8 +228,8 @@ describe('OpenAIProvider Hooks', () => {
       const response = await provider.generateImage!(request, ctxDefault);
 
       // Check that pre-request hook was called with params
-      expect(preRequestHook).toHaveBeenCalledTimes(1);
-      expect(preRequestHook).toHaveBeenCalledWith(
+      expect(beforeRequestHook).toHaveBeenCalledTimes(1);
+      expect(beforeRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: expect.any(String),
@@ -239,8 +239,8 @@ describe('OpenAIProvider Hooks', () => {
       );
 
       // Check that post-request hook was called with params
-      expect(postRequestHook).toHaveBeenCalledTimes(1);
-      expect(postRequestHook).toHaveBeenCalledWith(
+      expect(afterRequestHook).toHaveBeenCalledTimes(1);
+      expect(afterRequestHook).toHaveBeenCalledWith(
         request,
         expect.objectContaining({
           model: expect.any(String),
@@ -263,13 +263,13 @@ describe('OpenAIProvider Hooks', () => {
   describe('Hook Error Handling', () => {
     it('should propagate errors from pre-request hooks', async () => {
       const errorMessage = 'Pre-request hook failed';
-      preRequestHook.mockRejectedValue(new Error(errorMessage));
+      beforeRequestHook.mockRejectedValue(new Error(errorMessage));
 
       provider = new OpenAIProvider({
         apiKey: 'test-api-key',
         hooks: {
           chat: {
-            preRequest: preRequestHook
+            beforeRequest: beforeRequestHook
           }
         }
       });
@@ -282,7 +282,7 @@ describe('OpenAIProvider Hooks', () => {
       await expect(executor(request, ctxDefault, { model: 'gpt-4' }))
         .rejects.toThrow(errorMessage);
 
-      expect(preRequestHook).toHaveBeenCalledTimes(1);
+      expect(beforeRequestHook).toHaveBeenCalledTimes(1);
     });
   });
 

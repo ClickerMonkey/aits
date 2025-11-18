@@ -381,6 +381,8 @@ export interface ToolDefinition
   description?: string;
   /** Zod schema defining the tool's input parameters */
   parameters: z.ZodType<object>;
+  /** Whether to require AI to strictly follow the schema. True by default. */
+  strict?: boolean;
 }
 
 /**

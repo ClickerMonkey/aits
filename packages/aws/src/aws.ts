@@ -112,18 +112,18 @@ export type PostRequestHook<TRequest = any, TCommand = any, TResponse = any> = (
 export interface AWSBedrockHooks {
   // Chat completion hooks
   chat?: {
-    preRequest?: PreRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand>;
-    postRequest?: PostRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand, Response>;
+    beforeRequest?: PreRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand>;
+    afterRequest?: PostRequestHook<Request, InvokeModelCommand | InvokeModelWithResponseStreamCommand, Response>;
   };
   // Image generation hooks
   imageGenerate?: {
-    preRequest?: PreRequestHook<ImageGenerationRequest, InvokeModelCommand>;
-    postRequest?: PostRequestHook<ImageGenerationRequest, InvokeModelCommand, ImageGenerationResponse>;
+    beforeRequest?: PreRequestHook<ImageGenerationRequest, InvokeModelCommand>;
+    afterRequest?: PostRequestHook<ImageGenerationRequest, InvokeModelCommand, ImageGenerationResponse>;
   };
   // Embedding hooks
   embed?: {
-    preRequest?: PreRequestHook<EmbeddingRequest, InvokeModelCommand>;
-    postRequest?: PostRequestHook<EmbeddingRequest, InvokeModelCommand, EmbeddingResponse>;
+    beforeRequest?: PreRequestHook<EmbeddingRequest, InvokeModelCommand>;
+    afterRequest?: PostRequestHook<EmbeddingRequest, InvokeModelCommand, EmbeddingResponse>;
   };
 }
 
@@ -454,7 +454,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+      await this.config.hooks?.chat?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
@@ -491,7 +491,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
 
       // Call post-request hook with command
-      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+      await this.config.hooks?.chat?.afterRequest?.(request, command, result, ctx);
 
       return result;
     } catch (error: any) {
@@ -546,7 +546,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+      await this.config.hooks?.chat?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       
@@ -653,7 +653,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         arguments: tc.arguments,
       }));
       
-      await this.config.hooks?.chat?.postRequest?.(request, command, {
+      await this.config.hooks?.chat?.afterRequest?.(request, command, {
         content: accumulatedContent,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason,
@@ -803,7 +803,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+      await this.config.hooks?.chat?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
@@ -822,7 +822,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
 
       // Call post-request hook with command
-      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+      await this.config.hooks?.chat?.afterRequest?.(request, command, result, ctx);
 
       return result;
     } catch (error: any) {
@@ -907,7 +907,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await this.config.hooks?.chat?.preRequest?.(request, command, ctx);
+      await this.config.hooks?.chat?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
@@ -926,7 +926,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
 
       // Call post-request hook with command
-      await this.config.hooks?.chat?.postRequest?.(request, command, result, ctx);
+      await this.config.hooks?.chat?.afterRequest?.(request, command, result, ctx);
 
       return result;
     } catch (error: any) {
@@ -991,7 +991,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   // Image Generation (Stability AI)
   // ============================================================================
 
-  generateImage: Provider['generateImage'] = async (request, ctx, config) => {
+  generateImage: Provider['generateImage'] = async (request, ctx, config: AWSBedrockConfig) => {
     const effectiveConfig = { ...this.config, ...config };
     const model = getModel(request.model || effectiveConfig.defaultModels?.imageGenerate);
     
@@ -1033,7 +1033,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await effectiveConfig.hooks?.imageGenerate?.preRequest?.(request, command, ctx);
+      await effectiveConfig.hooks?.imageGenerate?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
@@ -1050,7 +1050,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
 
       // Call post-request hook with command
-      await effectiveConfig.hooks?.imageGenerate?.postRequest?.(request, command, result, ctx);
+      await effectiveConfig.hooks?.imageGenerate?.afterRequest?.(request, command, result, ctx);
 
       return result;
     } catch (error: any) {
@@ -1063,7 +1063,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   // Embeddings (Amazon Titan)
   // ============================================================================
 
-  embed: Provider['embed'] = async (request, ctx, config) => {
+  embed: Provider['embed'] = async (request, ctx, config: AWSBedrockConfig) => {
     const effectiveConfig = { ...this.config, ...config };
     const model = getModel(request.model || effectiveConfig.defaultModels?.embedding);
     
@@ -1085,7 +1085,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       });
 
       // Call pre-request hook with command
-      await effectiveConfig.hooks?.embed?.preRequest?.(request, command, ctx);
+      await effectiveConfig.hooks?.embed?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
@@ -1104,7 +1104,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
 
       // Call post-request hook with command
-      await effectiveConfig.hooks?.embed?.postRequest?.(request, command, result, ctx);
+      await effectiveConfig.hooks?.embed?.afterRequest?.(request, command, result, ctx);
 
       return result;
     } catch (error: any) {

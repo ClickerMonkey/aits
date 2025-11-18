@@ -22,7 +22,7 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, params, ctx, metadata) => {
+      beforeRequest: async (request, params, ctx, metadata) => {
         console.log('[OpenAI] Chat request:', {
           model: params.model,
           messageCount: request.messages.length,
@@ -31,7 +31,7 @@ const openai = new OpenAIProvider({
           timestamp: new Date().toISOString()
         });
       },
-      postRequest: async (request, params, response, ctx, metadata) => {
+      afterRequest: async (request, params, response, ctx, metadata) => {
         console.log('[OpenAI] Chat response:', {
           model: response.model?.id,
           tokens: response.usage?.text,
@@ -42,7 +42,7 @@ const openai = new OpenAIProvider({
       }
     },
     imageGenerate: {
-      preRequest: async (request, params, ctx) => {
+      beforeRequest: async (request, params, ctx) => {
         console.log('[OpenAI] Image generation request:', {
           prompt: params.prompt,
           model: params.model,
@@ -50,7 +50,7 @@ const openai = new OpenAIProvider({
           timestamp: new Date().toISOString()
         });
       },
-      postRequest: async (request, params, response, ctx) => {
+      afterRequest: async (request, params, response, ctx) => {
         console.log('[OpenAI] Image generation response:', {
           imageCount: response.images.length,
           hasUrls: response.images.some(img => img.url),
@@ -88,12 +88,12 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, params, ctx, metadata) => {
+      beforeRequest: async (request, params, ctx, metadata) => {
         metrics.totalRequests++;
         // You could also add the request to a queue or database
         console.log(`Request #${metrics.totalRequests} to model ${params.model}`);
       },
-      postRequest: async (request, params, response, ctx, metadata) => {
+      afterRequest: async (request, params, response, ctx, metadata) => {
         // Track token usage
         if (response.usage?.text) {
           const input = response.usage.text.input || 0;
@@ -124,7 +124,7 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, params, ctx, metadata) => {
+      beforeRequest: async (request, params, ctx, metadata) => {
         // Validate request before sending
         if (!request.messages || request.messages.length === 0) {
           throw new Error('Request must have at least one message');
@@ -142,7 +142,7 @@ const openai = new OpenAIProvider({
           })
         });
       },
-      postRequest: async (request, params, response, ctx, metadata) => {
+      afterRequest: async (request, params, response, ctx, metadata) => {
         // Check for content filter issues
         if (response.finishReason === 'content_filter') {
           console.warn('Content filtered:', {
@@ -170,13 +170,13 @@ const openai = new OpenAIProvider({
   apiKey: process.env.OPENAI_API_KEY!,
   hooks: {
     chat: {
-      preRequest: async (request, params, ctx, metadata) => {
+      beforeRequest: async (request, params, ctx, metadata) => {
         console.log('[Stream Start]', {
           model: params.model,
           timestamp: new Date().toISOString()
         });
       },
-      postRequest: async (request, params, response, ctx, metadata) => {
+      afterRequest: async (request, params, response, ctx, metadata) => {
         // Called after streaming completes with accumulated response
         console.log('[Stream Complete]', {
           model: params.model,

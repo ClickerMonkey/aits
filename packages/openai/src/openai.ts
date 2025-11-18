@@ -79,38 +79,38 @@ export type PostRequestHook<TRequest = any, TParams = any, TResponse = any> = (
 export interface OpenAIHooks {
   // Chat completion hooks
   chat?: {
-    preRequest?: PreRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams>;
-    postRequest?: PostRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+    beforeRequest?: PreRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams>;
+    afterRequest?: PostRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams, Response>;
   };
   // Image generation hooks
   imageGenerate?: {
-    preRequest?: PreRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams>;
-    postRequest?: PostRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams, ImageGenerationResponse>;
+    beforeRequest?: PreRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams>;
+    afterRequest?: PostRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams, ImageGenerationResponse>;
   };
   // Image edit hooks
   imageEdit?: {
-    preRequest?: PreRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams>;
-    postRequest?: PostRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams, ImageGenerationResponse>;
+    beforeRequest?: PreRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams>;
+    afterRequest?: PostRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams, ImageGenerationResponse>;
   };
   // Image analysis hooks
   imageAnalyze?: {
-    preRequest?: PreRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams>;
-    postRequest?: PostRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+    beforeRequest?: PreRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams>;
+    afterRequest?: PostRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams, Response>;
   };
   // Transcription hooks
   transcribe?: {
-    preRequest?: PreRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams>;
-    postRequest?: PostRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams, TranscriptionResponse>;
+    beforeRequest?: PreRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams>;
+    afterRequest?: PostRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams, TranscriptionResponse>;
   };
   // Speech synthesis hooks
   speech?: {
-    preRequest?: PreRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams>;
-    postRequest?: PostRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams, SpeechResponse>;
+    beforeRequest?: PreRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams>;
+    afterRequest?: PostRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams, SpeechResponse>;
   };
   // Embedding hooks
   embed?: {
-    preRequest?: PreRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams>;
-    postRequest?: PostRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams, EmbeddingResponse>;
+    beforeRequest?: PreRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams>;
+    afterRequest?: PostRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams, EmbeddingResponse>;
   };
 }
 
@@ -134,11 +134,11 @@ export interface OpenAIHooks {
  *   },
  *   hooks: {
  *     chat: {
- *       preRequest: async (request, params, ctx, metadata) => {
+ *       beforeRequest: async (request, params, ctx, metadata) => {
  *         console.log('Chat request:', request);
  *         console.log('OpenAI params:', params);
  *       },
- *       postRequest: async (request, params, response, ctx, metadata) => {
+ *       afterRequest: async (request, params, response, ctx, metadata) => {
  *         console.log('Chat response:', response);
  *         console.log('OpenAI params used:', params);
  *       },
@@ -862,6 +862,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         name: tool.name,
         description: tool.description,
         parameters: z.toJSONSchema(tool.parameters, { target: 'draft-7' }),
+        strict: tool.strict ?? true,
       },
     }));
   }
@@ -1060,27 +1061,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       this.augmentChatRequest(params, request, effectiveConfig);
 
       // Call pre-request hook with params
-      if (effectiveConfig.hooks?.chat?.preRequest) {
-        await effectiveConfig.hooks.chat.preRequest(request, params, ctx, metadata);
+      await effectiveConfig.hooks?.chat?.beforeRequest?.(request, params, ctx, metadata);
 
       let completion: OpenAI.Chat.Completions.ChatCompletion;
       try {
         completion = await retry(async (signal) => {
-          const { response, data } = await client.chat.completions.create(params, { signal }).withResponse();
-
-          if (!response.ok) {
-            const headers = Object.fromEntries(response.headers);
-            const body = await response.text().catch(() => '');
-            const details = {
-              status: response.status,
-              statusText: response.statusText,
-              headers,
-              body,
-            };
-            
-            throw new ProviderError(this.name, `Chat completion request failed: ${JSON.stringify(details)}`);
-          }
-
+          const data = await client.chat.completions.create(params, { signal });
           const choice = data.choices[0];
           if (!choice) {
             throw new ProviderError(this.name, 'No choices in response');
@@ -1088,7 +1074,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
           return data;
         });
-
       } catch (e: any) {
         if (isContextWindowError(e)) {
           const details = parseContextWindowError(e);
@@ -1101,8 +1086,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           };
           
           // Call post-request hook even on error
-          if (effectiveConfig.hooks?.chat?.postRequest) {
-            await effectiveConfig.hooks.chat.postRequest(request, params, errorResponse, ctx, metadata);
+          await effectiveConfig.hooks?.chat?.afterRequest?.(request, params, errorResponse, ctx, metadata);
           
           return errorResponse;
         }
@@ -1132,8 +1116,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       this.augmentChatResponse(completion, response, effectiveConfig);
 
       // Call post-request hook with params
-      if (effectiveConfig.hooks?.chat?.postRequest) {
-        await effectiveConfig.hooks.chat.postRequest(request, params, response, ctx, metadata);
+      await effectiveConfig.hooks?.chat?.afterRequest?.(request, params, response, ctx, metadata);
 
       return response;
     };
@@ -1195,8 +1178,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       this.augmentChatRequest(params, request, effectiveConfig);
 
       // Call pre-request hook with params
-      if (effectiveConfig.hooks?.chat?.preRequest) {
-        await effectiveConfig.hooks.chat.preRequest(request, params, ctx, metadata);
+      await effectiveConfig.hooks?.chat?.beforeRequest?.(request, params, ctx, metadata);
 
       let stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
       try {
@@ -1231,8 +1213,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           };
           
           // Call post-request hook even on error
-          if (effectiveConfig.hooks?.chat?.postRequest) {
-            await effectiveConfig.hooks.chat.postRequest(request, params, errorResponse, ctx, metadata);
+          await effectiveConfig.hooks?.chat?.afterRequest?.(request, params, errorResponse, ctx, metadata);
           
           return errorResponse;
         }
@@ -1343,7 +1324,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       }
 
       // Call post-request hook with accumulated response
-      if (effectiveConfig.hooks?.chat?.postRequest) {
+      if (effectiveConfig.hooks?.chat?.afterRequest) {
         const finalResponse: Response = {
           content: accumulatedContent,
           toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
@@ -1351,7 +1332,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           model,
           usage: finalUsage,
         };
-        await effectiveConfig.hooks.chat.postRequest(request, params, finalResponse, ctx, metadata);
+        await effectiveConfig.hooks.chat.afterRequest(request, params, finalResponse, ctx, metadata);
       }
     }.bind(this);
   }
@@ -1537,8 +1518,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.imageGenerate?.preRequest) {
-      await effectiveConfig.hooks.imageGenerate.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.imageGenerate?.beforeRequest?.(request, params, ctx);
     
     const client = this.createClient(effectiveConfig);
 
@@ -1567,8 +1547,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.imageGenerate?.postRequest) {
-      await effectiveConfig.hooks.imageGenerate.postRequest(request, params, result, ctx);
+    await effectiveConfig.hooks?.imageGenerate?.afterRequest?.(request, params, result, ctx);
 
     return result;
   }
@@ -1775,8 +1754,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.imageEdit?.preRequest) {
-      await effectiveConfig.hooks.imageEdit.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.imageEdit?.beforeRequest?.(request, params, ctx);
 
     const client = this.createClient(effectiveConfig);
 
@@ -1805,8 +1783,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.imageEdit?.postRequest) {
-      await effectiveConfig.hooks.imageEdit.postRequest(request, params, result, ctx);
+    await effectiveConfig.hooks?.imageEdit?.afterRequest?.(request, params, result, ctx);
 
     return result;
   }
@@ -2005,8 +1982,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.transcribe?.preRequest) {
-      await effectiveConfig.hooks.transcribe.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.transcribe?.beforeRequest?.(request, params, ctx);
     
     const client = this.createClient(effectiveConfig);
 
@@ -2032,8 +2008,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.transcribe?.postRequest) {
-      await effectiveConfig.hooks.transcribe.postRequest(request, params, result, ctx);
+    await effectiveConfig.hooks?.transcribe?.afterRequest?.(request, params, result, ctx);
 
     return result;
   }
@@ -2075,6 +2050,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
+
+    await effectiveConfig.hooks?.transcribe?.beforeRequest?.(request, params, ctx);
 
     const client = this.createClient(effectiveConfig);
 
@@ -2167,8 +2144,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     this.augmentSpeechRequest?.(params, request, effectiveConfig);
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.speech?.preRequest) {
-      await effectiveConfig.hooks.speech.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.speech?.beforeRequest?.(request, params, ctx);
 
     const client = this.createClient(effectiveConfig);
 
@@ -2192,8 +2168,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.speech?.postRequest) {
-      await effectiveConfig.hooks.speech.postRequest(request, params, result, ctx);
+    await effectiveConfig.hooks?.speech?.afterRequest?.(request, params, result, ctx);
 
     return result;
   }
@@ -2232,8 +2207,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     this.augmentEmbeddingRequest?.(params, request, effectiveConfig);
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.embed?.preRequest) {
-      await effectiveConfig.hooks.embed.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.embed?.beforeRequest?.(request, params, ctx);
 
     const client = this.createClient(effectiveConfig);
 
@@ -2268,8 +2242,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.embed?.postRequest) {
-      await effectiveConfig.hooks.embed.postRequest(request, params, result, ctx);
+    await effectiveConfig.hooks?.embed?.afterRequest?.(request, params, result, ctx);
 
     return result;
   }
@@ -2323,8 +2296,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.imageAnalyze?.preRequest) {
-      await effectiveConfig.hooks.imageAnalyze.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.imageAnalyze?.beforeRequest?.(request, params, ctx);
 
     const executor = this.createExecutor(effectiveConfig);
 
@@ -2337,8 +2309,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     );
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.imageAnalyze?.postRequest) {
-      await effectiveConfig.hooks.imageAnalyze.postRequest(request, params, response, ctx);
+    await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, response, ctx);
 
     return response;
   }
@@ -2394,8 +2365,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     };
 
     // Call pre-request hook with params
-    if (effectiveConfig.hooks?.imageAnalyze?.preRequest) {
-      await effectiveConfig.hooks.imageAnalyze.preRequest(request, params, ctx);
+    await effectiveConfig.hooks?.imageAnalyze?.beforeRequest?.(request, params, ctx);
 
     const streamer = this.createStreamer(effectiveConfig);
 
@@ -2428,15 +2398,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     }
 
     // Call post-request hook with params
-    if (effectiveConfig.hooks?.imageAnalyze?.postRequest) {
-      const finalResponse: Response = {
-        content: accumulatedContent,
-        toolCalls,
-        finishReason: finishReason || 'stop' as FinishReason,
-        model,
-        usage: finalUsage,
-      };
-      await effectiveConfig.hooks.imageAnalyze.postRequest(request, params, finalResponse, ctx);
-    }
+    const finalResponse: Response = {
+      content: accumulatedContent,
+      toolCalls,
+      finishReason: finishReason || 'stop' as FinishReason,
+      model,
+      usage: finalUsage,
+    };
+    await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, finalResponse, ctx);
   }
 }

@@ -72,23 +72,23 @@ export type PostRequestHook<TRequest = any, TInput = any, TResponse = any> = (
 export interface ReplicateHooks {
   // Chat completion hooks
   chat?: {
-    preRequest?: PreRequestHook<Request, object>;
-    postRequest?: PostRequestHook<Request, object, Response>;
+    beforeRequest?: PreRequestHook<Request, object>;
+    afterRequest?: PostRequestHook<Request, object, Response>;
   };
   // Image generation hooks
   imageGenerate?: {
-    preRequest?: PreRequestHook<ImageGenerationRequest, object>;
-    postRequest?: PostRequestHook<ImageGenerationRequest, object, ImageGenerationResponse>;
+    beforeRequest?: PreRequestHook<ImageGenerationRequest, object>;
+    afterRequest?: PostRequestHook<ImageGenerationRequest, object, ImageGenerationResponse>;
   };
   // Transcription hooks
   transcribe?: {
-    preRequest?: PreRequestHook<TranscriptionRequest, object>;
-    postRequest?: PostRequestHook<TranscriptionRequest, object, TranscriptionResponse>;
+    beforeRequest?: PreRequestHook<TranscriptionRequest, object>;
+    afterRequest?: PostRequestHook<TranscriptionRequest, object, TranscriptionResponse>;
   };
   // Embedding hooks
   embed?: {
-    preRequest?: PreRequestHook<EmbeddingRequest, object>;
-    postRequest?: PostRequestHook<EmbeddingRequest, object, EmbeddingResponse>;
+    beforeRequest?: PreRequestHook<EmbeddingRequest, object>;
+    afterRequest?: PostRequestHook<EmbeddingRequest, object, EmbeddingResponse>;
   };
 }
 
@@ -384,8 +384,8 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const input = convertRequest(request, ctx);
 
     // Call pre-request hook with input payload
-    if (hookType && repConfig.hooks?.[hookType]?.preRequest) {
-      await repConfig.hooks[hookType].preRequest(request, input, ctx);
+    if (hookType && repConfig.hooks?.[hookType]?.beforeRequest) {
+      await repConfig.hooks[hookType].beforeRequest(request as any, input, ctx);
     }
 
     // Run prediction
@@ -395,8 +395,8 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const response = parseResponse(output, ctx);
 
     // Call post-request hook with input payload
-    if (hookType && repConfig.hooks?.[hookType]?.postRequest) {
-      await repConfig.hooks[hookType].postRequest(request, input, response, ctx);
+    if (hookType && repConfig.hooks?.[hookType]?.afterRequest) {
+      await repConfig.hooks[hookType].afterRequest(request as any, input, response, ctx);
     }
 
     return response;
