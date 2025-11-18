@@ -33,6 +33,65 @@ import Replicate from 'replicate';
 // Configuration
 // ============================================================================
 
+/**
+ * Hook called before a request is made to the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TInput - The Replicate input payload type
+ * @param request - The request object
+ * @param input - The Replicate input payload being sent to the API
+ * @param ctx - The context object
+ */
+export type PreRequestHook<TRequest = any, TInput = any> = (
+  request: TRequest,
+  input: TInput,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hook called after a response is received from the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TInput - The Replicate input payload type
+ * @template TResponse - The response type
+ * @param request - The request object
+ * @param input - The Replicate input payload that was sent to the API
+ * @param response - The response object
+ * @param ctx - The context object
+ */
+export type PostRequestHook<TRequest = any, TInput = any, TResponse = any> = (
+  request: TRequest,
+  input: TInput,
+  response: TResponse,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hooks for different operation types.
+ */
+export interface ReplicateHooks {
+  // Chat completion hooks
+  chat?: {
+    preRequest?: PreRequestHook<Request, object>;
+    postRequest?: PostRequestHook<Request, object, Response>;
+  };
+  // Image generation hooks
+  imageGenerate?: {
+    preRequest?: PreRequestHook<ImageGenerationRequest, object>;
+    postRequest?: PostRequestHook<ImageGenerationRequest, object, ImageGenerationResponse>;
+  };
+  // Transcription hooks
+  transcribe?: {
+    preRequest?: PreRequestHook<TranscriptionRequest, object>;
+    postRequest?: PostRequestHook<TranscriptionRequest, object, TranscriptionResponse>;
+  };
+  // Embedding hooks
+  embed?: {
+    preRequest?: PreRequestHook<EmbeddingRequest, object>;
+    postRequest?: PostRequestHook<EmbeddingRequest, object, EmbeddingResponse>;
+  };
+}
+
 export interface ReplicateConfig {
   apiKey: string;
   baseUrl?: string;
@@ -41,6 +100,10 @@ export interface ReplicateConfig {
    * Map of model ID (owner/name) to transformer
    */
   transformers?: Record<string, ModelTransformer>;
+  /**
+   * Hooks for intercepting requests and responses
+   */
+  hooks?: ReplicateHooks;
 }
 
 // ============================================================================
@@ -284,7 +347,8 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     getConverters: (transformer: ModelTransformer) => {
       convertRequest?: (request: TRequest, ctx: AIContextAny) => object;
       parseResponse?: (response: object, ctx: AIContextAny) => TResponse;
-    }
+    },
+    hookType?: 'chat' | 'imageGenerate' | 'transcribe' | 'embed'
   ) {
     const repConfig = config || this.config;
 
@@ -319,11 +383,23 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     // Convert request using transformer
     const input = convertRequest(request, ctx);
 
+    // Call pre-request hook with input payload
+    if (hookType && repConfig.hooks?.[hookType]?.preRequest) {
+      await repConfig.hooks[hookType].preRequest(request, input, ctx);
+    }
+
     // Run prediction
     const output = await client.run(modelId, { input, signal });
 
     // Parse response using transformer
-    return parseResponse(output, ctx);
+    const response = parseResponse(output, ctx);
+
+    // Call post-request hook with input payload
+    if (hookType && repConfig.hooks?.[hookType]?.postRequest) {
+      await repConfig.hooks[hookType].postRequest(request, input, response, ctx);
+    }
+
+    return response;
   }
 
   /**
@@ -402,7 +478,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const repConfig = config || this.config;
 
     return async (request: Request, ctx, metadata, signal) => {
-      return this.doRequest(repConfig, request, ctx, metadata, signal, (transformer) => transformer.chat || {});
+      return this.doRequest(repConfig, request, ctx, metadata, signal, (transformer) => transformer.chat || {}, 'chat');
     };
   }
 
@@ -442,7 +518,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<ImageGenerationResponse> {
-    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {});
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {}, 'imageGenerate');
   }
 
   /**
@@ -520,7 +596,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<TranscriptionResponse> {
-    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {});
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {}, 'transcribe');
   }
 
   /**
@@ -559,6 +635,6 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<EmbeddingResponse> {
-    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.embed || {});
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.embed || {}, 'embed');
   }
 }

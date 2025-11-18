@@ -37,6 +37,84 @@ import { ContextWindowError, ProviderError } from './types';
 // ============================================================================
 
 /**
+ * Hook called before a request is made to the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TParams - The provider-specific parameters type
+ * @param request - The request object
+ * @param params - The provider-specific parameters being sent to the API
+ * @param ctx - The context object
+ * @param metadata - Optional metadata
+ */
+export type PreRequestHook<TRequest = any, TParams = any> = (
+  request: TRequest,
+  params: TParams,
+  ctx: AIContextAny,
+  metadata?: AIMetadataAny
+) => void | Promise<void>;
+
+/**
+ * Hook called after a response is received from the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TParams - The provider-specific parameters type
+ * @template TResponse - The response type
+ * @param request - The request object
+ * @param params - The provider-specific parameters that were sent to the API
+ * @param response - The response object
+ * @param ctx - The context object
+ * @param metadata - Optional metadata
+ */
+export type PostRequestHook<TRequest = any, TParams = any, TResponse = any> = (
+  request: TRequest,
+  params: TParams,
+  response: TResponse,
+  ctx: AIContextAny,
+  metadata?: AIMetadataAny
+) => void | Promise<void>;
+
+/**
+ * Hooks for different operation types.
+ */
+export interface OpenAIHooks {
+  // Chat completion hooks
+  chat?: {
+    preRequest?: PreRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams>;
+    postRequest?: PostRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+  };
+  // Image generation hooks
+  imageGenerate?: {
+    preRequest?: PreRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams>;
+    postRequest?: PostRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams, ImageGenerationResponse>;
+  };
+  // Image edit hooks
+  imageEdit?: {
+    preRequest?: PreRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams>;
+    postRequest?: PostRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams, ImageGenerationResponse>;
+  };
+  // Image analysis hooks
+  imageAnalyze?: {
+    preRequest?: PreRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams>;
+    postRequest?: PostRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+  };
+  // Transcription hooks
+  transcribe?: {
+    preRequest?: PreRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams>;
+    postRequest?: PostRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams, TranscriptionResponse>;
+  };
+  // Speech synthesis hooks
+  speech?: {
+    preRequest?: PreRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams>;
+    postRequest?: PostRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams, SpeechResponse>;
+  };
+  // Embedding hooks
+  embed?: {
+    preRequest?: PreRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams>;
+    postRequest?: PostRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams, EmbeddingResponse>;
+  };
+}
+
+/**
  * Configuration options for the OpenAI provider.
  *
  * @example
@@ -52,6 +130,18 @@ import { ContextWindowError, ProviderError } from './types';
  *   retryEvents: {
  *     onRetry: (attempt, error, delay, context) => {
  *       console.log(`Retry attempt ${attempt} for ${context.operation} after ${delay}ms`);
+ *     },
+ *   },
+ *   hooks: {
+ *     chat: {
+ *       preRequest: async (request, params, ctx, metadata) => {
+ *         console.log('Chat request:', request);
+ *         console.log('OpenAI params:', params);
+ *       },
+ *       postRequest: async (request, params, response, ctx, metadata) => {
+ *         console.log('Chat response:', response);
+ *         console.log('OpenAI params used:', params);
+ *       },
  *     },
  *   },
  * };
@@ -70,6 +160,8 @@ export interface OpenAIConfig {
   retry?: RetryConfig;
   // Global event handlers for retry lifecycle events
   retryEvents?: RetryEvents;
+  // Hooks for intercepting requests and responses
+  hooks?: OpenAIHooks;
   // Default models
   defaultModels?: {
     chat?: ModelInput;
@@ -967,6 +1059,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
       this.augmentChatRequest(params, request, effectiveConfig);
 
+      // Call pre-request hook with params
+      if (effectiveConfig.hooks?.chat?.preRequest) {
+        await effectiveConfig.hooks.chat.preRequest(request, params, ctx, metadata);
+
       let completion: OpenAI.Chat.Completions.ChatCompletion;
       try {
         completion = await retry(async (signal) => {
@@ -996,13 +1092,19 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       } catch (e: any) {
         if (isContextWindowError(e)) {
           const details = parseContextWindowError(e);
-          return {
+          const errorResponse: Response = {
             content: '',
             toolCalls: [],
-            finishReason: 'length',
+            finishReason: 'length' as FinishReason,
             model,
             usage: { text: { input: details?.contextWindow } },
           };
+          
+          // Call post-request hook even on error
+          if (effectiveConfig.hooks?.chat?.postRequest) {
+            await effectiveConfig.hooks.chat.postRequest(request, params, errorResponse, ctx, metadata);
+          
+          return errorResponse;
         }
 
         throw e;
@@ -1028,6 +1130,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       };
 
       this.augmentChatResponse(completion, response, effectiveConfig);
+
+      // Call post-request hook with params
+      if (effectiveConfig.hooks?.chat?.postRequest) {
+        await effectiveConfig.hooks.chat.postRequest(request, params, response, ctx, metadata);
 
       return response;
     };
@@ -1088,6 +1194,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
       this.augmentChatRequest(params, request, effectiveConfig);
 
+      // Call pre-request hook with params
+      if (effectiveConfig.hooks?.chat?.preRequest) {
+        await effectiveConfig.hooks.chat.preRequest(request, params, ctx, metadata);
+
       let stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
       try {
         stream = await retry(async (signal) => {
@@ -1112,22 +1222,31 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       } catch (e: any) {
         if (isContextWindowError(e)) {
           const details = parseContextWindowError(e);
-          return {
+          const errorResponse: Response = {
             content: '',
             toolCalls: [],
-            finishReason: 'length',
+            finishReason: 'length' as FinishReason,
             model,
             usage: { text: { input: details?.contextWindow } },
           };
+          
+          // Call post-request hook even on error
+          if (effectiveConfig.hooks?.chat?.postRequest) {
+            await effectiveConfig.hooks.chat.postRequest(request, params, errorResponse, ctx, metadata);
+          
+          return errorResponse;
         }
 
         throw e;
       }
 
-      // Track accumulated tool calls
+      // Track accumulated tool calls and response
       type ToolCallItem = { id: string; name: string; arguments: string, named: boolean, finished: boolean, updated: boolean };
       const toolCallsMap = new Map<number, ToolCallItem>();
       const toolCalls: ToolCallItem[] = [];
+      let accumulatedContent = '';
+      let finalUsage: any = undefined;
+      let finishReason: FinishReason | undefined = undefined;
       
       for await (const chunk of stream) {
         if (signal?.aborted) {
@@ -1143,6 +1262,17 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           refusal: delta?.refusal ?? undefined,
           usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
         };
+
+        // Track accumulated content and final data
+        if (delta?.content) {
+          accumulatedContent += delta.content;
+        }
+        if (chunk.usage) {
+          finalUsage = convertOpenAIUsage(chunk.usage);
+        }
+        if (choice?.finish_reason) {
+          finishReason = choice.finish_reason as FinishReason;
+        }
 
         // Handle tool calls
         for (const toolCall of toolCalls) {
@@ -1210,6 +1340,18 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           // Send it!
           yield { toolCall };
         }
+      }
+
+      // Call post-request hook with accumulated response
+      if (effectiveConfig.hooks?.chat?.postRequest) {
+        const finalResponse: Response = {
+          content: accumulatedContent,
+          toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+          finishReason: finishReason || 'stop' as FinishReason,
+          model,
+          usage: finalUsage,
+        };
+        await effectiveConfig.hooks.chat.postRequest(request, params, finalResponse, ctx, metadata);
       }
     }.bind(this);
   }
@@ -1393,6 +1535,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Apply provider-specific customizations
     this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
+
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.imageGenerate?.preRequest) {
+      await effectiveConfig.hooks.imageGenerate.preRequest(request, params, ctx);
     
     const client = this.createClient(effectiveConfig);
 
@@ -1410,7 +1556,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       throw e;
     }
   
-    return {
+    const result = {
       images: (response.data || []).map((img) => ({
         url: img.url || undefined,
         b64_json: img.b64_json || undefined,
@@ -1419,6 +1565,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       model,
       usage: response.usage ? convertOpenAIUsage(response.usage) : undefined,
     };
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.imageGenerate?.postRequest) {
+      await effectiveConfig.hooks.imageGenerate.postRequest(request, params, result, ctx);
+
+    return result;
   }
   
   /**
@@ -1622,6 +1774,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     // Apply provider-specific customizations
     this.augmentImageGenerateRequest?.(params, request, effectiveConfig);
 
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.imageEdit?.preRequest) {
+      await effectiveConfig.hooks.imageEdit.preRequest(request, params, ctx);
+
     const client = this.createClient(effectiveConfig);
 
     let response: OpenAI.Images.ImagesResponse;
@@ -1638,7 +1794,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       throw e;
     }
 
-    return {
+    const result = {
       images: (response.data || []).map((img) => ({
         url: img.url || undefined,
         b64_json: img.b64_json || undefined,
@@ -1647,6 +1803,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       model,
       usage: response.usage ? convertOpenAIUsage(response.usage) : undefined,
     };
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.imageEdit?.postRequest) {
+      await effectiveConfig.hooks.imageEdit.postRequest(request, params, result, ctx);
+
+    return result;
   }
 
   /**
@@ -1841,6 +2003,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Apply provider-specific customizations
     this.augmentTranscriptionRequest?.(params, request, effectiveConfig);
+
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.transcribe?.preRequest) {
+      await effectiveConfig.hooks.transcribe.preRequest(request, params, ctx);
     
     const client = this.createClient(effectiveConfig);
 
@@ -1858,12 +2024,18 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       throw e;
     }
 
-    return {
+    const result = {
       text: response.text,
       model,
       usage: response.usage?.type === 'tokens' ? convertOpenAIUsage(response.usage) : 
              response.usage?.seconds ? { audio: { seconds: response.usage.seconds } } : undefined,
     };
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.transcribe?.postRequest) {
+      await effectiveConfig.hooks.transcribe.postRequest(request, params, result, ctx);
+
+    return result;
   }
 
   /**
@@ -1994,6 +2166,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     // Apply provider-specific customizations
     this.augmentSpeechRequest?.(params, request, effectiveConfig);
 
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.speech?.preRequest) {
+      await effectiveConfig.hooks.speech.preRequest(request, params, ctx);
+
     const client = this.createClient(effectiveConfig);
 
     let response: globalThis.Response;
@@ -2009,11 +2185,17 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       throw e;
     }
 
-    return {
+    const result = {
       model,
       audio: response.body as ReadableStream<any>,
       responseFormat,
     };
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.speech?.postRequest) {
+      await effectiveConfig.hooks.speech.postRequest(request, params, result, ctx);
+
+    return result;
   }
 
   /**
@@ -2049,6 +2231,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     // Apply provider-specific customizations
     this.augmentEmbeddingRequest?.(params, request, effectiveConfig);
 
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.embed?.preRequest) {
+      await effectiveConfig.hooks.embed.preRequest(request, params, ctx);
+
     const client = this.createClient(effectiveConfig);
 
     let response: OpenAI.CreateEmbeddingResponse;
@@ -2065,7 +2251,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       throw e;
     }
 
-    return {
+    const result = {
       embeddings: response.data.map((item) => ({
         embedding: item.embedding,
         index: item.index,
@@ -2080,6 +2266,12 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           }
         : undefined,
     };
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.embed?.postRequest) {
+      await effectiveConfig.hooks.embed.postRequest(request, params, result, ctx);
+
+    return result;
   }
 
   /**
@@ -2101,7 +2293,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     config?: TConfig
   ): Promise<Response> => {
     const effectiveConfig = { ...this.config, ...config };
-    const executor = this.createExecutor(effectiveConfig);
 
     // Convert ImageAnalyzeRequest to chat Request
     const chatRequest: Request = {
@@ -2121,13 +2312,33 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       maxTokens: request.maxTokens,
     };
 
-    // Use the chat executor to analyze the images
+    // Construct the params that would be sent to OpenAI
+    const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
+    const messages = this.convertMessages(chatRequest);
+    const params: OpenAI.Chat.ChatCompletionCreateParams = {
+      model: model.id,
+      messages,
+      temperature: chatRequest.temperature,
+      max_completion_tokens: chatRequest.maxTokens,
+    };
+
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.imageAnalyze?.preRequest) {
+      await effectiveConfig.hooks.imageAnalyze.preRequest(request, params, ctx);
+
+    const executor = this.createExecutor(effectiveConfig);
+
+    // Use the chat executor to analyze the images (this will also call chat hooks)
     const response = await executor(
       chatRequest,
       ctx,
       {},
       undefined
     );
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.imageAnalyze?.postRequest) {
+      await effectiveConfig.hooks.imageAnalyze.postRequest(request, params, response, ctx);
 
     return response;
   }
@@ -2152,7 +2363,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     config?: TConfig
   ): AsyncIterable<Chunk> {
     const effectiveConfig = { ...this.config, ...config };
-    const streamer = this.createStreamer(effectiveConfig);
 
     // Convert ImageAnalyzeRequest to chat Request
     const chatRequest: Request = {
@@ -2172,14 +2382,61 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       maxTokens: request.maxTokens,
     };
 
-    // Use the chat streamer to analyze the images
+    // Construct the params that would be sent to OpenAI
+    const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image stream', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
+    const messages = this.convertMessages(chatRequest);
+    const params: OpenAI.Chat.ChatCompletionCreateParams = {
+      model: model.id,
+      messages,
+      temperature: chatRequest.temperature,
+      max_completion_tokens: chatRequest.maxTokens,
+      stream: true,
+    };
+
+    // Call pre-request hook with params
+    if (effectiveConfig.hooks?.imageAnalyze?.preRequest) {
+      await effectiveConfig.hooks.imageAnalyze.preRequest(request, params, ctx);
+
+    const streamer = this.createStreamer(effectiveConfig);
+
+    // Track accumulated response for post-hook
+    let accumulatedContent = '';
+    let finalUsage: any = undefined;
+    let finishReason: any = undefined;
+    const toolCalls: any[] = [];
+
+    // Use the chat streamer to analyze the images (this will also call chat hooks)
     for await (const chunk of streamer(
       chatRequest,
       ctx,
       { model: request.model } as any,
       undefined
     )) {
+      if (chunk.content) {
+        accumulatedContent += chunk.content;
+      }
+      if (chunk.usage) {
+        finalUsage = chunk.usage;
+      }
+      if (chunk.finishReason) {
+        finishReason = chunk.finishReason;
+      }
+      if (chunk.toolCall) {
+        toolCalls.push(chunk.toolCall);
+      }
       yield chunk;
+    }
+
+    // Call post-request hook with params
+    if (effectiveConfig.hooks?.imageAnalyze?.postRequest) {
+      const finalResponse: Response = {
+        content: accumulatedContent,
+        toolCalls,
+        finishReason: finishReason || 'stop' as FinishReason,
+        model,
+        usage: finalUsage,
+      };
+      await effectiveConfig.hooks.imageAnalyze.postRequest(request, params, finalResponse, ctx);
     }
   }
 }
