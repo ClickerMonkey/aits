@@ -288,8 +288,6 @@ export const OperationKindSchema = z.enum([
   'web_search',
   'web_get_page',
   'web_api_call',
-  // utility
-  'get_operation_output',
 ]);
 
 export const OperationSchema = z.object({

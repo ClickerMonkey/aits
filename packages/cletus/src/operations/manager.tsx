@@ -87,7 +87,7 @@ export class OperationManager {
     const result = await this.execute(op, doNow, ctx);
     
     // Update status after operation completes
-    const operationTypeName = op.type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    const operationTypeName = formatName(op.type);
     ctx.chatStatus(`Analyzing ${operationTypeName} results...`);
     
     return result;
