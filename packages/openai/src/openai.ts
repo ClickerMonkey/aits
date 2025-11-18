@@ -24,7 +24,7 @@ import type {
   TranscriptionResponse
 } from '@aeye/ai';
 import { detectTier } from '@aeye/ai';
-import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, type ToolCall, type Usage } from '@aeye/core';
+import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, toJSONSchema, type ToolCall, type Usage } from '@aeye/core';
 import fs from 'fs';
 import OpenAI, { Uploadable } from 'openai';
 import { Stream } from 'openai/core/streaming';
@@ -855,13 +855,13 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   protected convertTools(request: Request): OpenAI.Chat.ChatCompletionTool[] | undefined {
     if (!request.tools || request.tools.length === 0) return undefined;
-
+    
     return request.tools.map((tool) => ({
       type: 'function' as const,
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: z.toJSONSchema(tool.parameters, { target: 'draft-7' }),
+        parameters: toJSONSchema(tool.parameters, tool.strict ?? true),
         strict: tool.strict ?? true,
       },
     }));
@@ -916,13 +916,15 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       return undefined;
     }
 
+    const strict = request.responseFormat.strict ?? true;
+
     // Zod schema
     return {
       type: 'json_schema',
       json_schema: {
         name: 'response',
-        schema: z.toJSONSchema(request.responseFormat, { target: 'draft-7' }),
-        strict: true,
+        schema: toJSONSchema(request.responseFormat.type, strict),
+        strict,
       },
     };
   }

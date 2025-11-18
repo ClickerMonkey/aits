@@ -1,9 +1,10 @@
 import Handlebars from "handlebars";
-import z from 'zod';
+import { ZodString, ZodType } from 'zod';
 
 import { accumulateUsage, Fn, getChunksFromResponse, getInputTokens, getModel, getOutputTokens, getTotalTokens, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible } from "./tool";
 import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
+import { strictify, toJSONSchema } from "./schema";
 
 /**
  * Input provided to the prompt reconfiguration function.
@@ -74,7 +75,9 @@ export interface PromptInput<
   // An object or function/promise that returns an object for the variables that are injected into the prompt content.
   input?: Fn<Record<string, any>, [TInput | undefined, Context<TContext, TMetadata>]>;
   // A schema or function/promise that returns a schema defining the expected output format of the prompt. If not provided, defaults to plain text.
-  schema?: Fn<z.ZodType<TOutput> | false, [TInput | undefined, Context<TContext, TMetadata>]>;
+  schema?: Fn<ZodType<TOutput> | false, [TInput | undefined, Context<TContext, TMetadata>]>;
+  // If true, the output schema is strictly enforced. By default this is true.
+  strict?: boolean;
   // A configuration object or function/promise that returns a configuration object for the AI request.
   config?: Fn<Partial<Request> | false, [TInput | undefined, Context<TContext, TMetadata>]>;
   // After an iteration, a function that can reconfigure the prompt based on runtime statistics.
@@ -271,7 +274,7 @@ export class Prompt<
   constructor(
     public input: PromptInput<TContext, TMetadata, TName, TInput, TOutput, TTools>,
     private retool = resolveFn(input.retool),
-    private schema = resolveFn(input.schema),
+    private schema = resolveFn(input.schema, s => s && input.strict !== false ? strictify(s) as ZodType<TOutput> : s),
     private config = resolveFn(input.config),
     private translate = resolveFn(input.input),
     private content = Prompt.compileContent(input.content, !!input.tools?.length),
@@ -833,7 +836,7 @@ export class Prompt<
 
       // If we are finished, parse the output
       if (finishReason === 'stop') {
-        if (!schema || (schema instanceof z.ZodString)) {
+        if (!schema || (schema instanceof ZodString)) {
           result = content as unknown as TOutput;
 
           break; // All good!
@@ -854,7 +857,7 @@ export class Prompt<
               const issueSummary = parsedSafe.error.issues
                 .map(i => `- ${i.path.join('.')}: ${i.message}${['string', 'boolean', 'number'].includes(typeof i.input) ? ` (input: ${i.input})` : ''}`)
                 .join('\n')
-              errorMessage = `The output was an invalid format:\n${issueSummary}\n\nPlease adhere to the output schema:\n${z.toJSONSchema(schema)}`;
+              errorMessage = `The output was an invalid format:\n${issueSummary}\n\nPlease adhere to the output schema:\n${toJSONSchema(schema, this.input.strict ?? true)}`;
               resetReason = 'schema-parsing';
             } else {
               result = parsedSafe.data as unknown as TOutput;
@@ -1075,8 +1078,8 @@ export class Prompt<
     const content = this.content(contentInput);
 
     // Determine response format
-    const responseFormat: ResponseFormat = schema && !(schema instanceof z.ZodString)
-      ? schema as z.ZodType<object, object>
+    const responseFormat: ResponseFormat = schema && !(schema instanceof ZodString)
+      ? { type: schema as ZodType<object, object>, strict: this.input.strict ?? true }
       : 'text';
 
     return { config, content, tools, toolObjects, responseFormat, schema };

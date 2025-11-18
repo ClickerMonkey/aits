@@ -1,8 +1,8 @@
 import Handlebars from 'handlebars';
 import { ZodType } from 'zod';
-
 import { Fn, resolveFn } from './common';
-import { AnyComponent, Component, ComponentCompatible, ComponentTuple, Context, OptionalParams, ToolDefinition, Tuple } from './types';
+import { strictify } from './schema';
+import { Component, ComponentCompatible, Context, OptionalParams, ToolDefinition, Tuple } from './types';
     
 /**
  * Configuration for creating a Tool component.
@@ -121,7 +121,7 @@ export class Tool<
   constructor(
     public input: ToolInput<TContext, TMetadata, TName, TParams, TOutput, TRefs>,
     private instructions = input.instructions ? Tool.compileInstructions(input.instructions, !!input.input) : undefined,
-    private schema = resolveFn(input.schema),
+    private schema = resolveFn(input.schema, (s) => s && input.strict !== false ? strictify(s) as ZodType<TParams> : s),
     private translate = resolveFn(input.input),
     private descriptionFn = resolveFn(input.descriptionFn),
     private instructionsFn = resolveFn(input.instructionsFn, (r) => r ? Tool.compileInstructions(r, !!input.input) : undefined),
@@ -155,7 +155,7 @@ export class Tool<
    * @throws Error if schema is not available or parsing/validation fails.
    */
   async parse(ctx: Context<TContext, TMetadata>, args: string, schema?: ZodType<TParams>): Promise<TParams> {
-    const resolvedSchema = schema || await this.schema(ctx);
+    let resolvedSchema = schema || await this.schema(ctx);
 
     if (!resolvedSchema) {
       throw new Error(`Not able to build a schema to parse arguments for ${this.input.name}`);
@@ -179,8 +179,8 @@ export class Tool<
    * @returns A tuple of [instructions, toolDefinition] or undefined if not applicable.
    */
   async compile(ctx: Context<TContext, TMetadata>): Promise<readonly [string, ToolDefinition] | undefined> {
-    const schema = await this.schema(ctx);
-    if (!schema) {
+    const parameters = await this.schema(ctx);
+    if (!parameters) {
       return undefined;
     }
 
@@ -200,14 +200,15 @@ export class Tool<
     
     // Get dynamic description if function is provided
     const description = await this.descriptionFn(ctx) || this.input.description;
+    const strict = this.input.strict ?? true;
 
     return [
       instructions,
       {
         name: this.input.name,
         description,
-        parameters: schema,
-        strict: this.input.strict ?? true,
+        parameters,
+        strict,
       },
     ] as const;
   }

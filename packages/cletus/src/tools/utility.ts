@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai';
+import { formatName } from '../common';
 
 /**
  * Create utility tools for Cletus operations
@@ -8,39 +9,23 @@ export function createUtilityTools(ai: CletusAI) {
   const getOperationOutput = ai.tool({
     name: 'getOperationOutput',
     description: 'Retrieves the full output of a truncated operation message',
-    instructions: `Use this when you see a message indicating that operation output was truncated.
-The key format is "{messageTimestamp}-{operationIndex}" as provided in the truncation message.
-
-Example: Retrieve full output for operation 12345678-0:
-{ "key": "12345678-0" }`,
+    instructions: `Use this when you see a message indicating that operation output was truncated.`,
     schema: z.object({
-      key: z.string().describe('The operation output key in format "{messageTimestamp}-{operationIndex}"'),
+      id: z.number().describe('The message ID provided in the truncation notice'),
+      operation: z.number().describe('The operation index within the message provided in the truncation notice'),
     }),
-    call: async (input, _, ctx) => {
-      // Parse the key to extract created timestamp and operation index
-      const parts = input.key.split('-');
-      if (parts.length !== 2) {
-        throw new Error(`Invalid key format. Expected "{messageTimestamp}-{operationIndex}", got: ${input.key}`);
-      }
-      
-      const created = parseFloat(parts[0]);
-      const operationIndex = parseInt(parts[1], 10);
-      
-      if (isNaN(created) || isNaN(operationIndex)) {
-        throw new Error(`Invalid key format. Could not parse timestamp or operation index from: ${input.key}`);
-      }
-      
+    call: async ({ id: created, operation: operationIndex }, _, { chatData, chatStatus }) => {
       // Verify chat is in context
-      if (!ctx.chatData) {
+      if (!chatData) {
         throw new Error('No active chat context available');
       }
       
       // Find the message with matching created timestamp
-      const messages = ctx.chatData.getMessages();
+      const messages = chatData.getMessages();
       const message = messages.find((m) => m.created === created);
       
       if (!message) {
-        throw new Error(`No message found with timestamp: ${created}`);
+        throw new Error(`No message found with ID: ${created}`);
       }
       
       // Get the operation at the given index
@@ -54,6 +39,9 @@ Example: Retrieve full output for operation 12345678-0:
       if (!operation.message) {
         throw new Error(`Operation at index ${operationIndex} has no message`);
       }
+      
+      // Update status after operation completes
+      chatStatus(`Analyzing ${formatName(operation.type)} full results...`);
       
       return operation.message;
     },

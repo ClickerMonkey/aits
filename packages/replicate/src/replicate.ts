@@ -396,7 +396,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
 
     // Call post-request hook with input payload
     if (hookType && repConfig.hooks?.[hookType]?.afterRequest) {
-      await repConfig.hooks[hookType].afterRequest(request as any, input, response, ctx);
+      await repConfig.hooks[hookType].afterRequest(request as any, input, response as any, ctx);
     }
 
     return response;

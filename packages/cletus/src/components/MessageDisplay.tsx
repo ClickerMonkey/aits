@@ -6,6 +6,7 @@ import { Operations } from '../operations/types';
 import type { Message } from '../schemas';
 import { Markdown } from './Markdown';
 import { CletusAI } from '../ai';
+import { formatName } from '../common';
 
 
 interface MessageDisplayProps {
@@ -81,7 +82,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
                 return (
                   <Box key={i} marginBottom={1}>
                     <Text dimColor>
-                      [{c.operation.type}] - [{c.operation.status}]
+                      [{formatName(c.operation.type)}] - [{c.operation.status}]
                     </Text>
                   </Box>
                 );

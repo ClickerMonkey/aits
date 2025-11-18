@@ -1,6 +1,6 @@
 
 import { CletusAIContext } from "../ai";
-import { formatValue } from "../common";
+import { ANALYSIS_END, ANALYSIS_START, formatName, formatValue, INPUT_END, INPUT_START, INSTRUCTIONS_END, INSTRUCTIONS_START, OUTPUT_END, OUTPUT_START } from "../common";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
@@ -81,14 +81,13 @@ export class OperationManager {
     this.onOperationAdded?.(op, this.operations.length - 1);
     
     // Update status with operation description
-    const statusMsg = def.status ? def.status(op.input) : `Processing operation: ${op.type}`;
+    const statusMsg = def.status ? def.status(op.input) : `Processing operation: ${formatName(op.type)}`;
     ctx.chatStatus(statusMsg);
 
     const result = await this.execute(op, doNow, ctx);
     
     // Update status after operation completes
-    const operationTypeName = formatName(op.type);
-    ctx.chatStatus(`Analyzing ${operationTypeName} results...`);
+    ctx.chatStatus(`Analyzing ${formatName(op.type)} results...`);
     
     return result;
   }
@@ -142,23 +141,28 @@ export class OperationManager {
         : op.status === 'done'
           ? `Operation ${op.type} completed successfully:`
           : op.status === 'analyzed'
-            ? `Operation ${op.type} requires approval: ${op.analysis}`
-            : `Operation ${op.type} cannot be performed: ${op.analysis}`;
+            ? `Operation ${op.type} requires approval:`
+            : `Operation ${op.type} cannot be performed:`;
 
       // Add input details
       if (op.input) {
-        op.message += `\n\n<input>\n${formatValue(op.input)}\n</input>`;
+        op.message += `${INPUT_START}${formatValue(op.input)}${INPUT_END}`;
+      }
+
+      // Add analysis details if available
+      if (op.analysis && !op.output) {
+        op.message += `${ANALYSIS_START}${formatValue(op.analysis)}${ANALYSIS_END}`;
       }
 
       // Add output details if available
       if (op.output) {
-        op.message += `\n\n<output>\n${formatValue(op.output)}\n</output>`;
+        op.message += `${OUTPUT_START}${formatValue(op.output)}${OUTPUT_END}`;
       }
     }
 
     // Add instructions after the message if they exist
     if (def.instructions) {
-      op.message += `\n\n<instructions>\n${def.instructions}\n</instructions>`;
+      op.message += `${INSTRUCTIONS_START}${def.instructions}${INSTRUCTIONS_END}`;
     }
 
     this.onOperationUpdated?.(op, this.operations.indexOf(op));

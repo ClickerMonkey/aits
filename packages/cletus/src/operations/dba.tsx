@@ -1580,7 +1580,7 @@ Consider:
         { role: 'system', content: 'You are a database design assistant. Analyze data schemas and identify unique key fields.' },
         { role: 'user', content: prompt },
       ],
-      responseFormat: z.object({ fields: z.array(z.string()) }),
+      responseFormat: { type: z.object({ fields: z.array(z.string()) }), strict: true },
     });
     
     // Parse JSON from content

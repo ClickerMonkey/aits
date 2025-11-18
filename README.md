@@ -4,7 +4,7 @@
 
 @aeye (AI TypeScript) is a modern, type-safe AI library for Node.js and TypeScript applications. It provides a unified interface for working with multiple AI providers (OpenAI, OpenRouter, Replicate, etc.) with automatic model selection, cost tracking, streaming support, and extensible architecture.
 
-To see a complex example of a CLI agent built with aeye - `npm i --global @aeye/cletus` and run `cletus`!
+To see a complex example of a CLI agent built with aeye - `npm i -g @aeye/cletus` and run `cletus`!
 
 ```ts
 import { AI } from '@aeye/ai';

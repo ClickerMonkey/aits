@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import React, { useEffect, useRef, useState } from 'react';
 import type { CletusAI } from '../ai';
 import { ChatFile } from '../chat';
-import { formatTime, pluralize } from '../common';
+import { formatName, formatTime, pluralize } from '../common';
 import { COLORS } from '../constants';
 import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message } from '../schemas';
@@ -156,9 +156,9 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       if (indices.length === 1) {
         const op = operations[indices[0]];
         if (failed > 0) {
-          summaryText = `Operation ${op.type} failed after ${formatTime(elapsed)}`;
+          summaryText = `Operation ${formatName(op.type)} failed after ${formatTime(elapsed)}`;
         } else {
-          summaryText = `Operation ${op.type} executed in ${formatTime(elapsed)}`;
+          summaryText = `Operation ${formatName(op.type)} executed in ${formatTime(elapsed)}`;
         }
       } else {
         summaryText = `${indices.length} operations executed in ${formatTime(elapsed)}`;
@@ -201,7 +201,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       // Mark operations as rejected
       for (const idx of indices) {
         operations[idx].status = 'rejected';
-        operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+        operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
         
         // Update the message content
         const content = message.content.find((c) => c.operationIndex === idx);
@@ -331,7 +331,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         // Mark rejected operations
         for (const idx of rejected) {
           operations[idx].status = 'rejected';
-          operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+          operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
           
           // Update the message content
           const content = message.content.find((c) => c.operationIndex === idx);
@@ -416,7 +416,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
             // Mark rejected operations
             for (const idx of rejected) {
               operations[idx].status = 'rejected';
-              operations[idx].message = `Operation ${operations[idx].type} rejected by user`;
+              operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
             }
 
             rejectOperations(rejected);
@@ -573,7 +573,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       flexDirection="column"
     >
       <Text bold color={COLORS.APPROVAL_BORDER}>
-        Operation {currentOperationIndex + 1} of {approvableOperations.length}: {currentOp.op.type}
+        Operation {currentOperationIndex + 1} of {approvableOperations.length}: {formatName(currentOp.op.type)}
       </Text>
 
       <Box marginTop={1} marginBottom={1}>

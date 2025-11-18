@@ -423,7 +423,7 @@ export type ToolChoice =
 export type ResponseFormat =
   | 'text'
   | 'json'
-  | z.ZodType<object, object>;
+  | { type: z.ZodType<object, object>, strict: boolean };
 
 /**
  * Statistics about usage for an AI request.

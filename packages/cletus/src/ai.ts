@@ -13,7 +13,7 @@ import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 import z from 'zod';
 import { loadPromptFiles } from './prompt-loader';
-import { Usage, accumulateUsage } from '@aeye/core';
+import { Usage, accumulateUsage, toJSONSchema } from '@aeye/core';
 
 /**
  * Cletus AI Context
@@ -88,7 +88,7 @@ export function createCletusAI(configFile: ConfigFile) {
 
   const jsonReplacer = (_key: string, value: any) => {
     if (value instanceof z.ZodType) {
-      return z.toJSONSchema(value, { target: 'draft-7'})
+      return toJSONSchema(value, true)
     }
     return value;
   };

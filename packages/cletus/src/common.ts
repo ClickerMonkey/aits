@@ -345,6 +345,15 @@ export async function convertMessage(msg: Message): Promise<AIMessage> {
   };
 }
 
+export const INPUT_START = '\n\n<input>\n';
+export const INPUT_END = '\n</input>';
+export const ANALYSIS_START = '\n\n<analysis>\n';
+export const ANALYSIS_END = '\n</analysis>';
+export const OUTPUT_START = '\n\n<output>\n';
+export const OUTPUT_END = '\n</output>';
+export const INSTRUCTIONS_START = '\n\n<instructions>\n';
+export const INSTRUCTIONS_END = '\n</instructions>';
+
 /**
  * 
  * @param messageContent - The message content to convert
@@ -359,12 +368,31 @@ async function convertMessageContent(messageContent: MessageContent, messageTime
     // Check if this is an operation message that needs truncation
     if (operationIndex !== undefined && content.length > CONSTS.OPERATION_MESSAGE_TRUNCATE_LIMIT) {
       // Generate the truncation message
-      const operationKey = `${messageTimestamp}-${operationIndex}`;
-      const truncationMessage = `\n\nThe output of the operation has been truncated for length. To get the full output call 'getOperationOutput("${operationKey}")'`;
-      const maxContentLength = CONSTS.OPERATION_MESSAGE_TRUNCATE_LIMIT - truncationMessage.length;
-      
-      // Return truncated content
-      const truncatedContent = content.slice(0, maxContentLength) + truncationMessage;
+      const contentTruncated = content.slice(0, CONSTS.OPERATION_MESSAGE_TRUNCATE_LIMIT - CONSTS.OPERATION_MESSAGE_TRUNCATE_BUFFER);
+      const truncatedAt = contentTruncated.indexOf(INPUT_START) >= 0 && contentTruncated.indexOf(INPUT_END) === -1
+        ? 'input'
+        : contentTruncated.indexOf(ANALYSIS_START) >= 0 && contentTruncated.indexOf(ANALYSIS_END) === -1
+          ? 'analysis'
+            : contentTruncated.indexOf(OUTPUT_START) >= 0 && contentTruncated.indexOf(OUTPUT_END) === -1
+              ? 'output'
+              : contentTruncated.indexOf(INSTRUCTIONS_START) >= 0 && contentTruncated.indexOf(INSTRUCTIONS_END) === -1
+                ? 'instructions'
+                : '';
+      const sections = [
+        ...(content.includes(INPUT_START) ? ['input'] : []),
+        ...(content.includes(ANALYSIS_START) ? ['analysis'] : []),
+        ...(content.includes(OUTPUT_START) ? ['output'] : []),
+        ...(content.includes(INSTRUCTIONS_START) ? ['instructions'] : []),
+      ];
+      const truncatedSections = sections.slice(sections.indexOf(truncatedAt));
+
+      const truncatedLength = content.length - contentTruncated.length;
+      let truncatedContent = contentTruncated;
+      if (truncatedAt) {
+        truncatedContent += `...\n</${truncatedAt}>`;
+      }
+      truncatedContent += `\n\nThe operation summary has had <${truncatedSections.join('>, <')}> truncated for length (${truncatedLength} characters not shown). To get the full summary call 'getOperationOutput(${messageTimestamp}, ${operationIndex})'`;
+
       return { type, content: truncatedContent };
     }
     
@@ -375,14 +403,17 @@ async function convertMessageContent(messageContent: MessageContent, messageTime
   if (content.startsWith('http://') || content.startsWith('https://')) {
     return { type, content: new URL(content) };
   }
+
+  // Handle file content
   const file = unlinkFile(content);
   if (file) {
-    const imageBuffer = await fs.promises.readFile(file.filepath);
-    const base64Image = imageBuffer.toString("base64");
-    const mimeType = await detectMimeType(file.filepath, file.filename);
+    const fileBuffer = await fs.promises.readFile(file.filepath);
+    const fileBase64 = fileBuffer.toString("base64");
+    const fileMimeType = await detectMimeType(file.filepath, file.filename);
 
-    return { type, content: `data:${mimeType};base64,${base64Image}` };
+    return { type, content: `data:${fileMimeType};base64,${fileBase64}` };
   }
+
   return { type, content };
 }
 

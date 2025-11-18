@@ -12,20 +12,20 @@ import type {
   EmbeddingResponse,
   ImageGenerationRequest,
   ImageGenerationResponse,
-  ImageGenerationChunk,
   ModelInfo,
-  Provider,
+  Provider
 } from '@aeye/ai';
 import { detectTier } from '@aeye/ai';
-import type {
+import {
   Chunk,
   Executor,
   FinishReason,
+  ModelInput,
   Request,
   Response,
   Streamer,
+  toJSONSchema,
   ToolCall,
-  ModelInput,
 } from '@aeye/core';
 import { getModel } from '@aeye/core';
 import {
@@ -36,11 +36,9 @@ import {
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
-  InvokeModelWithResponseStreamCommand,
-  type InvokeModelCommandOutput,
+  InvokeModelWithResponseStreamCommand
 } from '@aws-sdk/client-bedrock-runtime';
-import z from 'zod';
-import { AWSError, AWSAuthError, AWSRateLimitError, AWSQuotaError, AWSContextWindowError, type ModelFamilyConfig } from './types';
+import { AWSAuthError, AWSContextWindowError, AWSError, AWSQuotaError, AWSRateLimitError, type ModelFamilyConfig } from './types';
 
 // ============================================================================
 // AWS Bedrock Provider Configuration
@@ -387,7 +385,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
     return request.tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: z.toJSONSchema(tool.parameters, { target: 'draft-7' }),
+      input_schema: toJSONSchema(tool.parameters, tool.strict ?? true),
     }));
   }
 
@@ -652,8 +650,8 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         name: tc.name,
         arguments: tc.arguments,
       }));
-      
-      await this.config.hooks?.chat?.afterRequest?.(request, command, {
+
+      const accumulatedResponse = {
         content: accumulatedContent,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason,
@@ -664,7 +662,9 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
             output: outputTokens,
           },
         },
-      }, ctx);
+      };
+      
+      await this.config.hooks?.chat?.afterRequest?.(request, command, accumulatedResponse, ctx);
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
