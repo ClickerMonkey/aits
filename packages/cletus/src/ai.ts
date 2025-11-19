@@ -65,10 +65,20 @@ export function createCletusAI(configFile: ConfigFile) {
 
   // Initialize providers based on config
   const providers = {
+    // OpenAI
     ...(config.providers.openai ? { openai: new OpenAIProvider({
       ...config.providers.openai,
       retryEvents,
-    }) } : {}),
+      hooks: {
+        chat: {
+          beforeRequest: (request, params, ctx, metadata) => {
+            logger.log(`OpenAI Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
+          }
+        }
+      }
+    })} : {}),
+
+    // OpenRouter
     ...(config.providers.openrouter ? { openrouter: new OpenRouterProvider({
       ...config.providers.openrouter,
       retryEvents,
@@ -81,9 +91,17 @@ export function createCletusAI(configFile: ConfigFile) {
           ...config.providers.openrouter.defaultParams?.providers,
         }
       },
-    }) } : {}),
-    ...(config.providers.replicate ? { replicate: new ReplicateProvider(config.providers.replicate) } : {}),
-    ...(config.providers.aws ? { aws: new AWSBedrockProvider(config.providers.aws) } : {}),
+    })} : {}),
+
+    // Replicate
+    ...(config.providers.replicate ? { replicate: new ReplicateProvider({
+      ...config.providers.replicate,
+    })} : {}),
+
+    // AWS Bedrock
+    ...(config.providers.aws ? { aws: new AWSBedrockProvider({
+      ...config.providers.aws,
+    })} : {}),
   } as const;
 
   const jsonReplacer = (_key: string, value: any) => {

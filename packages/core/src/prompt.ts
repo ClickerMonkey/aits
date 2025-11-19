@@ -852,7 +852,7 @@ export class Prompt<
           try {
             const parsedJSON = JSON.parse(potentialJSON);
 
-            const parsedSafe = schema.safeParse(parsedJSON);
+            const parsedSafe = await schema.safeParseAsync(parsedJSON);
             if (!parsedSafe.success) {
               const issueSummary = parsedSafe.error.issues
                 .map(i => `- ${i.path.join('.')}: ${i.message}${['string', 'boolean', 'number'].includes(typeof i.input) ? ` (input: ${i.input})` : ''}`)

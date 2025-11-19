@@ -161,7 +161,7 @@ export class Tool<
       throw new Error(`Not able to build a schema to parse arguments for ${this.input.name}`);
     }
 
-    const parsed = resolvedSchema.parse(JSON.parse(args));
+    const parsed = await resolvedSchema.parseAsync(JSON.parse(args));
 
     // Run post-validation hook if provided
     if (this.input.validate) {

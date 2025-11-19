@@ -234,6 +234,7 @@ Files:
     config: {
       toolsOneAtATime: true,
     },
+    dynamic: true,
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),

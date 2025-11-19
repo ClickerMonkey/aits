@@ -11,6 +11,17 @@ import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
 import { OperationKind } from '../schemas';
 
+
+export const requestPrompt = `You have been given the following request to perform by Cletus. 
+It is VERY IMPORTANT you follow this request. 
+Cletus will execute and receive the results and decide what to do next. 
+That's why it's VERY important to strictly follow the request because Cletus is relying on you to only do what is needed. 
+If you can't "see" something - trust that Cletus has.
+
+<cletusRequest>
+{{request}}
+</cletusRequest>`
+
 /**
  * Create all sub-agents, each with their own prompt and tools
  */
@@ -39,16 +50,6 @@ export function createSubAgents(ai: CletusAI) {
       }
     }
   }
-
-  const requestPrompt = `You have been given the following request to perform by Cletus. 
-It is VERY IMPORTANT you follow this request. 
-Cletus will execute and receive the results and decide what to do next. 
-That's why it's VERY important to strictly follow the request because Cletus is relying on you to only do what is needed. 
-If you can't "see" something - trust that Cletus has.
-
-<cletusRequest>
-{{request}}
-</cletusRequest>`
 
   // Planner sub-agent
   const planner = ai.prompt({

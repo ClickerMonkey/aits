@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CletusAI, CletusAIContext } from '../ai';
 import type { TypeDefinition, TypeField } from '../schemas';
 import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
+import { requestPrompt } from '../agents/sub-agents';
 
 /**
  * Create the DBA agent that identifies the type first, then creates specific tools.
@@ -70,7 +71,7 @@ Example 2: Query with sorting:
       limit: z.number().optional().default(10).describe('Maximum results'),
       orderBy: z.array(
         z.object({
-          field: z.enum(type.fields.map(f => f.name) as [string, ...string[]]),
+          field: getSchemas(type, cache).fieldNames,
           direction: z.enum(['asc', 'desc']).default('asc'),
         })
       ).optional().describe('Sort order'),
@@ -205,10 +206,6 @@ Example: Search for relevant records:
     description: 'Database administrator agent for data operations',
     content: `You are the DBA agent for Cletus, responsible for managing data operations.
 
-<userInformation>
-{{userPrompt}}
-</userInformation>
-
 <typeInformation>
 You are working with {{type.friendlyName}} data. {{type.description}}
 Fields:
@@ -218,10 +215,11 @@ Fields:
 
 Use the available tools to complete the data operation requested in the conversation.
 
-You have been given the following request to perform by the chat agent, the conversation follows.
-<userRequest>
-{{request}}
-</userRequest>
+${requestPrompt}
+
+<userInformation>
+{{userPrompt}}
+</userInformation>
 `,
     tools: [
       dataCreate,

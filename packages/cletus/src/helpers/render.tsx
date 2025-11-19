@@ -44,7 +44,7 @@ export function getStatusInfo(status: Operation['status']): { color: string; lab
  */
 export function getElapsedTime(op: Operation): string {
   if (!op.start) return '';
-  const duration = op.end ? op.end - op.start : Date.now() - op.start;
+  const duration = op.end && op.end >= op.start ? op.end - op.start : Date.now() - op.start;
   return formatTime(duration);
 }
 
@@ -103,7 +103,7 @@ export function renderOperation<TOperation extends Operation>(
         <Text dimColor>[{statusLabel}] </Text>
         <Text dimColor>({elapsed})</Text>
       </Box>
-      
+
       {typeof summary === 'string' ? (
         op.error ? (
           <Box marginLeft={2} flexGrow={1}>

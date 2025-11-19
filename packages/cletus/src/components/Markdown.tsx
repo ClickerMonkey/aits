@@ -28,7 +28,7 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
 
   // Step 2: Find all link segments (second priority)
   const linkSegments: Array<{ start: number; end: number; text: string; url: string }> = [];
-  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const linkRegex = /\[(!\[[^\]]+\]\([^\)]+\)|[^\]]+)\]\(([^)]+)\)/g;
   while ((match = linkRegex.exec(text)) !== null) {
     linkSegments.push({
       start: match.index,
@@ -107,32 +107,35 @@ const applyFormatting = (text: string): LineSegment[] => {
   let match;
   
   // Find bold (**text**) - check first to handle ***text*** correctly
-  const boldRegex = /\*\*(.+?)\*\*/g;
+  // Only match if not preceded/followed by word characters
+  const boldRegex = /(?<!\w)\*\*(.+?)\*\*(?!\w)/g;
   while ((match = boldRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'bold', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'bold', isStart: false, length: 2 });
   }
 
   // Find italic - single * or _ (but not part of ** or __)
-  // Use negative lookbehind/lookahead to avoid matching doubled delimiters
-  const italicRegex = /(?<!\*)(\*)(?!\*)(.+?)(?<!\*)(\*)(?!\*)|(?<!_)(_)(?!_)(.+?)(?<!_)(_)(?!_)/g;
+  // Only match if not preceded/followed by word characters
+  const italicRegex = /(?<!\w)(?<!\*)(\*)(?!\*)(.+?)(?<!\*)(\*)(?!\*)(?!\w)|(?<!\w)(?<!_)(_)(?!_)(.+?)(?<!_)(_)(?!_)(?!\w)/g;
   while ((match = italicRegex.exec(text)) !== null) {
     // match[1] and match[2] for *, match[4] and match[5] for _
-    const startIndex = match[1] ? match.index : match.index;
+    const startIndex = match.index;
     const content = match[2] || match[5];
     markers.push({ index: startIndex, type: 'italic', isStart: true, length: 1 });
     markers.push({ index: startIndex + content.length + 1, type: 'italic', isStart: false, length: 1 });
   }
 
   // Find underline (__text__)
-  const underlineRegex = /__(.+?)__/g;
+  // Only match if not preceded/followed by word characters
+  const underlineRegex = /(?<!\w)__(.+?)__(?!\w)/g;
   while ((match = underlineRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'underline', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'underline', isStart: false, length: 2 });
   }
 
   // Find strikethrough (~~text~~)
-  const strikethroughRegex = /~~(.+?)~~/g;
+  // Only match if not preceded/followed by word characters
+  const strikethroughRegex = /(?<!\w)~~(.+?)~~(?!\w)/g;
   while ((match = strikethroughRegex.exec(text)) !== null) {
     markers.push({ index: match.index, type: 'strikethrough', isStart: true, length: 2 });
     markers.push({ index: match.index + match[0].length - 2, type: 'strikethrough', isStart: false, length: 2 });

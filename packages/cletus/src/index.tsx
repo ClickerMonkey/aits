@@ -2,6 +2,9 @@
 
 import { render, Text } from 'ink';
 import React, { useState } from 'react';
+
+import './logger';
+
 import { InkChatView } from './components/InkChatView';
 import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';

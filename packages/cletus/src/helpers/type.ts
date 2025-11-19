@@ -89,28 +89,28 @@ export function buildFieldSchema(field: TypeField): z.ZodTypeAny {
     schema = schema.default(field.default);
   }
 
-  return schema;
+  return schema.meta({ title: field.name });
 }
 
 /**
  * Build a Zod object schema for a type's fields
  */
-export function buildFieldsSchema(typeDef: TypeDefinition) {
+export function buildFieldsSchema(type: TypeDefinition) {
   const shape: Record<string, z.ZodTypeAny> = {};
-  for (const field of typeDef.fields) {
+  for (const field of type.fields) {
     shape[field.name] = buildFieldSchema(field);
   }
-  return z.object(shape);
+  return z.object(shape).meta({ title: `${type.name}_fields` });
 }
 
 /**
  * Build a where clause schema that supports field equality, and/or logic
  */
-export function buildWhereSchema(typeDef: TypeDefinition) {
+export function buildWhereSchema(type: TypeDefinition) {
   const fieldConditions: Record<string, z.ZodType<FieldCondition | undefined>> = {};
 
   // Each field can be matched by value
-  for (const field of typeDef.fields) {
+  for (const field of type.fields) {
     switch (field.type) {
       case 'string':
         fieldConditions[field.name] = z.object({
@@ -120,7 +120,7 @@ export function buildWhereSchema(typeDef: TypeDefinition) {
           endsWith: z.string().optional(),
           oneOf: z.array(z.string()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
       case 'number':
         fieldConditions[field.name] = z.object({
@@ -131,13 +131,13 @@ export function buildWhereSchema(typeDef: TypeDefinition) {
           gte: z.number().optional(),
           oneOf: z.array(z.number()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
       case 'boolean':
         fieldConditions[field.name] = z.object({
           equals: z.boolean().optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
       case 'date':
         fieldConditions[field.name] = z.object({
@@ -146,7 +146,7 @@ export function buildWhereSchema(typeDef: TypeDefinition) {
           after: z.iso.date().optional(),
           oneOf: z.array(z.iso.date()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
       case 'enum':
         const enumSchema = z.enum(field.enumOptions as [string, ...string[]]);
@@ -154,7 +154,7 @@ export function buildWhereSchema(typeDef: TypeDefinition) {
           equals: enumSchema.optional(),
           oneOf: z.array(enumSchema).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
       default:
         // references a data type
@@ -162,20 +162,26 @@ export function buildWhereSchema(typeDef: TypeDefinition) {
           equals: z.string().optional(),
           oneOf: z.array(z.string()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional();
+        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
         break;
     }
   }
 
   // Define the where clause recursively supporting and/or
-  const whereSchema: z.ZodType<WhereClause> = z.lazy(() =>
-    z.object({
-      and: z.array(whereSchema).optional(),
-      or: z.array(whereSchema).optional(),
-      not: whereSchema.optional(),
-      ...fieldConditions,
-    })
-  );
+  const whereSchema: z.ZodType<WhereClause> = z.object({
+    get and() {
+      return whereList.optional();
+    },
+    get or() {
+      return whereList.optional();
+    },
+    get not() {
+      return whereSchema.optional();
+    },
+    ...fieldConditions,
+  }).meta({ title: `${type.name}_where` });
+
+  const whereList = z.array(whereSchema).meta({ title: `${type.name}_where_list` });
 
   return whereSchema;
 }
@@ -192,7 +198,7 @@ export function getSchemas(type: TypeDefinition, cache: Record<string, any> = {}
   if (!schemas) {
     schemas = {
       fields: buildFieldsSchema(type),
-      fieldNames: z.enum(type.fields.map(f => f.name) as [string, ...string[]]),
+      fieldNames: z.enum(type.fields.map(f => f.name) as [string, ...string[]]).meta({ title: `${type.name}_fieldNames` }),
       where: buildWhereSchema(type),
     };
     cache[cacheKey] = schemas;

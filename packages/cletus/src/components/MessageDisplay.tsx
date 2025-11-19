@@ -59,9 +59,9 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
         </Text>
       </Box>
       {isUser ? (
-        <Box borderStyle={'round'} flexDirection="row" paddingX={1} flexGrow={1}>
+        <Box borderStyle={'round'} flexDirection="row" flexGrow={1}>
           <Box width={1}><Text>&gt;</Text></Box>
-          <Box flexDirection="column" marginLeft={1} flexGrow={1}>
+          <Box flexDirection="column" marginX={1}>
             {message.content.map((part, i) => (
               <Markdown key={i}>{part.content}</Markdown>
             ))}
