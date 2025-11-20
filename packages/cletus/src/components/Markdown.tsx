@@ -8,6 +8,17 @@ import { logger } from "../logger";
 type LineSegment = { text: string;  url?: string; styles?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; } };
 
 /**
+ * Simple syntax highlight component using cli-highlight
+ */
+const SyntaxHighlight: React.FC<{ code: string; language?: string }> = ({ code, language }) => {
+  const highlightedCode = React.useMemo(() => {
+    return language ? highlight(code, { language, ignoreIllegals: true }) : code;
+  }, [code, language]);
+  
+  return <Text>{highlightedCode}</Text>;
+};
+
+/**
 * Parse inline markdown formatting and return text segments with styles
 * Priority: code and links are extracted first, then formatting is applied to remaining text
 */
@@ -206,13 +217,10 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       
       // Render the code block
       const code = codeLines.join('\n');
-      const highlightedCode = language 
-        ? highlight(code, { language, ignoreIllegals: true })
-        : code;
       
       result.push(
         <Box key={`codeblock-${i}`} flexGrow={1} backgroundColor={COLORS.MARKDOWN_CODE_BACKGROUND} paddingX={1}>
-          <Text key={`code-${i}`}>{highlightedCode}</Text>
+          <SyntaxHighlight key={`code-${i}`} code={code} language={language} />
         </Box>
       );
       
