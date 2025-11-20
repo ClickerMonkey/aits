@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useEffect, useState } from 'react';
 import type { CletusAI } from '../ai';
+import { getAltKeyLabel } from '../common';
 
 interface ModelSelectorProps {
   ai: CletusAI;
@@ -22,6 +23,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   onSelect,
   onCancel,
 }) => {
+  const altKeyLabel = getAltKeyLabel();
   const [mode, setMode] = useState<'weights' | 'models'>('models');
   const [weights, setWeights] = useState({
     cost: baseMetadata.weights?.cost ?? 0.4,
@@ -620,7 +622,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>ESC to go back | Alt+W weights | Alt+C cost/metrics | Alt+T tier/caps | Alt+S sort</Text>
+        <Text dimColor>ESC to go back | {altKeyLabel}+W weights | {altKeyLabel}+C cost/metrics | {altKeyLabel}+T tier/caps | {altKeyLabel}+S sort</Text>
       </Box>
     </Box>
   );
