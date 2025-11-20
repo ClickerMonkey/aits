@@ -1361,7 +1361,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             AWS Model Prefix
           </Text>
         </Box>
-        <Box marginBottom={1} flexDirection='column'>
+        <Box marginBottom={1} flexDirection="column">
           <Text dimColor>Set a prefix for cross-region inference</Text>
           <Text dimColor>Common prefixes: 'us.', 'eu.', or leave empty for none</Text>
         </Box>
@@ -1374,7 +1374,12 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             onSubmit={async () => {
               await config.save((data) => {
                 if (data.providers.aws) {
-                  data.providers.aws.modelPrefix = modelPrefixInput.trim() || undefined;
+                  const trimmedValue = modelPrefixInput.trim();
+                  if (trimmedValue) {
+                    data.providers.aws.modelPrefix = trimmedValue;
+                  } else {
+                    delete data.providers.aws.modelPrefix;
+                  }
                 }
               });
               const displayValue = modelPrefixInput.trim() || '(none)';
