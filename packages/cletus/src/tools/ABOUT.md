@@ -1,8 +1,4 @@
-import { z } from 'zod';
-import type { CletusAI } from '../ai';
-import { formatName } from '../common';
-
-const ABOUT_CONTENT = `# About Cletus
+# About Cletus
 
 **Cletus** is an interactive CLI assistant that demonstrates the powerful capabilities of the @aeye library. Built with TypeScript and React/Ink, Cletus provides a beautiful terminal user interface for interacting with AI-powered tools across multiple domains.
 
@@ -72,15 +68,15 @@ The project emphasizes:
 
 Install Cletus globally:
 
-\`\`\`bash
+```bash
 npm install -g @aeye/cletus
-\`\`\`
+```
 
 Then simply run:
 
-\`\`\`bash
+```bash
 cletus
-\`\`\`
+```
 
 On first launch, you'll be guided through an interactive setup to configure your AI providers and preferences.
 
@@ -112,74 +108,3 @@ _This section is reserved for additional information about Cletus, new features,
 ---
 
 **Made with ❤️ and TypeScript** | **MIT Licensed** | **Open Source**
-`;
-
-/**
- * Create utility tools for Cletus operations
- */
-export function createUtilityTools(ai: CletusAI) {
-  const getOperationOutput = ai.tool({
-    name: 'getOperationOutput',
-    description: 'Retrieves the full output of a truncated operation message',
-    instructions: `Use this when you see a message indicating that operation output was truncated.`,
-    schema: z.object({
-      id: z.number().describe('The message ID provided in the truncation notice'),
-      operation: z.number().describe('The operation index within the message provided in the truncation notice'),
-    }),
-    call: async ({ id: created, operation: operationIndex }, _, { chatData, chatStatus }) => {
-      // Verify chat is in context
-      if (!chatData) {
-        throw new Error('No active chat context available');
-      }
-      
-      // Find the message with matching created timestamp
-      const messages = chatData.getMessages();
-      const message = messages.find((m) => m.created === created);
-      
-      if (!message) {
-        throw new Error(`No message found with ID: ${created}`);
-      }
-      
-      // Get the operation at the given index
-      if (!message.operations || operationIndex >= message.operations.length) {
-        throw new Error(`No operation found at index ${operationIndex} for message ${created}`);
-      }
-      
-      const operation = message.operations[operationIndex];
-      
-      // Return the full operation message
-      if (!operation.message) {
-        throw new Error(`Operation at index ${operationIndex} has no message`);
-      }
-      
-      // Update status after operation completes
-      chatStatus(`Analyzing ${formatName(operation.type)} full results...`);
-      
-      return operation.message;
-    },
-  });
-
-  const about = ai.tool({
-    name: 'about',
-    description: 'Provides information about Cletus, the @aeye library, and the author',
-    instructions: `Use this tool when users ask about:
-- What Cletus is or can do
-- Information about the @aeye library
-- Who created Cletus
-- Project background and details
-- How to get started`,
-    schema: z.object({}),
-    call: async (_, __, { chatStatus }) => {
-      chatStatus('Retrieving about information...');
-      return ABOUT_CONTENT;
-    },
-  });
-
-  return [
-    getOperationOutput,
-    about,
-  ] as [
-    typeof getOperationOutput,
-    typeof about,
-  ];
-}
