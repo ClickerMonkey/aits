@@ -292,8 +292,6 @@ export const OperationKindSchema = z.enum([
   'web_search',
   'web_get_page',
   'web_api_call',
-  // utility
-  'about',
 ]);
 
 export const OperationSchema = z.object({
