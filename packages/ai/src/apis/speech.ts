@@ -106,7 +106,7 @@ export class SpeechAPI<T extends AIBaseTypes> extends BaseAPI<
     return [response];
   }
 
-  protected chunksToResponse(chunks: SpeechResponse[], model: string): SpeechResponse {
+  protected chunksToResponse(chunks: SpeechResponse[], model: SelectedModelFor<T>): SpeechResponse {
     return chunks[0];
   }
 

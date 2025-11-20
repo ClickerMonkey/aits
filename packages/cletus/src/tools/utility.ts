@@ -7,6 +7,7 @@ import ABOUT_CONTENT from './ABOUT.md';
  * Create utility tools for Cletus operations
  */
 export function createUtilityTools(ai: CletusAI) {
+  
   const getOperationOutput = ai.tool({
     name: 'getOperationOutput',
     description: 'Retrieves the full output of a truncated operation message',

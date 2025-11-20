@@ -7,5 +7,5 @@
  * To regenerate, run: npm run scrape
  */
 
-export { models, openaiModels, openrouterModels, replicateModels } from './models';
+export { models, openaiModels, openrouterModels, replicateModels, awsModels } from './models';
 export { transformers } from './transformers';

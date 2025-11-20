@@ -101,6 +101,16 @@ export function createCletusAI(configFile: ConfigFile) {
     // AWS Bedrock
     ...(config.providers.aws ? { aws: new AWSBedrockProvider({
       ...config.providers.aws,
+      hooks: {
+        chat: {
+          beforeRequest: (request, params, ctx) => {
+            logger.log(`AWS Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
+          },
+          afterRequest: (request, response, responseComplete, ctx) => {
+            logger.log(`AWS Chat afterRequest:\n${JSON.stringify(response, null, 2)}\n\n${JSON.stringify(responseComplete, null, 2)}`);
+          },
+        }
+      }
     })} : {}),
   } as const;
 

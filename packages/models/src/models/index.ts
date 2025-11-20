@@ -11,11 +11,13 @@ import type { ModelInfo } from '@aeye/ai';
 import { openaiModels } from './openai';
 import { openrouterModels } from './openrouter';
 import { replicateModels } from './replicate';
+import { awsModels } from './aws';
 
-export { openaiModels, openrouterModels, replicateModels };
+export { openaiModels, openrouterModels, replicateModels, awsModels };
 
 export const models: ModelInfo[] = [
   ...openaiModels,
   ...openrouterModels,
   ...replicateModels,
+  ...awsModels,
 ];

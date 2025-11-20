@@ -155,7 +155,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
       const agentInstructions = !tools?.length
         ? `The ${agent} agent could not find any appropriate tools to handle the request. You should try a different agent or provide more details in the request and try again.`
         : effectiveOps.automatedOperations(operationProgress)
-          ? `The ${agent} agent was able to complete all operations without user approval. The agent loop will continue - DO NOT RESPOND to the user yet. No questions. You will enter an automated loop until interrupted.`
+          ? `The ${agent} agent was able to complete all operations without user approval. The agent loop will continue - DO NOT RESPOND to the user yet. No questions. You will enter an automated loop until interrupted. Do not comment about the automated loop. If you want you can make a brief comment on the results so far.`
           : effectiveOps.needsUserInput(operationProgress)
             ? `The ${agent} is handing operations off to the user for approval before proceeding. Present the operations clearly for approval - be concise but don't leave out any important details. DO NOT ask questions, the user will automatically be prompted for permission.`
             : `The ${agent} agent is in a state where it needs user input before proceeding. Wait for the user to respond. Ask questions that are needed to get tool calls correct.`;

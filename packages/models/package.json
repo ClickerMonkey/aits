@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "@aeye/ai": "^0.1.0",
-    "@aeye/openrouter": "^0.1.0"
+    "@aeye/openrouter": "^0.1.0",
+    "@aeye/aws": "^0.1.0"
   },
   "devDependencies": {
     "@aws-sdk/client-bedrock": "^3.709.0",

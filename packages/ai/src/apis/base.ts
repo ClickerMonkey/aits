@@ -256,7 +256,7 @@ export abstract class BaseAPI<
         const cost = this.calculateStreamCost(accumulatedUsage, finalSelected);
 
         // Build response from chunks
-        const response = this.chunksToResponse(chunks, finalSelected.model.id);
+        const response = this.chunksToResponse(chunks, finalSelected);
 
         // Run afterRequest hook
         await hooks.afterRequest?.(fullCtx, request, response, finished, finalSelected, accumulatedUsage, cost);
@@ -338,13 +338,13 @@ export abstract class BaseAPI<
    * Convert a response to a single chunk (for executor-to-streamer fallback)
    * @param response - The response to convert
    */
-  protected abstract responseToChunks(response: TResponse): TChunk[];
+  protected abstract responseToChunks(response: TResponse, model: SelectedModelFor<T>): TChunk[];
 
   /**
    * Convert accumulated chunks to a response (for streamer-to-executor fallback)
    * @param chunks - Array of chunks to convert
    */
-  protected abstract chunksToResponse(chunks: TChunk[], model: string): TResponse;
+  protected abstract chunksToResponse(chunks: TChunk[], model: SelectedModelFor<T>): TResponse;
 
   /**
    * Check if the provider supports non-streaming execution for this operation
@@ -506,7 +506,7 @@ export abstract class BaseAPI<
       for await (const chunk of streamerMethod(request, ctx)) {
         chunks.push(chunk);
       }
-      return this.chunksToResponse(chunks, selected.model.id);
+      return this.chunksToResponse(chunks, selected);
     }
 
     // Try provider streamer as fallback
@@ -515,7 +515,7 @@ export abstract class BaseAPI<
       for await (const chunk of this.executeStreamRequest(request, selected, ctx)) {
         chunks.push(chunk);
       }
-      return this.chunksToResponse(chunks, selected.model.id);
+      return this.chunksToResponse(chunks, selected);
     }
 
     throw new Error(
@@ -539,21 +539,19 @@ export abstract class BaseAPI<
     // Try handler first
     const handlerMethod = this.getHandlerStreamMethod(handler);
     if (handlerMethod) {
-      yield* handlerMethod(request, ctx);
-      return;
+      return yield* handlerMethod(request, ctx);
     }
 
     // Try provider streamer
     if (this.hasProviderStreamer(selected)) {
-      yield* this.executeStreamRequest(request, selected, ctx);
-      return;
+      return yield* this.executeStreamRequest(request, selected, ctx);
     }
 
     // Fallback: try converting executor to streamer
     const getMethod = this.getHandlerGetMethod(handler);
     if (getMethod) {
       const response = await getMethod(request, ctx);
-      for (const chunk of this.responseToChunks(response)) {
+      for (const chunk of this.responseToChunks(response, selected)) {
         yield chunk;
       }
       return;
@@ -562,7 +560,7 @@ export abstract class BaseAPI<
     // Try provider executor as fallback
     if (this.hasProviderExecutor(selected)) {
       const response = await this.executeRequest(request, selected, ctx);
-      for (const chunk of this.responseToChunks(response)) {
+      for (const chunk of this.responseToChunks(response, selected)) {
         yield chunk;
       }
       return;

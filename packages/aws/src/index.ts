@@ -6,6 +6,7 @@
  */
 
 export { AWSBedrockProvider, type AWSBedrockConfig } from './aws';
+export * from './common'
 export {
   AWSError,
   AWSAuthError,

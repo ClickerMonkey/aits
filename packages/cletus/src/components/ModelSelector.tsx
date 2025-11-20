@@ -1,8 +1,8 @@
-import { Box, Text, useInput, measureElement } from 'ink';
-import TextInput from 'ink-text-input';
-import React, { useState, useEffect, useRef } from 'react';
-import type { CletusAI } from '../ai';
 import type { AIBaseMetadata, ModelInfo, ScoredModel } from '@aeye/ai';
+import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
+import React, { useEffect, useState } from 'react';
+import type { CletusAI } from '../ai';
 
 interface ModelSelectorProps {
   ai: CletusAI;

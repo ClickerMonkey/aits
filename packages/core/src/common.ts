@@ -382,11 +382,11 @@ export function getModel(input: ModelInput | undefined): Model | undefined {
  * @param chunks - The array of Chunk objects to convert.
  * @returns The aggregated Response object.
  */
-export function getResponseFromChunks(chunks: Chunk[]): Response {
+export function getResponseFromChunks(chunks: Chunk[], model: ModelInput = 'unknown'): Response {
   const resp: Response = { 
     content: '',
     finishReason: 'stop', 
-    model: 'unknown',
+    model,
   };
   for (const chunk of chunks) {
     if (chunk.content) {

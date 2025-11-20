@@ -15,11 +15,11 @@ import type {
   ModelInfo,
   Provider
 } from '@aeye/ai';
-import { detectTier } from '@aeye/ai';
 import {
   Chunk,
   Executor,
   FinishReason,
+  getModel,
   ModelInput,
   Request,
   Response,
@@ -27,18 +27,22 @@ import {
   toJSONSchema,
   ToolCall,
 } from '@aeye/core';
-import { getModel } from '@aeye/core';
+import type { Anthropic } from '@anthropic-ai/sdk';
 import {
   BedrockClient,
-  ListFoundationModelsCommand,
-  type FoundationModelSummary,
+  BedrockClientConfig,
+  ListFoundationModelsCommand
 } from '@aws-sdk/client-bedrock';
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
   InvokeModelWithResponseStreamCommand
 } from '@aws-sdk/client-bedrock-runtime';
+import { isModelInfo } from 'packages/ai/src/common';
+import { convertAWSModel, detectAWSFamily } from './common';
 import { AWSAuthError, AWSContextWindowError, AWSError, AWSQuotaError, AWSRateLimitError, type ModelFamilyConfig } from './types';
+import { get } from 'http';
+import { Base64ImageSource, URLImageSource } from '@anthropic-ai/sdk/resources/messages.mjs';
 
 // ============================================================================
 // AWS Bedrock Provider Configuration
@@ -130,8 +134,8 @@ export interface AWSBedrockConfig {
   region?: string;
   // Optional explicit credentials (if not using default credential chain)
   credentials?: {
-    accessKeyId: string;
-    secretAccessKey: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
     sessionToken?: string;
   };
   // Model family configurations
@@ -142,9 +146,23 @@ export interface AWSBedrockConfig {
     imageGenerate?: ModelInput;
     embedding?: ModelInput;
   };
+  // Anthropic-specific configuration
+  anthropic?: {
+    version?: string;
+    beta?: AnthropicBeta[];
+    emptyMessage?: Anthropic.MessageParam;
+  },
   // Hooks for intercepting requests and responses
   hooks?: AWSBedrockHooks;
 }
+
+
+// Helper types
+type AnthropicBeta = 'computer-use-2025-01-24' | 'token-efficient-tools-2025-02-19' | 'Interleaved-thinking-2025-05-14' | 'output-128k-2025-02-19' | 'dev-full-thinking-2025-05-14' | 'context-1m-2025-08-07' | 'context-management-2025-06-27';
+type AnthropicRequest = Omit<Anthropic.MessageCreateParams, 'model' | 'stream'> & {
+  anthropic_version: string;
+  anthropic_beta?: AnthropicBeta[];
+};
 
 // ============================================================================
 // AWS Bedrock Provider Class
@@ -192,88 +210,30 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   constructor(config: AWSBedrockConfig) {
     this.config = config;
     
-    const clientConfig = {
-      region: config.region || process.env.AWS_REGION || 'us-east-1',
-      credentials: config.credentials,
-    };
+    const clientConfig = AWSBedrockProvider.convertConfig(config);
 
     this.bedrockClient = new BedrockClient(clientConfig);
     this.bedrockRuntimeClient = new BedrockRuntimeClient(clientConfig);
   }
 
-  // ============================================================================
-  // Model Information & Detection
-  // ============================================================================
-
   /**
-   * Detect model family from model ID
+   * Convert AWSBedrockConfig to BedrockClientConfig
+   * 
+   * @param config 
+   * @returns 
    */
-  private detectModelFamily(modelId: string): string {
-    if (modelId.startsWith('anthropic.')) return 'anthropic';
-    if (modelId.startsWith('amazon.')) return 'amazon';
-    if (modelId.startsWith('meta.')) return 'meta';
-    if (modelId.startsWith('mistral.')) return 'mistral';
-    if (modelId.startsWith('cohere.')) return 'cohere';
-    if (modelId.startsWith('ai21.')) return 'ai21';
-    if (modelId.startsWith('stability.')) return 'stability';
-    return 'unknown';
-  }
-
-  /**
-   * Convert AWS Bedrock model to @aeye ModelInfo format
-   */
-  private convertModel(model: FoundationModelSummary): ModelInfo {
-    const modelId = model.modelId || '';
-    const family = this.detectModelFamily(modelId);
-    const tier = detectTier(modelId);
-
-    // Detect capabilities based on model family and ID
-    const capabilities = new Set<'chat' | 'tools' | 'vision' | 'json' | 'structured' | 'streaming' | 'reasoning' | 'image' | 'audio' | 'hearing' | 'embedding' | 'zdr'>();
-    
-    // Chat models
-    if (family === 'anthropic' || family === 'meta' || family === 'mistral' || family === 'cohere' || family === 'ai21') {
-      capabilities.add('chat');
-      capabilities.add('streaming');
-    }
-    
-    // Vision support (Claude 3 models)
-    if (modelId.includes('claude-3') || modelId.includes('claude-3-5')) {
-      capabilities.add('vision');
-    }
-    
-    // Tools support
-    if (family === 'anthropic' && (modelId.includes('claude-3') || modelId.includes('claude-3-5'))) {
-      capabilities.add('tools');
-    }
-    
-    // Image generation
-    if (family === 'stability') {
-      capabilities.add('image');
-    }
-    
-    // Embeddings
-    if (family === 'amazon' && modelId.includes('embed')) {
-      capabilities.add('embedding');
-    }
-
-    return {
-      provider: this.name,
-      id: modelId,
-      name: model.modelName || modelId,
-      capabilities,
-      tier,
-      pricing: {},
-      contextWindow: 0, // Will need to be populated from external sources
-      maxOutputTokens: undefined,
-      metadata: {
-        modelArn: model.modelArn,
-        responseStreamingSupported: model.responseStreamingSupported,
-        customizationsSupported: model.customizationsSupported,
-        inferenceTypesSupported: model.inferenceTypesSupported,
-        inputModalities: model.inputModalities,
-        outputModalities: model.outputModalities,
-      },
+  private static convertConfig(config: AWSBedrockConfig): BedrockClientConfig {
+    const clientConfig: BedrockClientConfig = {
+      region: config.region || process.env.AWS_REGION || 'us-east-1',
     };
+    if (config.credentials && config.credentials.accessKeyId && config.credentials.secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId: config.credentials.accessKeyId,
+        secretAccessKey: config.credentials.secretAccessKey,
+        sessionToken: config.credentials.sessionToken,
+      };
+    }
+    return clientConfig;
   }
 
   // ============================================================================
@@ -285,8 +245,11 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
    */
   async listModels(config?: AWSBedrockConfig): Promise<ModelInfo[]> {
     try {
+      const client = config && JSON.stringify(config) !== JSON.stringify(this.config)
+        ? new BedrockClient(AWSBedrockProvider.convertConfig(config)) 
+        : this.bedrockClient;
       const command = new ListFoundationModelsCommand({});
-      const response = await this.bedrockClient.send(command);
+      const response = await client.send(command);
       
       if (!response.modelSummaries) {
         return [];
@@ -294,7 +257,8 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
       return response.modelSummaries
         .filter(m => m.modelId) // Filter out models without IDs
-        .map(m => this.convertModel(m));
+        .map(m => convertAWSModel(m))
+        .filter(m => !!m);
     } catch (error) {
       throw new AWSError('Failed to list models', error as Error);
     }
@@ -304,9 +268,14 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
    * Check if AWS Bedrock is accessible
    */
   async checkHealth(config?: AWSBedrockConfig): Promise<boolean> {
+    
     try {
+      const client = config && JSON.stringify(config) !== JSON.stringify(this.config)
+        ? new BedrockClient(AWSBedrockProvider.convertConfig(config)) 
+        : this.bedrockClient;
+
       const command = new ListFoundationModelsCommand({});
-      await this.bedrockClient.send(command);
+      await client.send(command);
       return true;
     } catch {
       return false;
@@ -318,22 +287,24 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
    */
   createExecutor(config?: AWSBedrockConfig): Executor<AIContextAny, AIMetadataAny> {
     const effectiveConfig = { ...this.config, ...config };
+    const self = this;
 
     return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny): Promise<Response> => {
-      const model = getModel(request.model || ctx.metadata?.model || metadata?.model || effectiveConfig.defaultModels?.chat);
-      if (!model) {
+      const modelInput = request.model || ctx.metadata?.model || metadata?.model || effectiveConfig.defaultModels?.chat
+      if (!modelInput) {
         throw new AWSError('Model is required for AWS Bedrock requests');
       }
-
-      const family = this.detectModelFamily(model.id);
+      
+      const model = getModel(modelInput);
+      const family = detectAWSFamily(model.id);
       
       // Route to appropriate model handler
       if (family === 'anthropic') {
-        return this.executeAnthropicModel(model.id, request, ctx);
+        return self.executeAnthropicModel(modelInput, request, ctx);
       } else if (family === 'meta' || family === 'mistral') {
-        return this.executeLlamaStyleModel(model.id, request, ctx);
+        return self.executeLlamaStyleModel(model.id, request, ctx);
       } else if (family === 'cohere') {
-        return this.executeCohereModel(model.id, request, ctx);
+        return self.executeCohereModel(model.id, request, ctx);
       } else {
         throw new AWSError(`Unsupported model family: ${family}`);
       }
@@ -345,6 +316,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
    */
   createStreamer(config?: AWSBedrockConfig): Streamer<AIContextAny, AIMetadataAny> {
     const effectiveConfig = { ...this.config, ...config };
+    const self = this;
 
     return async function* (
       this: AWSBedrockProvider,
@@ -357,15 +329,15 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
         throw new AWSError('Model is required for AWS Bedrock requests');
       }
 
-      const family = this.detectModelFamily(model.id);
+      const family = detectAWSFamily(model.id);
       
       // Route to appropriate model handler
       if (family === 'anthropic') {
-        yield* this.streamAnthropicModel(model.id, request, ctx);
+        return yield* self.streamAnthropicModel(model.id, request, ctx);
       } else if (family === 'meta' || family === 'mistral') {
-        yield* this.streamLlamaStyleModel(model.id, request, ctx);
+        return yield* self.streamLlamaStyleModel(model.id, request, ctx);
       } else if (family === 'cohere') {
-        yield* this.streamCohereModel(model.id, request, ctx);
+        return yield* self.streamCohereModel(model.id, request, ctx);
       } else {
         throw new AWSError(`Unsupported model family for streaming: ${family}`);
       }
@@ -379,20 +351,20 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
   /**
    * Convert tools to Anthropic format
    */
-  private convertToolsToAnthropic(request: Request): any[] | undefined {
+  private convertToolsToAnthropic(request: Request): Anthropic.Tool[] | undefined {
     if (!request.tools || request.tools.length === 0) return undefined;
 
     return request.tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: toJSONSchema(tool.parameters, tool.strict ?? true),
+      input_schema: toJSONSchema(tool.parameters, tool.strict ?? true) as Anthropic.Tool.InputSchema,
     }));
   }
 
   /**
    * Convert tool choice to Anthropic format
    */
-  private convertToolChoiceToAnthropic(request: Request): any | undefined {
+  private convertToolChoiceToAnthropic(request: Request): Anthropic.ToolChoice | undefined {
     if (!request.toolChoice) return undefined;
 
     if (request.toolChoice === 'auto') return { type: 'auto' };
@@ -405,44 +377,42 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
     return undefined;
   }
 
-  private async executeAnthropicModel(modelId: string, request: Request, ctx: AIContextAny): Promise<Response> {
-    // Convert messages to Anthropic format
+  private convertRequestToAnthropic(model: ModelInput, request: Request): AnthropicRequest {
     const messages = this.convertMessagesToAnthropic(request);
-    
-    // Join all system messages
-    const systemMessages = request.messages.filter(m => m.role === 'system');
-    const system = systemMessages.length > 0
-      ? systemMessages.map(m => typeof m.content === 'string' ? m.content : '').join('\n\n')
-      : undefined;
-
-    // Convert tools
     const tools = this.convertToolsToAnthropic(request);
     const tool_choice = tools ? this.convertToolChoiceToAnthropic(request) : undefined;
+    const systemMessages = request.messages.filter(m => m.role === 'system');
+    const system = systemMessages.length > 0
+      ? systemMessages.map((m): Anthropic.TextBlockParam => ({
+          type: 'text', 
+          text: typeof m.content === 'string' ? m.content : m.content.map(m => m.content).join('\n'),
+        }))
+      : undefined;
 
-    interface AnthropicRequestBody {
-      anthropic_version: string;
-      max_tokens: number;
-      messages: any[];
-      system?: string;
-      temperature?: number;
-      top_p?: number;
-      stop_sequences?: string | string[];
-      tools?: any[];
-      tool_choice?: any;
-    }
+    const modelMax = isModelInfo(model) ? model.maxOutputTokens : undefined;
 
-    const body: AnthropicRequestBody = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: request.maxTokens || 4096,
+    return {
+      anthropic_version: this.config.anthropic?.version ?? 'bedrock-2023-05-31',
+      anthropic_beta: this.config.anthropic?.beta,
+      max_tokens: modelMax || 4096,
       messages,
       system,
       temperature: request.temperature,
       top_p: request.topP,
-      stop_sequences: request.stop,
+      stop_sequences: request.stop ? Array.isArray(request.stop) ? request.stop : [request.stop] : undefined,
       tools,
       tool_choice,
+      metadata: {
+        user_id: request.userKey || undefined,
+      },
+      ...request.extra,
     };
+  }
 
+  private async executeAnthropicModel(model: ModelInput, request: Request, ctx: AIContextAny): Promise<Response> {
+    const body = this.convertRequestToAnthropic(model, request);
+    const modelId = getModel(model)?.id || '';
+    
     try {
       const command = new InvokeModelCommand({
         modelId,
@@ -455,13 +425,14 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       await this.config.hooks?.chat?.beforeRequest?.(request, command, ctx);
 
       const response = await this.bedrockRuntimeClient.send(command);
-      const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+      const responseBody: Anthropic.Message = JSON.parse(new TextDecoder().decode(response.body));
 
       // Extract text content and tool calls
       let content = '';
+      let reasoning = undefined as string | undefined;
       const toolCalls: ToolCall[] = [];
 
-      if (responseBody.content && Array.isArray(responseBody.content)) {
+      if (responseBody.content) {
         for (const block of responseBody.content) {
           if (block.type === 'text') {
             content += block.text;
@@ -471,15 +442,18 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
               name: block.name,
               arguments: JSON.stringify(block.input),
             });
+          } else if (block.type === 'thinking') {
+            reasoning = (reasoning || '') + block.thinking;
           }
         }
       }
 
       const result: Response = {
         content,
+        reasoning,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason: this.mapAnthropicStopReason(responseBody.stop_reason),
-        model: { id: modelId },
+        model,
         usage: {
           text: {
             input: responseBody.usage?.input_tokens ?? -1,
@@ -498,43 +472,10 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
     }
   }
 
-  private async* streamAnthropicModel(modelId: string, request: Request, ctx: AIContextAny): AsyncGenerator<Chunk> {
-    const messages = this.convertMessagesToAnthropic(request);
+  private async* streamAnthropicModel(model: ModelInput, request: Request, ctx: AIContextAny): AsyncGenerator<Chunk> {
+    const body = this.convertRequestToAnthropic(model, request);
+    const modelId = getModel(model)?.id || '';
     
-    // Join all system messages
-    const systemMessages = request.messages.filter(m => m.role === 'system');
-    const system = systemMessages.length > 0
-      ? systemMessages.map(m => typeof m.content === 'string' ? m.content : '').join('\n\n')
-      : undefined;
-
-    // Convert tools
-    const tools = this.convertToolsToAnthropic(request);
-    const tool_choice = tools ? this.convertToolChoiceToAnthropic(request) : undefined;
-
-    interface AnthropicRequestBody {
-      anthropic_version: string;
-      max_tokens: number;
-      messages: any[];
-      system?: string;
-      temperature?: number;
-      top_p?: number;
-      stop_sequences?: string | string[];
-      tools?: any[];
-      tool_choice?: any;
-    }
-
-    const body: AnthropicRequestBody = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: request.maxTokens || 4096,
-      messages,
-      system,
-      temperature: request.temperature,
-      top_p: request.topP,
-      stop_sequences: request.stop,
-      tools,
-      tool_choice,
-    };
-
     try {
       const command = new InvokeModelWithResponseStreamCommand({
         modelId,
@@ -555,130 +496,155 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       let inputTokens = 0;
       let outputTokens = 0;
       let accumulatedContent = '';
+      let accumulatedReasoning = '';
       let finishReason: any = undefined;
       
       // Track tool calls similar to OpenAI implementation
       type ToolCallItem = { id: string; name: string; arguments: string; named: boolean; finished: boolean };
       const toolCallsMap = new Map<number, ToolCallItem>();
-
-      for await (const event of response.body) {
-        if (event.chunk) {
-          const chunk = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
-          
-          if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
-            accumulatedContent += chunk.delta.text;
-            yield {
-              content: chunk.delta.text,
-              finishReason: undefined,
-            };
-          } else if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'tool_use') {
-            // Start of a tool use block
-            const index = chunk.index;
-            const toolCall: ToolCallItem = {
-              id: chunk.content_block.id,
-              name: chunk.content_block.name,
-              arguments: '',
-              named: true,
-              finished: false,
-            };
-            toolCallsMap.set(index, toolCall);
+      
+      try {
+        for await (const event of response.body) {
+          if (event.chunk) {
+            const chunk: Anthropic.MessageStreamEvent = JSON.parse(new TextDecoder().decode(event.chunk.bytes));
             
-            // Yield toolCallNamed event
-            yield {
-              toolCallNamed: {
-                id: toolCall.id,
-                name: toolCall.name,
-                arguments: toolCall.arguments,
-              },
-            };
-          } else if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'input_json_delta') {
-            // Tool input accumulation
-            const index = chunk.index;
-            const toolCall = toolCallsMap.get(index);
-            if (toolCall) {
-              toolCall.arguments += chunk.delta.partial_json;
+            if (chunk.type === 'content_block_delta' && chunk.delta) {
+              switch (chunk.delta.type) {
+              case 'text_delta':
+                accumulatedContent += chunk.delta.text;
+                yield {
+                  content: chunk.delta.text,
+                  finishReason: undefined,
+                };
+                break;
+              case 'thinking_delta':
+                accumulatedReasoning += chunk.delta.thinking;
+                yield {
+                  reasoning: chunk.delta.thinking,
+                };
+                break;
+              case 'input_json_delta':
+                // Tool input accumulation
+                const index = chunk.index;
+                const toolCall = toolCallsMap.get(index);
+                if (toolCall && chunk.delta.partial_json) {
+                  if (toolCall.arguments === '{}') {
+                    toolCall.arguments = '';
+                  }
+                  toolCall.arguments += chunk.delta.partial_json;
+                  
+                  // Yield toolCallArguments event
+                  yield {
+                    toolCallArguments: {
+                      id: toolCall.id,
+                      name: toolCall.name,
+                      arguments: toolCall.arguments,
+                    },
+                  };
+                }
+                break;
+              }
+            } else if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'tool_use') {
+              // Start of a tool use block
+              const index = chunk.index;
+              const toolCall: ToolCallItem = {
+                id: chunk.content_block.id,
+                name: chunk.content_block.name,
+                arguments: chunk.content_block.input ? JSON.stringify(chunk.content_block.input) : '',
+                named: true,
+                finished: false,
+              };
+              toolCallsMap.set(index, toolCall);
               
-              // Yield toolCallArguments event
+              // Yield toolCallNamed event
               yield {
-                toolCallArguments: {
+                toolCallNamed: {
                   id: toolCall.id,
                   name: toolCall.name,
                   arguments: toolCall.arguments,
                 },
               };
-            }
-          } else if (chunk.type === 'content_block_stop') {
-            // Tool use block completed
-            const index = chunk.index;
-            const toolCall = toolCallsMap.get(index);
-            if (toolCall && !toolCall.finished) {
-              toolCall.finished = true;
-              
-              // Yield toolCall event
-              yield {
-                toolCall: {
-                  id: toolCall.id,
-                  name: toolCall.name,
-                  arguments: toolCall.arguments,
-                },
-              };
-            }
-          } else if (chunk.type === 'message_start' && chunk.message?.usage) {
-            inputTokens = chunk.message.usage.input_tokens || 0;
-          } else if (chunk.type === 'message_delta') {
-            if (chunk.delta?.stop_reason) {
-              finishReason = this.mapAnthropicStopReason(chunk.delta.stop_reason);
-              outputTokens = chunk.usage?.output_tokens || 0;
-              yield {
-                content: undefined,
-                finishReason,
-                usage: {
-                  text: {
-                    input: inputTokens,
-                    output: outputTokens,
+            } else if (chunk.type === 'content_block_stop') {
+              // Tool use block completed
+              const index = chunk.index;
+              const toolCall = toolCallsMap.get(index);
+              if (toolCall && !toolCall.finished) {
+                toolCall.finished = true;
+                
+                // Yield toolCall event
+                yield {
+                  toolCall: {
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    arguments: toolCall.arguments,
                   },
-                },
-              };
+                };
+              }
+            } else if (chunk.type === 'message_start' && chunk.message?.usage) {
+              inputTokens = chunk.message.usage.input_tokens || 0;
+            } else if (chunk.type === 'message_delta') {
+              if (chunk.delta?.stop_reason) {
+                finishReason = this.mapAnthropicStopReason(chunk.delta.stop_reason);
+                
+                yield {
+                  finishReason,
+                  usage: {
+                    text: {
+                      input: chunk.usage.input_tokens || inputTokens || undefined,
+                      output: chunk.usage.output_tokens || undefined,
+                      cached: chunk.usage.cache_read_input_tokens || undefined,
+                    },
+                  },
+                };
+              }
             }
           }
         }
-      }
+      } finally {
+        // Call post-request hook with accumulated response
+        const toolCalls = Array.from(toolCallsMap.values()).map(tc => ({
+          id: tc.id,
+          name: tc.name,
+          arguments: tc.arguments,
+        }));
 
-      // Call post-request hook with accumulated response
-      const toolCalls = Array.from(toolCallsMap.values()).map(tc => ({
-        id: tc.id,
-        name: tc.name,
-        arguments: tc.arguments,
-      }));
-
-      const accumulatedResponse = {
-        content: accumulatedContent,
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-        finishReason,
-        model: { id: modelId },
-        usage: {
-          text: {
-            input: inputTokens,
-            output: outputTokens,
+        const accumulatedResponse: Response = {
+          content: accumulatedContent,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          finishReason,
+          model,
+          usage: {
+            text: {
+              input: inputTokens,
+              output: outputTokens,
+            },
           },
-        },
-      };
-      
-      await this.config.hooks?.chat?.afterRequest?.(request, command, accumulatedResponse, ctx);
+        };
+        
+        await this.config.hooks?.chat?.afterRequest?.(request, command, accumulatedResponse, ctx);
+      }
     } catch (error: any) {
       this.handleAWSError(error);
       throw error;
     }
   }
 
-  private convertMessagesToAnthropic(request: Request): any[] {
-    return request.messages
+  private convertMessagesToAnthropic(request: Request): Anthropic.MessageParam[] {
+    const toContent = (part: string | Anthropic.ContentBlockParam[]): Anthropic.ContentBlockParam[] => {
+      if (typeof part === 'string') {
+        return [{ type: 'text', text: part }];
+      } else {
+        return part;
+      }
+    };
+
+    const messages = request.messages
       .filter(m => m.role !== 'system')
-      .map(msg => {
+      .map((msg): Anthropic.MessageParam => {
         if (msg.role === 'assistant') {
           // Handle assistant messages with tool calls
           if (msg.toolCalls && msg.toolCalls.length > 0) {
-            const content: any[] = [];
+            const content: Anthropic.ContentBlockParam[] = [];
             
             // Add text content if present
             if (msg.content && typeof msg.content === 'string' && msg.content.trim()) {
@@ -691,7 +657,13 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
                 type: 'tool_use',
                 id: toolCall.id,
                 name: toolCall.name,
-                input: JSON.parse(toolCall.arguments),
+                input: (() => {
+                  try {
+                    return JSON.parse(toolCall.arguments);
+                  } catch (e) {
+                    return { badArguments: toolCall.arguments };
+                  }
+                })(),
               });
             }
             
@@ -703,7 +675,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
           
           return {
             role: 'assistant',
-            content: typeof msg.content === 'string' ? msg.content : '',
+            content: typeof msg.content === 'string' ? msg.content : msg.content.map(m => m.content).join('\n\n'),
           };
         } else if (msg.role === 'tool') {
           // Handle tool result messages
@@ -712,7 +684,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
             content: [
               {
                 type: 'tool_result',
-                tool_use_id: msg.toolCallId,
+                tool_use_id: msg.toolCallId!,
                 content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
               },
             ],
@@ -725,47 +697,111 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
               content: msg.content,
             };
           } else if (Array.isArray(msg.content)) {
-            const content = msg.content.map(part => {
+            const content = msg.content.map((part): Anthropic.ContentBlockParam => {
               if (part.type === 'text') {
                 return { type: 'text', text: String(part.content) };
               } else if (part.type === 'image') {
                 // Convert image to base64 if needed
-                let source: any;
+                let source: Base64ImageSource | URLImageSource | undefined;
                 if (typeof part.content === 'string') {
                   if (part.content.startsWith('data:')) {
                     const match = part.content.match(/^data:([^;]+);base64,(.+)$/);
                     if (match) {
                       source = {
                         type: 'base64',
-                        media_type: match[1],
+                        media_type: match[1] as Base64ImageSource['media_type'],
                         data: match[2],
                       };
+                    } else if (part.content.startsWith('http')) {
+                      source = {
+                        type: 'url',
+                        url: part.content,
+                      };
                     }
-                  } else if (part.content.startsWith('http')) {
+                  } else {
                     source = {
                       type: 'url',
                       url: part.content,
                     };
                   }
+                } else if (part.content instanceof URL) {
+                  source = {
+                    type: 'url',
+                    url: part.content.toString(),
+                  };
                 }
-                return { type: 'image', source };
+                if (source) {
+                  return { type: 'image', source };
+                }
               }
               return { type: 'text', text: '[Unsupported content type]' };
             });
+
             return {
               role: 'user',
               content,
             };
           }
         }
+
         return {
           role: 'user',
-          content: '',
+          content: '<unsupported role>',
         };
       });
+
+    // Filter out empty messages
+    const nonEmptyMessages = messages.filter(m => {
+      const contentArray = toContent(m.content);
+      return contentArray.some(c => c.type === 'text' ? c.text.trim().length > 0 : true);
+    });
+
+    // Join up consecutive messages with the same role
+    const joinedMessages: Anthropic.MessageParam[] = [];
+    let lastMessage: Anthropic.MessageParam | null = null;
+
+    for (const msg of nonEmptyMessages) {
+      if (lastMessage && lastMessage.role === msg.role) {
+        const lastContent = toContent(lastMessage.content);
+        const newContent = toContent(msg.content);
+        const allContent = lastContent.concat(newContent);
+
+        lastMessage.content = allContent;
+      } else {
+        if (lastMessage) {
+          joinedMessages.push(lastMessage);
+        }
+        lastMessage = msg;
+      }
+    }
+    if (lastMessage) {
+      joinedMessages.push(lastMessage);
+    }
+
+    // Simplify content if single text block
+    for (const msg of joinedMessages) {
+      const contentArray = toContent(msg.content);
+      if (contentArray.every(c => c.type === 'text')) {
+        msg.content = contentArray.map(c => c.text).join('\n\n');
+      }
+    }
+
+    if (joinedMessages.length === 0) {
+      if (this.config.anthropic?.emptyMessage) {
+        joinedMessages.push(this.config.anthropic.emptyMessage);
+      } else {
+        joinedMessages.push({
+          role: 'user',
+          content: 'Perform the requested operation.',
+        });
+      }
+    }
+
+    return joinedMessages;
   }
 
-  private mapAnthropicStopReason(reason: string): FinishReason {
+  private mapAnthropicStopReason(reason: Anthropic.StopReason | null): FinishReason {
+    if (!reason) return 'stop';
     switch (reason) {
       case 'end_turn':
         return 'stop';

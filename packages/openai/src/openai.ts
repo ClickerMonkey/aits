@@ -1231,110 +1231,113 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       let finalUsage: any = undefined;
       let finishReason: FinishReason | undefined = undefined;
       
-      for await (const chunk of stream) {
-        if (signal?.aborted) {
-          throw new Error('Request aborted');
-        }
+      try {
+        for await (const chunk of stream) {
+          if (signal?.aborted) {
+            throw new Error('Request aborted');
+          }
 
-        const choice = chunk?.choices[0];
-        const delta = choice?.delta;
-        
-        const yieldChunk: Chunk = {
-          content: delta?.content || undefined,
-          finishReason: choice?.finish_reason as FinishReason | undefined,
-          refusal: delta?.refusal ?? undefined,
-          usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
-        };
+          const choice = chunk?.choices[0];
+          const delta = choice?.delta;
+          
+          const yieldChunk: Chunk = {
+            content: delta?.content || undefined,
+            finishReason: choice?.finish_reason as FinishReason | undefined,
+            refusal: delta?.refusal ?? undefined,
+            usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
+          };
 
-        // Track accumulated content and final data
-        if (delta?.content) {
-          accumulatedContent += delta.content;
-        }
-        if (chunk.usage) {
-          finalUsage = convertOpenAIUsage(chunk.usage);
-        }
-        if (choice?.finish_reason) {
-          finishReason = choice.finish_reason as FinishReason;
-        }
+          // Track accumulated content and final data
+          if (delta?.content) {
+            accumulatedContent += delta.content;
+          }
+          if (chunk.usage) {
+            finalUsage = convertOpenAIUsage(chunk.usage);
+          }
+          if (choice?.finish_reason) {
+            finishReason = choice.finish_reason as FinishReason;
+          }
 
-        // Handle tool calls
-        for (const toolCall of toolCalls) {
-          toolCall.updated = false;
-        }
+          // Handle tool calls
+          for (const toolCall of toolCalls) {
+            toolCall.updated = false;
+          }
 
-        if (delta?.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const existing = toolCallsMap.get(tc.index);
-            const toolCall = existing || { id: '', name: '', arguments: '', named: false, finished: false, updated: true };
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const existing = toolCallsMap.get(tc.index);
+              const toolCall = existing || { id: '', name: '', arguments: '', named: false, finished: false, updated: true };
 
-            if (tc.id) {
-              toolCall.id = tc.id;
-              toolCall.updated = true;
-            }
-            if (tc.function?.name) {
-              toolCall.name = tc.function.name;
-              toolCall.updated = true;
-            }
-            if (tc.function?.arguments) {
-              toolCall.arguments += tc.function.arguments;
-              toolCall.updated = true;
-            }
-            if (!existing) {
-              toolCallsMap.set(tc.index, toolCall);
-              toolCalls.push(toolCall);
-            }
+              if (tc.id) {
+                toolCall.id = tc.id;
+                toolCall.updated = true;
+              }
+              if (tc.function?.name) {
+                toolCall.name = tc.function.name;
+                toolCall.updated = true;
+              }
+              if (tc.function?.arguments) {
+                toolCall.arguments += tc.function.arguments;
+                toolCall.updated = true;
+              }
+              if (!existing) {
+                toolCallsMap.set(tc.index, toolCall);
+                toolCalls.push(toolCall);
+              }
 
-            if (toolCall.arguments) {
-              if (!toolCall.named) {
-                yieldChunk.toolCallNamed = existing;
-                toolCall.named = true;
-              } else {
-                yieldChunk.toolCallArguments = existing;
+              if (toolCall.arguments) {
+                if (!toolCall.named) {
+                  yieldChunk.toolCallNamed = existing;
+                  toolCall.named = true;
+                } else {
+                  yieldChunk.toolCallArguments = existing;
+                }
               }
             }
           }
-        }
 
-        for (const toolCall of toolCalls) {
-          if (!toolCall.updated && !toolCall.finished) {
-            toolCall.finished = true;
-            yieldChunk.toolCall = toolCall;
+          for (const toolCall of toolCalls) {
+            if (!toolCall.updated && !toolCall.finished) {
+              toolCall.finished = true;
+              yieldChunk.toolCall = toolCall;
+            }
           }
-        }
 
-        // Augment chunk with provider-specific data
-        this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
-
-        // Send it!
-        yield yieldChunk;
-      }
-
-      // All tool calls should've been emitted, but just in case
-      for (const toolCall of toolCalls) {
-        if (!toolCall.finished) {
-          toolCall.finished = true;
-
-          const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = { choices: [], created: 0, id: '', model: '', object: 'chat.completion.chunk' };
-          const yieldChunk: Chunk = { toolCall };
-
-          // Augment chunk with provider-specific data  
+          // Augment chunk with provider-specific data
           this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
 
           // Send it!
-          yield { toolCall };
+          yield yieldChunk;
         }
-      }
+      } finally {
+        // All tool calls should've been emitted, but just in case
+        for (const toolCall of toolCalls) {
+          if (!toolCall.finished) {
+            toolCall.finished = true;
 
-      // Call post-request hook with accumulated response
-      if (effectiveConfig.hooks?.chat?.afterRequest) {
-        const finalResponse: Response = {
-          content: accumulatedContent,
-          toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
-          finishReason: finishReason || 'stop' as FinishReason,
-          model,
-          usage: finalUsage,
-        };
-        await effectiveConfig.hooks.chat.afterRequest(request, params, finalResponse, ctx, metadata);
+            const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = { choices: [], created: 0, id: '', model: '', object: 'chat.completion.chunk' };
+            const yieldChunk: Chunk = { toolCall };
+
+            // Augment chunk with provider-specific data  
+            this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
+
+            // Send it!
+            yield { toolCall };
+          }
+        }
+
+        // Call post-request hook with accumulated response
+        if (effectiveConfig.hooks?.chat?.afterRequest) {
+          const finalResponse: Response = {
+            content: accumulatedContent,
+            toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
+            finishReason: finishReason || 'stop' as FinishReason,
+            model,
+            usage: finalUsage,
+          };
+          
+          await effectiveConfig.hooks.chat.afterRequest(request, params, finalResponse, ctx, metadata);
+        }
       }
     }.bind(this);
   }

@@ -105,7 +105,7 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
       throw new Error(`Provider ${selected.model.provider} does not support streaming transcription`);
     }
 
-    yield* selected.provider.transcribeStream(
+    return yield* selected.provider.transcribeStream(
       request,
       ctx,
       selected.providerConfig
@@ -120,9 +120,9 @@ export class TranscribeAPI<T extends AIBaseTypes> extends BaseAPI<
     }];
   }
 
-  protected chunksToResponse(chunks: TranscriptionChunk[], givenModel: string): TranscriptionResponse {
+  protected chunksToResponse(chunks: TranscriptionChunk[], givenModel: SelectedModelFor<T>): TranscriptionResponse {
     let text = '';
-    let model: ModelInput = givenModel;
+    let model: ModelInput = givenModel.model;
     let usage: Usage | undefined;
 
     for (const chunk of chunks) {

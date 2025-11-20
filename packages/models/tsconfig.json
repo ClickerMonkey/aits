@@ -8,7 +8,8 @@
   "exclude": ["node_modules", "dist"],
   "references": [
     { "path": "../ai" },
+    { "path": "../core" },
     { "path": "../openrouter" },
-    { "path": "../core" }
+    { "path": "../aws" }
   ]
 }

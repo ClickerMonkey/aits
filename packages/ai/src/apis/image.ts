@@ -16,8 +16,8 @@ import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
   ModelCapability,
-  ModelParameter,
   ModelHandlerFor,
+  ModelParameter,
   Request,
   Response,
   SelectedModelFor,
@@ -121,7 +121,7 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     selected: SelectedModelFor<T>,
     ctx: AIContext<T>
   ): AsyncIterable<ImageGenerationChunk> {
-    yield* selected.provider.generateImageStream!(
+    return yield* selected.provider.generateImageStream!(
       request,
       ctx,
       selected.providerConfig
@@ -138,14 +138,14 @@ class ImageGenerateAPI<T extends AIBaseTypes> extends BaseAPI<
     }));
   }
 
-  protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
+  protected chunksToResponse(chunks: ImageGenerationChunk[], model: SelectedModelFor<T>): ImageGenerationResponse {
     const images = chunks
       .filter(c => c.image)
       .map(c => c.image!);
 
     return {
       images: images,
-      model: chunks.find(c => c.model)?.model || model,
+      model: chunks.find(c => c.model)?.model || model?.model,
       usage: chunks.find(c => c.usage)?.usage,
     };
   }
@@ -268,7 +268,7 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     selected: SelectedModelFor<T>,
     ctx: AIContext<T>
   ): AsyncIterable<ImageGenerationChunk> {
-    yield* selected.provider.editImageStream!(
+    return yield* selected.provider.editImageStream!(
       request,
       ctx,
       selected.providerConfig
@@ -285,14 +285,14 @@ class ImageEditAPI<T extends AIBaseTypes> extends BaseAPI<
     }));
   }
 
-  protected chunksToResponse(chunks: ImageGenerationChunk[], model: string): ImageGenerationResponse {
+  protected chunksToResponse(chunks: ImageGenerationChunk[], model: SelectedModelFor<T>): ImageGenerationResponse {
     const images = chunks
       .filter(c => c.image)
       .map(c => c.image!);
 
     return {
       images: images,
-      model: chunks.find(c => c.model)?.model || model,
+      model: chunks.find(c => c.model)?.model || model?.model,
       usage: chunks.find(c => c.usage)?.usage,
     };
   }
@@ -413,15 +413,15 @@ class ImageAnalyzeAPI<T extends AIBaseTypes = AIBaseTypes> extends BaseAPI<
   ): AsyncIterable<Chunk> {
     const chatRequest = this.convertToChatRequest(request);
     const streamer = selected.provider.createStreamer!(selected.providerConfig);
-    yield* streamer(chatRequest, ctx, ctx.metadata);
+    return yield* streamer(chatRequest, ctx, ctx.metadata);
   }
 
   protected responseToChunks(response: Response): Chunk[] {
     return getChunksFromResponse(response);
   }
 
-  protected chunksToResponse(chunks: Chunk[], model: string): Response {
-    return getResponseFromChunks(chunks);
+  protected chunksToResponse(chunks: Chunk[], model: SelectedModelFor<T>): Response {
+    return getResponseFromChunks(chunks, model?.model);
   }
 
   protected getHandlerGetMethod(

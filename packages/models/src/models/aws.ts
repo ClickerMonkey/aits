@@ -18,7 +18,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-fast-upscale-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-fast-upscale-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -37,12 +37,18 @@ export const awsModels: ModelInfo[] = [{
   id: 'anthropic.claude-sonnet-4-20250514-v1:0',
   provider: 'aws',
   name: 'Claude Sonnet 4',
-  contextWindow: 0,
+  contextWindow: 200000,
+  maxOutputTokens: 16384,
   tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
-  pricing: {},
+  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
+  pricing: {
+    text: {
+      input: 3,
+      output: 15
+    }
+  },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -61,12 +67,18 @@ export const awsModels: ModelInfo[] = [{
   id: 'anthropic.claude-haiku-4-5-20251001-v1:0',
   provider: 'aws',
   name: 'Claude Haiku 4.5',
-  contextWindow: 0,
+  contextWindow: 200000,
+  maxOutputTokens: 16384,
   tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
-  pricing: {},
+  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
+  pricing: {
+    text: {
+      input: 1,
+      output: 5
+    }
+  },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -90,7 +102,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-erase-object-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-erase-object-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -106,6 +118,29 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
+  id: 'qwen.qwen3-235b-a22b-2507-v1:0',
+  provider: 'aws',
+  name: 'Qwen3 235B A22B 2507',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set([]),
+  pricing: {},
+  metadata: {
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/qwen.qwen3-235b-a22b-2507-v1:0",
+    providerName: "Qwen",
+    responseStreamingSupported: true,
+    customizationsSupported: [],
+    inferenceTypesSupported: [
+      "ON_DEMAND"
+    ],
+    inputModalities: [
+      "TEXT"
+    ],
+    outputModalities: [
+      "TEXT"
+    ]
+  }
+}, {
   id: 'stability.stable-image-control-structure-v1:0',
   provider: 'aws',
   name: 'Stable Image Control Structure',
@@ -114,7 +149,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-control-structure-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-control-structure-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -138,7 +173,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-oss-120b-1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/openai.gpt-oss-120b-1:0",
     providerName: "OpenAI",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -153,42 +188,20 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'twelvelabs.marengo-embed-3-0-v1:0',
-  provider: 'aws',
-  name: 'Marengo Embed 3.0',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
-    providerName: "TwelveLabs",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "INFERENCE_PROFILE",
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "SPEECH",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
   id: 'anthropic.claude-sonnet-4-5-20250929-v1:0',
   provider: 'aws',
   name: 'Claude Sonnet 4.5',
   contextWindow: 0,
   tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
-  pricing: {},
+  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
+  pricing: {
+    text: {
+      input: 3,
+      output: 15
+    }
+  },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -204,32 +217,6 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'twelvelabs.marengo-embed-2-7-v1:0',
-  provider: 'aws',
-  name: 'Marengo Embed v2.7',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/twelvelabs.marengo-embed-2-7-v1:0",
-    providerName: "TwelveLabs",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "INFERENCE_PROFILE"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "SPEECH",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
   id: 'stability.stable-creative-upscale-v1:0',
   provider: 'aws',
   name: 'Stable Image Creative Upscale',
@@ -238,7 +225,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-creative-upscale-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-creative-upscale-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -254,32 +241,6 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'amazon.nova-2-multimodal-embeddings-v1:0',
-  provider: 'aws',
-  name: 'Amazon Nova Multimodal Embeddings',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "AUDIO",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
   id: 'stability.stable-outpaint-v1:0',
   provider: 'aws',
   name: 'Stable Image Outpaint',
@@ -288,7 +249,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-outpaint-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-outpaint-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -312,7 +273,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-inpaint-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-inpaint-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -331,12 +292,18 @@ export const awsModels: ModelInfo[] = [{
   id: 'anthropic.claude-opus-4-1-20250805-v1:0',
   provider: 'aws',
   name: 'Claude Opus 4.1',
-  contextWindow: 0,
+  contextWindow: 200000,
+  maxOutputTokens: 16384,
   tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
-  pricing: {},
+  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
+  pricing: {
+    text: {
+      input: 15,
+      output: 75
+    }
+  },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-4-1-20250805-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-opus-4-1-20250805-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -360,12 +327,11 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-pro-v1:0",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
@@ -386,7 +352,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-remove-background-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-remove-background-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -402,6 +368,29 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
+  id: 'qwen.qwen3-coder-480b-a35b-v1:0',
+  provider: 'aws',
+  name: 'Qwen3 Coder 480B A35B Instruct',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set([]),
+  pricing: {},
+  metadata: {
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/qwen.qwen3-coder-480b-a35b-v1:0",
+    providerName: "Qwen",
+    responseStreamingSupported: true,
+    customizationsSupported: [],
+    inferenceTypesSupported: [
+      "ON_DEMAND"
+    ],
+    inputModalities: [
+      "TEXT"
+    ],
+    outputModalities: [
+      "TEXT"
+    ]
+  }
+}, {
   id: 'stability.stable-image-style-guide-v1:0',
   provider: 'aws',
   name: 'Stable Image Style Guide',
@@ -410,7 +399,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-style-guide-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-style-guide-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -434,7 +423,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-control-sketch-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-control-sketch-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -458,7 +447,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-conservative-upscale-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-conservative-upscale-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -482,7 +471,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-search-recolor-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-search-recolor-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -506,7 +495,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/twelvelabs.pegasus-1-2-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/twelvelabs.pegasus-1-2-v1:0",
     providerName: "TwelveLabs",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -530,7 +519,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-style-transfer-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-style-transfer-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -554,12 +543,11 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['embedding']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.embed-v4:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/cohere.embed-v4:0",
     providerName: "Cohere",
     responseStreamingSupported: false,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
@@ -571,6 +559,29 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
+  id: 'deepseek.v3-v1:0',
+  provider: 'aws',
+  name: 'DeepSeek-V3.1',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set([]),
+  pricing: {},
+  metadata: {
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/deepseek.v3-v1:0",
+    providerName: "DeepSeek",
+    responseStreamingSupported: true,
+    customizationsSupported: [],
+    inferenceTypesSupported: [
+      "ON_DEMAND"
+    ],
+    inputModalities: [
+      "TEXT"
+    ],
+    outputModalities: [
+      "TEXT"
+    ]
+  }
+}, {
   id: 'stability.stable-image-search-replace-v1:0',
   provider: 'aws',
   name: 'Stable Image Search and Replace',
@@ -579,7 +590,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['image']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/stability.stable-image-search-replace-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/stability.stable-image-search-replace-v1:0",
     providerName: "Stability AI",
     responseStreamingSupported: false,
     customizationsSupported: [],
@@ -603,7 +614,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/qwen.qwen3-coder-30b-a3b-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/qwen.qwen3-coder-30b-a3b-v1:0",
     providerName: "Qwen",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -626,7 +637,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/qwen.qwen3-32b-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/qwen.qwen3-32b-v1:0",
     providerName: "Qwen",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -649,7 +660,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-oss-20b-1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/openai.gpt-oss-20b-1:0",
     providerName: "OpenAI",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -664,17 +675,17 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'amazon.titan-tg1-large',
+  id: 'amazon.titan-embed-text-v2:0',
   provider: 'aws',
-  name: 'Titan Text Large',
+  name: 'Titan Text Embeddings V2',
   contextWindow: 0,
   tier: 'efficient',
-  capabilities: new Set([]),
+  capabilities: new Set(['embedding']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-tg1-large",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.titan-embed-text-v2:0",
     providerName: "Amazon",
-    responseStreamingSupported: true,
+    responseStreamingSupported: false,
     customizationsSupported: [],
     inferenceTypesSupported: [
       "ON_DEMAND"
@@ -683,81 +694,7 @@ export const awsModels: ModelInfo[] = [{
       "TEXT"
     ],
     outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-image-generator-v1:0',
-  provider: 'aws',
-  name: 'Titan Image Generator G1',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v1:0",
-    providerName: "Amazon",
-    customizationsSupported: [
-      "FINE_TUNING"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "IMAGE"
-    ]
-  }
-}, {
-  id: 'amazon.titan-image-generator-v1',
-  provider: 'aws',
-  name: 'Titan Image Generator G1',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v1",
-    providerName: "Amazon",
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "IMAGE"
-    ]
-  }
-}, {
-  id: 'amazon.titan-image-generator-v2:0',
-  provider: 'aws',
-  name: 'Titan Image Generator G1 v2',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0",
-    providerName: "Amazon",
-    customizationsSupported: [
-      "FINE_TUNING"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED",
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "IMAGE"
+      "EMBEDDING"
     ]
   }
 }, {
@@ -769,7 +706,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-premier-v1:0:8k",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-premier-v1:0:8k",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -792,7 +729,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-premier-v1:0:20k",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-premier-v1:0:20k",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -815,7 +752,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-premier-v1:0:1000k",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-premier-v1:0:1000k",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -838,7 +775,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-premier-v1:0:mm",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-premier-v1:0:mm",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -861,118 +798,12 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-premier-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-premier-v1:0",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
       "INFERENCE_PROFILE"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-pro-v1:0:24k',
-  provider: 'aws',
-  name: 'Nova Pro',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['vision']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0:24k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-pro-v1:0:300k',
-  provider: 'aws',
-  name: 'Nova Pro',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['vision']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0:300k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [
-      "FINE_TUNING",
-      "DISTILLATION"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-lite-v1:0:24k',
-  provider: 'aws',
-  name: 'Nova Lite',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['vision']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0:24k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE",
-      "VIDEO"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-lite-v1:0:300k',
-  provider: 'aws',
-  name: 'Nova Lite',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['vision']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0:300k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [
-      "FINE_TUNING",
-      "DISTILLATION"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
     ],
     inputModalities: [
       "TEXT",
@@ -992,142 +823,17 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
       "TEXT",
       "IMAGE",
       "VIDEO"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-canvas-v1:0',
-  provider: 'aws',
-  name: 'Nova Canvas',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-canvas-v1:0",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [
-      "FINE_TUNING"
-    ],
-    inferenceTypesSupported: [
-      "ON_DEMAND",
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "IMAGE"
-    ]
-  }
-}, {
-  id: 'amazon.nova-reel-v1:0',
-  provider: 'aws',
-  name: 'Nova Reel',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-reel-v1:0",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "VIDEO"
-    ]
-  }
-}, {
-  id: 'amazon.nova-reel-v1:1',
-  provider: 'aws',
-  name: 'Nova Reel',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-reel-v1:1",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "VIDEO"
-    ]
-  }
-}, {
-  id: 'amazon.nova-micro-v1:0:24k',
-  provider: 'aws',
-  name: 'Nova Micro',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0:24k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.nova-micro-v1:0:128k',
-  provider: 'aws',
-  name: 'Nova Micro',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0:128k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [
-      "FINE_TUNING",
-      "DISTILLATION"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
     ],
     outputModalities: [
       "TEXT"
@@ -1142,12 +848,11 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-micro-v1:0",
     providerName: "Amazon",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
@@ -1158,514 +863,11 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'amazon.nova-sonic-v1:0',
+  id: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
   provider: 'aws',
-  name: 'Nova Sonic',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-sonic-v1:0",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "SPEECH"
-    ],
-    outputModalities: [
-      "SPEECH",
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-g1-text-02',
-  provider: 'aws',
-  name: 'Titan Text Embeddings v2',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-g1-text-02",
-    providerName: "Amazon",
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-text-lite-v1:0:4k',
-  provider: 'aws',
-  name: 'Titan Text G1 - Lite',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-lite-v1:0:4k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [
-      "FINE_TUNING",
-      "CONTINUED_PRE_TRAINING"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-text-lite-v1',
-  provider: 'aws',
-  name: 'Titan Text G1 - Lite',
-  contextWindow: 4096,
-  maxOutputTokens: 4096,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.15,
-      output: 0.2
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-lite-v1",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-text-express-v1:0:8k',
-  provider: 'aws',
-  name: 'Titan Text G1 - Express',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-express-v1:0:8k",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [
-      "FINE_TUNING",
-      "CONTINUED_PRE_TRAINING"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-text-express-v1',
-  provider: 'aws',
-  name: 'Titan Text G1 - Express',
-  contextWindow: 8192,
-  maxOutputTokens: 8192,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.2,
-      output: 0.6
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-express-v1",
-    providerName: "Amazon",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-text-v1:2:8k',
-  provider: 'aws',
-  name: 'Titan Embeddings G1 - Text',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1:2:8k",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-text-v1',
-  provider: 'aws',
-  name: 'Titan Embeddings G1 - Text',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-text-v2:0:8k',
-  provider: 'aws',
-  name: 'Titan Text Embeddings V2',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0:8k",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-text-v2:0',
-  provider: 'aws',
-  name: 'Titan Text Embeddings V2',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
-    providerName: "Amazon",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-image-v1:0',
-  provider: 'aws',
-  name: 'Titan Multimodal Embeddings G1',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-image-v1:0",
-    providerName: "Amazon",
-    customizationsSupported: [
-      "FINE_TUNING"
-    ],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'amazon.titan-embed-image-v1',
-  provider: 'aws',
-  name: 'Titan Multimodal Embeddings G1',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-image-v1",
-    providerName: "Amazon",
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'ai21.jamba-1-5-large-v1:0',
-  provider: 'aws',
-  name: 'Jamba 1.5 Large',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/ai21.jamba-1-5-large-v1:0",
-    providerName: "AI21 Labs",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'ai21.jamba-1-5-mini-v1:0',
-  provider: 'aws',
-  name: 'Jamba 1.5 Mini',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/ai21.jamba-1-5-mini-v1:0",
-    providerName: "AI21 Labs",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-instant-v1:2:100k',
-  provider: 'aws',
-  name: 'Claude Instant',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-instant-v1:2:100k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-v2:0:18k',
-  provider: 'aws',
-  name: 'Claude',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2:0:18k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-v2:0:100k',
-  provider: 'aws',
-  name: 'Claude',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2:0:100k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-v2:1:18k',
-  provider: 'aws',
-  name: 'Claude',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2:1:18k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-v2:1:200k',
-  provider: 'aws',
-  name: 'Claude',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-v2:1:200k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-sonnet-20240229-v1:0:28k',
-  provider: 'aws',
-  name: 'Claude 3 Sonnet',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0:28k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-sonnet-20240229-v1:0:200k',
-  provider: 'aws',
-  name: 'Claude 3 Sonnet',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0:200k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-sonnet-20240229-v1:0',
-  provider: 'aws',
-  name: 'Claude 3 Sonnet',
+  name: 'Claude 3.5 Sonnet',
   contextWindow: 200000,
-  maxOutputTokens: 4096,
+  maxOutputTokens: 8192,
   tier: 'efficient',
   capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
   pricing: {
@@ -1675,12 +877,12 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND"
+      "INFERENCE_PROFILE"
     ],
     inputModalities: [
       "TEXT",
@@ -1691,20 +893,26 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'anthropic.claude-3-haiku-20240307-v1:0:48k',
+  id: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
   provider: 'aws',
-  name: 'Claude 3 Haiku',
-  contextWindow: 0,
+  name: 'Claude 3.7 Sonnet',
+  contextWindow: 200000,
+  maxOutputTokens: 8192,
   tier: 'efficient',
   capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
+  pricing: {
+    text: {
+      input: 3,
+      output: 15
+    }
+  },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0:48k",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "PROVISIONED"
+      "INFERENCE_PROFILE"
     ],
     inputModalities: [
       "TEXT",
@@ -1723,13 +931,11 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0:200k",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0:200k",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
+    inferenceTypesSupported: [],
     inputModalities: [
       "TEXT",
       "IMAGE"
@@ -1753,138 +959,11 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-opus-20240229-v1:0:12k',
-  provider: 'aws',
-  name: 'Claude 3 Opus',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-opus-20240229-v1:0:12k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-opus-20240229-v1:0:28k',
-  provider: 'aws',
-  name: 'Claude 3 Opus',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-opus-20240229-v1:0:28k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-opus-20240229-v1:0:200k',
-  provider: 'aws',
-  name: 'Claude 3 Opus',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-opus-20240229-v1:0:200k",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-opus-20240229-v1:0',
-  provider: 'aws',
-  name: 'Claude 3 Opus',
-  contextWindow: 200000,
-  maxOutputTokens: 4096,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {
-    text: {
-      input: 15,
-      output: 75
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-opus-20240229-v1:0",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "INFERENCE_PROFILE"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
-  provider: 'aws',
-  name: 'Claude 3.5 Sonnet',
-  contextWindow: 200000,
-  maxOutputTokens: 8192,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {
-    text: {
-      input: 3,
-      output: 15
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
@@ -1910,31 +989,7 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0",
-    providerName: "Anthropic",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "INFERENCE_PROFILE"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
-  provider: 'aws',
-  name: 'Claude 3.7 Sonnet',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -1953,12 +1008,13 @@ export const awsModels: ModelInfo[] = [{
   id: 'anthropic.claude-3-5-haiku-20241022-v1:0',
   provider: 'aws',
   name: 'Claude 3.5 Haiku',
-  contextWindow: 0,
+  contextWindow: 200000,
+  maxOutputTokens: 8192,
   tier: 'efficient',
   capabilities: new Set(['chat', 'streaming', 'tools']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -1976,12 +1032,13 @@ export const awsModels: ModelInfo[] = [{
   id: 'anthropic.claude-opus-4-20250514-v1:0',
   provider: 'aws',
   name: 'Claude Opus 4',
-  contextWindow: 0,
+  contextWindow: 200000,
+  maxOutputTokens: 16384,
   tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
+  capabilities: new Set(['chat', 'streaming', 'vision', 'tools']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-4-20250514-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-opus-4-20250514-v1:0",
     providerName: "Anthropic",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -1997,179 +1054,6 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'cohere.command-r-v1:0',
-  provider: 'aws',
-  name: 'Command R',
-  contextWindow: 128000,
-  maxOutputTokens: 4096,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.5,
-      output: 1.5
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.command-r-v1:0",
-    providerName: "Cohere",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'cohere.command-r-plus-v1:0',
-  provider: 'aws',
-  name: 'Command R+',
-  contextWindow: 128000,
-  maxOutputTokens: 4096,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 3,
-      output: 15
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.command-r-plus-v1:0",
-    providerName: "Cohere",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'cohere.embed-english-v3:0:512',
-  provider: 'aws',
-  name: 'Embed English',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.embed-english-v3:0:512",
-    providerName: "Cohere",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'cohere.embed-english-v3',
-  provider: 'aws',
-  name: 'Embed English',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.embed-english-v3",
-    providerName: "Cohere",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'cohere.embed-multilingual-v3:0:512',
-  provider: 'aws',
-  name: 'Embed Multilingual',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.embed-multilingual-v3:0:512",
-    providerName: "Cohere",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "PROVISIONED"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'cohere.embed-multilingual-v3',
-  provider: 'aws',
-  name: 'Embed Multilingual',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['embedding']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.embed-multilingual-v3",
-    providerName: "Cohere",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "EMBEDDING"
-    ]
-  }
-}, {
-  id: 'cohere.rerank-v3-5:0',
-  provider: 'aws',
-  name: 'Rerank 3.5',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0",
-    providerName: "Cohere",
-    responseStreamingSupported: false,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
   id: 'deepseek.r1-v1:0',
   provider: 'aws',
   name: 'DeepSeek-R1',
@@ -2178,7 +1062,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set([]),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/deepseek.r1-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/deepseek.r1-v1:0",
     providerName: "DeepSeek",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2193,56 +1077,43 @@ export const awsModels: ModelInfo[] = [{
     ]
   }
 }, {
-  id: 'meta.llama3-8b-instruct-v1:0',
+  id: 'mistral.pixtral-large-2502-v1:0',
   provider: 'aws',
-  name: 'Llama 3 8B Instruct',
-  contextWindow: 8192,
-  maxOutputTokens: 2048,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.3,
-      output: 0.6
-    }
-  },
+  name: 'Pixtral Large (25.02)',
+  contextWindow: 0,
+  tier: 'flagship',
+  capabilities: new Set(['chat', 'streaming', 'vision']),
+  pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-8b-instruct-v1:0",
-    providerName: "Meta",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/mistral.pixtral-large-2502-v1:0",
+    providerName: "Mistral AI",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
-      "ON_DEMAND"
+      "INFERENCE_PROFILE"
     ],
     inputModalities: [
-      "TEXT"
+      "TEXT",
+      "IMAGE"
     ],
     outputModalities: [
       "TEXT"
     ]
   }
 }, {
-  id: 'meta.llama3-70b-instruct-v1:0',
+  id: 'meta.llama3-1-8b-instruct-v1:0:128k',
   provider: 'aws',
-  name: 'Llama 3 70B Instruct',
-  contextWindow: 8192,
-  maxOutputTokens: 2048,
+  name: 'Llama 3.1 8B Instruct',
+  contextWindow: 0,
   tier: 'efficient',
   capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 2.65,
-      output: 3.5
-    }
-  },
+  pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-70b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-1-8b-instruct-v1:0:128k",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
+    inferenceTypesSupported: [],
     inputModalities: [
       "TEXT"
     ],
@@ -2265,13 +1136,34 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-1-8b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-1-8b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
       "INFERENCE_PROFILE"
     ],
+    inputModalities: [
+      "TEXT"
+    ],
+    outputModalities: [
+      "TEXT"
+    ]
+  }
+}, {
+  id: 'meta.llama3-1-70b-instruct-v1:0:128k',
+  provider: 'aws',
+  name: 'Llama 3.1 70B Instruct',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['chat', 'streaming']),
+  pricing: {},
+  metadata: {
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-1-70b-instruct-v1:0:128k",
+    providerName: "Meta",
+    responseStreamingSupported: true,
+    customizationsSupported: [],
+    inferenceTypesSupported: [],
     inputModalities: [
       "TEXT"
     ],
@@ -2294,7 +1186,36 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-1-70b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-1-70b-instruct-v1:0",
+    providerName: "Meta",
+    responseStreamingSupported: true,
+    customizationsSupported: [],
+    inferenceTypesSupported: [
+      "INFERENCE_PROFILE"
+    ],
+    inputModalities: [
+      "TEXT"
+    ],
+    outputModalities: [
+      "TEXT"
+    ]
+  }
+}, {
+  id: 'meta.llama3-1-405b-instruct-v1:0',
+  provider: 'aws',
+  name: 'Llama 3.1 405B Instruct',
+  contextWindow: 128000,
+  maxOutputTokens: 4096,
+  tier: 'flagship',
+  capabilities: new Set(['chat', 'streaming']),
+  pricing: {
+    text: {
+      input: 5.32,
+      output: 16
+    }
+  },
+  metadata: {
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-1-405b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2323,7 +1244,7 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-2-11b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-2-11b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2353,7 +1274,7 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-2-90b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-2-90b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2383,7 +1304,7 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-2-1b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-2-1b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2412,7 +1333,7 @@ export const awsModels: ModelInfo[] = [{
     }
   },
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-2-3b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-2-3b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2435,11 +1356,12 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['chat', 'streaming']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama3-3-70b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama3-3-70b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [
+      "ON_DEMAND",
       "INFERENCE_PROFILE"
     ],
     inputModalities: [
@@ -2458,7 +1380,7 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['chat', 'streaming', 'vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama4-scout-17b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama4-scout-17b-instruct-v1:0",
     providerName: "Meta",
     responseStreamingSupported: true,
     customizationsSupported: [],
@@ -2482,142 +1404,8 @@ export const awsModels: ModelInfo[] = [{
   capabilities: new Set(['chat', 'streaming', 'vision']),
   pricing: {},
   metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/meta.llama4-maverick-17b-instruct-v1:0",
+    modelArn: "arn:aws:bedrock:us-east-2::foundation-model/meta.llama4-maverick-17b-instruct-v1:0",
     providerName: "Meta",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "INFERENCE_PROFILE"
-    ],
-    inputModalities: [
-      "TEXT",
-      "IMAGE"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'mistral.mistral-7b-instruct-v0:2',
-  provider: 'aws',
-  name: 'Mistral 7B Instruct',
-  contextWindow: 32000,
-  maxOutputTokens: 8192,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.15,
-      output: 0.2
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/mistral.mistral-7b-instruct-v0:2",
-    providerName: "Mistral AI",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'mistral.mixtral-8x7b-instruct-v0:1',
-  provider: 'aws',
-  name: 'Mixtral 8x7B Instruct',
-  contextWindow: 32000,
-  maxOutputTokens: 8192,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 0.45,
-      output: 0.7
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/mistral.mixtral-8x7b-instruct-v0:1",
-    providerName: "Mistral AI",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'mistral.mistral-large-2402-v1:0',
-  provider: 'aws',
-  name: 'Mistral Large (24.02)',
-  contextWindow: 32000,
-  maxOutputTokens: 8192,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {
-    text: {
-      input: 4,
-      output: 12
-    }
-  },
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/mistral.mistral-large-2402-v1:0",
-    providerName: "Mistral AI",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'mistral.mistral-small-2402-v1:0',
-  provider: 'aws',
-  name: 'Mistral Small (24.02)',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/mistral.mistral-small-2402-v1:0",
-    providerName: "Mistral AI",
-    responseStreamingSupported: true,
-    customizationsSupported: [],
-    inferenceTypesSupported: [
-      "ON_DEMAND"
-    ],
-    inputModalities: [
-      "TEXT"
-    ],
-    outputModalities: [
-      "TEXT"
-    ]
-  }
-}, {
-  id: 'mistral.pixtral-large-2502-v1:0',
-  provider: 'aws',
-  name: 'Pixtral Large (25.02)',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming', 'vision']),
-  pricing: {},
-  metadata: {
-    modelArn: "arn:aws:bedrock:us-east-1::foundation-model/mistral.pixtral-large-2502-v1:0",
-    providerName: "Mistral AI",
     responseStreamingSupported: true,
     customizationsSupported: [],
     inferenceTypesSupported: [

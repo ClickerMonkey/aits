@@ -556,8 +556,8 @@ export class Prompt<
 
     // Main execution loop!
     while (iterations < maxIterations) {
-      const toolCalls: ToolExecution<PromptTools<TTools>>[] = [];
-      const toolCallMap = new Map<string, ToolExecution<PromptTools<TTools>>>();
+      const toolExecutors: ToolExecution<PromptTools<TTools>>[] = [];
+      const toolExecutorMap = new Map<string, ToolExecution<PromptTools<TTools>>>();
       const toolErrorsPrevious = (toolCallErrors + toolParseErrors);
       const toolParseErrorsPrevious = toolParseErrors;
 
@@ -612,32 +612,32 @@ export class Prompt<
 
         // Handle tool calls
         if (chunk.toolCallNamed) {
-          const toolCall = newToolExecution(ctx, chunk.toolCallNamed, toolMap.get(chunk.toolCallNamed.name));
-          toolCalls.push(toolCall);
-          toolCallMap.set(chunk.toolCallNamed.id, toolCall);
+          const toolExecutor = newToolExecution(ctx, chunk.toolCallNamed, toolMap.get(chunk.toolCallNamed.name));
+          toolExecutors.push(toolExecutor);
+          toolExecutorMap.set(chunk.toolCallNamed.id, toolExecutor);
           
-          if (toolCall.tool) {
-            yield emit({ type: 'toolParseName', tool: toolCall.tool, request });
+          if (toolExecutor.tool) {
+            yield emit({ type: 'toolParseName', tool: toolExecutor.tool, request });
           } else {
-            streamController.abort(toolCall.error);
+            streamController.abort(toolExecutor.error);
             break;
           }
         }
 
         if (chunk.toolCallArguments) {
-          const toolCall = toolCallMap.get(chunk.toolCallArguments.id)!;
-          toolCall.toolCall = chunk.toolCallArguments;
+          const toolExecutor = toolExecutorMap.get(chunk.toolCallArguments.id)!;
+          toolExecutor.toolCall = chunk.toolCallArguments;
   
-          yield emit({ type: 'toolParseArguments', tool: toolCall.tool!, args: chunk.toolCallArguments.arguments, request });
+          yield emit({ type: 'toolParseArguments', tool: toolExecutor.tool!, args: chunk.toolCallArguments.arguments, request });
         }
 
         if (chunk.toolCall) {
-          const toolCall = toolCallMap.get(chunk.toolCall.id)!;
-          toolCall.toolCall = chunk.toolCall;
+          const toolExecutor = toolExecutorMap.get(chunk.toolCall.id)!;
+          toolExecutor.toolCall = chunk.toolCall;
 
           if (toolMode === 'immediate') {
             // Start execution immediately
-            setImmediate(toolCall.run);
+            setImmediate(toolExecutor.run);
           }
         }
 
@@ -647,7 +647,7 @@ export class Prompt<
 
         // In immediate mode we might be getting more chunks while executing, emit events as soon as possible.
         if (toolMode === 'immediate') {
-          for (const toolCall of toolCalls) {
+          for (const toolCall of toolExecutors) {
             if (toolCall.emitStart()) {
               yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
             }
@@ -706,28 +706,28 @@ export class Prompt<
 
       // If we need to make some tool calls, lets do it! 
       // We might not have a finish_reason if we got a bad tool name.
-      if (finishReason === 'tool_calls' || toolCalls.length) {
+      if (finishReason === 'tool_calls' || toolExecutors.length) {
         // Add the assistant's response with tool calls to the conversation
         request.messages.push({
           role: 'assistant',
           content,
-          toolCalls: toolCalls.map(tc => tc.toolCall),
+          toolCalls: toolExecutors.map(te => te.toolCall),
         });
 
         // If there are any error/invalid - just stop and add their errors and retry
         let skip = false;
-        for (const toolCall of toolCalls) {
-          if (toolCall.error) {
+        for (const toolExecutor of toolExecutors) {
+          if (toolExecutor.error) {
             skip = true;
           } else {
             // Non-blocking call, we don't want to hold up execution here. But if we can emit start or error early below this we will try.
-            toolCall.parse();
+            toolExecutor.parse();
           }
-          if (toolCall.emitStart()) {
-            yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
+          if (toolExecutor.emitStart()) {
+            yield emitTool({ type: 'toolStart', tool: toolExecutor.tool!, args: toolExecutor.args, request });
           }
-          if (toolCall.emitError()) {
-            yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
+          if (toolExecutor.emitError()) {
+            yield emitTool({ type: 'toolError', tool: toolExecutor.tool!, args: toolExecutor.args, error: toolExecutor.error!, request })
           }
         }
 
@@ -737,58 +737,58 @@ export class Prompt<
         // All tool calls are valid, lets start this!
         switch (iterationMode) {
           case 'sequential':
-            for (const toolCall of toolCalls) {
-              await toolCall.parse();
-              if (toolCall.emitStart()) {
-                yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
+            for (const toolExecutor of toolExecutors) {
+              await toolExecutor.parse();
+              if (toolExecutor.emitStart()) {
+                yield emitTool({ type: 'toolStart', tool: toolExecutor.tool!, args: toolExecutor.args, request });
               }
-              await toolCall.run();
-              if (toolCall.emitOutput()) {
-                yield emitTool({ type: 'toolOutput', tool: toolCall.tool!, args: toolCall.args, result: toolCall.result, request });
+              await toolExecutor.run();
+              if (toolExecutor.emitOutput()) {
+                yield emitTool({ type: 'toolOutput', tool: toolExecutor.tool!, args: toolExecutor.args, result: toolExecutor.result, request });
               }
-              if (toolCall.emitError()) {
-                yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
+              if (toolExecutor.emitError()) {
+                yield emitTool({ type: 'toolError', tool: toolExecutor.tool!, args: toolExecutor.args, error: toolExecutor.error!, request })
               }
             }
             break;
           case 'parallel':
           case 'immediate':
-            const parseRuns = toolCalls.map(tc => [tc.parse(), tc.run()]).flat();
+            const parseRuns = toolExecutors.map(tc => [tc.parse(), tc.run()]).flat();
             for await (const { result: toolCallPromise } of yieldAll(parseRuns)) {
-              const toolCall = await toolCallPromise;
-              if (toolCall.emitStart()) {
-                yield emitTool({ type: 'toolStart', tool: toolCall.tool!, args: toolCall.args, request });
+              const toolExecutor = await toolCallPromise;
+              if (toolExecutor.emitStart()) {
+                yield emitTool({ type: 'toolStart', tool: toolExecutor.tool!, args: toolExecutor.args, request });
               }
-              if (toolCall.emitOutput()) {
-                yield emitTool({ type: 'toolOutput', tool: toolCall.tool!, args: toolCall.args, result: toolCall.result, request });
+              if (toolExecutor.emitOutput()) {
+                yield emitTool({ type: 'toolOutput', tool: toolExecutor.tool!, args: toolExecutor.args, result: toolExecutor.result, request });
               }
-              if (toolCall.emitError()) {
-                yield emitTool({ type: 'toolError', tool: toolCall.tool!, args: toolCall.args, error: toolCall.error!, request })
+              if (toolExecutor.emitError()) {
+                yield emitTool({ type: 'toolError', tool: toolExecutor.tool!, args: toolExecutor.args, error: toolExecutor.error!, request })
               }
             }
             break;
         }
 
-        for (const toolCall of toolCalls) {
-          const content = toolCall.error
-            ? toolCall.error
-            : toolCall.result
-              ? typeof toolCall.result === 'string'
-                ? toolCall.result
-                : JSON.stringify(toolCall.result)
+        for (const toolExecutor of toolExecutors) {
+          const content = toolExecutor.error
+            ? toolExecutor.error
+            : toolExecutor.result
+              ? typeof toolExecutor.result === 'string'
+                ? toolExecutor.result
+                : JSON.stringify(toolExecutor.result)
               : '';
 
           request.messages.push({
             role: 'tool',
             content,
-            toolCallId: toolCall.toolCall.id,
+            toolCallId: toolExecutor.toolCall.id,
           });
 
-          if (toolCall.status === 'invalid') {
+          if (toolExecutor.status === 'invalid') {
             toolParseErrors++;
-          } else if (toolCall.status === 'error') {
+          } else if (toolExecutor.status === 'error') {
             toolCallErrors++;
-          } else if (toolCall.status === 'success') {
+          } else if (toolExecutor.status === 'success') {
             toolSuccesses++;
           }
         }
@@ -808,7 +808,7 @@ export class Prompt<
       // If if there are only tool calls wanted...
       if (onlyTools) {
         const successWithoutNewErrors = toolSuccesses > 0 && !hadToolErrors;
-        const noTools = toolCalls.length === 0;
+        const noTools = toolExecutors.length === 0;
 
         // If we met our max tool calls, or had some successes with no new errors, or there are no more tools to call, end it.
         if (hitMax || successWithoutNewErrors || noTools) {
@@ -1292,12 +1292,12 @@ function newToolExecution<T extends AnyTool>(ctx: Context<any, any>, toolCall: T
         return execution;
       }
       try {
-        execution.args = await toolInfo!.tool.parse(ctx, toolCall.arguments, toolInfo!.definition.parameters);
+        execution.args = await toolInfo!.tool.parse(ctx, execution.toolCall.arguments, toolInfo!.definition.parameters);
         execution.status = 'parsed';
         start.ready = true;
       } catch (e: any) {
         execution.status = 'invalid';
-        execution.error = `Error parsing tool arguments: ${e.message}, args: ${toolCall.arguments}`;
+        execution.error = `Error parsing tool arguments: ${e.message}, args: ${execution.toolCall.arguments}`;
         error.ready = true;
       }
 

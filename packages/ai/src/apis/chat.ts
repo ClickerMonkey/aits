@@ -207,15 +207,15 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
     }
 
     const streamer = selected.provider.createStreamer(selected.providerConfig);
-    yield* streamer(request, ctx, ctx.metadata);
+    return yield* streamer(request, ctx, ctx.metadata);
   }
 
-  protected responseToChunks(response: Response): Chunk[] {
+  protected responseToChunks(response: Response, model?: SelectedModelFor<T>): Chunk[] {
     return getChunksFromResponse(response);
   }
 
-  protected chunksToResponse(chunks: Chunk[], model: string): Response {
-    return getResponseFromChunks(chunks);
+  protected chunksToResponse(chunks: Chunk[], model?: SelectedModelFor<T>): Response {
+    return getResponseFromChunks(chunks, model?.model);
   }
 
   protected getHandlerGetMethod(
@@ -285,7 +285,7 @@ export class ChatAPI<T extends AIBaseTypes> extends BaseAPI<
         chunks.push(chunk);
       }
 
-      return chatAPI.chunksToResponse(chunks, 'unknown');
+      return chatAPI.chunksToResponse(chunks);
     };
   }
 }
