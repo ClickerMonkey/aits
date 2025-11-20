@@ -12,7 +12,7 @@ import { ModelCapability } from '@aeye/ai';
 import { logger } from '../logger';
 import { abbreviate } from '../common';
 import { AUTONOMOUS } from '../constants';
-import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedrock';
+import { AWSBedrockProvider } from '@aeye/aws';
 
 type SettingsView =
   | 'menu'
@@ -81,16 +81,22 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     setAwsTestMessage('Testing AWS credentials...');
     
     try {
-      const bedrockClient = new BedrockClient({
+      const awsProvider = new AWSBedrockProvider({
         region: process.env.AWS_REGION || 'us-east-1',
       });
       
-      // Try to list foundation models as a test
-      await bedrockClient.send(new ListFoundationModelsCommand({}));
+      // Use the provider's checkHealth method to test credentials
+      const isHealthy = await awsProvider.checkHealth();
       
-      setAwsTestStatus('success');
-      setAwsTestMessage('✓ AWS credentials detected and working!');
-      return true;
+      if (isHealthy) {
+        setAwsTestStatus('success');
+        setAwsTestMessage('✓ AWS credentials detected and working!');
+        return true;
+      } else {
+        setAwsTestStatus('error');
+        setAwsTestMessage('⚠️ AWS credentials test failed.');
+        return false;
+      }
     } catch (error: any) {
       setAwsTestStatus('error');
       if (error.name === 'CredentialsProviderError' || error.name === 'UnrecognizedClientException') {

@@ -58,7 +58,6 @@
     "@aeye/openai": "0.1.0",
     "@aeye/openrouter": "0.1.0",
     "@aeye/replicate": "0.1.0",
-    "@aws-sdk/client-bedrock": "^3.709.0",
     "@langchain/core": "^0.3.79",
     "@langchain/textsplitters": "^0.1.0",
     "@tavily/core": "^0.5.13",
