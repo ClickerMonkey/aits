@@ -113,6 +113,7 @@ export class OperationManager {
     ctx.log(`op start: ${op.type} input=${JSON.stringify(op.input)}`);
 
     op.start = performance.now();
+    op.end = undefined;
     try {
       if (doit) {
         op.status = 'doing';

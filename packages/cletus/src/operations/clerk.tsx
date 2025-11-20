@@ -826,7 +826,8 @@ export const file_edit = operationOf<
       // ... divider
       let additions = 0;
       let subtractions = 0;
-      const diffLines = op.analysis ? op.analysis.split('\n') : [];
+      const diff = op.output || op.analysis || '';
+      const diffLines = diff.split('\n');
       const relevantLines = diffLines.slice(4).filter(line => !line.startsWith('\\'));
       const changeSetLines = chunk(relevantLines, (_, line) => line.startsWith('@@'));
       const changeSets = changeSetLines.map((setLines, setLinesIndex) => {

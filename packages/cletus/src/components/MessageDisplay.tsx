@@ -79,7 +79,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
                   </Box>
                 );
               } else {
-                return (
+              return (
                   <Box key={i} marginBottom={1}>
                     <Text dimColor>
                       [{formatName(c.operation.type)}] - [{c.operation.status}]

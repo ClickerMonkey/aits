@@ -150,7 +150,11 @@ export const TodoItemSchema = z.object({
 
 export const ChatModeSchema = z.enum(['none', 'read', 'create', 'update', 'delete']);
 
+export const OperationModeSchema = z.enum(['local', 'none', 'read', 'create', 'update', 'delete']);
+
 export const AgentModeSchema = z.enum(['plan', 'default']);
+
+export const AgentNameSchema = z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'dba', 'artist', 'internet']);
 
 export const ChatMetaSchema = z.object({
   id: z.string(),
@@ -300,6 +304,7 @@ export const OperationSchema = z.object({
   end: z.number().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
+  requestIndex: z.number().optional(),
 });
 
 // ============================================================================
@@ -347,6 +352,13 @@ export const UsageSchema = z.object({
   cost: z.number().optional(),
 }).optional();
 
+export const AgentRequest = z.object({
+  agent: AgentNameSchema,
+  request: z.string(),
+  typeName: z.string().optional(),
+  simulateMode: OperationModeSchema.optional(),
+});
+
 export const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
   name: z.string().optional(),
@@ -357,7 +369,9 @@ export const MessageSchema = z.object({
   usage: UsageSchema,
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
+  requests: z.array(AgentRequest).optional(),
 });
+
 
 export const ChatMessagesSchema = z.object({
   updated: z.number(),

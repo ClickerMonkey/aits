@@ -4,10 +4,9 @@ import type { CletusAI } from '../ai';
 import { ChatFile } from '../chat';
 import { formatName, formatTime, pluralize } from '../common';
 import { COLORS } from '../constants';
-import { OperationManager } from '../operations/manager';
-import type { ChatMeta, Message } from '../schemas';
-import { on } from 'events';
 import { logger } from '../logger';
+import { OperationManager } from '../operations/manager';
+import type { ChatMeta, Message, Operation } from '../schemas';
 
 
 interface OperationApprovalMenuProps {
@@ -60,6 +59,18 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
 
   const hasMultipleOperations = approvableOperations.length > 1;
 
+  const updateMessageContent = (op: Operation, operationIndex: number) => {
+    // Update the message content when operation is executed.
+    // Move to end of message content array to ensure visibility.
+    const contentIndex = message.content.findIndex((c) => c.operationIndex === operationIndex);
+    if (contentIndex !== -1) {
+      const content = message.content.splice(contentIndex, 1)[0];
+      content.content = op.message || '';
+      message.content.push(content);
+      onMessageUpdate?.(message);
+    }
+  };
+
   // Timer for elapsed time
   useEffect(() => {
     if (isProcessing) {
@@ -76,7 +87,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
     if (menuState === 'complete' && completionResult) {
       const timeout = setTimeout(() => {
         onComplete(completionResult);
-      }, 2500);
+      }, 1500);
       return () => clearTimeout(timeout);
     }
   }, [menuState, completionResult]);
@@ -117,14 +128,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         'none',
         operations,
         undefined,
-        (op, operationIndex) => {
-          // Update the message content when operation is executed
-          const content = message.content.find((c) => c.operationIndex === operationIndex);
-          if (content) {
-            content.content = op.message || '';
-            onMessageUpdate?.(message);
-          }
-        }
+        updateMessageContent,
       );
 
       const ctx = await getContext(sessionSignal);
@@ -202,13 +206,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       for (const idx of indices) {
         operations[idx].status = 'rejected';
         operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
-        
-        // Update the message content
-        const content = message.content.find((c) => c.operationIndex === idx);
-        if (content) {
-          content.content = operations[idx].message || '';
-          onMessageUpdate?.(message);
-        }
+        updateMessageContent(operations[idx], idx);
       }
 
       // Generate summary message
@@ -332,13 +330,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         for (const idx of rejected) {
           operations[idx].status = 'rejected';
           operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
-          
-          // Update the message content
-          const content = message.content.find((c) => c.operationIndex === idx);
-          if (content) {
-            content.content = operations[idx].message || '';
-            onMessageUpdate?.(message);
-          }
+          updateMessageContent(operations[idx], idx);
         }
 
         const elapsed = (performance.now() - startTime);
@@ -410,15 +402,6 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           if (approved.length > 0 || rejected.length > 0) {
             setIsProcessing(true);
             setMenuState('processing');
-
-            const operations = message.operations || [];
-
-            // Mark rejected operations
-            for (const idx of rejected) {
-              operations[idx].status = 'rejected';
-              operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
-            }
-
             rejectOperations(rejected);
           }
         }

@@ -296,7 +296,7 @@ export async function categorizeFile(filePath: string, fileName: string = filePa
     ['txt', 'md', 'markdown', 'html', 'htm', 'xml', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx',
       'py', 'java', 'cpp', 'c', 'h', 'hpp', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt',
       'scala', 'r', 'sql', 'sh', 'bash', 'ps1', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
-      'log', 'rtf', 'tex', 'latex', 'rst', 'org', 'proto', 'sol'].includes(fileExtension)
+      'log', 'rtf', 'tex', 'latex', 'rst', 'org', 'proto', 'sol', 'css', 'scss', 'less'].includes(fileExtension)
   ) {
     return 'text';
   } else {

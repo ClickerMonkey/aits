@@ -143,7 +143,7 @@ Example: Read a source file:
       path: z.string().describe('Relative file path'),
       limit: z.number().optional().describe('Maximum summary length in characters/lines (default: 64,000 chars or 1000 lines - whatever is smaller)'),
       offset: z.number().optional().describe('Character offset to start reading from (default: 0). This can be a negative number meaning it will start from the end of the file.'),
-      limitOffsetMode: z.enum(['characters', 'lines']).optional().describe('Whether limit & offset are in characters or lines (default: "characters")'),
+      limitOffsetMode: z.enum(['characters', 'lines']).default('characters').describe('Whether limit & offset are in characters or lines (default: "characters")'),
       showLines: z.boolean().optional().describe('Include line numbers in output (default: false)'),
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),

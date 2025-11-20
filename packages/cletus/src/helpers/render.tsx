@@ -44,7 +44,7 @@ export function getStatusInfo(status: Operation['status']): { color: string; lab
  */
 export function getElapsedTime(op: Operation): string {
   if (!op.start) return '';
-  const duration = op.end && op.end >= op.start ? op.end - op.start : Date.now() - op.start;
+  const duration = op.end ? op.end - op.start : performance.now() - op.start;
   return formatTime(duration);
 }
 

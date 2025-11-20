@@ -1,6 +1,7 @@
 import { AnyTool, Names, Tuple } from '@aeye/core';
-import type { CletusAI, CletusAIContext, CletusContext } from '../ai';
+import type { CletusAI, CletusAIContext } from '../ai';
 import { Operations } from '../operations/types';
+import { OperationKind } from '../schemas';
 import { createArchitectTools } from '../tools/architect';
 import { createArtistTools } from '../tools/artist';
 import { createClerkTools } from '../tools/clerk';
@@ -9,7 +10,6 @@ import { createInternetTools } from '../tools/internet';
 import { createLibrarianTools } from '../tools/librarian';
 import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
-import { OperationKind } from '../schemas';
 
 
 export const requestPrompt = `You have been given the following request to perform by Cletus. 

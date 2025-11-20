@@ -98,7 +98,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
       
       return z.object({
         agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', 'dba']).describe('Which sub-agent to use'),
-        request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls.'),
+        request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls. At the end provide one or more suggested tool calls with parameters filled in based on your understanding of their capabilities.'),
         typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
         simulateMode: z.enum(availableModes).default(currentMode).describe(`Mode override for this delegation. Current mode is '${currentMode}'. Use a lower mode (e.g., 'read' when in 'delete' mode) to simulate what would happen without actually executing destructive operations. This allows you to preview the effects before committing to them. Defaults to current mode.`),
       });
@@ -159,6 +159,26 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
           : effectiveOps.needsUserInput(operationProgress)
             ? `The ${agent} is handing operations off to the user for approval before proceeding. Present the operations clearly for approval - be concise but don't leave out any important details. DO NOT ask questions, the user will automatically be prompted for permission.`
             : `The ${agent} agent is in a state where it needs user input before proceeding. Wait for the user to respond. Ask questions that are needed to get tool calls correct.`;
+
+      // Record the request index for all new operations from this delegation
+      const chatMessage = ctx.chatMessage;
+      if (chatMessage) {
+        if (!chatMessage.requests) {
+          chatMessage.requests = [];
+        }
+        const requestIndex = chatMessage.requests.length;
+        chatMessage.requests.push({
+          agent,
+          request,
+          typeName: agent === 'dba' ? typeName! : undefined,
+          simulateMode: simulateMode !== ctx.chat?.mode ? simulateMode : undefined,
+        });
+
+        const operations = effectiveOps.operations.slice(operationProgress);
+        for (const op of operations) {
+          op.requestIndex = requestIndex;
+        }
+      }
 
       return { tools, agentInstructions };
     },
