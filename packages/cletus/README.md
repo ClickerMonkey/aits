@@ -25,6 +25,7 @@ Cletus organizes its capabilities into specialized agents, each with domain-spec
 ### 🎨 Interactive Terminal UI
 
 - Beautiful React/Ink-based interface
+- Automatic light/dark mode theme detection for optimal color visibility
 - Chat history management
 - Real-time streaming responses
 - Syntax-highlighted code blocks
