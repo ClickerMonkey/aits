@@ -21,7 +21,7 @@ myTool.run(input, ctx?); // same signature with myPrompt & myAgent
 myPrompt.get('tools', input, ctx?); // prompts can have tool results, results, streaming, etc through get
 
 ai.chat.get(request, ctx?) // or stream
-ai.image.generate(request, ctx?) // or stream
+ai.image.generate.get(request, ctx?) // or stream
 ai.image.edit.get(request, ctx?) // or stream
 ai.image.analyze.get(request, ctx?) // or stream
 ai.speech.get(request, ctx?) // or stream
@@ -58,12 +58,13 @@ ai.models.list() // get(id), search(criteria), select(criteria), refresh()
 
 ```bash
 # Install core packages
-npm install @aeye/ai @aeye/core zod
+npm install @aeye/ai @aeye/core
 
 # Install provider packages as needed
 npm install @aeye/openai openai       # OpenAI
 npm install @aeye/openrouter          # OpenRouter (multi-provider)
 npm install @aeye/replicate replicate # Replicate
+npm install @aeye/aws                 # AWS
 ```
 
 ### Basic Usage
@@ -113,7 +114,6 @@ const ai = AI.with()
   .create({
     // Automatic model selection criteria
     defaultMetadata: {
-      required: ['chat', 'streaming'],
       weights: {
         cost: 0.4,
         speed: 0.3,
