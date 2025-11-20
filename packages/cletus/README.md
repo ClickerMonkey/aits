@@ -4,7 +4,7 @@
 
 Cletus is a terminal-based AI assistant built with the @aeye library that demonstrates the power of multi-provider AI integration, tool calling, and context management. It features a beautiful TUI (Terminal User Interface) powered by React/Ink and provides specialized AI agents for different domains like file operations, data management, image generation, and web searching.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
 
 ## Features
@@ -605,7 +605,7 @@ Contributions are welcome! Please see the main [@aeye repository](https://github
 
 ## License
 
-MIT © ClickerMonkey
+GPL-3.0 © ClickerMonkey
 
 ## Related Packages
 

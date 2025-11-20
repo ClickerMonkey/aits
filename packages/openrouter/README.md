@@ -542,7 +542,7 @@ For image generation, speech, transcription, and embeddings, use provider-specif
 
 ## License
 
-MIT
+GPL-3.0
 
 ## Contributing
 

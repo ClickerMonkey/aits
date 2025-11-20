@@ -35,7 +35,7 @@
     "monorepo"
   ],
   "author": "ClickerMonkey",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/ClickerMonkey/aeye.git"
