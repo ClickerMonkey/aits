@@ -18,6 +18,7 @@ import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent';
 import { runChatOrchestrator } from './agents/chat-orchestrator';
 import { COLORS } from './constants';
+import { getAltKeyLabel } from './common';
 import { fileIsDirectory } from './helpers/files';
 import { useAdaptiveDebounce, useSyncedState } from './hooks';
 import { logger } from './logger';
@@ -88,6 +89,7 @@ const AGENTMODETEXT: Record<AgentMode, string> = {
 
 
 export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
+  const altKeyLabel = getAltKeyLabel();
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages, getChatMessages] = useSyncedState<Message[]>(messages);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
@@ -499,13 +501,13 @@ KEYBOARD SHORTCUTS:
 • Enter       - Send message
 • Ctrl+C      - Exit chat
 • ESC         - Interrupt AI response or stop transcription
-• Alt+C       - Cycle through chat modes
-• Alt+T       - Start/stop voice transcription
-• Alt+M       - Toggle agent mode (default/plan)
-• Alt+I       - Toggle operation input details
-• Alt+O       - Toggle operation output details
-• Alt+S       - Toggle system messages visibility
-• Alt+↑↓      - Navigate through message history
+• ${altKeyLabel}+C       - Cycle through chat modes
+• ${altKeyLabel}+T       - Start/stop voice transcription
+• ${altKeyLabel}+M       - Toggle agent mode (default/plan)
+• ${altKeyLabel}+I       - Toggle operation input details
+• ${altKeyLabel}+O       - Toggle operation output details
+• ${altKeyLabel}+S       - Toggle system messages visibility
+• ${altKeyLabel}+↑↓      - Navigate through message history
 • Tab         - Autocomplete command (when / menu is open)
 • ↑↓          - Navigate command menu (when / menu is open)
 
@@ -652,7 +654,7 @@ TIP: Type '/' to see all available commands with descriptions!`,
 
   const startTranscription = async () => {
     if (isTranscribing) {
-      addSystemMessage(`⚠️ Already transcribing. Press ESC or Alt+T to stop.`);
+      addSystemMessage(`⚠️ Already transcribing. Press ESC or ${altKeyLabel}+T to stop.`);
       return;
     }
 
@@ -1147,13 +1149,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>ESC: interrupt</Text>
               </Box>
               <Box flexDirection="column" marginLeft={2}>
-                <Text dimColor>Alt+C: cycle chat mode</Text>
-                <Text dimColor>Alt+T: transcribe</Text>
-                <Text dimColor>Alt+M: toggle agent mode</Text>
-                <Text dimColor>Alt+I: toggle inputs</Text>
-                <Text dimColor>Alt+O: toggle outputs</Text>
-                <Text dimColor>Alt+S: toggle system msgs</Text>
-                <Text dimColor>Alt+↑↓: message history</Text>
+                <Text dimColor>{altKeyLabel}+C: cycle chat mode</Text>
+                <Text dimColor>{altKeyLabel}+T: transcribe</Text>
+                <Text dimColor>{altKeyLabel}+M: toggle agent mode</Text>
+                <Text dimColor>{altKeyLabel}+I: toggle inputs</Text>
+                <Text dimColor>{altKeyLabel}+O: toggle outputs</Text>
+                <Text dimColor>{altKeyLabel}+S: toggle system msgs</Text>
+                <Text dimColor>{altKeyLabel}+↑↓: message history</Text>
                 <Text dimColor>/: commands  ?: help</Text>
               </Box>
             </Box>
@@ -1181,7 +1183,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 <Text dimColor>plan: planner only</Text>
               </Box>
               <Box flexDirection="column" marginLeft={2}>
-                <Text dimColor>(Alt+M to toggle)</Text>
+                <Text dimColor>({altKeyLabel}+M to toggle)</Text>
               </Box>
             </Box>
           </Box>

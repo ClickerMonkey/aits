@@ -6,6 +6,15 @@ import { Message as AIMessage, MessageContent as AIMessageContent } from "@aeye/
 import { detectMimeType } from "./helpers/files";
 
 /**
+ * Returns the appropriate label for the Alt/Option key based on the platform.
+ * 
+ * @returns "Opt" on macOS, "Alt" on other platforms
+ */
+export function getAltKeyLabel(): string {
+  return process.platform === 'darwin' ? 'Opt' : 'Alt';
+}
+
+/**
  * Formats time in milliseconds to a human-readable string.
  * 
  * @param ms - time in milliseconds
