@@ -34,6 +34,8 @@ type SettingsView =
   | 'manage-provider-action'
   | 'manage-provider-input'
   | 'manage-openrouter-settings'
+  | 'manage-aws-settings'
+  | 'manage-aws-model-prefix'
   | 'manage-tavily'
   | 'manage-tavily-input'
   | 'manage-models'
@@ -69,6 +71,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [maxIterationsInput, setMaxIterationsInput] = useState('');
   const [timeoutInput, setTimeoutInput] = useState('');
+  const [modelPrefixInput, setModelPrefixInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
 
   // AWS credential test state
@@ -151,6 +154,10 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     } else if (view === 'change-timeout') {
       const current = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
       setTimeoutInput(Math.round(current / AUTONOMOUS.MS_PER_MINUTE).toString());
+      setInputError(null);
+    } else if (view === 'manage-aws-model-prefix') {
+      const current = config.getData().providers.aws?.modelPrefix || '';
+      setModelPrefixInput(current);
       setInputError(null);
     }
   }, [view, providerKey, testAWSCredentials]);
@@ -1069,6 +1076,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       ? [
           { label: 'Update API key', value: 'update' },
           ...(providerKey === 'openrouter' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
+          ...(providerKey === 'aws' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
           { label: 'Remove provider', value: 'remove' },
           { label: '← Back', value: '__back__' },
         ]
@@ -1102,7 +1110,11 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
               return;
             }
             if (item.value === 'configure') {
-              setView('manage-openrouter-settings');
+              if (providerKey === 'openrouter') {
+                setView('manage-openrouter-settings');
+              } else if (providerKey === 'aws') {
+                setView('manage-aws-settings');
+              }
               return;
             }
             setProviderAction(item.value as 'update');
@@ -1295,6 +1307,84 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
         />
         <Box marginTop={1}>
           <Text dimColor>Zero Data Retention ensures your data is not stored by OpenRouter</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Manage AWS Settings
+  if (view === 'manage-aws-settings') {
+    const aws = config.getData().providers.aws;
+    const modelPrefix = aws?.modelPrefix || '(none)';
+
+    const items = [
+      { label: `🏷️ Model Prefix: ${modelPrefix}`, value: 'model-prefix' },
+      { label: '← Back', value: '__back__' },
+    ];
+
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            AWS Bedrock Settings
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Configure AWS Bedrock-specific options</Text>
+        </Box>
+        <SelectInput
+          items={items}
+          onSelect={async (item) => {
+            if (item.value === '__back__') {
+              setView('manage-provider-action');
+              return;
+            }
+            if (item.value === 'model-prefix') {
+              setView('manage-aws-model-prefix');
+              return;
+            }
+          }}
+        />
+        <Box marginTop={1}>
+          <Text dimColor>Model prefix is used for cross-region inference (e.g., 'us.', 'eu.')</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Manage AWS Model Prefix
+  if (view === 'manage-aws-model-prefix') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            AWS Model Prefix
+          </Text>
+        </Box>
+        <Box marginBottom={1} flexDirection='column'>
+          <Text dimColor>Set a prefix for cross-region inference</Text>
+          <Text dimColor>Common prefixes: 'us.', 'eu.', or leave empty for none</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={modelPrefixInput}
+            onChange={setModelPrefixInput}
+            placeholder="e.g., us. or eu."
+            onSubmit={async () => {
+              await config.save((data) => {
+                if (data.providers.aws) {
+                  data.providers.aws.modelPrefix = modelPrefixInput.trim() || undefined;
+                }
+              });
+              const displayValue = modelPrefixInput.trim() || '(none)';
+              setMessage(`✓ Model prefix set to: ${displayValue}`);
+              setView('manage-aws-settings');
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to submit, ESC to go back</Text>
         </Box>
       </Box>
     );
