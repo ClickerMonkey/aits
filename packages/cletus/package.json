@@ -1,6 +1,6 @@
 {
   "name": "@aeye/cletus",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Interactive CLI demo showcasing @aeye capabilities",
   "type": "module",
   "main": "dist/index.js",

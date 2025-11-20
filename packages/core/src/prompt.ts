@@ -625,19 +625,27 @@ export class Prompt<
         }
 
         if (chunk.toolCallArguments) {
-          const toolExecutor = toolExecutorMap.get(chunk.toolCallArguments.id)!;
-          toolExecutor.toolCall = chunk.toolCallArguments;
-  
-          yield emit({ type: 'toolParseArguments', tool: toolExecutor.tool!, args: chunk.toolCallArguments.arguments, request });
+          const toolExecutor = toolExecutorMap.get(chunk.toolCallArguments.id);
+          if (toolExecutor) {
+            toolExecutor.toolCall = chunk.toolCallArguments;
+    
+            yield emit({ type: 'toolParseArguments', tool: toolExecutor.tool!, args: chunk.toolCallArguments.arguments, request });
+          } else {
+            console.error(`Received tool call arguments for unknown tool call ID ${chunk.toolCallArguments.id}`);
+          }
         }
 
         if (chunk.toolCall) {
-          const toolExecutor = toolExecutorMap.get(chunk.toolCall.id)!;
-          toolExecutor.toolCall = chunk.toolCall;
+          const toolExecutor = toolExecutorMap.get(chunk.toolCall.id);
+          if (toolExecutor) {
+            toolExecutor.toolCall = chunk.toolCall;
 
-          if (toolMode === 'immediate') {
-            // Start execution immediately
-            setImmediate(toolExecutor.run);
+            if (toolMode === 'immediate') {
+              // Start execution immediately
+              setImmediate(toolExecutor.run);
+            }
+          } else {
+            console.error(`Received tool call for unknown tool call ID ${chunk.toolCall.id}`);
           }
         }
 

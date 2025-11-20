@@ -86,10 +86,6 @@ export function createCletusAI(configFile: ConfigFile) {
         ...config.providers.openrouter.defaultParams,
         appName: 'cletus',
         siteUrl: 'https://github.com/ClickerMonkey/aeye',
-        providers: {
-          requireParameters: true,
-          ...config.providers.openrouter.defaultParams?.providers,
-        }
       },
     })} : {}),
 
