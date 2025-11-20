@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { formatName } from '../common';
+import ABOUT_CONTENT from './ABOUT.md';
 
 /**
  * Create utility tools for Cletus operations
@@ -47,9 +48,27 @@ export function createUtilityTools(ai: CletusAI) {
     },
   });
 
+  const about = ai.tool({
+    name: 'about',
+    description: 'Provides information about Cletus, the @aeye library, and the author',
+    instructions: `Use this tool when users ask about:
+- What Cletus is or can do
+- Information about the @aeye library
+- Who created Cletus
+- Project background and details
+- How to get started`,
+    schema: z.object({}),
+    call: async (_, __, { chatStatus }) => {
+      chatStatus('Retrieving about information...');
+      return ABOUT_CONTENT;
+    },
+  });
+
   return [
     getOperationOutput,
+    about,
   ] as [
     typeof getOperationOutput,
+    typeof about,
   ];
 }
