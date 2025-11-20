@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CletusAI } from '../ai';
 import { formatName } from '../common';
-import { ABOUT_CONTENT } from './about-content';
+import ABOUT_CONTENT from './ABOUT.md';
 
 /**
  * Create utility tools for Cletus operations

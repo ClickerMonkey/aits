@@ -16,6 +16,25 @@ const stubPlugin = {
   },
 };
 
+const markdownPlugin = {
+  name: 'markdown',
+  setup(build) {
+    build.onResolve({ filter: /\.md$/ }, args => {
+      return {
+        path: path.resolve(args.resolveDir, args.path),
+        namespace: 'markdown',
+      };
+    });
+    build.onLoad({ filter: /.*/, namespace: 'markdown' }, args => {
+      const content = fs.readFileSync(args.path, 'utf8');
+      return {
+        contents: `export default ${JSON.stringify(content)};`,
+        loader: 'js',
+      };
+    });
+  },
+};
+
 const shebangPlugin = {
   name: 'shebang',
   setup(build) {
@@ -69,6 +88,7 @@ esbuild.build({
   format: 'esm',
   plugins: [
     stubPlugin,
+    markdownPlugin,
     shebangPlugin  // Must run last to add shebang after banner
   ],
   banner: {
