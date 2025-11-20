@@ -1,12 +1,22 @@
 import { Box, Text, TextProps } from "ink";
-import SyntaxHighlight from "ink-syntax-highlight";
-import { supportsLanguage } from "cli-highlight";
+import { highlight, supportsLanguage } from "cli-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
 import { Link } from "./Link";
 import { logger } from "../logger";
 
 type LineSegment = { text: string;  url?: string; styles?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; } };
+
+/**
+ * Simple syntax highlight component using cli-highlight
+ */
+const SyntaxHighlight: React.FC<{ code: string; language?: string }> = ({ code, language }) => {
+  const highlightedCode = React.useMemo(() => {
+    return language ? highlight(code, { language, ignoreIllegals: true }) : code;
+  }, [code, language]);
+  
+  return <Text>{highlightedCode}</Text>;
+};
 
 /**
 * Parse inline markdown formatting and return text segments with styles
@@ -211,9 +221,11 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       }
       
       // Render the code block
+      const code = codeLines.join('\n');
+      
       result.push(
         <Box key={`codeblock-${i}`} flexGrow={1} backgroundColor={COLORS.MARKDOWN_CODE_BACKGROUND} paddingX={1}>
-          <SyntaxHighlight key={`code-${i}`} code={codeLines.join('\n')} language={language} />
+          <SyntaxHighlight key={`code-${i}`} code={code} language={language} />
         </Box>
       );
       
