@@ -1,5 +1,5 @@
 import { Box, Text, TextProps } from "ink";
-import SyntaxHighlight from "ink-syntax-highlight";
+import { highlight } from "cli-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
 import { Link } from "./Link";
@@ -205,9 +205,14 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       }
       
       // Render the code block
+      const code = codeLines.join('\n');
+      const highlightedCode = language 
+        ? highlight(code, { language, ignoreIllegals: true })
+        : code;
+      
       result.push(
         <Box key={`codeblock-${i}`} flexGrow={1} backgroundColor={COLORS.MARKDOWN_CODE_BACKGROUND} paddingX={1}>
-          <SyntaxHighlight key={`code-${i}`} code={codeLines.join('\n')} language={language} />
+          <Text key={`code-${i}`}>{highlightedCode}</Text>
         </Box>
       );
       
