@@ -1,5 +1,6 @@
 import { Box, Text, TextProps } from "ink";
 import SyntaxHighlight from "ink-syntax-highlight";
+import { supportsLanguage } from "cli-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
 import { Link } from "./Link";
@@ -194,7 +195,7 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
 
     // Detect code block
     if (line.trim().startsWith('```')) {
-      const language = line.trim().substring(3).trim() || undefined;
+      let language = line.substring(line.lastIndexOf('`') + 1).trim() || undefined;
       const codeLines: string[] = [];
       let j = i + 1;
       
@@ -202,6 +203,11 @@ const renderMarkdownContent = (content: string, nestingLevel: number = 0): React
       while (j < lines.length && !lines[j].trim().startsWith('```')) {
         codeLines.push(lines[j]);
         j++;
+      }
+
+      // If we don't support the language, let the library detect it
+      if (language && !supportsLanguage(language)) {
+        language = undefined;
       }
       
       // Render the code block
