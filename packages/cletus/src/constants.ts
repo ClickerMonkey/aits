@@ -1,68 +1,94 @@
+import { adaptiveColor, isLightTerminal, adjustHexForLightMode } from './theme';
+
+/**
+ * Get color constants for the Cletus UI based on terminal theme
+ */
+function getColors() {
+  const isLight = isLightTerminal();
+  
+  return {
+    // User colors
+    USER: isLight ? adjustHexForLightMode('#9d4edd', 0.5) : '#9d4edd',
+    USER_INPUT_BORDER: isLight ? adjustHexForLightMode('#9d4edd', 0.5) : '#9d4edd',
+    USER_INPUT_PROMPT: isLight ? adjustHexForLightMode('#9d4edd', 0.5) : '#9d4edd',
+
+    // Assistant colors
+    ASSISTANT: adaptiveColor('green', 'green'), // Green works on both
+
+    // System colors
+    SYSTEM: adaptiveColor('yellow', '#b8860b'), // Darker yellow for light mode
+
+    // Status indicator colors
+    STATUS_USER: isLight ? adjustHexForLightMode('#9d4edd', 0.5) : '#9d4edd',
+    STATUS_NO_OPS: adaptiveColor('gray', '#666666'), // Darker gray for light mode
+    STATUS_DONE: adaptiveColor('green', 'green'), // Green works on both
+    STATUS_ANALYZED: adaptiveColor('yellow', '#b8860b'), // Darker yellow for light mode
+    STATUS_IN_PROGRESS: adaptiveColor('rgb(255,165,0)', 'rgb(180,120,0)'), // Darker orange for light mode
+
+    // Menu Gradient
+    MENU_GRADIENT: isLight 
+      ? [
+          adjustHexForLightMode('#9d4edd', 0.5),
+          'rgb(0,90,180)',
+          'rgb(180,120,0)',
+        ]
+      : [
+          '#9d4edd',
+          'rgb(0,128,255)',
+          'rgb(255,165,0)',
+        ],
+
+    // Operation approval menu colors
+    APPROVAL_BORDER: adaptiveColor('yellow', '#b8860b'),
+    APPROVAL_SELECTED: adaptiveColor('cyan', 'rgb(0,139,139)'), // Dark cyan for light mode
+    APPROVAL_UNSELECTED: adaptiveColor('white', 'black'),
+
+    // Processing states
+    PROCESSING_BORDER: adaptiveColor('cyan', 'rgb(0,139,139)'), // Dark cyan for light mode
+    PROCESSING_TEXT: adaptiveColor('cyan', 'rgb(0,139,139)'), // Dark cyan for light mode
+
+    // Completion states
+    SUCCESS_BORDER: adaptiveColor('green', 'green'),
+    SUCCESS_TEXT: adaptiveColor('green', 'green'),
+    ERROR_BORDER: adaptiveColor('red', 'red'),
+    ERROR_TEXT: adaptiveColor('red', 'red'),
+
+    // Input states
+    INPUT_TRANSCRIBING: adaptiveColor('blue', 'rgb(0,0,180)'), // Darker blue for light mode
+    INPUT_WAITING: adaptiveColor('gray', '#666666'),
+    INPUT_APPROVAL_MENU: adaptiveColor('gray', '#666666'),
+
+    // Markdown colors
+    MAKRDOWN_HEADINGS: isLight 
+      ? [
+          { color: 'rgb(0,139,139)', bold: true }, // Dark cyan
+          { color: 'rgb(0,120,120)', bold: true },
+          { color: 'rgb(0,100,100)', bold: true },
+          { color: 'rgb(0,80,80)', bold: true },
+          { color: 'rgb(0,60,60)', bold: true },
+          { color: 'rgb(0,40,40)', bold: false },
+        ]
+      : [
+          { color: 'rgb(0,255,255)', bold: true },
+          { color: 'rgb(0,210,210)', bold: true },
+          { color: 'rgb(0,165,165)', bold: true },
+          { color: 'rgb(0,130,130)', bold: true },
+          { color: 'rgb(0,95,95)', bold: true },
+          { color: 'rgb(0,60,60)', bold: false },
+        ],
+    MARKDOWN_CODE_BACKGROUND: adaptiveColor('rgb(25,25,25)', 'rgb(240,240,240)'), // Light gray for light mode
+    MARKDOWN_LINK: adaptiveColor('rgb(15,101,187)', 'rgb(10,70,130)'), // Darker blue for light mode
+    MARKDOWN_BLOCKQUOTE: adaptiveColor('rgb(30,30,30)', 'rgb(235,235,235)'), // Light gray for light mode
+
+    // Other UI elements
+    DIM_TEXT: adaptiveColor('gray', '#666666'),
+  };
+}
+
 /**
  * Color constants for the Cletus UI
  */
-export const COLORS = {
-  // User colors
-  USER: '#9d4edd' as const, // Purple instead of magenta
-  USER_INPUT_BORDER: '#9d4edd' as const,
-  USER_INPUT_PROMPT: '#9d4edd' as const,
-
-  // Assistant colors
-  ASSISTANT: 'green' as const,
-
-  // System colors
-  SYSTEM: 'yellow' as const,
-
-  // Status indicator colors
-  STATUS_USER: '#9d4edd' as const, // Purple circle for user messages
-  STATUS_NO_OPS: 'gray' as const, // Gray circle for no operations
-  STATUS_DONE: 'green' as const, // Green circle for completed operations
-  STATUS_ANALYZED: 'yellow' as const, // Yellow circle for operations needing approval
-  STATUS_IN_PROGRESS: 'rgb(255,165,0)' as const, // Orange circle for in-progress operations
-
-  // Menu Gradianet
-  MENU_GRADIENT: [
-    '#9d4edd',
-    'rgb(0,128,255)',
-    'rgb(255,165,0)',
-  ] as string[],
-
-  // Operation approval menu colors
-  APPROVAL_BORDER: 'yellow' as const,
-  APPROVAL_SELECTED: 'cyan' as const,
-  APPROVAL_UNSELECTED: 'white' as const,
-
-  // Processing states
-  PROCESSING_BORDER: 'cyan' as const,
-  PROCESSING_TEXT: 'cyan' as const,
-
-  // Completion states
-  SUCCESS_BORDER: 'green' as const,
-  SUCCESS_TEXT: 'green' as const,
-  ERROR_BORDER: 'red' as const,
-  ERROR_TEXT: 'red' as const,
-
-  // Input states
-  INPUT_TRANSCRIBING: 'blue' as const,
-  INPUT_WAITING: 'gray' as const,
-  INPUT_APPROVAL_MENU: 'gray' as const,
-
-  // Markdown colors
-  MAKRDOWN_HEADINGS: [
-    { color: 'rgb(0,255,255)', bold: true },
-    { color: 'rgb(0,210,210)', bold: true },
-    { color: 'rgb(0,165,165)', bold: true },
-    { color: 'rgb(0,130,130)', bold: true },
-    { color: 'rgb(0,95,95)', bold: true },
-    { color: 'rgb(0,60,60)', bold: false },
-  ] as const,
-  MARKDOWN_CODE_BACKGROUND: 'rgb(25,25,25)' as const,
-  MARKDOWN_LINK: 'rgb(15,101,187)' as const,
-  MARKDOWN_BLOCKQUOTE: 'rgb(30,30,30)' as const,
-
-  // Other UI elements
-  DIM_TEXT: 'gray' as const,
-} as const;
+export const COLORS = getColors();
 
 /**
  * Type for color values
