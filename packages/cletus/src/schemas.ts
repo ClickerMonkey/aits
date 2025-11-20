@@ -102,8 +102,8 @@ export const ReplicateConfigSchema = z.object({
 export const AWSBedrockConfigSchema = z.object({
   region: z.string().optional(),
   credentials: z.object({
-    accessKeyId: z.string(),
-    secretAccessKey: z.string(),
+    accessKeyId: z.string().optional(),
+    secretAccessKey: z.string().optional(),
     sessionToken: z.string().optional(),
   }).optional(),
   modelFamilies: z.record(z.string(), z.object({
