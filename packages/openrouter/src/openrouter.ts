@@ -249,13 +249,16 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
     if (config.defaultParams) {
       const dp = config.defaultParams;
 
-      params.provider = {
-        allow_fallbacks: dp.providers?.allowFallbacks,
-        require_parameters: dp.providers?.requireParameters,
-        data_collection: dp.providers?.dataCollection,
-        max_price: dp.providers?.maxPrice,
-        ...dp.providers,
-      };
+      if (dp.providers) {
+        const { allowFallbacks, requireParameters, dataCollection, maxPrice, ...provider } = dp.providers;
+        params.provider = {
+          allow_fallbacks: allowFallbacks,
+          require_parameters: requireParameters,
+          data_collection: dataCollection,
+          max_price: maxPrice,
+          ...provider,
+        };
+      }
 
       if (dp.transforms) {
         params.transforms = dp.transforms;
