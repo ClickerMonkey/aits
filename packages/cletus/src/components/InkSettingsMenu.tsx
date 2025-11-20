@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { ConfigFile } from '../config';
 import { ModelSelector } from './ModelSelector';
 import { createCletusAI } from '../ai';
@@ -12,6 +12,7 @@ import { ModelCapability } from '@aeye/ai';
 import { logger } from '../logger';
 import { abbreviate } from '../common';
 import { AUTONOMOUS } from '../constants';
+import { BedrockClient, ListFoundationModelsCommand } from '@aws-sdk/client-bedrock';
 
 type SettingsView =
   | 'menu'
@@ -70,6 +71,39 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
   const [timeoutInput, setTimeoutInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
 
+  // AWS credential test state
+  const [awsTestStatus, setAwsTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [awsTestMessage, setAwsTestMessage] = useState<string>('');
+
+  // Function to test AWS credentials
+  const testAWSCredentials = useCallback(async (): Promise<boolean> => {
+    setAwsTestStatus('testing');
+    setAwsTestMessage('Testing AWS credentials...');
+    
+    try {
+      const bedrockClient = new BedrockClient({
+        region: process.env.AWS_REGION || 'us-east-1',
+      });
+      
+      // Try to list foundation models as a test
+      await bedrockClient.send(new ListFoundationModelsCommand({}));
+      
+      setAwsTestStatus('success');
+      setAwsTestMessage('✓ AWS credentials detected and working!');
+      return true;
+    } catch (error: any) {
+      setAwsTestStatus('error');
+      if (error.name === 'CredentialsProviderError' || error.name === 'UnrecognizedClientException') {
+        setAwsTestMessage('⚠️ No AWS credentials found. Please configure manually.');
+      } else if (error.name === 'AccessDeniedException') {
+        setAwsTestMessage('✓ AWS credentials found but no Bedrock access. Check IAM permissions.');
+      } else {
+        setAwsTestMessage(`⚠️ AWS test failed: ${error.message || 'Unknown error'}`);
+      }
+      return false;
+    }
+  }, []);
+
   // Set terminal title
   useEffect(() => {
     process.stdout.write('\x1b]0;Cletus: Settings\x07');
@@ -98,6 +132,12 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
     } else if (view === 'manage-provider-input') {
       setApiKeyInput('');
       setInputError(null);
+      // Test AWS credentials when entering AWS configuration
+      if (providerKey === 'aws') {
+        setAwsTestStatus('idle');
+        setAwsTestMessage('');
+        testAWSCredentials();
+      }
     } else if (view === 'change-max-iterations') {
       const current = config.getData().user.autonomous?.maxIterations ?? AUTONOMOUS.DEFAULT_MAX_ITERATIONS;
       setMaxIterationsInput(current.toString());
@@ -107,7 +147,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
       setTimeoutInput(Math.round(current / AUTONOMOUS.MS_PER_MINUTE).toString());
       setInputError(null);
     }
-  }, [view]);
+  }, [view, providerKey, testAWSCredentials]);
 
   // Handle ESC and Ctrl+C keys
   useInput((input, key) => {
@@ -1079,51 +1119,86 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             </Text>
           </Box>
           <Box marginBottom={1} flexDirection='column'>
-            <Text dimColor>AWS Bedrock uses credentials from your environment or IAM roles.</Text>
-            <Text dimColor>Set the following environment variables:</Text>
-            <Text dimColor>  - AWS_REGION (e.g., us-east-1)</Text>
-            <Text dimColor>  - AWS_ACCESS_KEY_ID</Text>
-            <Text dimColor>  - AWS_SECRET_ACCESS_KEY</Text>
-            <Text dimColor>Or use IAM roles when running on AWS (EC2, ECS, Lambda).</Text>
+            <Text dimColor>AWS Bedrock can use credentials from multiple sources:</Text>
+            <Text dimColor>  - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)</Text>
+            <Text dimColor>  - Shared credentials file (~/.aws/credentials)</Text>
+            <Text dimColor>  - IAM roles (when running on EC2, ECS, Lambda)</Text>
           </Box>
-          <Box marginTop={1}>
+          <Box marginTop={1} marginBottom={1}>
             <Text>Currently configured: {config.getData().providers.aws ? 'Yes' : 'No'}</Text>
           </Box>
-          <Box marginTop={1}>
-            <SelectInput
-              items={[
-                { label: 'Use environment credentials', value: 'env' },
-                { label: '← Back', value: '__back__' },
-              ]}
-              onSelect={async (item) => {
-                if (item.value === '__back__') {
-                  setView('manage-provider-action');
-                  return;
-                }
-                if (item.value === 'env') {
-                  const awsRegion = process.env.AWS_REGION;
-                  const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
-                  const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-                  
-                  if (awsAccessKeyId && awsSecretAccessKey) {
+          {awsTestStatus === 'testing' && (
+            <Box marginBottom={1}>
+              <Text color="yellow">{awsTestMessage}</Text>
+            </Box>
+          )}
+          {awsTestStatus === 'success' && (
+            <Box marginBottom={1}>
+              <Text color="green">{awsTestMessage}</Text>
+            </Box>
+          )}
+          {awsTestStatus === 'error' && (
+            <Box marginBottom={1}>
+              <Text color="yellow">{awsTestMessage}</Text>
+            </Box>
+          )}
+          {awsTestStatus !== 'testing' && (
+            <Box marginTop={1}>
+              <SelectInput
+                items={[
+                  ...(awsTestStatus === 'success' || awsTestStatus === 'error' 
+                    ? [{ label: 'Enable with auto-detected credentials', value: 'auto' }]
+                    : []
+                  ),
+                  { label: 'Configure with explicit environment variables', value: 'env' },
+                  { label: 'Test credentials again', value: 'test' },
+                  { label: '← Back', value: '__back__' },
+                ]}
+                onSelect={async (item) => {
+                  if (item.value === '__back__') {
+                    setView('manage-provider-action');
+                    return;
+                  }
+                  if (item.value === 'test') {
+                    await testAWSCredentials();
+                    return;
+                  }
+                  if (item.value === 'auto') {
+                    // Enable AWS provider with empty config to use AWS SDK credential chain
                     await config.save((data) => {
                       data.providers.aws = {
-                        region: awsRegion,
-                        credentials: {
-                          accessKeyId: awsAccessKeyId,
-                          secretAccessKey: awsSecretAccessKey,
-                        },
+                        region: process.env.AWS_REGION,
                       };
                     });
-                    setMessage('✓ AWS configured with environment credentials!');
-                  } else {
-                    setMessage('⚠️ AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment');
+                    setMessage('✓ AWS configured with auto-detected credentials!');
+                    setView('manage-providers');
+                    return;
                   }
-                  setView('manage-providers');
-                }
-              }}
-            />
-          </Box>
+                  if (item.value === 'env') {
+                    const awsRegion = process.env.AWS_REGION;
+                    const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+                    const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+                    
+                    if (awsAccessKeyId && awsSecretAccessKey) {
+                      await config.save((data) => {
+                        data.providers.aws = {
+                          region: awsRegion,
+                          credentials: {
+                            accessKeyId: awsAccessKeyId,
+                            secretAccessKey: awsSecretAccessKey,
+                          },
+                        };
+                      });
+                      setMessage('✓ AWS configured with explicit environment credentials!');
+                    } else {
+                      setMessage('⚠️ AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY not found in environment');
+                    }
+                    setView('manage-providers');
+                  }
+                }}
+              />
+            </Box>
+          )}
         </Box>
       );
     }
