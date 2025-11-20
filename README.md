@@ -683,7 +683,7 @@ Please see the main [@aeye repository](https://github.com/ClickerMonkey/aeye) fo
 
 ## License
 
-MIT © [ClickerMonkey](https://github.com/ClickerMonkey)
+GPL-3.0 © [ClickerMonkey](https://github.com/ClickerMonkey)
 
 See [LICENSE](./LICENSE) for details.
 
@@ -705,4 +705,4 @@ Special thanks to:
 
 ---
 
-**Made with TypeScript** | **MIT Licensed** | **Production Ready**
+**Made with TypeScript** | **GPL-3.0 Licensed** | **Production Ready**

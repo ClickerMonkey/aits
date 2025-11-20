@@ -1314,7 +1314,7 @@ const report = await researchAgent.execute(
 
 ## License
 
-MIT
+GPL-3.0
 
 ---
 

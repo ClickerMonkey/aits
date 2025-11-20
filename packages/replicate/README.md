@@ -586,7 +586,7 @@ Popular model categories:
 
 ## License
 
-MIT
+GPL-3.0
 
 ## Contributing
 

@@ -904,7 +904,7 @@ Main provider class implementing the @aeye Provider interface.
 
 ## License
 
-MIT
+GPL-3.0
 
 ## Contributing
 

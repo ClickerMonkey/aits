@@ -559,7 +559,7 @@ Contributions are welcome! See the main [@aeye repository](https://github.com/Cl
 
 ## License
 
-MIT © [ClickerMonkey](https://github.com/ClickerMonkey)
+GPL-3.0 © [ClickerMonkey](https://github.com/ClickerMonkey)
 
 ## Links
 

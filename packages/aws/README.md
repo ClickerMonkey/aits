@@ -400,7 +400,7 @@ AWS_REGION=us-east-1
 
 ## License
 
-MIT - See [LICENSE](../../LICENSE) file for details.
+GPL-3.0 - See [LICENSE](../../LICENSE) file for details.
 
 ## Contributing
 
