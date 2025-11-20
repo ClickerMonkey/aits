@@ -138,6 +138,8 @@ export interface AWSBedrockConfig {
     secretAccessKey?: string;
     sessionToken?: string;
   };
+  // Optional prefix for cross-region inference (e.g., 'us.', 'eu.')
+  modelPrefix?: string;
   // Model family configurations
   modelFamilies?: Record<string, ModelFamilyConfig>;
   // Default models for different capabilities
@@ -234,6 +236,19 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
       };
     }
     return clientConfig;
+  }
+
+  /**
+   * Prepend model prefix if configured
+   * 
+   * @param modelId - The base model ID
+   * @returns Model ID with prefix prepended if configured
+   */
+  private applyModelPrefix(modelId: string): string {
+    if (this.config.modelPrefix) {
+      return `${this.config.modelPrefix}${modelId}`;
+    }
+    return modelId;
   }
 
   // ============================================================================
@@ -411,7 +426,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
   private async executeAnthropicModel(model: ModelInput, request: Request, ctx: AIContextAny): Promise<Response> {
     const body = this.convertRequestToAnthropic(model, request);
-    const modelId = getModel(model)?.id || '';
+    const modelId = this.applyModelPrefix(getModel(model)?.id || '');
     
     try {
       const command = new InvokeModelCommand({
@@ -474,7 +489,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
   private async* streamAnthropicModel(model: ModelInput, request: Request, ctx: AIContextAny): AsyncGenerator<Chunk> {
     const body = this.convertRequestToAnthropic(model, request);
-    const modelId = getModel(model)?.id || '';
+    const modelId = this.applyModelPrefix(getModel(model)?.id || '');
     
     try {
       const command = new InvokeModelWithResponseStreamCommand({
@@ -832,7 +847,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelCommand({
-        modelId,
+        modelId: this.applyModelPrefix(modelId),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),
@@ -879,7 +894,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelWithResponseStreamCommand({
-        modelId,
+        modelId: this.applyModelPrefix(modelId),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),
@@ -936,7 +951,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelCommand({
-        modelId,
+        modelId: this.applyModelPrefix(modelId),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),
@@ -985,7 +1000,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelWithResponseStreamCommand({
-        modelId,
+        modelId: this.applyModelPrefix(modelId),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),
@@ -1062,7 +1077,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelCommand({
-        modelId: model.id,
+        modelId: this.applyModelPrefix(model.id),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),
@@ -1114,7 +1129,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
     try {
       const command = new InvokeModelCommand({
-        modelId: model.id,
+        modelId: this.applyModelPrefix(model.id),
         contentType: 'application/json',
         accept: 'application/json',
         body: JSON.stringify(body),

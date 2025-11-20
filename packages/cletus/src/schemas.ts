@@ -106,6 +106,7 @@ export const AWSBedrockConfigSchema = z.object({
     secretAccessKey: z.string().optional(),
     sessionToken: z.string().optional(),
   }).optional(),
+  modelPrefix: z.string().optional(),
   modelFamilies: z.record(z.string(), z.object({
     enabled: z.boolean().optional(),
     modelIdMap: z.record(z.string(), z.string()).optional(),
