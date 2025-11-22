@@ -108,10 +108,26 @@ export abstract class JsonFile<T> {
 }
 
 /**
+ * Global profile name for the current session
+ */
+let globalProfile: string | undefined;
+
+/**
+ * Set the global profile for the session
+ */
+export function setProfile(profile: string | undefined): void {
+  globalProfile = profile;
+}
+
+/**
  * Get the Cletus home directory
  */
 export function getCletusHome(): string {
-  return path.join(os.homedir(), '.cletus');
+  const baseDir = path.join(os.homedir(), '.cletus');
+  if (globalProfile) {
+    return path.join(baseDir, 'profiles', globalProfile);
+  }
+  return baseDir;
 }
 
 /**

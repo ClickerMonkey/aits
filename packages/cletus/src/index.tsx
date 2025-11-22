@@ -9,7 +9,7 @@ import { InkChatView } from './components/InkChatView';
 import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
-import { configExists } from './file-manager';
+import { configExists, setProfile } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
@@ -83,7 +83,35 @@ const App = () => {
   return <Text>Loading...</Text>;
 };
 
+/**
+ * Parse command line arguments
+ */
+function parseArgs(): { profile?: string } {
+  const args = process.argv.slice(2);
+  let profile: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    // Handle --profile=name format
+    if (arg.startsWith('--profile=')) {
+      profile = arg.substring('--profile='.length);
+    }
+    // Handle --profile name format
+    else if (arg === '--profile' && i + 1 < args.length) {
+      profile = args[i + 1];
+      i++; // Skip next argument
+    }
+  }
+
+  return { profile };
+}
+
 async function main() {
+  // Parse command line arguments and set global profile
+  const { profile } = parseArgs();
+  setProfile(profile);
+
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
