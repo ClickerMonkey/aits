@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ConfigFile } from '../config';
 import { ModelSelector } from './ModelSelector';
 import { createCletusAI } from '../ai';
@@ -57,6 +57,15 @@ interface InkSettingsSplitViewProps {
   onExit: () => void;
 }
 
+// Panel width constants for consistent layout
+// Note: Widths intentionally sum to 96% to account for margins and borders (4%)
+const PANEL_WIDTHS = {
+  left: '23%',
+  middle: '35%',
+  middleExpanded: '72%',
+  right: '38%',
+} as const;
+
 export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ config, onExit }) => {
   const [selectedCategory, setSelectedCategory] = useState<SettingsCategory>('user-profile');
   const [subView, setSubView] = useState<SubView>('default');
@@ -67,6 +76,9 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
   const [providerAction, setProviderAction] = useState<'update' | 'remove' | null>(null);
   const [selectedDeleteId, setSelectedDeleteId] = useState<string>('');
   const [selectedModelType, setSelectedModelType] = useState<ModelType | null>(null);
+  
+  // Focus management: 0 = left pane, 1 = middle pane, 2 = right pane
+  const [focusedPane, setFocusedPane] = useState<0 | 1 | 2>(0);
 
   // State for all input fields
   const [nameInput, setNameInput] = useState('');
@@ -168,9 +180,56 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       setInputError(null);
     }
   }, [subView, providerKey, testAWSCredentials]);
+  
+  // Memoize third pane visibility to avoid repeated calculations
+  // Third pane is shown for specific sub-views that need deeper navigation
+  const showThirdPane = useMemo(() => {
+    return subView === 'provider-action' || 
+           subView === 'openrouter-settings' || 
+           subView === 'aws-settings' ||
+           subView === 'aws-model-prefix' ||
+           subView === 'delete-chat-options';
+  }, [subView]);
 
-  // Handle ESC and Ctrl+C keys
+  // Handle ESC, Ctrl+C, and Tab keys for pane navigation
   useInput((input, key) => {
+    // Tab key to switch between panes
+    if (key.tab) {
+      // Only allow tab navigation on default view (not during text input)
+      if (subView === 'default') {
+        setFocusedPane((prev) => {
+          // Cycle through panes: left (0) -> middle (1) -> right (2 if shown) -> left (0)
+          if (prev === 0) return 1;
+          if (prev === 1) {
+            // Check if there's content in the third pane that can be focused
+            return showThirdPane ? 2 : 0;
+          }
+          return 0;
+        });
+      }
+      return;
+    }
+    
+    // Left/Right arrow keys for pane navigation (alternative to Tab)
+    if (key.leftArrow && subView === 'default') {
+      setFocusedPane((prev) => {
+        if (prev === 2) return 1;
+        if (prev === 1) return 0;
+        return prev;
+      });
+      return;
+    }
+    if (key.rightArrow && subView === 'default') {
+      setFocusedPane((prev) => {
+        if (prev === 0) return 1;
+        if (prev === 1) {
+          return showThirdPane ? 2 : 1;
+        }
+        return prev;
+      });
+      return;
+    }
+    
     if (key.escape && subView === 'add-memory') {
       handleBackToCategory();
     }
@@ -191,6 +250,8 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
   const handleBackToCategory = () => {
     setMessage(null);
     setSubView('default');
+    // Reset focus to middle pane when going back to category default
+    setFocusedPane(1);
   };
 
   const showConfirm = (msg: string, action: () => Promise<void>) => {
@@ -212,9 +273,9 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     { label: '🐛 Debug', value: 'debug' as SettingsCategory },
   ];
 
-  // Render the right panel based on selected category and subView
-  const renderRightPanel = () => {
-    // Confirm dialog
+  // Render the middle panel based on selected category and subView
+  const renderMiddlePanel = () => {
+    // Confirm dialog takes over middle panel
     if (subView === 'confirm') {
       const items = [
         { label: 'Yes', value: 'yes' },
@@ -230,6 +291,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           </Box>
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={async (item) => {
               if (item.value === 'yes' && confirmAction) {
                 await confirmAction();
@@ -347,8 +409,10 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               setSubView(item.value as SubView);
+              setFocusedPane(1);
             }}
           />
         </Box>
@@ -421,6 +485,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={async (item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -464,6 +529,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={async (item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -510,6 +576,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               if (item.value === '__info__' || item.value === '__separator__') {
                 return;
@@ -521,6 +588,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
               } else if (item.value === 'remove') {
                 setSubView('remove-prompt-file');
               }
+              setFocusedPane(1);
             }}
           />
         </Box>
@@ -579,6 +647,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={(item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -632,6 +701,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               if (item.value === 'add') {
                 setSubView('add-memory');
@@ -670,6 +740,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={(item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -682,71 +753,6 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
                     data.assistants.splice(index, 1);
                   });
                   setMessage(`✓ Assistant "${name}" deleted`);
-                });
-              }}
-            />
-          </Box>
-        );
-      } else if (subView === 'delete-chat-options') {
-        const chats = config.getChats();
-        const chat = chats.find((c) => c.id === selectedDeleteId);
-        
-        if (!chat) {
-          setSubView('delete-chat');
-          return null;
-        }
-
-        const chatIndex = chats.findIndex((c) => c.id === selectedDeleteId);
-        const hasOlderChats = chatIndex < chats.length - 1;
-        const olderCount = chats.length - chatIndex - 1;
-
-        const items = [
-          { label: `Delete this chat only`, value: 'single' },
-          ...(hasOlderChats ? [{ label: `Delete this chat and ${olderCount} older chat${olderCount !== 1 ? 's' : ''}`, value: 'and_older' }] : []),
-          { label: '← Cancel', value: '__cancel__' },
-        ];
-
-        return (
-          <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text bold color="cyan">Delete: {abbreviate(chat.title, 50)}</Text>
-            </Box>
-            <SelectInput
-              items={items}
-              onSelect={(item) => {
-                if (item.value === '__cancel__') {
-                  setSubView('delete-chat');
-                  return;
-                }
-
-                const deleteChats = item.value === 'and_older' 
-                  ? chats.slice(chatIndex)
-                  : [chat];
-
-                const confirmMsg = item.value === 'and_older'
-                  ? `Delete "${abbreviate(chat.title, 40)}" and ${deleteChats.length - 1} older chat${deleteChats.length - 1 !== 1 ? 's' : ''}?`
-                  : `Delete "${abbreviate(chat.title, 50)}" and all its messages?`;
-
-                showConfirm(confirmMsg, async () => {
-                  for (const chatToDelete of deleteChats) {
-                    try {
-                      await fs.unlink(getChatPath(chatToDelete.id));
-                    } catch (error: any) {
-                      if (error.code !== 'ENOENT') {
-                        console.error('Failed to delete chat messages:', error.message);
-                      }
-                    }
-                    await config.deleteChat(chatToDelete.id);
-                  }
-                  const deletedCount = deleteChats.length;
-                  setMessage(`✓ ${deletedCount} chat${deletedCount !== 1 ? 's' : ''} deleted`);
-                  
-                  const remainingChats = config.getChats();
-                  if (remainingChats.length === 0) {
-                    handleBackToCategory();
-                  } else {
-                    setSubView('delete-chat');
-                  }
                 });
               }}
             />
@@ -778,6 +784,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={(item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -805,6 +812,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
                 setSelectedDeleteId(item.value);
                 setSubView('delete-chat-options');
+                setFocusedPane(2);
               }}
             />
           </Box>
@@ -833,6 +841,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={(item) => {
                 if (item.value === '__cancel__') {
                   handleBackToCategory();
@@ -878,6 +887,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               setSubView(item.value as SubView);
             }}
@@ -914,6 +924,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
             <SelectInput
               items={items}
+              isFocused={focusedPane === 1}
               onSelect={(item) => {
                 if (item.value === '__back__') {
                   handleBackToCategory();
@@ -932,8 +943,10 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
                 if (item.value === 'configure') {
                   if (providerKey === 'openrouter') {
                     setSubView('openrouter-settings');
+                    setFocusedPane(2);
                   } else if (providerKey === 'aws') {
                     setSubView('aws-settings');
+                    setFocusedPane(2);
                   }
                   return;
                 }
@@ -986,6 +999,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
                       { label: 'Test credentials again', value: 'test' },
                       { label: '← Back', value: '__back__' },
                     ]}
+                    isFocused={focusedPane === 1}
                     onSelect={async (item) => {
                       if (item.value === '__back__') {
                         setSubView('provider-action');
@@ -1072,125 +1086,6 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             </Box>
           </Box>
         );
-      } else if (subView === 'openrouter-settings') {
-        const openrouter = config.getData().providers.openrouter;
-        const zdrEnabled = openrouter?.defaultParams?.providers?.dataCollection === 'deny';
-
-        const items = [
-          { label: `🔒 Zero Data Retention (ZDR) ${zdrEnabled ? '✅' : '❌'}`, value: 'toggle-zdr' },
-          { label: '← Back', value: '__back__' },
-        ];
-
-        return (
-          <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text bold color="cyan">OpenRouter Settings</Text>
-            </Box>
-            <Box marginBottom={1}>
-              <Text dimColor>Configure OpenRouter-specific options</Text>
-            </Box>
-            <SelectInput
-              items={items}
-              onSelect={async (item) => {
-                if (item.value === '__back__') {
-                  setSubView('provider-action');
-                  return;
-                }
-                if (item.value === 'toggle-zdr') {
-                  const newZdrValue = !zdrEnabled;
-                  await config.save((data) => {
-                    if (data.providers.openrouter) {
-                      if (!data.providers.openrouter.defaultParams) {
-                        data.providers.openrouter.defaultParams = {};
-                      }
-                      if (!data.providers.openrouter.defaultParams.providers) {
-                        data.providers.openrouter.defaultParams.providers = {};
-                      }
-                      data.providers.openrouter.defaultParams.providers.dataCollection = newZdrValue ? 'deny' : 'allow';
-                    }
-                  });
-                  setMessage(`✓ ZDR ${newZdrValue ? 'enabled' : 'disabled'} - Your data ${newZdrValue ? 'will not be stored' : 'may be stored'} by OpenRouter`);
-                }
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Zero Data Retention ensures your data is not stored by OpenRouter</Text>
-            </Box>
-          </Box>
-        );
-      } else if (subView === 'aws-settings') {
-        const aws = config.getData().providers.aws;
-        const modelPrefix = aws?.modelPrefix || '(none)';
-
-        const items = [
-          { label: `🏷️ Model Prefix: ${modelPrefix}`, value: 'model-prefix' },
-          { label: '← Back', value: '__back__' },
-        ];
-
-        return (
-          <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text bold color="cyan">AWS Bedrock Settings</Text>
-            </Box>
-            <Box marginBottom={1}>
-              <Text dimColor>Configure AWS Bedrock-specific options</Text>
-            </Box>
-            <SelectInput
-              items={items}
-              onSelect={async (item) => {
-                if (item.value === '__back__') {
-                  setSubView('provider-action');
-                  return;
-                }
-                if (item.value === 'model-prefix') {
-                  setSubView('aws-model-prefix');
-                  return;
-                }
-              }}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>Model prefix is used for cross-region inference (e.g., 'us.', 'eu.')</Text>
-            </Box>
-          </Box>
-        );
-      } else if (subView === 'aws-model-prefix') {
-        return (
-          <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text bold color="cyan">AWS Model Prefix</Text>
-            </Box>
-            <Box marginBottom={1} flexDirection="column">
-              <Text dimColor>Set a prefix for cross-region inference</Text>
-              <Text dimColor>Common prefixes: 'us.', 'eu.', or leave empty for none</Text>
-            </Box>
-            <Box>
-              <Text color="cyan">▶ </Text>
-              <TextInput
-                value={modelPrefixInput}
-                onChange={setModelPrefixInput}
-                placeholder="e.g., us. or eu."
-                onSubmit={async () => {
-                  await config.save((data) => {
-                    if (data.providers.aws) {
-                      const trimmedValue = modelPrefixInput.trim();
-                      if (trimmedValue) {
-                        data.providers.aws.modelPrefix = trimmedValue;
-                      } else {
-                        delete data.providers.aws.modelPrefix;
-                      }
-                    }
-                  });
-                  const displayValue = modelPrefixInput.trim() || '(none)';
-                  setMessage(`✓ Model prefix set to: ${displayValue}`);
-                  setSubView('aws-settings');
-                }}
-              />
-            </Box>
-            <Box marginTop={1}>
-              <Text dimColor>Enter to submit, ESC to go back</Text>
-            </Box>
-          </Box>
-        );
       }
 
       // Default providers view
@@ -1227,6 +1122,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               setProviderKey(item.value as keyof Providers);
               setSubView('provider-action');
@@ -1298,6 +1194,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               if (item.value === 'remove') {
                 showConfirm('Remove Tavily API key?', async () => {
@@ -1409,6 +1306,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               setSelectedModelType(item.value as ModelType);
               setSubView('select-model');
@@ -1525,6 +1423,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           )}
           <SelectInput
             items={items}
+            isFocused={focusedPane === 1}
             onSelect={(item) => {
               setSubView(item.value as SubView);
             }}
@@ -1554,6 +1453,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
             items={[
               { label: debugEnabled ? 'Disable debug logging' : 'Enable debug logging', value: 'toggle' },
             ]}
+            isFocused={focusedPane === 1}
             onSelect={async (item) => {
               await config.save((cfg) => {
                 cfg.user.debug = !cfg.user.debug;
@@ -1570,6 +1470,216 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     return <Text>Unknown category</Text>;
   };
 
+  // Render the right (third) panel for deeper navigation
+  const renderRightPanel = () => {
+    // OpenRouter Settings (third pane)
+    if (subView === 'openrouter-settings') {
+      const openrouter = config.getData().providers.openrouter;
+      const zdrEnabled = openrouter?.defaultParams?.providers?.dataCollection === 'deny';
+
+      const items = [
+        { label: `🔒 Zero Data Retention (ZDR) ${zdrEnabled ? '✅' : '❌'}`, value: 'toggle-zdr' },
+        { label: '← Back', value: '__back__' },
+      ];
+
+      return (
+        <Box flexDirection="column">
+          <Box marginBottom={1}>
+            <Text bold color="magenta">OpenRouter Settings</Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text dimColor>Configure OpenRouter-specific options</Text>
+          </Box>
+          <SelectInput
+            items={items}
+            isFocused={focusedPane === 2}
+            onSelect={async (item) => {
+              if (item.value === '__back__') {
+                setSubView('provider-action');
+                setFocusedPane(1);
+                return;
+              }
+              if (item.value === 'toggle-zdr') {
+                const newZdrValue = !zdrEnabled;
+                await config.save((data) => {
+                  if (data.providers.openrouter) {
+                    if (!data.providers.openrouter.defaultParams) {
+                      data.providers.openrouter.defaultParams = {};
+                    }
+                    if (!data.providers.openrouter.defaultParams.providers) {
+                      data.providers.openrouter.defaultParams.providers = {};
+                    }
+                    data.providers.openrouter.defaultParams.providers.dataCollection = newZdrValue ? 'deny' : 'allow';
+                  }
+                });
+                setMessage(`✓ ZDR ${newZdrValue ? 'enabled' : 'disabled'} - Your data ${newZdrValue ? 'will not be stored' : 'may be stored'} by OpenRouter`);
+                setSubView('provider-action');
+                setFocusedPane(1);
+              }
+            }}
+          />
+          <Box marginTop={1}>
+            <Text dimColor>Zero Data Retention ensures your data is not stored by OpenRouter</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // AWS Settings (third pane)
+    if (subView === 'aws-settings') {
+      const aws = config.getData().providers.aws;
+      const modelPrefix = aws?.modelPrefix || '(none)';
+
+      const items = [
+        { label: `🏷️ Model Prefix: ${modelPrefix}`, value: 'model-prefix' },
+        { label: '← Back', value: '__back__' },
+      ];
+
+      return (
+        <Box flexDirection="column">
+          <Box marginBottom={1}>
+            <Text bold color="magenta">AWS Bedrock Settings</Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text dimColor>Configure AWS Bedrock-specific options</Text>
+          </Box>
+          <SelectInput
+            items={items}
+            isFocused={focusedPane === 2}
+            onSelect={async (item) => {
+              if (item.value === '__back__') {
+                setSubView('provider-action');
+                setFocusedPane(1);
+                return;
+              }
+              if (item.value === 'model-prefix') {
+                setSubView('aws-model-prefix');
+                return;
+              }
+            }}
+          />
+          <Box marginTop={1}>
+            <Text dimColor>Model prefix is used for cross-region inference (e.g., 'us.', 'eu.')</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // AWS Model Prefix Input (third pane)
+    if (subView === 'aws-model-prefix') {
+      return (
+        <Box flexDirection="column">
+          <Box marginBottom={1}>
+            <Text bold color="magenta">AWS Model Prefix</Text>
+          </Box>
+          <Box marginBottom={1} flexDirection="column">
+            <Text dimColor>Set a prefix for cross-region inference</Text>
+            <Text dimColor>Common prefixes: 'us.', 'eu.', or leave empty for none</Text>
+          </Box>
+          <Box>
+            <Text color="cyan">▶ </Text>
+            <TextInput
+              value={modelPrefixInput}
+              onChange={setModelPrefixInput}
+              placeholder="e.g., us. or eu."
+              onSubmit={async () => {
+                await config.save((data) => {
+                  if (data.providers.aws) {
+                    const trimmedValue = modelPrefixInput.trim();
+                    if (trimmedValue) {
+                      data.providers.aws.modelPrefix = trimmedValue;
+                    } else {
+                      delete data.providers.aws.modelPrefix;
+                    }
+                  }
+                });
+                const displayValue = modelPrefixInput.trim() || '(none)';
+                setMessage(`✓ Model prefix set to: ${displayValue}`);
+                setSubView('aws-settings');
+              }}
+            />
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>Enter to submit, ESC to go back</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // Delete Chat Options (third pane)
+    if (subView === 'delete-chat-options') {
+      const chats = config.getChats();
+      const chat = chats.find((c) => c.id === selectedDeleteId);
+      
+      if (!chat) {
+        setSubView('delete-chat');
+        return null;
+      }
+
+      const chatIndex = chats.findIndex((c) => c.id === selectedDeleteId);
+      const hasOlderChats = chatIndex < chats.length - 1;
+      const olderCount = chats.length - chatIndex - 1;
+
+      const items = [
+        { label: `Delete this chat only`, value: 'single' },
+        ...(hasOlderChats ? [{ label: `Delete this chat and ${olderCount} older chat${olderCount !== 1 ? 's' : ''}`, value: 'and_older' }] : []),
+        { label: '← Cancel', value: '__cancel__' },
+      ];
+
+      return (
+        <Box flexDirection="column">
+          <Box marginBottom={1}>
+            <Text bold color="magenta">Delete: {abbreviate(chat.title, 50)}</Text>
+          </Box>
+          <SelectInput
+            items={items}
+            isFocused={focusedPane === 2}
+            onSelect={(item) => {
+              if (item.value === '__cancel__') {
+                setSubView('delete-chat');
+                setFocusedPane(1);
+                return;
+              }
+
+              const deleteChats = item.value === 'and_older' 
+                ? chats.slice(chatIndex)
+                : [chat];
+
+              const confirmMsg = item.value === 'and_older'
+                ? `Delete "${abbreviate(chat.title, 40)}" and ${deleteChats.length - 1} older chat${deleteChats.length - 1 !== 1 ? 's' : ''}?`
+                : `Delete "${abbreviate(chat.title, 50)}" and all its messages?`;
+
+              showConfirm(confirmMsg, async () => {
+                for (const chatToDelete of deleteChats) {
+                  try {
+                    await fs.unlink(getChatPath(chatToDelete.id));
+                  } catch (error: any) {
+                    if (error.code !== 'ENOENT') {
+                      console.error('Failed to delete chat messages:', error.message);
+                    }
+                  }
+                  await config.deleteChat(chatToDelete.id);
+                }
+                const deletedCount = deleteChats.length;
+                setMessage(`✓ ${deletedCount} chat${deletedCount !== 1 ? 's' : ''} deleted`);
+                
+                const remainingChats = config.getChats();
+                if (remainingChats.length === 0) {
+                  handleBackToCategory();
+                } else {
+                  setSubView('delete-chat');
+                  setFocusedPane(1);
+                }
+              });
+            }}
+          />
+        </Box>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
@@ -1580,27 +1690,39 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
       <Box flexDirection="row">
         {/* Left panel: Categories */}
-        <Box flexDirection="column" width="30%" borderStyle="round" borderColor="gray" paddingX={1} marginRight={1}>
+        <Box flexDirection="column" width={PANEL_WIDTHS.left} borderStyle="round" borderColor={focusedPane === 0 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
           <Box marginBottom={1}>
             <Text bold dimColor>Categories</Text>
           </Box>
           <SelectInput
             items={categoryItems}
+            isFocused={focusedPane === 0}
             onSelect={(item) => {
               setSelectedCategory(item.value);
               setSubView('default');
               setMessage(null);
+              setFocusedPane(1);
             }}
           />
           <Box marginTop={1}>
+            <Text dimColor>Tab/Arrows to navigate</Text>
+          </Box>
+          <Box>
             <Text dimColor>Ctrl+C to exit</Text>
           </Box>
         </Box>
 
-        {/* Right panel: Settings details */}
-        <Box flexDirection="column" width="70%" borderStyle="round" borderColor="cyan" paddingX={1}>
-          {renderRightPanel()}
+        {/* Middle panel: Options */}
+        <Box flexDirection="column" width={showThirdPane ? PANEL_WIDTHS.middle : PANEL_WIDTHS.middleExpanded} borderStyle="round" borderColor={focusedPane === 1 ? "cyan" : "gray"} paddingX={1} marginRight={showThirdPane ? 1 : 0}>
+          {renderMiddlePanel()}
         </Box>
+
+        {/* Right panel: Sub-options (shown when needed) */}
+        {showThirdPane && (
+          <Box flexDirection="column" width={PANEL_WIDTHS.right} borderStyle="round" borderColor={focusedPane === 2 ? "cyan" : "gray"} paddingX={1}>
+            {renderRightPanel()}
+          </Box>
+        )}
       </Box>
     </Box>
   );
