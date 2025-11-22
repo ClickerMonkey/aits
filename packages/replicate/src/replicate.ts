@@ -345,18 +345,20 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     metadata: AIMetadataAny | undefined,
     requestSignal: AbortSignal | undefined,
     getConverters: (transformer: ModelTransformer) => {
-      convertRequest?: (request: TRequest, ctx: AIContextAny) => object;
-      parseResponse?: (response: object, ctx: AIContextAny) => TResponse;
+      convertRequest?: (request: TRequest, ctx: AIContextAny) => Promise<object>;
+      parseResponse?: (response: object, ctx: AIContextAny) => Promise<TResponse>;
     },
     hookType?: 'chat' | 'imageGenerate' | 'transcribe' | 'embed'
   ) {
     const repConfig = config || this.config;
 
     // Extract model ID from metadata
-    const model = getModel(request.model || metadata?.model || ctx.metadata?.model);
-    if (!model) {
+    const modelInput = request.model || metadata?.model || ctx.metadata?.model;
+    if (!modelInput) {
       throw new Error('Replicate executor requires model ID in metadata');
     }
+
+    const model = getModel(modelInput);
 
     // Get transformer for model
     const transformer = this.getTransformer(model.id, repConfig);
@@ -381,7 +383,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const client = createClient(repConfig);
 
     // Convert request using transformer
-    const input = convertRequest(request, ctx);
+    const input = await convertRequest(request, ctx);
 
     // Call pre-request hook with input payload
     if (hookType && repConfig.hooks?.[hookType]?.beforeRequest) {
@@ -392,7 +394,8 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const output = await client.run(modelId, { input, signal });
 
     // Parse response using transformer
-    const response = parseResponse(output, ctx);
+    const response = await parseResponse(output, ctx);
+    response.model = modelInput;
 
     // Call post-request hook with input payload
     if (hookType && repConfig.hooks?.[hookType]?.afterRequest) {
@@ -420,17 +423,18 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     metadata: AIMetadataAny | undefined,
     requestSignal: AbortSignal | undefined,
     getConverters: (transformer: ModelTransformer) => {
-      convertRequest?: (request: TRequest, ctx: AIContextAny) => object;
-      parseChunk?: (chunk: object, ctx: AIContextAny) => TChunk;
+      convertRequest?: (request: TRequest, ctx: AIContextAny) => Promise<object>;
+      parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<TChunk>;
     }
   ) {
     const repConfig = config || this.config;
 
     // Extract model ID from metadata
-    const model = getModel(request.model || metadata?.model || ctx.metadata?.model);
-    if (!model) {
+    const modelInput = request.model || metadata?.model || ctx.metadata?.model;
+    if (!modelInput) {
       throw new Error('Replicate executor requires model ID in metadata');
     }
+    const model = getModel(modelInput);
 
     // Get transformer for model
     const transformer = this.getTransformer(model.id, repConfig);
@@ -455,7 +459,8 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const client = createClient(repConfig);
 
     // Convert request using transformer
-    const input = convertRequest(request, ctx);
+    const input = await convertRequest(request, ctx);
+    let yieldedModel = false;
 
     // Stream prediction
     for await (const event of client.stream(modelId, { input, signal })) {
@@ -464,8 +469,17 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
       }
       
       // Parse chunk using transformer
-      const chunk = parseChunk(event, ctx);
+      const chunk = await parseChunk(event, ctx);
+      if (chunk.usage && !yieldedModel) {
+        chunk.model = modelInput;
+        yieldedModel = true;
+      }
       yield chunk;
+    }
+    if (!yieldedModel) {
+      yield {
+        model: modelInput,
+      };    
     }
   }
 

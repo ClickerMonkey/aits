@@ -322,6 +322,23 @@ export type Runner = <
 ) => ComponentOutput<TComponent>
 
 /**
+ * A resource that can be converted to a URL, Base64 string, text, or Readable.
+ */
+export type Resource = 
+ | string // plain text, or data URL, or http(s) URL, or file:// URL
+ | AsyncIterable<Uint8Array> // fs.ReadStream, ReadableStream
+ | Blob // File
+ | Uint8Array 
+ | URL
+ | ArrayBuffer
+ | DataView
+ | Buffer
+ | { blob(): Promise<Blob> | Blob }
+ | { url(): string }
+ | { read(): Promise<ReadableStream> | ReadableStream }
+;
+
+/**
  * The role of a message in a conversation with an AI system.
  */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -364,7 +381,7 @@ export interface MessageContent
   /** The type of content */
   type: MessageContentType;
   /** The actual content data */
-  content: string | Buffer | URL | ReadableStream<Uint8Array | string>;
+  content: Resource;
   /** Format of the content if known (e.g., 'png', 'mp3', 'pdf') */
   format?: string;
 }
@@ -581,6 +598,8 @@ export interface BaseResponse
   usage?: Usage;
   /** Model used for this response **/
   model: ModelInput;
+  /** Provider-specific extra response data **/
+  extra?: Record<string, any>;
 }
 
 /**

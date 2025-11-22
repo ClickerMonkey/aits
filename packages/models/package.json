@@ -13,6 +13,7 @@
     "scrape:openrouter": "tsx scripts/scrapers/openrouter.ts",
     "scrape:openai": "tsx scripts/scrapers/openai.ts",
     "scrape:replicate": "tsx scripts/scrapers/replicate.ts",
+    "scrape:replicate:next": "tsx scripts/scrapers/replicate.ts --transformers --n=1",
     "scrape:aws": "tsx scripts/scrapers/aws.ts"
   },
   "keywords": ["ai", "models", "openai", "openrouter", "replicate", "aws", "bedrock"],

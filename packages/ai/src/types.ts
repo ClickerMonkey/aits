@@ -27,6 +27,7 @@ import type {
   ModelInput,
   Model,
   Simplify,
+  Resource,
 } from '@aeye/core';
 import type { PromptInput } from '@aeye/core';
 import type { ToolInput } from '@aeye/core';
@@ -592,13 +593,13 @@ export interface ImageGenerationRequest extends BaseRequest {
 /**
  * Request for editing existing images with text prompts.
  */
-export interface ImageEditRequest extends BaseRequest{
+export interface ImageEditRequest extends BaseRequest {
   // Text description of desired edits
   prompt: string;
   // Source image to edit
-  image: Buffer | Uint8Array | string;
+  image: Resource;
   // Optional mask indicating edit region
-  mask?: Buffer | Uint8Array | string;
+  mask?: Resource;
   // Number of edited images to generate
   n?: number;
   // Output size
@@ -647,7 +648,7 @@ export interface ImageGenerationChunk extends BaseChunk {
  */
 export interface TranscriptionRequest extends BaseRequest {
   // Audio data to transcribe
-  audio: Buffer | ReadStream | string | File;
+  audio: Resource;
   // Source language code (e.g., "en")
   language?: string;
   // Optional prompt to guide transcription
@@ -824,43 +825,43 @@ export type ModelHandlerFor<T extends AIBaseTypes> = ModelHandler<AIContext<T>>;
  */
 export interface ModelTransformer {
   chat?: {
-    convertRequest?: (request: Request, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => Response;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Chunk;
+    convertRequest?: (request: Request, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   imageGenerate?: {
-    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => ImageGenerationResponse;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => ImageGenerationChunk;
+    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageEdit?: {
-    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => ImageGenerationResponse;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => ImageGenerationChunk;
+    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageAnalyze?: {
-    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => Response;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Chunk;
+    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   transcribe?: {
-    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => TranscriptionResponse;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => TranscriptionChunk;
+    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<TranscriptionResponse>;
+    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<TranscriptionChunk>;
   };
 
   speech?: {
-    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => SpeechResponse;
+    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<SpeechResponse>;
   };
 
   embed?: {
-    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => object;
-    parseResponse?: (response: object, ctx: AIContextAny) => EmbeddingResponse;
+    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => Promise<object>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<EmbeddingResponse>;
   };
 }
 

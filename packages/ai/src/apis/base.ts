@@ -11,7 +11,6 @@ import { isModelInfo } from '../common';
 import type {
   AIBaseTypes,
   AIContext,
-  AIContextOptional,
   AIContextRequired,
   AIMetadataRequired,
   AIProviderNames,

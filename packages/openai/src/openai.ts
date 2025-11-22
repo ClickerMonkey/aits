@@ -24,11 +24,10 @@ import type {
   TranscriptionResponse
 } from '@aeye/ai';
 import { detectTier } from '@aeye/ai';
-import { BaseRequest, type Chunk, type Executor, type FinishReason, getModel, type MessageContent, ModelInput, type Request, type Response, type Streamer, toJSONSchema, type ToolCall, type Usage } from '@aeye/core';
+import { toFile, BaseRequest, type Chunk, type Executor, type FinishReason, getModel, getResourceFormat, type MessageContent, ModelInput, type Request, Resource, type Response, type Streamer, toBase64, toJSONSchema, type ToolCall, toStream, toText, toURL, type Usage } from '@aeye/core';
 import fs from 'fs';
-import OpenAI, { Uploadable } from 'openai';
+import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
-import z, { size } from 'zod';
 import { isContextWindowError, parseContextWindowError, type RetryConfig, RetryContext, type RetryEvents, withRetry } from './retry';
 import { ContextWindowError, ProviderError } from './types';
 
@@ -580,49 +579,32 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param name 
    * @returns 
    */
-  protected convertContent(
+  protected async convertContent(
     x: string | MessageContent[],
     name: string
-  ): string | OpenAI.Chat.Completions.ChatCompletionContentPart[] {
+  ): Promise<string | OpenAI.Chat.Completions.ChatCompletionContentPart[]> {
     if (typeof x === 'string') {
       return x;
     }
-    return x.map((part): OpenAI.Chat.Completions.ChatCompletionContentPart => {
+    return Promise.all(x.map(async (part): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart> => {
       switch (part.type) {
-        case 'text':
+        case 'text': {
+          const text = await toText(part.content).catch(() => `Text content sent by ${name} could not be converted to text.`);
           return {
             type: 'text',
-            text: String(part.content),
+            text,
           };
+        }
 
         case 'image': {
-          // Convert content to URL or base64 data URL
-          let url: string;
-          if (typeof part.content === 'string') {
-            // Check if it's already a data URL or regular URL
-            if (part.content.startsWith('data:')) {
-              url = part.content;
-            } else if (part.content.startsWith('http://') || part.content.startsWith('https://')) {
-              url = part.content;
-            } else {
-              // Assume it's base64 encoded data without the data URL prefix
-              const mimeType = part.format || 'image/png';
-              url = `data:${mimeType};base64,${part.content}`;
-            }
-          } else if (part.content instanceof URL) {
-            url = part.content.toString();
-          } else if (part.content instanceof Buffer) {
-            // Convert Buffer to base64 data URL
-            const base64 = part.content.toString('base64');
-            const mimeType = part.format || 'image/png';
-            url = `data:${mimeType};base64,${base64}`;
-          } else {
-            // ReadableStream - not supported, return text fallback
+          const url = await toURL(part.content, part.format, 'INVALID').catch(() => 'INVALID');
+          if (url === 'INVALID') {
             return {
               type: 'text',
-              text: `Image (stream) sent by ${name} cannot be converted to URL.`,
+              text: `Image content sent by ${name} could not be converted to a URL.`,
             };
           }
+
           return {
             type: 'image_url',
             image_url: { url },
@@ -631,53 +613,16 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
         case 'audio': {
           // Convert audio content to base64 data
-          let data: string;
-          let format: 'wav' | 'mp3' = 'mp3';
-
-          if (typeof part.content === 'string') {
-            // Check if it's a data URL
-            if (part.content.startsWith('data:')) {
-              const dataUrlMatch = part.content.match(/^data:([^;]+);base64,(.+)$/);
-              if (dataUrlMatch) {
-                const mimeType = dataUrlMatch[1];
-                data = dataUrlMatch[2];
-
-                // Extract format from MIME type
-                if (mimeType.includes('wav')) {
-                  format = 'wav';
-                } else if (mimeType.includes('mp3') || mimeType.includes('mpeg')) {
-                  format = 'mp3';
-                }
-              } else {
-                // Invalid data URL
-                return {
-                  type: 'text',
-                  text: `Audio data URL sent by ${name} is not valid base64.`,
-                };
-              }
-            } else {
-              // Assume it's already base64 encoded without the data URL prefix
-              data = part.content;
-            }
-          } else if (part.content instanceof Buffer) {
-            data = part.content.toString('base64');
-          } else {
-            // URL or ReadableStream - not supported
+          const base64 = await toBase64(part.content, undefined, 'INVALID').catch(() => 'INVALID');
+          if (base64 === 'INVALID') {
             return {
               type: 'text',
-              text: `Audio sent by ${name} cannot be converted to base64.`,
+              text: `Audio content sent by ${name} could not be converted to base64.`,
             };
           }
 
-          // Override format from part.format if provided
-          if (part.format) {
-            if (part.format === 'wav' || part.format === 'audio/wav') {
-              format = 'wav';
-            } else if (part.format === 'mp3' || part.format === 'audio/mpeg' || part.format === 'audio/mp3') {
-              format = 'mp3';
-            }
-          }
-
+          const [, mimeType, data] = /^data:([^;]+);base64,(.+)$/.exec(base64) || [null, '', ''];
+          const format = part.format || mimeType && mimeType.includes('wav') ? 'wav' : 'mp3';
           return {
             type: 'input_audio',
             input_audio: { data, format },
@@ -686,49 +631,11 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
         case 'file': {
           // Convert file content to base64 data (file IDs not supported)
-          let fileData: string;
-
-          if (typeof part.content === 'string') {
-            // Check if it's a data URL
-            if (part.content.startsWith('data:')) {
-              const dataUrlMatch = part.content.match(/^data:[^;]+;base64,(.+)$/);
-              if (dataUrlMatch) {
-                fileData = dataUrlMatch[1];
-              } else {
-                // Invalid data URL
-                return {
-                  type: 'text',
-                  text: `File data URL sent by ${name} is not valid base64.`,
-                };
-              }
-            }
-            // Check if it's a URL or file ID (not supported)
-            else if (
-              part.content.startsWith('http://') ||
-              part.content.startsWith('https://') ||
-              part.content.startsWith('file-')
-            ) {
-              return {
-                type: 'text',
-                text: `File URL/ID sent by ${name} cannot be used (only base64 data supported).`,
-              };
-            }
-            // Assume it's base64 data
-            else {
-              fileData = part.content;
-            }
-          } else if (part.content instanceof Buffer) {
-            fileData = part.content.toString('base64');
-          } else if (part.content instanceof URL) {
+          const fileData = await toBase64(part.content, part.format, 'INVALID').catch(() => 'INVALID');
+          if (fileData === 'INVALID') {
             return {
               type: 'text',
-              text: `File URL sent by ${name} cannot be used (only base64 data supported).`,
-            };
-          } else {
-            // ReadableStream - not supported
-            return {
-              type: 'text',
-              text: `File (stream) sent by ${name} cannot be converted.`,
+              text: `File content sent by ${name} could not be converted to base64.`,
             };
           }
 
@@ -746,7 +653,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             text: `Unsupported content type from ${name}.`,
           };
       }
-    });
+    }));
   }
 
   /**
@@ -790,8 +697,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param request @aeye request object
    * @returns Array of OpenAI-formatted messages
    */
-  protected convertMessages(request: Request): OpenAI.Chat.ChatCompletionMessageParam[] {
-    return request.messages.map((msg): OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Chat.ChatCompletionMessageParam[] => {
+  protected async convertMessages(request: Request): Promise<OpenAI.Chat.ChatCompletionMessageParam[]> {
+    return (await Promise.all(request.messages.map(async (msg): Promise<OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Chat.ChatCompletionMessageParam[]> => {
       switch (msg.role) {
         case 'system':
           return {
@@ -806,7 +713,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             content: this.convertContentText(msg.content, msg.name || 'tool'),
           };
         case 'assistant':
-          const content = this.convertContent(msg.content, msg.name || 'assistant');
+          const content = await this.convertContent(msg.content, msg.name || 'assistant');
           if (!content || typeof content === 'string' || content.every(c => c.type === 'text')) {
             return {
               role: msg.role,
@@ -839,10 +746,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           return {
             role: msg.role,
             name: this.convertName(msg.name),
-            content: this.convertContent(msg.content, msg.name || 'user'),
+            content: await this.convertContent(msg.content, msg.name || 'user'),
           };
       }
-    }).flat();
+    }))).flat();
   }
 
   /**
@@ -1032,7 +939,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, requestSignal?: AbortSignal): Promise<Response> => {
       const { model, retry } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(request, requestSignal, ctx, effectiveConfig, 'chat', metadata?.model || effectiveConfig.defaultModels?.chat);
 
-      const messages = this.convertMessages(request);
+      const messages = await this.convertMessages(request);
       const tools = this.convertTools(request);
       const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
       const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
@@ -1148,7 +1055,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ): AsyncGenerator<Chunk> {
       const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>>(request, requestSignal, ctx, effectiveConfig, 'streaming chat', metadata?.model || effectiveConfig.defaultModels?.chat);
 
-      const messages = this.convertMessages(request);
+      const messages = await this.convertMessages(request);
       const tools = this.convertTools(request);
       const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
       const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
@@ -1742,8 +1649,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const { model, retry } = this.getRequestData<OpenAI.Images.ImagesResponse>(request, undefined, ctx, effectiveConfig, 'edit image', effectiveConfig.defaultModels?.imageEdit || 'gpt-image-1');
     
-    const image = this.toUploadableImage(request.image);
-    const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+    const image = await toFile(request.image);
+    const mask = request.mask ? await toFile(request.mask) : undefined;
     const baseParams = this.getEditParameters(request, model.id);
     
     const params: OpenAI.Images.ImageEditParamsNonStreaming = {
@@ -1816,8 +1723,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const { model, retry, signal } = this.getRequestData<Stream<OpenAI.ImageEditStreamEvent>>(request, undefined, ctx, effectiveConfig, 'edit image stream', effectiveConfig.defaultModels?.imageEdit || 'gpt-image-1');
     
-    const image = this.toUploadableImage(request.image);
-    const mask = request.mask ? this.toUploadableImage(request.mask) : undefined;
+    const image = await toFile(request.image);
+    const mask = request.mask ? await toFile(request.mask) : undefined;
     const imageStreams = Math.max(1, Math.min(3, request.streamCount ?? 2));
     const baseParams = this.getEditParameters(request, model.id);
 
@@ -1870,85 +1777,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     }
   }
 
-
-  /**
-   * Convert various image input types to Uploadable format.
-   *
-   * @param data Image data in various formats
-   * @returns Uploadable image for OpenAI API
-   */
-  protected toUploadableImage(data: Buffer | Uint8Array | string): Uploadable {
-    if (typeof data === 'string') {
-      // URL
-      if (data.startsWith('http://') || data.startsWith('https://')) {
-        return fs.createReadStream(data);
-      }
-      // Data URL
-      if (data.startsWith('data:')) {
-        const match = data.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) {
-          throw new Error('Invalid data URL');
-        }
-        const base64Data = match[2];
-        const buffer = Buffer.from(base64Data, 'base64');
-
-        return new File([buffer], 'image', { type: match[1] });
-      }
-      // File path
-      if (data.startsWith('/')) {
-        return fs.createReadStream(data);
-      }
-
-      // Raw base64
-      const buffer = Buffer.from(data, 'base64');
-      return new File([buffer], 'image', { type: 'image/png' });
-    } else if (Buffer.isBuffer(data)) {
-      return new File([data], 'image', { type: 'image/png' });
-    } else if (data instanceof Uint8Array) {
-      return new File([data], 'image', { type: 'image/png' });
-    } else {
-      return data;
-    }
-  }
-
-  /**
-   * Convert various audio input types to Uploadable format.
-   *
-   * @param data Audio data in various formats
-   * @returns Uploadable audio for OpenAI API
-   */
-  protected toUploadableAudio(data: TranscriptionRequest['audio']): Uploadable {
-    if (typeof data === 'string') {
-      // URL
-      if (data.startsWith('http://') || data.startsWith('https://')) {
-        return fs.createReadStream(data);
-      }
-      // Data URL
-      if (data.startsWith('data:')) {
-        const match = data.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) {
-          throw new Error('Invalid data URL');
-        }
-        const base64Data = match[2];
-        const buffer = Buffer.from(base64Data, 'base64');
-
-        return new File([buffer], 'audio', { type: match[1] });
-      }
-      // File path
-      if (data.startsWith('/')) {
-        return fs.createReadStream(data);
-      }
-
-      // Raw base64
-      const buffer = Buffer.from(data, 'base64');
-      return new File([buffer], 'audio', {});
-    } else if (Buffer.isBuffer(data)) {
-      return new File([data], 'audio', {});
-    } else {
-      return data;
-    }
-  }
-
   /**
    * Transcribe audio to text using Whisper models.
    *
@@ -1970,7 +1798,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const { model, retry, signal } = this.getRequestData<OpenAI.Audio.Transcriptions.Transcription>(request, undefined, ctx, effectiveConfig, 'transcribe', effectiveConfig.defaultModels?.transcription || 'whisper-1');
     
-    const file: Uploadable = this.toUploadableAudio(request.audio);
+    const file = await toFile(request.audio);
     const params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsNonStreaming = {
       model: model.id,
       file,
@@ -2041,7 +1869,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Audio.Transcriptions.TranscriptionStreamEvent>>(request, undefined, ctx, effectiveConfig, 'transcribe stream', effectiveConfig.defaultModels?.transcription || 'whisper-1');
     
-    const file: Uploadable = this.toUploadableAudio(request.audio);
+    const file = await toFile(request.audio);
     const params: OpenAI.Audio.Transcriptions.TranscriptionCreateParamsStreaming = {
       model: model.id,
       file,
@@ -2292,7 +2120,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Construct the params that would be sent to OpenAI
     const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
-    const messages = this.convertMessages(chatRequest);
+    const messages = await this.convertMessages(chatRequest);
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
       model: model.id,
       messages,
@@ -2360,7 +2188,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Construct the params that would be sent to OpenAI
     const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image stream', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
-    const messages = this.convertMessages(chatRequest);
+    const messages = await this.convertMessages(chatRequest);
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
       model: model.id,
       messages,

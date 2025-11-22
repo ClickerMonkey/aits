@@ -75,7 +75,7 @@ export async function scrapeAllModels(options: ScraperOptions = {}): Promise<voi
   // Scrape Replicate
   if (sources.includes('replicate')) {
     try {
-      await scrapeReplicate(outputDir, cacheDir, { concurrency });
+      await scrapeReplicate(outputDir, cacheDir, { concurrency, transformerModel: 'google/gemini-2.5-pro' });
       results.replicate = { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

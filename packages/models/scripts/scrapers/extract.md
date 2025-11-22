@@ -66,7 +66,7 @@ export interface Message {
 export type MessageContentType = 'text' | 'image' | 'file' | 'audio';
 export interface MessageContent {
   type: MessageContentType;
-  content: string | Buffer | URL | ReadableStream<Uint8Array | string>;
+  content: Resource;
   format?: string;
 }
 export interface ToolDefinition {
@@ -188,8 +188,8 @@ export interface ImageGenerationRequest extends BaseRequest {
 }
 export interface ImageEditRequest extends BaseRequest {
   prompt: string;
-  image: Buffer | Uint8Array | string;
-  mask?: Buffer | Uint8Array | string;
+  image: Resource;
+  mask?: Resource;
   n?: number;
   size?: string;
   responseFormat?: 'url' | 'b64_json';
@@ -214,7 +214,7 @@ export interface ImageGenerationChunk extends BaseChunk {
   };
 }
 export interface TranscriptionRequest extends BaseRequest {
-  audio: Buffer | ReadStream | string | File;
+  audio: Resource;
   language?: string;
   prompt?: string;
   temperature?: number;
@@ -259,33 +259,16 @@ export interface ImageAnalyzeRequest extends BaseRequest{
   maxTokens?: number;
   temperature?: number;
 }
-```
-
-The replicate code that feeds into the transformer looks like this (for reference):
-```ts
-// =============================================================
-// Execute
-// =============================================================
-const client = new Replicate({ /* config */ });
-const { convertRequest, parseResponse } = transformer;
-const input = convertRequest(request, ctx);
-const output = await client.run(modelId, { input, signal });
-const response = parseResponse(output, ctx);
-
-// =============================================================
-// Stream
-// =============================================================
-const client = new Replicate({ /* config */ });
-const { convertRequest, parseChunk } = transformer;
-const signal = requestSignal || ctx.signal;
-const input = convertRequest(request, ctx);
-for await (const event of client.stream(modelId, { input, signal })) {
-  if (signal?.aborted) {
-    throw new Error('Request aborted');
-  }
-
-  // Parse chunk using transformer
-  const chunk = parseChunk(event, ctx);
-  yield chunk;
-}
+export type Resource = 
+ | string // plain text, or data URL, or http(s) URL, or file:// URL
+ | AsyncIterable<Uint8Array> // fs.ReadStream, ReadableStream
+ | Blob // File
+ | Uint8Array 
+ | URL
+ | ArrayBuffer
+ | DataView
+ | Buffer
+ | { blob(): Promise<Blob> | Blob }
+ | { url(): string }
+ | { read(): Promise<ReadableStream> | ReadableStream }
 ```
