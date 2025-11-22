@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ConfigFile } from '../config';
 import { ModelSelector } from './ModelSelector';
 import { createCletusAI } from '../ai';
@@ -58,6 +58,7 @@ interface InkSettingsSplitViewProps {
 }
 
 // Panel width constants for consistent layout
+// Note: Widths intentionally sum to 96% to account for margins and borders (4%)
 const PANEL_WIDTHS = {
   left: '23%',
   middle: '35%',
@@ -179,6 +180,19 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       setInputError(null);
     }
   }, [subView, providerKey, testAWSCredentials]);
+  
+  // Helper function to determine if third pane should be shown
+  const shouldShowThirdPane = (): boolean => {
+    // Third pane is shown for specific sub-views that need deeper navigation
+    return subView === 'provider-action' || 
+           subView === 'openrouter-settings' || 
+           subView === 'aws-settings' ||
+           subView === 'aws-model-prefix' ||
+           subView === 'delete-chat-options';
+  };
+  
+  // Memoize third pane visibility to avoid repeated calculations
+  const showThirdPane = useMemo(() => shouldShowThirdPane(), [subView]);
 
   // Handle ESC, Ctrl+C, and Tab keys for pane navigation
   useInput((input, key) => {
@@ -191,8 +205,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
           if (prev === 0) return 1;
           if (prev === 1) {
             // Check if there's content in the third pane that can be focused
-            const hasThirdPane = shouldShowThirdPane();
-            return hasThirdPane ? 2 : 0;
+            return showThirdPane ? 2 : 0;
           }
           return 0;
         });
@@ -213,8 +226,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       setFocusedPane((prev) => {
         if (prev === 0) return 1;
         if (prev === 1) {
-          const hasThirdPane = shouldShowThirdPane();
-          return hasThirdPane ? 2 : 1;
+          return showThirdPane ? 2 : 1;
         }
         return prev;
       });
@@ -237,16 +249,6 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       }
     }
   });
-  
-  // Helper function to determine if third pane should be shown
-  const shouldShowThirdPane = (): boolean => {
-    // Third pane is shown for specific sub-views that need deeper navigation
-    return subView === 'provider-action' || 
-           subView === 'openrouter-settings' || 
-           subView === 'aws-settings' ||
-           subView === 'aws-model-prefix' ||
-           subView === 'delete-chat-options';
-  };
 
   const handleBackToCategory = () => {
     setMessage(null);
@@ -1680,9 +1682,6 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
     return null;
   };
-
-  // Memoize third pane visibility to avoid repeated function calls
-  const showThirdPane = shouldShowThirdPane();
 
   return (
     <Box flexDirection="column" padding={1}>
