@@ -48,10 +48,11 @@ type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imag
 
 interface InkSettingsMenuProps {
   config: ConfigFile;
+  profile?: string;
   onExit: () => void;
 }
 
-export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit }) => {
+export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, profile, onExit }) => {
   const [view, setView] = useState<SettingsView>('menu');
   const [message, setMessage] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null);
@@ -796,7 +797,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             showConfirm(confirmMsg, async () => {
               for (const chatToDelete of deleteChats) {
                 try {
-                  await fs.unlink(getChatPath(chatToDelete.id));
+                  await fs.unlink(getChatPath(chatToDelete.id, profile));
                 } catch (error: any) {
                   if (error.code !== 'ENOENT') {
                     console.error('Failed to delete chat messages:', error.message);
@@ -864,7 +865,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
               showConfirm(`Delete ALL ${chats.length} chat${chats.length !== 1 ? 's' : ''} and their messages?`, async () => {
                 for (const chat of chats) {
                   try {
-                    await fs.unlink(getChatPath(chat.id));
+                    await fs.unlink(getChatPath(chat.id, profile));
                   } catch (error: any) {
                     if (error.code !== 'ENOENT') {
                       console.error('Failed to delete chat messages:', error.message);
@@ -922,7 +923,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
             const type = types[index];
             showConfirm(`Delete "${type.friendlyName}" and all its data?`, async () => {
               try {
-                await fs.unlink(getDataPath(type.name));
+                await fs.unlink(getDataPath(type.name, profile));
               } catch (error: any) {
                 if (error.code !== 'ENOENT') {
                   console.error('Failed to delete data file:', error.message);

@@ -45,7 +45,8 @@ function isReferenceType(fieldType: string, config: ConfigFile): boolean {
 async function validateRelatedFields(
   fields: Record<string, any>,
   type: TypeDefinition,
-  config: ConfigFile
+  config: ConfigFile,
+  profile?: string
 ): Promise<void> {
   // Find all reference fields being set
   const referenceFields = type.fields.filter(f => 
@@ -69,7 +70,7 @@ async function validateRelatedFields(
   await Promise.all(
     Array.from(refTypeMap.entries()).map(async ([refTypeName, refFields]) => {
       const refType = getType(config, refTypeName);
-      const refDataManager = new DataManager(refTypeName);
+      const refDataManager = new DataManager(refTypeName, profile);
       await refDataManager.load();
       
       // Create a set of all valid IDs for quick lookup
@@ -103,6 +104,7 @@ async function joinRelatedRecords(
   records: any[],
   type: TypeDefinition,
   config: ConfigFile,
+  profile?: string,
   depth: number = 0,
   maxDepth: number = 3
 ): Promise<any[]> {
@@ -134,7 +136,7 @@ async function joinRelatedRecords(
     Array.from(refTypeMap.keys()).map(async (refTypeName) => {
       try {
         const refType = getType(config, refTypeName);
-        const refDataManager = new DataManager(refTypeName);
+        const refDataManager = new DataManager(refTypeName, profile);
         await refDataManager.load();
         
         // Create a map of all records for quick lookup
@@ -201,6 +203,7 @@ async function joinRelatedRecords(
         Array.from(recordsToJoin),
         refData.type,
         config,
+        profile,
         depth + 1,
         maxDepth
       );
@@ -237,7 +240,8 @@ async function joinRelatedRecords(
 async function findReferencingRecords(
   targetTypeName: string,
   targetRecordIds: string[],
-  config: ConfigFile
+  config: ConfigFile,
+  profile?: string
 ): Promise<Array<{ typeName: string; records: any[]; field: TypeField; targetRecordId: string }>> {
   const allTypes = config.getData().types;
   const referencingData: Array<{ typeName: string; records: any[]; field: TypeField; targetRecordId: string }> = [];
@@ -252,7 +256,7 @@ async function findReferencingRecords(
   
   await Promise.all(
     typesWithReferences.map(async (type) => {
-      const dataManager = new DataManager(type.name);
+      const dataManager = new DataManager(type.name, profile);
       await dataManager.load();
       typeDataMap.set(type.name, {
         type,
@@ -308,7 +312,7 @@ async function handleCascadeDeletes(
   const updatedIds: string[] = [];
 
   // Find all referencing records for all target records at once
-  const referencingData = await findReferencingRecords(typeName, recordIds, config);
+  const referencingData = await findReferencingRecords(typeName, recordIds, config, ctx.profile);
   
   // Group referencing data by type and field to minimize data manager loads
   const refTypeGroups = new Map<string, Map<string, Array<{ records: any[]; field: TypeField }>>>();
@@ -328,7 +332,7 @@ async function handleCascadeDeletes(
   
   // Process each referencing type - load data manager once per type
   for (const [refTypeName, fieldMap] of refTypeGroups.entries()) {
-    const refDataManager = new DataManager(refTypeName);
+    const refDataManager = new DataManager(refTypeName, ctx.profile);
     await refDataManager.load();
     
     for (const [fieldKey, groups] of fieldMap.entries()) {
@@ -409,9 +413,9 @@ export const data_create = operationOf<
     const type = getType(ctx.config, name);
     
     // Validate related field values
-    await validateRelatedFields(fields, type, ctx.config);
+    await validateRelatedFields(fields, type, ctx.config, ctx.profile);
     
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
     const id = await dataManager.create(fields);
 
@@ -453,9 +457,9 @@ export const data_update = operationOf<
   mode: 'update',
   signature: 'data_update(id: string, fields)',
   status: ({ name, id }) => `Updating ${name}: ${id.slice(0, 8)}`,
-  analyze: async ({ name, id, fields }, { config }) => {
+  analyze: async ({ name, id, fields }, { config, profile }) => {
     const type = getType(config, name);
-    const dataManager = new DataManager(type.name);
+    const dataManager = new DataManager(type.name, profile);
     await dataManager.load();
     const record = dataManager.getById(id);
 
@@ -476,9 +480,9 @@ export const data_update = operationOf<
     const type = getType(ctx.config, name);
     
     // Validate related field values
-    await validateRelatedFields(fields, type, ctx.config);
+    await validateRelatedFields(fields, type, ctx.config, ctx.profile);
     
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
     await dataManager.update(id, fields);
 
@@ -518,9 +522,9 @@ export const data_delete = operationOf<
   mode: 'delete',
   signature: 'data_delete(id: string)',
   status: ({ name, id }) => `Deleting ${name}: ${id.slice(0, 8)}`,
-  analyze: async ({ name, id }, { config }) => {
+  analyze: async ({ name, id }, { config, profile }) => {
     const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
     const record = dataManager.getById(id);
 
@@ -532,7 +536,7 @@ export const data_delete = operationOf<
     }
 
     // Check for referencing records
-    const referencingData = await findReferencingRecords(name, [id], config);
+    const referencingData = await findReferencingRecords(name, [id], config, profile);
     
     if (referencingData.length > 0) {
       const restrictions: string[] = [];
@@ -578,7 +582,7 @@ export const data_delete = operationOf<
   },
   do: async ({ name, id }, ctx) => {
     const { config } = ctx;
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
     
     // Handle cascade deletes using reusable function
@@ -634,9 +638,9 @@ export const data_select = operationOf<
   mode: 'local',
   signature: 'data_select(where?, offset?, limit?, orderBy?)',
   status: ({ name }) => `Selecting ${name} records`,
-  analyze: async ({ name, where, offset, limit, orderBy }, { config }) => {
+  analyze: async ({ name, where, offset, limit, orderBy }, { config, profile }) => {
     const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
 
     let records = dataManager.getAll();
@@ -653,7 +657,7 @@ export const data_select = operationOf<
     };
   },
   do: async ({ name, where, offset, limit, orderBy }, ctx) => {
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
 
     let results = dataManager.getAll();
@@ -685,7 +689,7 @@ export const data_select = operationOf<
 
     // Join related records for reference fields
     const type = getType(ctx.config, name);
-    const joinedResults = await joinRelatedRecords(slicedResults, type, ctx.config);
+    const joinedResults = await joinRelatedRecords(slicedResults, type, ctx.config, ctx.profile);
 
     return {
       count: results.length,
@@ -721,9 +725,9 @@ export const data_update_many = operationOf<
   mode: 'update',
   signature: 'data_update_many(set, where, limit?)',
   status: ({ name }) => `Updating multiple ${name} records`,
-  analyze: async ({ name, limit, set, where }, { config }) => {
+  analyze: async ({ name, limit, set, where }, { config, profile }) => {
     const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
 
     const matchingCount = countByWhere(dataManager.getAll(), where);
@@ -740,9 +744,9 @@ export const data_update_many = operationOf<
     const type = getType(ctx.config, name);
     
     // Validate related field values
-    await validateRelatedFields(set, type, ctx.config);
+    await validateRelatedFields(set, type, ctx.config, ctx.profile);
     
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
 
     let matchingRecords = filterByWhere(dataManager.getAll(), where);
@@ -796,10 +800,10 @@ export const data_delete_many = operationOf<
   mode: 'delete',
   signature: 'data_delete_many(where, limit?)',
   status: ({ name }) => `Deleting multiple ${name} records`,
-  analyze: async ({ name, where, limit }, { config }) => {
+  analyze: async ({ name, where, limit }, { config, profile }) => {
     const type = getType(config, name);
     
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
 
     const matchingCount = countByWhere(dataManager.getAll(), where);
@@ -813,7 +817,7 @@ export const data_delete_many = operationOf<
   },
   do: async ({ name, where, limit }, ctx) => {
     const { config } = ctx;
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
 
     let matchingRecords = filterByWhere(dataManager.getAll(), where);
@@ -894,9 +898,9 @@ export const data_aggregate = operationOf<
   mode: 'local',
   signature: 'data_aggregate(select, where?, having?, groupBy?, orderBy?)',
   status: ({ name }) => `Aggregating ${name} records`,
-  analyze: async ({ name, where }, { config }) => {
+  analyze: async ({ name, where }, { config, profile }) => {
     const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
 
     let records = dataManager.getAll();
@@ -911,8 +915,8 @@ export const data_aggregate = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, having, groupBy, select, orderBy }) => {
-    const dataManager = new DataManager(name);
+  do: async ({ name, where, having, groupBy, select, orderBy }, { profile }) => {
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
 
     let records = dataManager.getAll();
@@ -1061,7 +1065,7 @@ export const data_index = operationOf<
     };
   },
   do: async ({ name }, ctx) => {
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, ctx.profile);
     await dataManager.load();
 
     const allRecords = dataManager.getAll();
@@ -1121,9 +1125,9 @@ export const data_import = operationOf<
     };
   },
   do: async ({ name, glob, transcribeImages = false }, ctx) => {
-    const { chatStatus, ai, config, cwd, log } = ctx;
+    const { chatStatus, ai, config, cwd, log, profile } = ctx;
     const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const dataManager = new DataManager(name, profile);
     await dataManager.load();
     
     // Find and filter files
@@ -1189,7 +1193,7 @@ Fields:
       try {
         // Process file to get sections
         const parsed = await processFile(fullPath, file.file, {
-          assetPath: await getAssetPath(true),
+          assetPath: await getAssetPath(true, profile),
           sections: true,
           transcribeImages: transcribeImages,
           describeImages: false,
@@ -1419,7 +1423,7 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
     return false;
   }
 
-  const dataFile = new DataManager(type.name);
+  const dataFile = new DataManager(type.name, ctx.profile);
   await dataFile.load();
   
   const typeTemplate = type.knowledgeTemplate ? Handlebars.compile(type.knowledgeTemplate) : () => '';

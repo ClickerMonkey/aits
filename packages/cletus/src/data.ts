@@ -6,13 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
  * Data file manager for custom user-defined types
  */
 export class DataManager extends JsonFile<DataFile> {
-  constructor(private typeName: string) {
+  constructor(private typeName: string, profile?: string) {
     const initialData: DataFile = {
       updated: Date.now(),
       data: [],
     };
 
-    super(getDataPath(typeName), initialData);
+    super(getDataPath(typeName, profile), initialData);
   }
 
   protected validate(parsed: any): DataFile {

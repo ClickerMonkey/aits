@@ -110,43 +110,47 @@ export abstract class JsonFile<T> {
 /**
  * Get the Cletus home directory
  */
-export function getCletusHome(): string {
-  return path.join(os.homedir(), '.cletus');
+export function getCletusHome(profile?: string): string {
+  const baseDir = path.join(os.homedir(), '.cletus');
+  if (profile) {
+    return path.join(baseDir, 'profiles', profile);
+  }
+  return baseDir;
 }
 
 /**
  * Get path to config file
  */
-export function getConfigPath(): string {
-  return path.join(getCletusHome(), 'config.json');
+export function getConfigPath(profile?: string): string {
+  return path.join(getCletusHome(profile), 'config.json');
 }
 
 /**
  * Get path to knowledge file
  */
-export function getKnowledgePath(): string {
-  return path.join(getCletusHome(), 'knowledge.json');
+export function getKnowledgePath(profile?: string): string {
+  return path.join(getCletusHome(profile), 'knowledge.json');
 }
 
 /**
  * Get path to chat messages file
  */
-export function getChatPath(chatId: string): string {
-  return path.join(getCletusHome(), 'chats', `${chatId}.json`);
+export function getChatPath(chatId: string, profile?: string): string {
+  return path.join(getCletusHome(profile), 'chats', `${chatId}.json`);
 }
 
 /**
  * Get path to data file
  */
-export function getDataPath(typeName: string): string {
-  return path.join(getCletusHome(), 'data', `${typeName}.json`);
+export function getDataPath(typeName: string, profile?: string): string {
+  return path.join(getCletusHome(profile), 'data', `${typeName}.json`);
 }
 
 /**
  * Get path to config file
  */
-export async function getAssetPath(createIfNotExists: boolean = false): Promise<string> {
-  const fullPath = path.join(getCletusHome(), 'assets');
+export async function getAssetPath(createIfNotExists: boolean = false, profile?: string): Promise<string> {
+  const fullPath = path.join(getCletusHome(profile), 'assets');
   if (createIfNotExists) {
     await fs.mkdir(fullPath, { recursive: true });
   }
@@ -156,8 +160,8 @@ export async function getAssetPath(createIfNotExists: boolean = false): Promise<
 /**
  * Get path to images directory for generated images
  */
-export async function getImagePath(createIfNotExists: boolean = false): Promise<string> {
-  const fullPath = path.join(getCletusHome(), 'images');
+export async function getImagePath(createIfNotExists: boolean = false, profile?: string): Promise<string> {
+  const fullPath = path.join(getCletusHome(profile), 'images');
   if (createIfNotExists) {
     await fs.mkdir(fullPath, { recursive: true })
   }
@@ -167,9 +171,9 @@ export async function getImagePath(createIfNotExists: boolean = false): Promise<
 /**
  * Check if config exists
  */
-export async function configExists(): Promise<boolean> {
+export async function configExists(profile?: string): Promise<boolean> {
   try {
-    await fs.access(getConfigPath());
+    await fs.access(getConfigPath(profile));
     return true;
   } catch {
     return false;

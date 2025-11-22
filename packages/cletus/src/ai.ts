@@ -29,6 +29,7 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
+  profile?: string;
   usage: {
     accumulated: Usage;
     accumulatedCost: number;
@@ -45,7 +46,7 @@ export interface CletusMetadata {
 /**
  * Create the Cletus AI instance
  */
-export function createCletusAI(configFile: ConfigFile) {
+export function createCletusAI(configFile: ConfigFile, profile?: string) {
   const config = configFile.getData();
 
   const retryEvents: RetryEvents = {
@@ -127,6 +128,7 @@ export function createCletusAI(configFile: ConfigFile) {
         ops: new OperationManager('none'),
         log: logger.log.bind(logger),
         chatStatus: () => {},
+        profile,
         usage: {
           accumulated: {},
           accumulatedCost: 0,

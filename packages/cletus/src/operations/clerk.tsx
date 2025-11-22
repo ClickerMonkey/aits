@@ -94,11 +94,11 @@ export const file_summary = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai, config }) => {
+  do: async (input, { cwd, ai, config, profile }) => {
     const fullPath = path.resolve(cwd, input.path);
     
     const summarized = await processFile(fullPath, input.path, {
-      assetPath: await getAssetPath(true),
+      assetPath: await getAssetPath(true, profile),
       sections: false,
       describeImages: input.describeImages ?? false,
       extractImages: input.extractImages ?? false,
@@ -159,7 +159,7 @@ export const file_index = operationOf<
       doable: indexable.length > 0,
     };
   },
-  async do(input, { cwd, ai, chatStatus }) {
+  async do(input, { cwd, ai, chatStatus, profile }) {
     const files = await searchFiles(cwd, input.glob);
     const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
     const indexingPromises: Promise<any>[] = [];
@@ -175,7 +175,7 @@ export const file_index = operationOf<
       const fullPath = path.resolve(cwd, file.file);
     
       const parsed = await processFile(fullPath, file.file, {
-        assetPath: await getAssetPath(true),
+        assetPath: await getAssetPath(true, profile),
         sections: true,
         describeImages: input.describeImages ?? false,
         extractImages: input.extractImages ?? false,
@@ -624,7 +624,7 @@ export const file_read = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai }) => {
+  do: async (input, { cwd, ai, profile }) => {
     const fullPath = path.resolve(cwd, input.path);
     const limitOffsetMode = input.limitOffsetMode || 'characters';
 
@@ -640,7 +640,7 @@ export const file_read = operationOf<
     }
 
     const processed = await processFile(fullPath, input.path, {
-      assetPath: await getAssetPath(true),
+      assetPath: await getAssetPath(true, profile),
       sections: false,
       describeImages: input.describeImages ?? false,
       extractImages: input.extractImages ?? false,
@@ -940,7 +940,7 @@ export const text_search = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai, chatStatus }) => {
+  do: async (input, { cwd, ai, chatStatus, profile }) => {
     const files = await searchFiles(cwd, input.glob);
     const readable = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
@@ -962,7 +962,7 @@ export const text_search = operationOf<
     const results = await Promise.allSettled(readable.map(async (file) => {
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
-        assetPath: await getAssetPath(true),
+        assetPath: await getAssetPath(true, profile),
         sections: false,
         describeImages: false,
         extractImages: false,
