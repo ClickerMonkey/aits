@@ -61,7 +61,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         setScoredModels([]);
       }
     }
-  }, [mode, weights.cost, weights.speed, weights.accuracy, weights.contextWindow]);
+  }, [mode, weights.cost, weights.speed, weights.accuracy, weights.contextWindow, ai, baseMetadata]);
 
   // Helper functions for sorting
   const getModelCost = (model: ModelInfo): number | null => {
