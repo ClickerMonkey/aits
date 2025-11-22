@@ -108,12 +108,24 @@ export abstract class JsonFile<T> {
 }
 
 /**
+ * Global profile name for the current session
+ */
+let globalProfile: string | undefined;
+
+/**
+ * Set the global profile for the session
+ */
+export function setProfile(profile: string | undefined): void {
+  globalProfile = profile;
+}
+
+/**
  * Get the Cletus home directory
  */
-export function getCletusHome(profile?: string): string {
+export function getCletusHome(): string {
   const baseDir = path.join(os.homedir(), '.cletus');
-  if (profile) {
-    return path.join(baseDir, 'profiles', profile);
+  if (globalProfile) {
+    return path.join(baseDir, 'profiles', globalProfile);
   }
   return baseDir;
 }
@@ -121,36 +133,36 @@ export function getCletusHome(profile?: string): string {
 /**
  * Get path to config file
  */
-export function getConfigPath(profile?: string): string {
-  return path.join(getCletusHome(profile), 'config.json');
+export function getConfigPath(): string {
+  return path.join(getCletusHome(), 'config.json');
 }
 
 /**
  * Get path to knowledge file
  */
-export function getKnowledgePath(profile?: string): string {
-  return path.join(getCletusHome(profile), 'knowledge.json');
+export function getKnowledgePath(): string {
+  return path.join(getCletusHome(), 'knowledge.json');
 }
 
 /**
  * Get path to chat messages file
  */
-export function getChatPath(chatId: string, profile?: string): string {
-  return path.join(getCletusHome(profile), 'chats', `${chatId}.json`);
+export function getChatPath(chatId: string): string {
+  return path.join(getCletusHome(), 'chats', `${chatId}.json`);
 }
 
 /**
  * Get path to data file
  */
-export function getDataPath(typeName: string, profile?: string): string {
-  return path.join(getCletusHome(profile), 'data', `${typeName}.json`);
+export function getDataPath(typeName: string): string {
+  return path.join(getCletusHome(), 'data', `${typeName}.json`);
 }
 
 /**
  * Get path to config file
  */
-export async function getAssetPath(createIfNotExists: boolean = false, profile?: string): Promise<string> {
-  const fullPath = path.join(getCletusHome(profile), 'assets');
+export async function getAssetPath(createIfNotExists: boolean = false): Promise<string> {
+  const fullPath = path.join(getCletusHome(), 'assets');
   if (createIfNotExists) {
     await fs.mkdir(fullPath, { recursive: true });
   }
@@ -160,8 +172,8 @@ export async function getAssetPath(createIfNotExists: boolean = false, profile?:
 /**
  * Get path to images directory for generated images
  */
-export async function getImagePath(createIfNotExists: boolean = false, profile?: string): Promise<string> {
-  const fullPath = path.join(getCletusHome(profile), 'images');
+export async function getImagePath(createIfNotExists: boolean = false): Promise<string> {
+  const fullPath = path.join(getCletusHome(), 'images');
   if (createIfNotExists) {
     await fs.mkdir(fullPath, { recursive: true })
   }
@@ -171,9 +183,9 @@ export async function getImagePath(createIfNotExists: boolean = false, profile?:
 /**
  * Check if config exists
  */
-export async function configExists(profile?: string): Promise<boolean> {
+export async function configExists(): Promise<boolean> {
   try {
-    await fs.access(getConfigPath(profile));
+    await fs.access(getConfigPath());
     return true;
   } catch {
     return false;

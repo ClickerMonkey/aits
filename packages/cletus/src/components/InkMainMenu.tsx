@@ -14,12 +14,11 @@ type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat
 
 interface InkMainMenuProps {
   config: ConfigFile;
-  profile?: string;
   onChatSelect: (chatId: string) => void;
   onExit: () => void;
 }
 
-export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, profile, onChatSelect, onExit }) => {
+export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, onExit }) => {
   const [view, setView] = useState<MainMenuView>('menu');
   const [selectedAssistant, setSelectedAssistant] = useState<string | undefined>();
   const [customPrompt, setCustomPrompt] = useState('');
@@ -60,7 +59,6 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, profile, onCha
     return (
       <InkSettingsMenu
         config={config}
-        profile={profile}
         onExit={() => setView('menu')}
       />
     );

@@ -8,12 +8,11 @@ import type { ChatMeta, Message } from '../schemas';
 interface InkChatViewProps {
   chatId: string;
   config: ConfigFile;
-  profile?: string;
   onExit: () => void;
 }
 
-export const InkChatView: React.FC<InkChatViewProps> = ({ chatId, config, profile, onExit }) => {
-  const [chatFile] = useState(() => new ChatFile(chatId, profile));
+export const InkChatView: React.FC<InkChatViewProps> = ({ chatId, config, onExit }) => {
+  const [chatFile] = useState(() => new ChatFile(chatId));
   const [messages, setMessages] = useState<Message[]>([]);
 
   const chatMeta = config.getChats().find((c) => c.id === chatId);
@@ -40,7 +39,6 @@ export const InkChatView: React.FC<InkChatViewProps> = ({ chatId, config, profil
       chat={chatMeta}
       config={config}
       messages={messages}
-      profile={profile}
       onExit={onExit}
       onChatUpdate={async (updates) => {
         await config.updateChat(chatId, updates);

@@ -84,7 +84,7 @@ const DEFAULT_TYPES: TypeDefinition[] = [
  * Config file manager
  */
 export class ConfigFile extends JsonFile<Config> {
-  constructor(profile?: string) {
+  constructor() {
     const initialData: Config = {
       updated: Date.now(),
       user: {
@@ -114,7 +114,7 @@ export class ConfigFile extends JsonFile<Config> {
       types: DEFAULT_TYPES,
     };
 
-    super(getConfigPath(profile), initialData);
+    super(getConfigPath(), initialData);
   }
 
   protected validate(parsed: any): Config {

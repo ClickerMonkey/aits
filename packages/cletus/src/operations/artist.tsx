@@ -52,8 +52,8 @@ async function loadImageAsDataUrl(cwd: string, imagePath: string): Promise<strin
   return `data:image/png;base64,${base64}`;
 }
 
-async function saveGeneratedImage(response: ImageGenerationResponse, profile?: string) {
-  const imagesDir = await getImagePath(true, profile);
+async function saveGeneratedImage(response: ImageGenerationResponse) {
+  const imagesDir = await getImagePath(true);
 
   return await Promise.all(response.images.map(async (img, index) => {
     const timestamp = Date.now();
@@ -88,7 +88,7 @@ export const image_generate = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config, chatMessage, profile }) => {
+  do: async (input, { ai, cwd, config, chatMessage }) => {
     // Generate images
     const response = await ai.image.generate.get({
       model: config.getData().user.models?.imageGenerate,
@@ -97,7 +97,7 @@ export const image_generate = operationOf<
     });
 
     // Save images to files and collect file URLs
-    const imagePaths = await saveGeneratedImage(response, profile);
+    const imagePaths = await saveGeneratedImage(response);
     const imageLinks = imagePaths.map(linkImage);
 
     return {
@@ -142,7 +142,7 @@ export const image_edit = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config, chatMessage, profile }) => {
+  do: async (input, { ai, cwd, config, chatMessage }) => {
     const image = await loadImageAsDataUrl(cwd, input.path);
 
     // Edit image
@@ -152,7 +152,7 @@ export const image_edit = operationOf<
       image,
     });
 
-    const edited = await saveGeneratedImage(response, profile);
+    const edited = await saveGeneratedImage(response);
     const imageUrls = edited.map(linkImage);
 
     return {

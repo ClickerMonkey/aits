@@ -6,13 +6,13 @@ import { KnowledgeSchema, type Knowledge, type KnowledgeEntry } from './schemas'
  * Knowledge file manager for storing embeddings
  */
 export class KnowledgeFile extends JsonFile<Knowledge> {
-  constructor(profile?: string) {
+  constructor() {
     const initialData: Knowledge = {
       updated: Date.now(),
       knowledge: {},
     };
 
-    super(getKnowledgePath(profile), initialData);
+    super(getKnowledgePath(), initialData);
   }
 
   protected validate(parsed: any): Knowledge {

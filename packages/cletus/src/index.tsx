@@ -9,15 +9,11 @@ import { InkChatView } from './components/InkChatView';
 import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
-import { configExists } from './file-manager';
+import { configExists, setProfile } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
-interface AppProps {
-  profile?: string;
-}
-
-const App = ({ profile }: AppProps) => {
+const App = () => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<ConfigFile | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -25,10 +21,10 @@ const App = ({ profile }: AppProps) => {
   // Check if config exists
   React.useEffect(() => {
     async function checkConfig() {
-      const exists = await configExists(profile);
+      const exists = await configExists();
       if (exists) {
         // Config exists, load it
-        const cfg = new ConfigFile(profile);
+        const cfg = new ConfigFile();
         await cfg.load();
         setConfig(cfg);
         setView('main');
@@ -38,7 +34,7 @@ const App = ({ profile }: AppProps) => {
       }
     }
     checkConfig();
-  }, [profile]);
+  }, []);
 
   // Loading state
   if (view === 'loading') {
@@ -49,7 +45,6 @@ const App = ({ profile }: AppProps) => {
   if (view === 'init') {
     return (
       <InkInitWizard
-        profile={profile}
         onComplete={(cfg) => {
           setConfig(cfg);
           setView('main');
@@ -64,7 +59,6 @@ const App = ({ profile }: AppProps) => {
       <InkChatView
         chatId={selectedChatId}
         config={config}
-        profile={profile}
         onExit={() => setView('main')}
       />
     );
@@ -75,7 +69,6 @@ const App = ({ profile }: AppProps) => {
     return (
       <InkMainMenu
         config={config}
-        profile={profile}
         onChatSelect={(chatId) => {
           setSelectedChatId(chatId);
           setView('chat');
@@ -115,13 +108,14 @@ function parseArgs(): { profile?: string } {
 }
 
 async function main() {
-  // Parse command line arguments
+  // Parse command line arguments and set global profile
   const { profile } = parseArgs();
+  setProfile(profile);
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  const { waitUntilExit } = render(React.createElement(App, { profile }), {
+  const { waitUntilExit } = render(React.createElement(App), {
     exitOnCtrlC: false,
   });
   await waitUntilExit();

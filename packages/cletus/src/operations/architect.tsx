@@ -431,7 +431,7 @@ export const type_import = operationOf<
     };
   },
   do: async ({ glob, hints, max }, ctx) => {
-    const { ai, config, cwd, log, chatStatus, profile } = ctx;
+    const { ai, config, cwd, log, chatStatus } = ctx;
     
     // Find and filter files
     const files = await searchFiles(cwd, glob);
@@ -831,7 +831,7 @@ When managing types:
             
             // Read and process file
             const parsed = await processFile(fullPath, file.file, {
-              assetPath: await getAssetPath(true, profile),
+              assetPath: await getAssetPath(true),
               sections: true,
               transcribeImages: false,
               describeImages: false,

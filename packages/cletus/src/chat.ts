@@ -5,13 +5,13 @@ import { ChatMessagesSchema, type ChatMessages, type Message } from './schemas';
  * Chat messages file manager
  */
 export class ChatFile extends JsonFile<ChatMessages> {
-  constructor(public id: string, profile?: string) {
+  constructor(public id: string) {
     const initialData: ChatMessages = {
       updated: Date.now(),
       messages: [],
     };
 
-    super(getChatPath(id, profile), initialData);
+    super(getChatPath(id), initialData);
   }
 
   protected validate(parsed: any): ChatMessages {

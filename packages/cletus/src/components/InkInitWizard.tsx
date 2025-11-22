@@ -28,11 +28,10 @@ type WizardStep =
   | 'complete';
 
 interface InkInitWizardProps {
-  profile?: string;
   onComplete: (config: ConfigFile) => void;
 }
 
-export const InkInitWizard: React.FC<InkInitWizardProps> = ({ profile, onComplete }) => {
+export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState<WizardStep>('openai-env');
   const [providers, setProviders] = useState<Providers>({
     openai: null,
@@ -653,7 +652,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ profile, onComplet
             placeholder="e.g., I prefer concise responses"
             onSubmit={async () => {
               // Create config file
-              const config = new ConfigFile(profile);
+              const config = new ConfigFile();
               await config.save((data) => {
                 data.user.name = name;
                 data.user.pronouns = pronouns;
@@ -668,7 +667,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ profile, onComplet
               });
 
               // Create knowledge file
-              const knowledge = new KnowledgeFile(profile);
+              const knowledge = new KnowledgeFile();
               await knowledge.save(() => {
                 // Initialize with empty knowledge
               });

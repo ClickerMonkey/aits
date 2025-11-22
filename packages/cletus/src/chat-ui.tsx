@@ -28,7 +28,6 @@ interface ChatUIProps {
   chat: ChatMeta;
   config: ConfigFile;
   messages: Message[];
-  profile?: string;
   onExit: () => void;
   onChatUpdate: (updates: Partial<ChatMeta>) => Promise<void>;
 }
@@ -89,7 +88,7 @@ const AGENTMODETEXT: Record<AgentMode, string> = {
 };
 
 
-export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, profile, onExit, onChatUpdate }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, onChatUpdate }) => {
   const altKeyLabel = getAltKeyLabel();
   const [inputValue, setInputValue] = useState('');
   const [chatMessages, setChatMessages, getChatMessages] = useSyncedState<Message[]>(messages);
@@ -118,10 +117,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, profile,
   const interceptingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
-  const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id, profile));
+  const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
   const transcriptionAbortRef = useRef<AbortController | undefined>(undefined);
   const firstMessageRef = useRef<number>(Math.max(0, chatMessages.length - 20));
-  const [ai, _] = useState(() => createCletusAI(config, profile));
+  const [ai, _] = useState(() => createCletusAI(config));
   const [chatAgent, __] = useState(() => createChatAgent(ai));
   
   // Convenience function to add message
