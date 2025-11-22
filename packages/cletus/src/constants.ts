@@ -122,3 +122,8 @@ export const AUTONOMOUS = {
   /** Milliseconds per minute for time conversions */
   MS_PER_MINUTE: 60 * 1000,
 } as const;
+
+/**
+ * Default prompt file names (in order of precedence)
+ */
+export const DEFAULT_PROMPT_FILES = ['cletus.md', 'agents.md', 'claude.md'] as const;
