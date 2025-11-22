@@ -104,12 +104,20 @@ The configuration is saved to `~/.cletus/config.json` and can be modified later 
 # Start Cletus
 cletus
 
+# Start Cletus with split view settings menu
+cletus --split-settings
+
 # The main menu provides options to:
 # - Start a new chat
 # - Continue existing chats
 # - Configure settings
 # - Exit
 ```
+
+### Command Line Arguments
+
+- `--split-settings` - Use split view settings interface instead of nested menu (keeps all settings on one screen)
+- `--profile=NAME` or `--profile NAME` - Use a specific configuration profile
 
 ### Creating a Chat
 
@@ -499,6 +507,31 @@ Operations:
 - Content extraction (text, images, tables)
 - OCR for images in documents
 - Image description and analysis
+
+## Settings Interface
+
+Cletus provides two interfaces for managing settings:
+
+### Traditional Settings Menu (default)
+- Navigate through nested menus with deep navigation
+- Each setting category is accessed by drilling down through screens
+- Good for focused, sequential configuration
+
+### Split View Settings (use `--split-settings` flag)
+- All settings accessible from a single screen
+- Left panel shows categories, right panel shows configuration
+- Reduced navigation and screen transitions
+- Ideal for quick settings adjustments
+
+Both interfaces provide the same functionality:
+- User profile (name, pronouns, global prompt)
+- Prompt file management
+- Memory management
+- Provider configuration (OpenAI, OpenRouter, Replicate, AWS)
+- Tavily web search setup
+- Model selection for different capabilities
+- Autonomous operation settings
+- Debug mode toggle
 
 ## Keyboard Shortcuts
 

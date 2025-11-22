@@ -11,7 +11,7 @@ import { getChatPath, getDataPath } from '../file-manager';
 import { ModelCapability } from '@aeye/ai';
 import { logger } from '../logger';
 import { abbreviate } from '../common';
-import { AUTONOMOUS } from '../constants';
+import { AUTONOMOUS, DEFAULT_PROMPT_FILES } from '../constants';
 import { AWSBedrockProvider } from '@aeye/aws';
 
 type SettingsView =
@@ -318,7 +318,7 @@ export const InkSettingsMenu: React.FC<InkSettingsMenuProps> = ({ config, onExit
 
   // Manage Prompt Files
   if (view === 'manage-prompt-files') {
-    const promptFiles = config.getData().user.promptFiles || ['cletus.md', 'agents.md', 'claude.md'];
+    const promptFiles = config.getData().user.promptFiles || [...DEFAULT_PROMPT_FILES];
     
     const items = [
       { label: `Current files (first found used): ${promptFiles.join(', ')}`, value: '__info__' },

@@ -13,7 +13,11 @@ import { configExists, setProfile } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
-const App = () => {
+interface AppProps {
+  useSplitSettings: boolean;
+}
+
+const App: React.FC<AppProps> = ({ useSplitSettings }) => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<ConfigFile | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -69,6 +73,7 @@ const App = () => {
     return (
       <InkMainMenu
         config={config}
+        useSplitSettings={useSplitSettings}
         onChatSelect={(chatId) => {
           setSelectedChatId(chatId);
           setView('chat');
@@ -86,9 +91,10 @@ const App = () => {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { profile?: string } {
+function parseArgs(): { profile?: string; splitSettings: boolean } {
   const args = process.argv.slice(2);
   let profile: string | undefined;
+  let splitSettings = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -102,20 +108,24 @@ function parseArgs(): { profile?: string } {
       profile = args[i + 1];
       i++; // Skip next argument
     }
+    // Handle --split-settings flag
+    else if (arg === '--split-settings') {
+      splitSettings = true;
+    }
   }
 
-  return { profile };
+  return { profile, splitSettings };
 }
 
 async function main() {
   // Parse command line arguments and set global profile
-  const { profile } = parseArgs();
+  const { profile, splitSettings } = parseArgs();
   setProfile(profile);
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  const { waitUntilExit } = render(React.createElement(App), {
+  const { waitUntilExit } = render(React.createElement(App, { useSplitSettings: splitSettings }), {
     exitOnCtrlC: false,
   });
   await waitUntilExit();

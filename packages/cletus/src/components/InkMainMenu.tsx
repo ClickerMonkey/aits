@@ -6,6 +6,7 @@ import type { ConfigFile } from '../config';
 import { ChatFile } from '../chat';
 import type { ChatMeta } from '../schemas';
 import { InkSettingsMenu } from './InkSettingsMenu';
+import { InkSettingsSplitView } from './InkSettingsSplitView';
 import Gradient from 'ink-gradient';
 import BigText from 'ink-big-text';
 import { COLORS } from '../constants';
@@ -15,11 +16,12 @@ type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat
 
 interface InkMainMenuProps {
   config: ConfigFile;
+  useSplitSettings?: boolean;
   onChatSelect: (chatId: string) => void;
   onExit: () => void;
 }
 
-export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, onExit }) => {
+export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, useSplitSettings = false, onChatSelect, onExit }) => {
   const [view, setView] = useState<MainMenuView>('menu');
   const [selectedAssistant, setSelectedAssistant] = useState<string | undefined>();
   const [customPrompt, setCustomPrompt] = useState('');
@@ -57,6 +59,14 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
 
   // Settings View
   if (view === 'settings') {
+    if (useSplitSettings) {
+      return (
+        <InkSettingsSplitView
+          config={config}
+          onExit={() => setView('menu')}
+        />
+      );
+    }
     return (
       <InkSettingsMenu
         config={config}
