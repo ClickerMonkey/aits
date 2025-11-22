@@ -236,6 +236,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     return subView === 'provider-action' || 
            subView === 'openrouter-settings' || 
            subView === 'aws-settings' ||
+           subView === 'aws-model-prefix' ||
            subView === 'delete-chat-options';
   };
 
@@ -1682,7 +1683,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
       <Box flexDirection="row">
         {/* Left panel: Categories */}
-        <Box flexDirection="column" width="25%" borderStyle="round" borderColor={focusedPane === 0 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
+        <Box flexDirection="column" width="23%" borderStyle="round" borderColor={focusedPane === 0 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
           <Box marginBottom={1}>
             <Text bold dimColor>Categories</Text>
           </Box>
@@ -1705,13 +1706,13 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
         </Box>
 
         {/* Middle panel: Options */}
-        <Box flexDirection="column" width={shouldShowThirdPane() ? "35%" : "75%"} borderStyle="round" borderColor={focusedPane === 1 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
+        <Box flexDirection="column" width={shouldShowThirdPane() ? "35%" : "72%"} borderStyle="round" borderColor={focusedPane === 1 ? "cyan" : "gray"} paddingX={1} marginRight={shouldShowThirdPane() ? 1 : 0}>
           {renderMiddlePanel()}
         </Box>
 
         {/* Right panel: Sub-options (shown when needed) */}
         {shouldShowThirdPane() && (
-          <Box flexDirection="column" width="40%" borderStyle="round" borderColor={focusedPane === 2 ? "cyan" : "gray"} paddingX={1}>
+          <Box flexDirection="column" width="38%" borderStyle="round" borderColor={focusedPane === 2 ? "cyan" : "gray"} paddingX={1}>
             {renderRightPanel()}
           </Box>
         )}
