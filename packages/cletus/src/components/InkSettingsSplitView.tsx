@@ -57,6 +57,14 @@ interface InkSettingsSplitViewProps {
   onExit: () => void;
 }
 
+// Panel width constants for consistent layout
+const PANEL_WIDTHS = {
+  left: '23%',
+  middle: '35%',
+  middleExpanded: '72%',
+  right: '38%',
+} as const;
+
 export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ config, onExit }) => {
   const [selectedCategory, setSelectedCategory] = useState<SettingsCategory>('user-profile');
   const [subView, setSubView] = useState<SubView>('default');
@@ -1673,6 +1681,9 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     return null;
   };
 
+  // Memoize third pane visibility to avoid repeated function calls
+  const showThirdPane = shouldShowThirdPane();
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box borderStyle="round" borderColor="cyan" paddingX={1} marginBottom={1}>
@@ -1683,7 +1694,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
       <Box flexDirection="row">
         {/* Left panel: Categories */}
-        <Box flexDirection="column" width="23%" borderStyle="round" borderColor={focusedPane === 0 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
+        <Box flexDirection="column" width={PANEL_WIDTHS.left} borderStyle="round" borderColor={focusedPane === 0 ? "cyan" : "gray"} paddingX={1} marginRight={1}>
           <Box marginBottom={1}>
             <Text bold dimColor>Categories</Text>
           </Box>
@@ -1706,13 +1717,13 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
         </Box>
 
         {/* Middle panel: Options */}
-        <Box flexDirection="column" width={shouldShowThirdPane() ? "35%" : "72%"} borderStyle="round" borderColor={focusedPane === 1 ? "cyan" : "gray"} paddingX={1} marginRight={shouldShowThirdPane() ? 1 : 0}>
+        <Box flexDirection="column" width={showThirdPane ? PANEL_WIDTHS.middle : PANEL_WIDTHS.middleExpanded} borderStyle="round" borderColor={focusedPane === 1 ? "cyan" : "gray"} paddingX={1} marginRight={showThirdPane ? 1 : 0}>
           {renderMiddlePanel()}
         </Box>
 
         {/* Right panel: Sub-options (shown when needed) */}
-        {shouldShowThirdPane() && (
-          <Box flexDirection="column" width="38%" borderStyle="round" borderColor={focusedPane === 2 ? "cyan" : "gray"} paddingX={1}>
+        {showThirdPane && (
+          <Box flexDirection="column" width={PANEL_WIDTHS.right} borderStyle="round" borderColor={focusedPane === 2 ? "cyan" : "gray"} paddingX={1}>
             {renderRightPanel()}
           </Box>
         )}
