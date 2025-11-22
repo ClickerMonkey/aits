@@ -181,18 +181,15 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     }
   }, [subView, providerKey, testAWSCredentials]);
   
-  // Helper function to determine if third pane should be shown
-  const shouldShowThirdPane = (): boolean => {
-    // Third pane is shown for specific sub-views that need deeper navigation
+  // Memoize third pane visibility to avoid repeated calculations
+  // Third pane is shown for specific sub-views that need deeper navigation
+  const showThirdPane = useMemo(() => {
     return subView === 'provider-action' || 
            subView === 'openrouter-settings' || 
            subView === 'aws-settings' ||
            subView === 'aws-model-prefix' ||
            subView === 'delete-chat-options';
-  };
-  
-  // Memoize third pane visibility to avoid repeated calculations
-  const showThirdPane = useMemo(() => shouldShowThirdPane(), [subView]);
+  }, [subView]);
 
   // Handle ESC, Ctrl+C, and Tab keys for pane navigation
   useInput((input, key) => {
@@ -201,7 +198,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       // Only allow tab navigation on default view (not during text input)
       if (subView === 'default') {
         setFocusedPane((prev) => {
-          // Cycle through panes: 0 -> 1 -> 0 (or 0 -> 1 -> 2 -> 0 when third pane is visible)
+          // Cycle through panes: left (0) -> middle (1) -> right (2 if shown) -> left (0)
           if (prev === 0) return 1;
           if (prev === 1) {
             // Check if there's content in the third pane that can be focused
