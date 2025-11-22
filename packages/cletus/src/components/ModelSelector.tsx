@@ -1,7 +1,7 @@
 import type { AIBaseMetadata, ModelInfo, ScoredModel } from '@aeye/ai';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { CletusAI } from '../ai';
 import { getAltKeyLabel } from '../common';
 
@@ -61,7 +61,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         setScoredModels([]);
       }
     }
-  }, [mode, weights]);
+  }, [mode, weights.cost, weights.speed, weights.accuracy, weights.contextWindow]);
 
   // Helper functions for sorting
   const getModelCost = (model: ModelInfo): number | null => {
@@ -166,8 +166,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     return model.capabilities.size + (model.supportedParameters?.size ?? 0);
   };
 
-  // Filter and sort models
-  const filteredModels = (() => {
+  // Filter and sort models - memoized to prevent excessive re-computation
+  const filteredModels = useMemo(() => {
     let filtered = scoredModels.filter((scored) => {
       if (!filterText) return true;
       const model = scored.model;
@@ -245,7 +245,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
 
     return filtered;
-  })();
+  }, [scoredModels, filterText, sortMode]);
 
   // Reset selection to top when filter or sort changes
   useEffect(() => {
