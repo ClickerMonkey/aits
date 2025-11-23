@@ -12,12 +12,13 @@ import { ConfigFile } from './config';
 import { configExists, setProfile } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
+type MenuType = 'default' | 'split' | 'tab' | 'tree';
 
 interface AppProps {
-  useSplitSettings: boolean;
+  menuType: MenuType;
 }
 
-const App: React.FC<AppProps> = ({ useSplitSettings }) => {
+const App: React.FC<AppProps> = ({ menuType }) => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<ConfigFile | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -73,7 +74,7 @@ const App: React.FC<AppProps> = ({ useSplitSettings }) => {
     return (
       <InkMainMenu
         config={config}
-        useSplitSettings={useSplitSettings}
+        menuType={menuType}
         onChatSelect={(chatId) => {
           setSelectedChatId(chatId);
           setView('chat');
@@ -91,10 +92,10 @@ const App: React.FC<AppProps> = ({ useSplitSettings }) => {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { profile?: string; splitSettings: boolean } {
+function parseArgs(): { profile?: string; menuType: MenuType } {
   const args = process.argv.slice(2);
   let profile: string | undefined;
-  let splitSettings = false;
+  let menuType: MenuType = 'default';
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -108,24 +109,30 @@ function parseArgs(): { profile?: string; splitSettings: boolean } {
       profile = args[i + 1];
       i++; // Skip next argument
     }
-    // Handle --split-settings flag
+    // Handle menu type flags
     else if (arg === '--split-settings') {
-      splitSettings = true;
+      menuType = 'split';
+    }
+    else if (arg === '--tab-settings') {
+      menuType = 'tab';
+    }
+    else if (arg === '--tree-settings') {
+      menuType = 'tree';
     }
   }
 
-  return { profile, splitSettings };
+  return { profile, menuType };
 }
 
 async function main() {
   // Parse command line arguments and set global profile
-  const { profile, splitSettings } = parseArgs();
+  const { profile, menuType } = parseArgs();
   setProfile(profile);
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  const { waitUntilExit } = render(React.createElement(App, { useSplitSettings: splitSettings }), {
+  const { waitUntilExit } = render(React.createElement(App, { menuType }), {
     exitOnCtrlC: false,
   });
   await waitUntilExit();
