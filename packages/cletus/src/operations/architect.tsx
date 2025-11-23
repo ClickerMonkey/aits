@@ -70,6 +70,43 @@ export const type_info = operationOf<
   ),
 });
 
+export const type_list = operationOf<
+  {},
+  { types: Pick<TypeDefinition, 'name' | 'friendlyName' | 'description'>[] }
+>({
+  mode: 'local',
+  signature: 'type_list()',
+  status: () => `Listing all types`,
+  analyze: async (input, { config }) => {
+    return {
+      analysis: `This will list all existing data types.`,
+      doable: true,
+    };
+  },
+  do: async (input, { config }) => {
+    const types = config.getData().types;
+    const typeSummaries = types.map(t => ({
+      name: t.name,
+      friendlyName: t.friendlyName,
+      description: t.description,
+    }));
+    return { types: typeSummaries };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `TypeList()`,
+    (op) => {
+      if (op.output?.types.length) {
+        return `Found ${op.output.types.length} ${pluralize(op.output.types.length, 'type', 'types')}`;
+      } else {
+        return `No types found`;
+      }
+    },
+    showInput, showOutput
+  ),
+});
+
+
 type TypeUpdate = { name: string; update: { friendlyName?: string; description?: string; knowledgeTemplate?: string; fields?: Record<string, Partial<TypeField> | null> } };
 
 export const type_update = operationOf<

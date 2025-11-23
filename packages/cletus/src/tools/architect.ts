@@ -23,6 +23,16 @@ Example: Get information about a type:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_info', input }, ctx),
   });
 
+  const typeList = ai.tool({
+    name: 'type_list',
+    description: 'List all existing type definitions (names & descriptions',
+    instructions: `Use this to get a list of all custom data types defined in the system, including their names and friendly names.
+Example: List all types:
+{ }`,
+    schema: z.object({}),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_list', input }, ctx),
+  });
+
   const typeUpdate = ai.tool({
     name: 'type_update',
     description: 'Update a type definition in a backwards compatible way',
@@ -149,11 +159,13 @@ Example 3: Limit discovery to top types:
     typeCreate,
     typeDelete,
     typeImport,
+    typeList,
   ] as [
     typeof typeInfo,
     typeof typeUpdate,
     typeof typeCreate,
     typeof typeDelete,
     typeof typeImport,
+    typeof typeList,
   ];
 }

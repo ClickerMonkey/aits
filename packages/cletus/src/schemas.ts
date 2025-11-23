@@ -234,6 +234,7 @@ export const OperationStatusSchema = z.enum(['created', 'analyzed', 'analyzeErro
 export const OperationKindSchema = z.enum([
   // architect
   'type_info',
+  'type_list',
   'type_create',
   'type_update',
   'type_delete',
