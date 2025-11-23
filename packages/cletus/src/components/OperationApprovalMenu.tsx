@@ -153,6 +153,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         onUsageUpdate(ctx.usage.accumulated, ctx.usage.accumulatedCost);
       }
 
+      /*
       const elapsed = (performance.now() - startTime);
 
       // Generate summary message
@@ -174,6 +175,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         content: `__${summaryText}__`,
       });
       onMessageUpdate?.(message)
+      */
 
       result = {
         success,
@@ -209,6 +211,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         updateMessageContent(operations[idx], idx);
       }
 
+      /*
       // Generate summary message
       const summaryText = indices.length === 1
         ? 'Operation rejected'
@@ -220,6 +223,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         content: `__${summaryText}__`,
       });
       onMessageUpdate?.(message)
+      */
 
       result = {
         success: 0,
@@ -333,6 +337,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           updateMessageContent(operations[idx], idx);
         }
 
+        /*
         const elapsed = (performance.now() - startTime);
 
         // Generate summary message
@@ -354,6 +359,7 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
           content: `__${summaryText}__`,
         });
         onMessageUpdate?.(message)
+        */
 
         result = {
           success,

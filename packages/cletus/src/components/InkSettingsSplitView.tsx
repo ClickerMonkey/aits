@@ -265,7 +265,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
     { label: '👤 User Profile', value: 'user-profile' as SettingsCategory },
     { label: '📄 Prompt Files', value: 'prompt-files' as SettingsCategory },
     { label: '💭 Memories', value: 'memories' as SettingsCategory },
-    { label: '🗑️ Deletions', value: 'deletions' as SettingsCategory },
+    { label: '❌ Deletions', value: 'deletions' as SettingsCategory },
     { label: '🔌 Providers', value: 'providers' as SettingsCategory },
     { label: '🌐 Tavily (Web Search)', value: 'tavily' as SettingsCategory },
     { label: '🤖 Models', value: 'models' as SettingsCategory },
@@ -392,8 +392,8 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       // Default user profile view
       const userData = config.getData().user;
       const items = [
-        { label: `✏️ Change name (${userData.name})`, value: 'change-name' },
-        { label: `✏️ Change pronouns (${userData.pronouns || '(none)'})`, value: 'change-pronouns' },
+        { label: `📝 Change name (${userData.name})`, value: 'change-name' },
+        { label: `📝 Change pronouns (${userData.pronouns || '(none)'})`, value: 'change-pronouns' },
         { label: '📝 Change global prompt', value: 'change-global-prompt' },
       ];
 
@@ -558,7 +558,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
         { label: '', value: '__separator__' },
         { label: '➕ Add a file', value: 'add' },
         { label: '🔄 Reorder files', value: 'reorder' },
-        { label: '🗑️ Remove a file', value: 'remove' },
+        { label: '❌ Remove a file', value: 'remove' },
       ];
       
       return (
@@ -670,7 +670,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       const memories = config.getData().user.memory;
       const items = [
         { label: '➕ Add a memory', value: 'add' },
-        { label: '🗑️ Delete a memory', value: 'delete' },
+        { label: '❌ Delete a memory', value: 'delete' },
       ];
 
       return (
@@ -768,7 +768,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
         }
 
         const items = [
-          { label: '🗑️ Delete all chats', value: '__delete_all__' },
+          { label: '❌ Delete all chats', value: '__delete_all__' },
           { label: '', value: '__separator__' },
           ...chats.map((chat) => ({
             label: chat.title,
@@ -870,9 +870,9 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
       // Default deletions view
       const items = [
-        { label: '🗑️ Delete an assistant', value: 'delete-assistant' },
-        { label: '🗑️ Delete a chat', value: 'delete-chat' },
-        { label: '🗑️ Delete a data type', value: 'delete-type' },
+        { label: '❌ Delete an assistant', value: 'delete-assistant' },
+        { label: '❌ Delete a chat', value: 'delete-chat' },
+        { label: '❌ Delete a data type', value: 'delete-type' },
       ];
 
       return (
@@ -1277,18 +1277,18 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
       const currentModels = config.getData().user.models || {};
 
       const items = [
-        { label: `💬 Chat: ${currentModels.chat || '(none)'}`, value: 'chat' },
-        { label: `🎨 Image Generation: ${currentModels.imageGenerate || '(none)'}`, value: 'imageGenerate' },
-        { label: `✏️ Image Editing: ${currentModels.imageEdit || '(none)'}`, value: 'imageEdit' },
-        { label: `👁️ Image Analysis: ${currentModels.imageAnalyze || '(none)'}`, value: 'imageAnalyze' },
-        { label: `👁️ Image Embed: ${currentModels.imageEmbed || '(none)'}`, value: 'imageEmbed' },
-        { label: `🎙️ Transcription: ${currentModels.transcription || '(none)'}`, value: 'transcription' },
-        { label: `🔊 Text-to-Speech: ${currentModels.speech || '(none)'}`, value: 'speech' },
-        { label: `🔢 Embeddings: ${currentModels.embedding || '(none)'}`, value: 'embedding' },
-        { label: `📃 Summary: ${currentModels.summary || '(none)'}`, value: 'summary' },
-        { label: `👁️ Describe: ${currentModels.describe || '(none)'}`, value: 'describe' },
-        { label: `📑 Transcribe: ${currentModels.transcribe || '(none)'}`, value: 'transcribe' },
-        { label: `✍️ Edit: ${currentModels.edit || '(none)'}`, value: 'edit' },
+        { label: `Chat: ${currentModels.chat || '(none)'}`, value: 'chat' },
+        { label: `Image Generation: ${currentModels.imageGenerate || '(none)'}`, value: 'imageGenerate' },
+        { label: `Image Editing: ${currentModels.imageEdit || '(none)'}`, value: 'imageEdit' },
+        { label: `Image Analysis: ${currentModels.imageAnalyze || '(none)'}`, value: 'imageAnalyze' },
+        { label: `Image Embed: ${currentModels.imageEmbed || '(none)'}`, value: 'imageEmbed' },
+        { label: `Transcription: ${currentModels.transcription || '(none)'}`, value: 'transcription' },
+        { label: `Text-to-Speech: ${currentModels.speech || '(none)'}`, value: 'speech' },
+        { label: `Embeddings: ${currentModels.embedding || '(none)'}`, value: 'embedding' },
+        { label: `Summary: ${currentModels.summary || '(none)'}`, value: 'summary' },
+        { label: `Describe: ${currentModels.describe || '(none)'}`, value: 'describe' },
+        { label: `Transcribe: ${currentModels.transcribe || '(none)'}`, value: 'transcribe' },
+        { label: `Edit: ${currentModels.edit || '(none)'}`, value: 'edit' },
       ];
 
       return (
@@ -1408,7 +1408,7 @@ export const InkSettingsSplitView: React.FC<InkSettingsSplitViewProps> = ({ conf
 
       const items = [
         { label: `🔄 Max autonomous iterations: ${maxIterations}`, value: 'change-max-iterations' },
-        { label: `⏱️ Autonomous timeout: ${timeoutMinutes}m`, value: 'change-timeout' },
+        { label: `⌛ Autonomous timeout: ${timeoutMinutes}m`, value: 'change-timeout' },
       ];
 
       return (
