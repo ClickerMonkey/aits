@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create clerk tools for file operations
@@ -18,6 +18,7 @@ Example: Find all TypeScript files in src directory:
       glob: z.string().describe('Glob pattern (e.g., "**/*.ts", "src/**/*.json")'),
       limit: z.number().optional().describe('Maximum results (default: 50)'),
       offset: z.number().optional().describe('Starting position for results (default: 0)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_search', input }, ctx),
   });
@@ -37,6 +38,7 @@ Example: Summarize a PDF document:
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_summary', input }, ctx),
   });
@@ -57,6 +59,7 @@ Example 2: Index images with descriptions:
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_index', input }, ctx),
   });
@@ -71,6 +74,7 @@ Example: Create a new configuration file:
     schema: z.object({
       path: z.string().describe('Relative file path'),
       content: z.string().describe('File content'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_create', input }, ctx),
   });
@@ -85,6 +89,7 @@ Example: Copy all config files to backup directory:
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to copy'),
       target: z.string().describe('Destination file path or directory'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_copy', input }, ctx),
   });
@@ -102,6 +107,7 @@ Example 2: Move multiple files into a directory:
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to move'),
       target: z.string().describe('Destination directory or file'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_move', input }, ctx),
   });
@@ -115,6 +121,7 @@ Example: Get stats for a source file:
 { "path": "src/index.ts" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_stats', input }, ctx),
   });
@@ -128,6 +135,7 @@ Example: Delete a temporary file:
 { "path": "temp/cache.tmp" }`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_delete', input }, ctx),
   });
@@ -148,6 +156,7 @@ Example: Read a source file:
       describeImages: z.boolean().optional().describe('Generate descriptions for images (default: false)'),
       extractImages: z.boolean().optional().describe('Extract images from documents (default: false)'),
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_read', input }, ctx),
   });
@@ -169,6 +178,7 @@ Example 2: Edit a specific section of a large file (by line numbers):
       request: z.string().describe('Detailed request describing the changes to make. Be precise with rules and requirements.'),
       offset: z.number().optional().describe('Line offset to start editing from (default: 0). Negative numbers start from the end.'),
       limit: z.number().optional().describe('Maximum lines to edit (default: 1000 lines)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_edit', input }, ctx),
   });
@@ -200,6 +210,7 @@ Example: Find all function declarations in TypeScript files:
       transcribeImages: z.boolean().optional().describe('OCR text from images before searching (default: false). This may be slow and costly so the user should be prompted for permission if not done so yet.'),
       offset: z.number().optional().describe('Starting position for results (default: 0)'),
       limit: z.number().optional().describe('Maximum results (default: 0 = unlimited)'),
+      ...globalToolProperties,
     }),
     validate: (input) => {
       try {
@@ -220,6 +231,7 @@ Example: Create a new feature directory:
 { "path": "src/features/auth" }`,
     schema: z.object({
       path: z.string().describe('Relative directory path'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_create', input }, ctx),
   });
@@ -233,6 +245,7 @@ Example: Attach a document:
 { "path": "documents/report.pdf" }`,
     schema: z.object({
       path: z.string().describe('Relative path to the text, audio, or PDF file to attach'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_attach', input }, ctx),
   });

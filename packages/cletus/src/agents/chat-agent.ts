@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
-import { createSubAgents } from './sub-agents';
+import type { CletusAI, CletusAIContext } from '../ai';
 import { abbreviate } from '../common';
-import { Operations, OperationMode } from '../operations/types';
-import { ComponentOutput } from '@aeye/core';
 import { OperationManager } from '../operations/manager';
+import { OperationMode, Operations } from '../operations/types';
 import { createUtilityTools } from '../tools/utility';
+import { createSubAgents } from './sub-agents';
+import { CONSTS } from '../constants';
 
 /**
  * Create the main chat agent that routes to sub-agents
@@ -55,11 +55,11 @@ ${artistTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 - **internet**: Web searches, page fetching, and REST API calls
 ${internetTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
-- **dba**: Data operations (create, update, delete, select, update many, delete many, aggregate) - when using this agent, you MUST specify the type of data to operate on using the 'type' parameter
+- **dba:[type]**: Data operations (create, update, delete, select, update many, delete many, aggregate)
 ${dbaTools.map(tool => `  - ${Operations[tool.name].signature}`).join('\n')}
 
 Choose the appropriate agent based on what the user wants done.
-The agent will NOT be fed the conversation and you need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
+You need to provide a 'request' that includes all necessary details for the sub-agent to complete the task. This request should begin with human readable instructions followed by a technical description of what needs to be done (for example, a signature of one of the above tools with parameters filled in).
 
 <simulateMode>
 Use the 'simulateMode' parameter to override the operation mode for this delegation:
@@ -83,6 +83,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
 - All file operations are done within the current working directory - not outside. All files are relative. CWD: ${cwd}
 - Todos are exlusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should assumed to be a separate data type.
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
+- Don't present the results of an operation in <input> or <output> tags - those are only for your internal processing.
 </rules>
 `,
     schema: ({ config, chat }) => {
@@ -95,19 +96,19 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
       const availableModes = currentModeIndex === 0 
         ? ['local'] as [OperationMode, ...OperationMode[]]
         : modeHierarchy.slice(0, currentModeIndex + 1) as [OperationMode, ...OperationMode[]];
+      const dbas = config.getData().types.map(t => `dba:${t.name}`) as [`dba:${string}`, ...`dba:${string}`[]]
       
       return z.object({
-        agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', 'dba']).describe('Which sub-agent to use'),
-        request: z.string().describe('The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls. At the end provide one or more suggested tool calls with parameters filled in based on your understanding of their capabilities.'),
-        typeName: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).nullable().describe('The type of data to operate on (required for dba agent)'),
+        agent: z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', ...dbas]).describe('Which sub-agent to use'),
+        request: z.string().describe(`The user request to pass along to the sub-agent. Include all necessary details for the sub-agent to make accurate tool calls. At the end provide one or more suggested tool calls with parameters filled in based on your understanding of their capabilities.`),
         simulateMode: z.enum(availableModes).default(currentMode).describe(`Mode override for this delegation. Current mode is '${currentMode}'. Use a lower mode (e.g., 'read' when in 'delete' mode) to simulate what would happen without actually executing destructive operations. This allows you to preview the effects before committing to them. Defaults to current mode.`),
       });
     },
     refs: subAgents,
-    call: async ({ agent, typeName, request, simulateMode }, [planner, librarian, clerk, secretary, architect, artist, internet, dba], ctx) => {
-      ctx.log('Routing to sub-agent: ' + agent + (typeName ? ` (type: ${typeName})` : '') + ' with request: ' + request + (simulateMode !== ctx.chat?.mode ? ` (simulating in ${simulateMode} mode)` : ''));
+    call: async ({ agent, request, simulateMode }, [planner, librarian, clerk, secretary, architect, artist, internet, dba], ctx) => {
+      ctx.log('Routing to sub-agent: ' + agent + ' with request: ' + request + (simulateMode !== ctx.chat?.mode ? ` (simulating in ${simulateMode} mode)` : ''));
 
-      ctx.chatStatus(`Delegating ${agent === 'dba' ? `${typeName} request `: ``}to ${agent}: ${abbreviate(request, 80)}${simulateMode !== ctx.chat?.mode ? ` [${simulateMode} mode]` : ''}`);
+      ctx.chatStatus(`Delegating to ${agent}: ${abbreviate(request, 80)}${simulateMode !== ctx.chat?.mode ? ` [${simulateMode} mode]` : ''}`);
 
       // Create a new OperationManager with the simulated mode if different from current mode
       const effectiveOps = simulateMode !== ctx.chat?.mode && simulateMode !== 'none'
@@ -120,18 +121,30 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
         : ctx.ops;
       
       const operationProgress = effectiveOps.operations.length;
-      const contextWithMode = { ...ctx, ops: effectiveOps };
+      const types = ctx.config.getData().types;
+      const [isDBA, typeName] = agent.startsWith('dba:') 
+        ? [true, agent.substring('dba:'.length)] 
+        : [false, undefined];
+      const type = typeName ? types.find(t => t.name === typeName) : undefined;
+      const recent = (ctx.messages || []).slice(-CONSTS.SUB_AGENT_CONTEXT_MESSAGES);
+      const agentContext: CletusAIContext = { 
+        ...ctx, 
+        ops: effectiveOps,
+        messages: recent.concat([{
+          role: 'assistant',
+          content: `I will Delegating to ${agent} agent. They will handle the following request:\n\n${request}`,
+        }]),
+      };
       
       const tools = await (() => {
-        if (agent === 'dba') {
-          const types = ctx.config.getData().types;
-          const type = typeName ? types.find(t => t.name === typeName) : undefined;
+        if (isDBA) {
           if (!type) {
             throw new Error('The dba agent requires a type parameter to specify the data type to operate on. given: ' + (typeName || '(null))'));
           }
           
-          return dba.get('tools', { request }, { ...contextWithMode, type, messages: [] });
+          return dba.get('tools', { request }, { ...agentContext, type });
         } else {
+          const subAgentName = agent as Exclude<typeof agent, `dba:${string}`>;
           const subAgent = {
             planner,
             librarian,
@@ -140,13 +153,13 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
             architect,
             artist,
             internet,
-          }[agent];
+          }[subAgentName];
 
           if (!subAgent) {
             throw new Error(`Invalid sub-agent: ${agent || '(null)'}`);
           }
 
-          return subAgent.get('tools', { request }, { ...contextWithMode, messages: [] });
+          return subAgent.get('tools', { request }, agentContext);
         }
       })();
 
@@ -170,7 +183,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
         chatMessage.requests.push({
           agent,
           request,
-          typeName: agent === 'dba' ? typeName! : undefined,
+          typeName: isDBA ? typeName! : undefined,
           simulateMode: simulateMode !== ctx.chat?.mode ? simulateMode : undefined,
         });
 

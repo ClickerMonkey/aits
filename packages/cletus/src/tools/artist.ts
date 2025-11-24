@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create artist tools for image operations
@@ -16,6 +16,7 @@ Example: Generate a landscape image:
     schema: z.object({
       prompt: z.string().describe('Text description of the image to generate'),
       n: z.number().optional().default(1).describe('Number of images to generate (default: 1)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_generate', input }, ctx),
   });
@@ -30,6 +31,7 @@ Example: Add a sunset effect to an image:
     schema: z.object({
       prompt: z.string().describe('Description of how to edit the image'),
       path: z.string().describe('Path to the image to edit (relative path or absolute path or [filename](filepath) URL)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_edit', input }, ctx),
   });
@@ -45,6 +47,7 @@ Example: Compare two designs:
       prompt: z.string().describe('Question or analysis request about the images'),
       paths: z.array(z.string()).describe('Paths to images to analyze (relative paths or absolute file or [filename](filepath))'),
       maxCharacters: z.number().optional().default(2084).describe('Maximum response length (maxCharacters/4 = maxTokens, default: 2084)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_analyze', input }, ctx),
   });
@@ -58,6 +61,7 @@ Example: Describe a screenshot:
 { "path": "screenshots/dashboard.png" }`,
     schema: z.object({
       path: z.string().describe('Path to the image to describe (relative path or absolute path or [filename](filepath))'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_describe', input }, ctx),
   });
@@ -74,6 +78,7 @@ Example: Find images of people in photos:
       glob: z.string().describe('Glob pattern for image files to search (e.g., "**/*.png", "photos/*.jpg")'),
       maxImages: z.number().optional().default(100).describe('Maximum number of images to analyze (default: 100)'),
       n: z.number().optional().default(5).describe('Number of top results to return (default: 5)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_find', input }, ctx),
   });
@@ -87,6 +92,7 @@ Example: Attach an image file:
 { "path": "images/diagram.png" }`,
     schema: z.object({
       path: z.string().describe('Path to the image file to attach (absolute or relative)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_attach', input }, ctx),
   });

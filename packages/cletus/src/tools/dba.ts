@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI, CletusAIContext } from '../ai';
+import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
 import type { TypeDefinition, TypeField } from '../schemas';
 import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
 import { requestPrompt } from '../agents/sub-agents';
@@ -17,6 +17,7 @@ export function createDBAAgent(ai: CletusAI) {
     instructionsFn: ({ type }) => `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }`,
     schema: ({ type, cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: ctx.type.name, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
@@ -29,6 +30,7 @@ export function createDBAAgent(ai: CletusAI) {
     schema: ({ type, cache }) => z.object({
       id: z.string().describe('Record ID'),
       fields: getSchemas(type, cache).fields.partial().describe('Fields to update'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: ctx.type.name, id: input.id, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
@@ -40,6 +42,7 @@ export function createDBAAgent(ai: CletusAI) {
     instructionsFn: ({ type }) => `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }`,
     schema: z.object({
       id: z.string().describe('Record ID'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: ctx.type.name, id: input.id } }, ctx as unknown as CletusAIContext),
   });
@@ -75,6 +78,7 @@ Example 2: Query with sorting:
           direction: z.enum(['asc', 'desc']).default('asc'),
         })
       ).optional().describe('Sort order'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
@@ -92,6 +96,7 @@ Example 2: Query with sorting:
       set: getSchemas(type, cache).fields.partial().describe('Fields to set on matching records'),
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to update'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
@@ -104,8 +109,21 @@ Example 2: Query with sorting:
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
+  });
+
+  const dataCount = aiTyped.tool({
+    name: 'data_count',
+    description: `Count records`,
+    descriptionFn: ({ type }) => `Count ${type.friendlyName} records`,
+    instructionsFn: ({ type }) => `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
+    schema: ({ type, cache }) => z.object({
+      where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
+      ...globalToolProperties,
+    }),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_count', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataAggregate = aiTyped.tool({
@@ -149,6 +167,7 @@ Example 2: Aggregate with filter:
           alias: z.string().optional(),
         })
       ).describe('Aggregation functions'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
@@ -159,7 +178,9 @@ Example 2: Aggregate with filter:
     descriptionFn: ({ type }) => `Index ${type.friendlyName} records for knowledge base`,
     instructionsFn: ({ type }) => `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
 This should be done if an embedding model has changed or a knowledge template has changed.`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: ctx.type.name } }, ctx as unknown as CletusAIContext),
   });
 
@@ -182,6 +203,7 @@ Example: Import with image text extraction:
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
       transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: ctx.type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
@@ -197,6 +219,7 @@ Example: Search for relevant records:
     schema: z.object({
       query: z.string().describe('Search query text'),
       n: z.number().optional().describe('Maximum results (default: 10)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: ctx.type.name, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
   });
@@ -215,6 +238,8 @@ Fields:
 
 Use the available tools to complete the data operation requested in the conversation.
 
+You can ONLY do operations on the {{type.friendlyName}} type. Any request for other types MUST be declined.
+
 ${requestPrompt}
 
 <userInformation>
@@ -228,6 +253,7 @@ ${requestPrompt}
       dataSelect,
       dataUpdateMany,
       dataDeleteMany,
+      dataCount,
       dataAggregate,
       dataIndex,
       dataImport,

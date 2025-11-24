@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create secretary tools for assistant and memory management
@@ -14,6 +14,7 @@ Example: To switch to a coding-focused assistant:
 { "name": "coder" }`,
     schema: z.object({
       name: z.string().describe('Assistant name'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_switch', input }, ctx),
   });
@@ -28,6 +29,7 @@ Example: To make an assistant more concise:
     schema: z.object({
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('New system prompt'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_update', input }, ctx),
   });
@@ -42,6 +44,7 @@ Example: Create a specialized writing coach:
     schema: z.object({
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('System prompt for the assistant'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_add', input }, ctx),
   });
@@ -53,7 +56,9 @@ Example: Create a specialized writing coach:
 
 Example: Simply call with no parameters:
 {}`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_list', input }, ctx),
   });
 
@@ -66,6 +71,7 @@ Example: Store a user preference:
 { "content": "User prefers TypeScript over JavaScript for all new projects" }`,
     schema: z.object({
       content: z.string().describe('Memory content to add or update'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_update', input }, ctx),
   });

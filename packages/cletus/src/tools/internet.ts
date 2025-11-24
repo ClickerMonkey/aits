@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create internet tools for web operations
@@ -16,6 +16,7 @@ Example: Search for recent AI developments:
     schema: z.object({
       query: z.string().describe('Search query'),
       maxResults: z.number().optional().default(5).describe('Maximum number of results to return (default: 5)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_search', input }, ctx),
   });
@@ -40,6 +41,7 @@ Example 3: Search for specific content with regex:
       surrounding: z.number().optional().describe('Number of surrounding lines to include when using regex (default: 0)'),
       lineStart: z.number().optional().describe('Starting line number (1-indexed)'),
       lineEnd: z.number().optional().describe('Ending line number (1-indexed)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_get_page', input }, ctx),
   });
@@ -69,6 +71,7 @@ Request/Response Types:
       body: z.string().optional().describe('Request body (for POST, PUT, PATCH)'),
       requestType: z.enum(['json', 'text', 'binary']).optional().describe('Request body type (default: text)'),
       responseType: z.enum(['json', 'text', 'binary']).optional().describe('Expected response type (default: text)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_api_call', input }, ctx),
   });

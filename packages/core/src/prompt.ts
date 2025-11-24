@@ -499,14 +499,16 @@ export class Prompt<
     );
 
     const onlyTools = toolsOnly || this.input.toolsOnly;
+    const systemMessage: Message = {
+      role: 'system',
+      content,
+    };
 
     const request: Request = {
       name: this.name,
       ...config,
       maxTokens: config?.maxTokens ?? ctx.maxOutputTokens,
-      messages: [
-        { role: 'system', content },
-      ],
+      messages: [ systemMessage ],
       tools,
       responseFormat,
     };
@@ -517,7 +519,7 @@ export class Prompt<
       throw new Error(`Prompt ${this.input.name} is configured to require tools, but no tools are available.`);
     }
 
-    if (!this.input.excludeMessages && ctx.messages) {
+    if (!this.input.excludeMessages && ctx.messages?.length) {
       request.messages = request.messages.concat(ctx.messages);
 
       // Pre-emptively trim context messages if we have a context window limit
@@ -587,8 +589,6 @@ export class Prompt<
         if (chunk.usage) {
           usage = chunk.usage;
           if (!requestUsageSent) {
-            // Calculate input tokens from usage structure
-            const inputTokens = getInputTokens(chunk.usage);
             yield emit({ type: 'requestUsage', usage: chunk.usage, request });
             requestUsageSent = true;
           }
@@ -815,11 +815,10 @@ export class Prompt<
 
       // If if there are only tool calls wanted...
       if (onlyTools) {
-        const successWithoutNewErrors = toolSuccesses > 0 && !hadToolErrors;
         const noTools = toolExecutors.length === 0;
 
         // If we met our max tool calls, or had some successes with no new errors, or there are no more tools to call, end it.
-        if (hitMax || successWithoutNewErrors || noTools) {
+        if (hitMax || noTools) {
           // got what we needed!
           lastError = undefined;
           break;
@@ -962,7 +961,7 @@ export class Prompt<
 
         // Update request with new resolved state
         Object.assign(request, dynamicConfig);
-        request.messages[0].content = dynamicContent;
+        systemMessage.content = dynamicContent;
         request.tools = dynamicTools;
         request.responseFormat = dynamicResponseFormat;
 
@@ -1137,7 +1136,7 @@ export class Prompt<
     const contextWindow = model?.contextWindow ?? ctx.contextWindow ?? totalTokens;
 
     // We can't forget our past if we don't know the context window
-    if (contextWindow === undefined) {
+    if (!contextWindow) {
       return request.messages;
     }
 

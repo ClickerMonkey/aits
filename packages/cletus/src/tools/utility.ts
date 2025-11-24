@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 import { formatName } from '../common';
 import ABOUT_CONTENT from './ABOUT.md';
 
@@ -15,6 +15,7 @@ export function createUtilityTools(ai: CletusAI) {
     schema: z.object({
       id: z.number().describe('The message ID provided in the truncation notice'),
       operation: z.number().describe('The operation index within the message provided in the truncation notice'),
+      ...globalToolProperties,
     }),
     call: async ({ id: created, operation: operationIndex }, _, { chatData, chatStatus }) => {
       // Verify chat is in context
@@ -58,7 +59,9 @@ export function createUtilityTools(ai: CletusAI) {
 - Who created Cletus
 - Project background and details
 - How to get started`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (_, __, { chatStatus }) => {
       chatStatus('Retrieving about information...');
       return ABOUT_CONTENT;

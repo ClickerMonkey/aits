@@ -126,6 +126,8 @@ export class OperationManager {
         op.status = analysisResult.doable ? 'analyzed' : 'analyzedBlocked';
       }
     } catch (e: any) {
+      ctx.log(`op error: ${op.type} error=${e.message || String(e)} stack=${e.stack}`);
+
       op.error = e.message || String(e);
       op.status = doit ? 'doneError' : 'analyzeError';
     } finally {

@@ -155,7 +155,7 @@ export const OperationModeSchema = z.enum(['local', 'none', 'read', 'create', 'u
 
 export const AgentModeSchema = z.enum(['plan', 'default']);
 
-export const AgentNameSchema = z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'dba', 'artist', 'internet']);
+export const AgentNameSchema = z.enum(['planner', 'librarian', 'clerk', 'secretary', 'architect', 'dba', 'artist', 'internet']).or(z.string());
 
 export const ChatMetaSchema = z.object({
   id: z.string(),
@@ -267,6 +267,7 @@ export const OperationKindSchema = z.enum([
   'data_select',
   'data_update_many',
   'data_delete_many',
+  'data_count',
   'data_aggregate',
   'data_index',
   'data_import',

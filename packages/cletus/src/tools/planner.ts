@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create planner tools for todo management
@@ -12,7 +12,9 @@ export function createPlannerTools(ai: CletusAI) {
 
 Example: Simply call with no parameters:
 {}`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_clear', input }, ctx),
   });
 
@@ -23,7 +25,9 @@ Example: Simply call with no parameters:
 
 Example: Simply call with no parameters:
 {}`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_list', input }, ctx),
   });
 
@@ -36,6 +40,7 @@ Example: Add a task to implement a feature:
 { "name": "Implement user authentication with OAuth" }`,
     schema: z.object({
       name: z.string().describe('The todo name/description'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_add', input }, ctx),
   });
@@ -49,6 +54,7 @@ Example: Mark a todo as done:
 { "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID to mark as done'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_done', input }, ctx),
   });
@@ -62,6 +68,7 @@ Example: Get details for a specific todo:
 { "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_get', input }, ctx),
   });
@@ -75,6 +82,7 @@ Example: Remove a todo:
 { "id": "abc-123-def" }`,
     schema: z.object({
       id: z.string().describe('The todo ID to remove'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_remove', input }, ctx),
   });
@@ -93,6 +101,7 @@ Example: Replace with a new project plan:
           done: z.boolean().optional(),
         })
       ).describe('Array of new todos'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({
       type: 'todos_replace',

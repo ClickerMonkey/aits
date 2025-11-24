@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create architect tools for type definition management
@@ -19,6 +19,7 @@ Example: Get information about a type:
 { "name": "task" }`,
     schema: z.object({
       name: z.string().describe('Type name'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_info', input }, ctx),
   });
@@ -29,7 +30,9 @@ Example: Get information about a type:
     instructions: `Use this to get a list of all custom data types defined in the system, including their names and friendly names.
 Example: List all types:
 { }`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_list', input }, ctx),
   });
 
@@ -51,30 +54,35 @@ Example 1: Add a new optional field:
 Example 2: Update description:
 { "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }
  
+Example 3: Make a field optional:
+{ "name": "task", "update": { "fields": { "deadline": { "required": false } } } }
+
 If fields are being changed knowledgeTemplate MUST be updated to reflect those changes.
 If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.`,
-    schema: z.object({
-      name: z.string().describe('Type name'),
+    schema: ({ config }) => z.object({
+      name: z.enum(config.getData().types.map(t => t.name)).describe('Type name to update'),
       update: z.object({
         friendlyName: z.string().optional().describe('New friendly name'),
         description: z.string().optional().describe('New description'),
         knowledgeTemplate: z.string().optional().describe('New Handlebars template for knowledge generation, ie: {{name}} and {{#if field}}...{{/if}}. It should include all fields and if the fields are optional #if statements should be used. Newlines & markdown can be used for formatting.'),
-        fields: z.record(
-          z.string(),
-          z.union([
+        fields: z.array(z.object({
+          field: z.string().describe('Field name to update (lowercase, no spaces)'),
+          change: z.union([
             z.null(),
             z.object({
-              friendlyName: z.string().optional(),
-              type: fieldType.optional(),
-              required: z.boolean().optional(),
-              default: z.union([z.string(), z.number(), z.boolean()]).optional(),
-              enumOptions: z.array(z.string()).optional(),
-              onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields'),
+              friendlyName: z.string().optional().describe('Field display name, only specify if changing'),
+              type: fieldType.optional().describe('Field type, only specify if changing'),
+              required: z.boolean().optional().describe('Is field required? Only specify if changing'),
+              default: z.union([z.string(), z.number(), z.boolean()]).optional().describe('Default value, only specify if changing'),
+              enumOptions: z.array(z.string()).optional().describe('Valid enum values (required for enum type), only specify if changing or adding enum field'),
+              onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields, only specify if changing: restrict (default, prevent deletion), cascade (delete referencing records), setNull (set field to null)'),
             })
-          ])
-        ).optional().describe('Field updates: set to null to delete, object to add/update'),
+          ]).describe('Field updates: set to null to delete')
+        }))
       }).describe('Updates to apply'),
+      ...globalToolProperties,
     }),
+    applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_update', input }, ctx),
   });
 
@@ -101,6 +109,7 @@ Example: Create a project tracking type:
           onDelete: z.enum(['restrict', 'cascade', 'setNull']).optional().describe('Cascade delete behavior for reference fields: restrict (default, prevent deletion), cascade (delete referencing records), setNull (set field to null)'),
         })
       ).describe('Field definitions'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_create', input }, ctx),
   });
@@ -116,6 +125,7 @@ Example: Delete a type:
 { "name": "task" }`,
     schema: z.object({
       name: z.string().describe('Type name to delete'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_delete', input }, ctx),
   });
@@ -149,6 +159,7 @@ Example 3: Limit discovery to top types:
       glob: z.string().describe('Glob pattern for files to analyze (e.g., "data/*.csv", "**/*.txt")'),
       hints: z.array(z.string()).optional().describe('Optional type name hints to focus discovery (e.g., ["user", "order", "product"])'),
       max: z.number().optional().describe('Maximum number of types to discover (default: unlimited)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
   });

@@ -1,7 +1,7 @@
 import Handlebars from 'handlebars';
 import path from 'path';
 import { z } from 'zod';
-import { formatName, pluralize } from "../common";
+import { deleteUndefined, formatName, pluralize } from "../common";
 import { ConfigFile } from "../config";
 import type { TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
@@ -97,7 +97,7 @@ export const type_list = operationOf<
     `TypeList()`,
     (op) => {
       if (op.output?.types.length) {
-        return `Found ${op.output.types.length} ${pluralize(op.output.types.length, 'type', 'types')}`;
+        return `Found ${pluralize(op.output.types.length, 'type', 'types')}`;
       } else {
         return `No types found`;
       }
@@ -107,7 +107,18 @@ export const type_list = operationOf<
 });
 
 
-type TypeUpdate = { name: string; update: { friendlyName?: string; description?: string; knowledgeTemplate?: string; fields?: Record<string, Partial<TypeField> | null> } };
+type TypeUpdate = { 
+  name: string; 
+  update: { 
+    friendlyName?: string; 
+    description?: string; 
+    knowledgeTemplate?: string; 
+    fields?: {
+      field: string;
+      change: null | Partial<TypeField>
+    }[];
+  };
+}
 
 export const type_update = operationOf<
   TypeUpdate,
@@ -125,12 +136,12 @@ export const type_update = operationOf<
 
     // Validate field updates if provided
     if (input.update.fields) {
-      for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
+      for (const { field: fieldName, change: fieldUpdate } of input.update.fields) {
         if (fieldName !== fieldName.toLowerCase()) {
           return `Field name "${fieldName}" must be lowercase`;
         }
 
-        if (fieldUpdate === null) {
+        if (!fieldUpdate) {
           // Deleting a field - check if it's required (breaking change)
           const existingField = existing.fields.find((f) => f.name === fieldName);
           if (existingField?.required) {
@@ -179,8 +190,8 @@ export const type_update = operationOf<
     const newFields = fields.slice();
     // Handle field updates
     if (input.update.fields) {
-      for (const [fieldName, fieldUpdate] of Object.entries(input.update.fields)) {
-        if (fieldUpdate === null) {
+      for (const { field: fieldName, change: fieldUpdate } of input.update.fields) {
+        if (!fieldUpdate) {
           // Delete field
           const fieldIndex = newFields.findIndex((f) => f.name === fieldName);
           if (fieldIndex !== -1) {
@@ -191,6 +202,7 @@ export const type_update = operationOf<
           const existingField = newFields.find((f) => f.name === fieldName);
           if (existingField) {
             // Update existing field
+            deleteUndefined(fieldUpdate)
             Object.assign(existingField, fieldUpdate);
           } else {
             // Add new field (must provide full field definition)

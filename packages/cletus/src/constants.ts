@@ -99,6 +99,7 @@ export type ColorValue = typeof COLORS[keyof typeof COLORS];
  * General constants for Cletus operations
  */
 export const CONSTS = {
+  SUB_AGENT_CONTEXT_MESSAGES: 10, // Number of recent messages to pass to sub-agents
   EMBED_CHUNK_SIZE: 1000,
   MAX_CHARACTERS: 64_000,
   MAX_LINES: 1_000,

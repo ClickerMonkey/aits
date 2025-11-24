@@ -62,6 +62,21 @@ export function abbreviate(text: string, maxLength: number, suffix: string = 'â€
 }
 
 /**
+ * Delete undefined properties from an object.
+ * 
+ * @param obj - input object
+ * @returns 
+ */
+export function deleteUndefined<T>(obj: T): T {
+  for (const key in obj) {
+    if (obj[key] === undefined) {
+      delete obj[key];
+    }
+  }
+  return obj;
+}
+
+/**
  * Format a value for text display (high-level representation without JSON escaping)
  * - Arrays: items on separate lines with hyphens
  * - Non-objects (primitives): String(x)
@@ -97,7 +112,7 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
   }
   
   // Objects: bullet list with hyphens
-  const entries = Object.entries(value);
+  const entries = Object.entries(value).filter(([_, val]) => val !== undefined);
   if (entries.length === 0) {
     return '{}';
   }

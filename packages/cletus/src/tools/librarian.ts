@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CletusAI } from '../ai';
+import { globalToolProperties, type CletusAI } from '../ai';
 
 /**
  * Create librarian tools for knowledge management
@@ -16,6 +16,7 @@ Example: Search for user preferences:
       query: z.string().describe('Search query text'),
       limit: z.number().optional().describe('Maximum results (default: 10)'),
       sourcePrefix: z.string().optional().describe('Filter by source prefix (e.g., "user", "task:", "file@{path}:")'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_search', input }, ctx),
   });
@@ -27,7 +28,9 @@ Example: Search for user preferences:
 
 Example: Simply call with no parameters:
 {}`,
-    schema: z.object({}),
+    schema: z.object({
+      ...globalToolProperties,
+    }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_sources', input }, ctx),
   });
 
@@ -40,6 +43,7 @@ Example: Store a project detail:
 { "text": "The authentication service uses JWT tokens with a 24-hour expiration" }`,
     schema: z.object({
       text: z.string().describe('The memory text to add'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_add', input }, ctx),
   });
@@ -60,6 +64,7 @@ Example: Delete all user knowledge:
     schema: z.object({
       sourcePattern: z.string().describe('Regex pattern to match source strings (e.g., "^task:123", "file@.*\\.md:", "^user:")'),
       caseSensitive: z.boolean().optional().default(true).describe('Whether pattern matching is case-sensitive (default: true)'),
+      ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_delete', input }, ctx),
   });

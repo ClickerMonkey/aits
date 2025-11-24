@@ -17,13 +17,18 @@ import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
 
-
-function getType(config: ConfigFile, typeName: string): TypeDefinition {
+function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
+function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
+function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
   const type = config.getData().types.find((t) => t.name === typeName);
-  if (!type) {
+  if (!type && !optional) {
     throw new Error(`Data type not found: ${typeName}`);
   }
   return type;
+}
+
+function getTypeName(config: ConfigFile, typeName: string): string {
+  return getType(config, typeName, true)?.friendlyName || typeName;
 }
 
 /**
@@ -427,14 +432,14 @@ export const data_create = operationOf<
     return { id, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const firstField = Object.keys(op.input.fields)[0];
     const additionalCount = Object.keys(op.input.fields).length - 1;
     const more = additionalCount > 0 ? `, +${additionalCount} more` : '';
     
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Create("${op.input.fields[firstField]}"${more})`,
+      `${formatName(typeName)}Create("${op.input.fields[firstField]}"${more})`,
       (op) => {
         if (op.output) {
           return `Created record ID: ${op.output.id}`;
@@ -494,12 +499,12 @@ export const data_update = operationOf<
     return { updated: true, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
-    const fields = type.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
+    const type = getType(ai.config.defaultContext!.config!, op.input.name, true);
+    const fields = type?.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
     
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Update(${fields.map(f => `"${f}"`).join(', ')})`,
+      `${formatName(type?.friendlyName || op.input.name)}Update(${fields?.map(f => `"${f}"`).join(', ') || '?'})`,
       (op) => {
         if (op.output?.updated) {
           return `Updated record ID: ${op.input.id}`;
@@ -604,11 +609,11 @@ export const data_delete = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
 
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Delete("${op.input.id.slice(0, 8)}")`,
+      `${formatName(typeName)}Delete("${op.input.id.slice(0, 8)}")`,
       (op) => {
         if (op.output?.deleted) {
           let msg = `Deleted record ID: ${op.input.id}`;
@@ -693,7 +698,7 @@ export const data_select = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const offset = op.input.offset ? `offset=${op.input.offset}` : '';
@@ -702,7 +707,7 @@ export const data_select = operationOf<
 
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Select(${params})`,
+      `${formatName(typeName)}Select(${params})`,
       (op) => {
         if (op.output) {
           return `Returned ${op.output.results.length} of ${op.output.count} record(s)`;
@@ -769,7 +774,7 @@ export const data_update_many = operationOf<
     return { updated: matchingRecords.length, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const set = 'set=' + Object.keys(op.input.set).join(',');
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
@@ -777,7 +782,7 @@ export const data_update_many = operationOf<
 
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}UpdateMany(${params})`,
+      `${formatName(typeName)}UpdateMany(${params})`,
       (op) => {
         if (op.output) {
           return `Updated ${op.output.updated} record(s)`;
@@ -854,14 +859,14 @@ export const data_delete_many = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const params = [where, limit].filter(p => p).join(', ');
 
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}DeleteMany(${params})`,
+      `${formatName(typeName)}DeleteMany(${params})`,
       (op) => {
         if (op.output) {
           let msg = `Deleted ${op.output.deleted} record(s)`;
@@ -876,6 +881,54 @@ export const data_delete_many = operationOf<
         return null;
       },
       showInput, showOutput
+    );
+  },
+});
+
+export const data_count = operationOf<
+  { name: string; where?: WhereClause },
+  { count: number }
+>({
+  mode: 'local',
+  signature: 'data_count(where?)',
+  status: ({ name }) => `Counting ${name} records`,
+  analyze: async ({ name, where }, { config }) => {
+    const type = getType(config, name);
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+    let records = dataManager.getAll();
+    if (where) {
+      records = filterByWhere(records, where);
+    } 
+    return {
+      analysis: `This will count ${records.length} ${type.friendlyName} record(s) matching the specified criteria.`,
+      doable: true,
+    };
+  },
+  do: async ({ name, where }) => {
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+
+    let records = dataManager.getAll();
+    if (where) {
+      records = filterByWhere(records, where);
+    }
+    return { count: records.length };
+  },
+  render: (op, ai, showInput, showOutput) => {
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
+    
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Count(${where})`,
+      (op) => {
+        if (op.output) {
+          return `Count: ${op.output.count}`;
+        }
+        return null;
+      }
+      , showInput, showOutput
     );
   },
 });
@@ -1020,7 +1073,7 @@ export const data_aggregate = operationOf<
     return { results };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const having = op.input.having ? `having=${whereString(op.input.having)}` : ''
     const groupBy = op.input.groupBy ? `groupBy=${op.input.groupBy.join(',')}` : ''
@@ -1030,7 +1083,7 @@ export const data_aggregate = operationOf<
     
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Aggregate(${params})`,
+      `${formatName(typeName)}Aggregate(${params})`,
       (op) => {
         if (op.output?.results) {
           const resultCount = op.output.results.length;
@@ -1072,13 +1125,14 @@ export const data_index = operationOf<
     return { libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Index()`,
+      `${formatName(typeName)}Index()`,
       (op) => {
         if (op.output?.libraryKnowledgeUpdated) {
-          return `Knowledge updated for type: ${type.friendlyName}`;
+          return `Knowledge updated for type: ${typeName}`;
         }
         return null;
       },
@@ -1331,10 +1385,10 @@ Fields:
     return { imported, updated, updateSkippedNoChanges, libraryKnowledgeUpdated, failed: filesFailed };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Import("${op.input.glob}")`,
+      `${formatName(typeName)}Import("${op.input.glob}")`,
       (op) => {
         if (op.output) {
           return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.updateSkippedNoChanges} duplicate(s)`;
@@ -1386,10 +1440,10 @@ export const data_search = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
-      `${formatName(type.friendlyName)}Search("${abbreviate(op.input.query, 20)}")`,
+      `${formatName(typeName)}Search("${abbreviate(op.input.query, 20)}")`,
       (op) => {
         if (op.output) {
           const count = op.output.results.length;
