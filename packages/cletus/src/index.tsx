@@ -12,13 +12,8 @@ import { ConfigFile } from './config';
 import { configExists, setProfile } from './file-manager';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
-type MenuType = 'default' | 'split' | 'tab' | 'tree';
 
-interface AppProps {
-  menuType: MenuType;
-}
-
-const App: React.FC<AppProps> = ({ menuType }) => {
+const App: React.FC = () => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<ConfigFile | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -74,7 +69,6 @@ const App: React.FC<AppProps> = ({ menuType }) => {
     return (
       <InkMainMenu
         config={config}
-        menuType={menuType}
         onChatSelect={(chatId) => {
           setSelectedChatId(chatId);
           setView('chat');
@@ -92,14 +86,13 @@ const App: React.FC<AppProps> = ({ menuType }) => {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { profile?: string; menuType: MenuType } {
+function parseArgs(): { profile?: string } {
   const args = process.argv.slice(2);
   let profile: string | undefined;
-  let menuType: MenuType = 'default';
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     // Handle --profile=name format
     if (arg.startsWith('--profile=')) {
       profile = arg.substring('--profile='.length);
@@ -109,30 +102,20 @@ function parseArgs(): { profile?: string; menuType: MenuType } {
       profile = args[i + 1];
       i++; // Skip next argument
     }
-    // Handle menu type flags
-    else if (arg === '--split-settings') {
-      menuType = 'split';
-    }
-    else if (arg === '--tab-settings') {
-      menuType = 'tab';
-    }
-    else if (arg === '--tree-settings') {
-      menuType = 'tree';
-    }
   }
 
-  return { profile, menuType };
+  return { profile };
 }
 
 async function main() {
   // Parse command line arguments and set global profile
-  const { profile, menuType } = parseArgs();
+  const { profile } = parseArgs();
   setProfile(profile);
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  const { waitUntilExit } = render(React.createElement(App, { menuType }), {
+  const { waitUntilExit } = render(React.createElement(App), {
     exitOnCtrlC: false,
   });
   await waitUntilExit();

@@ -132,7 +132,7 @@ Use the 'simulateMode' parameter to override the operation mode for this delegat
         ops: effectiveOps,
         messages: recent.concat([{
           role: 'assistant',
-          content: `I will Delegating to ${agent} agent. They will handle the following request:\n\n${request}`,
+          content: `Delegating to ${agent} agent. They will handle the following request:\n\n${request}`,
         }]),
       };
       

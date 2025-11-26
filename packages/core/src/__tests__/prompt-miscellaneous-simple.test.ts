@@ -46,7 +46,7 @@ describe('Prompt Remaining Coverage', () => {
     // Start streaming
     const streamPromise = (async () => {
       const chunks = [];
-      for await (const chunk of prompt.get({}, 'streamContent', ctx)) {
+      for await (const chunk of prompt.get('streamContent', {}, ctx)) {
         chunks.push(chunk);
       }
       return chunks;
@@ -102,7 +102,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Recovered');
   });
 
@@ -120,7 +120,7 @@ describe('Prompt Remaining Coverage', () => {
         return {
           content: 'partial',
           finishReason: 'length',
-          usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+          usage: { text: { input: 100, output: 50, total: 150 } },
           model: 'model-abc',
         } as const;
       }
@@ -136,7 +136,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('complete');
     expect(callCount).toBe(2);
   });
@@ -190,7 +190,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Handled mixed results');
   });
 
@@ -235,7 +235,7 @@ describe('Prompt Remaining Coverage', () => {
     };
 
     const events = [];
-    for await (const event of prompt.get({}, 'stream', ctx)) {
+    for await (const event of prompt.get('stream', {}, ctx)) {
       events.push(event);
     }
 
@@ -256,7 +256,7 @@ describe('Prompt Remaining Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 },
+          usage: { text: { input: 1000, output: 0, total: 1000 } },
           model: 'model-abc',
         } as const;
       }
@@ -276,7 +276,7 @@ describe('Prompt Remaining Coverage', () => {
       maxOutputTokens: 500
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
   });
 
@@ -326,7 +326,7 @@ describe('Prompt Remaining Coverage', () => {
     };
 
     try {
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
     } catch (error) {
       // Expected to throw when reconfig returns false
     }
@@ -355,7 +355,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Just plain text response');
   });
 
@@ -379,7 +379,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('Valid string response');
   });
 
@@ -410,7 +410,7 @@ describe('Prompt Remaining Coverage', () => {
       messages: []
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toEqual({ value: 42 });
   });
 });

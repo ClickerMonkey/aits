@@ -48,7 +48,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Result: 10');
     });
   });
@@ -75,7 +75,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow(
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow(
         'no token usage was provided so context cannot be trimmed'
       );
     });
@@ -117,7 +117,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Done');
     });
   });
@@ -158,7 +158,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Completed');
     });
   });
@@ -186,7 +186,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toEqual({ value: 42 });
     });
   });
@@ -213,7 +213,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('not valid JSON');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('not valid JSON');
     });
   });
 
@@ -254,7 +254,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Used tools');
     });
 
@@ -295,7 +295,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Selected tools used');
     });
   });
@@ -323,7 +323,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({ rawValue: 'hello' }, 'result', ctx);
+      const result = await prompt.get('result', { rawValue: 'hello' }, ctx);
       expect(result).toBe('Processed');
     });
 
@@ -349,7 +349,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Done');
     });
   });
@@ -382,7 +382,7 @@ describe('Prompt Additional Coverage', () => {
       };
 
       const events: PromptEvent<string, []>[] = [];
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -431,7 +431,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -480,7 +480,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered from parse error');
     });
   });
@@ -531,7 +531,7 @@ describe('Prompt Additional Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({ text: 'input' }, 'result', ctx);
+      const result = await prompt.get('result', { text: 'input' }, ctx);
       expect(result).toEqual({ result: 'success' });
     });
   });

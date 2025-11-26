@@ -200,7 +200,7 @@ export type CletusTypeAIContext = ContextInfer<CletusTypeAI>;
 
 // Global tool properties - useful for debugging
 export const globalToolProperties = {
-  explanation: z.string().describe('Provide an explnation on why this tool is being used'),
+  explanation: z.string().describe('Provide an explanation on why this tool is being used'),
 } as const;
 
 /**

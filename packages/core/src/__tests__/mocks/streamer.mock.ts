@@ -21,7 +21,7 @@ export const createMockStreamer = (options?: MockStreamerOptions): Streamer<any,
     const chunks = options?.chunks || [
       { content: 'Hello', finishReason: null },
       { content: ' world', finishReason: null },
-      { content: '!', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
+      { content: '!', finishReason: 'stop', usage: { text: { input: 5, output: 10, total: 15 } } }
     ];
 
     for (let i = 0; i < chunks.length; i++) {
@@ -74,7 +74,7 @@ export const createMockStreamerWithTools = (
         ...tc,
         type: 'function' as const
       })),
-      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+      usage: { text: { input: 10, output: 5, total: 15 } },
       model: 'mock-model',
     };
 

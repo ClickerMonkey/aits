@@ -5,10 +5,7 @@ import React, { useState, useEffect } from 'react';
 import type { ConfigFile } from '../config';
 import { ChatFile } from '../chat';
 import type { ChatMeta } from '../schemas';
-import { InkSettingsMenu } from './InkSettingsMenu';
-import { InkSettingsSplitView } from './InkSettingsSplitView';
 import { InkSettingsTabView } from './InkSettingsTabView';
-import { InkSettingsTreeView } from './InkSettingsTreeView';
 import Gradient from 'ink-gradient';
 import BigText from 'ink-big-text';
 import { COLORS } from '../constants';
@@ -16,16 +13,13 @@ import packageJson from '../../package.json';
 
 type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat-prompt' | 'create-chat-mode';
 
-type MenuType = 'default' | 'split' | 'tab' | 'tree';
-
 interface InkMainMenuProps {
   config: ConfigFile;
-  menuType?: MenuType;
   onChatSelect: (chatId: string) => void;
   onExit: () => void;
 }
 
-export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, menuType = 'default', onChatSelect, onExit }) => {
+export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, onExit }) => {
   const [view, setView] = useState<MainMenuView>('menu');
   const [selectedAssistant, setSelectedAssistant] = useState<string | undefined>();
   const [customPrompt, setCustomPrompt] = useState('');
@@ -63,32 +57,8 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, menuType = 'de
 
   // Settings View
   if (view === 'settings') {
-    if (menuType === 'split') {
-      return (
-        <InkSettingsSplitView
-          config={config}
-          onExit={() => setView('menu')}
-        />
-      );
-    }
-    if (menuType === 'tab') {
-      return (
-        <InkSettingsTabView
-          config={config}
-          onExit={() => setView('menu')}
-        />
-      );
-    }
-    if (menuType === 'tree') {
-      return (
-        <InkSettingsTreeView
-          config={config}
-          onExit={() => setView('menu')}
-        />
-      );
-    }
     return (
-      <InkSettingsMenu
+      <InkSettingsTabView
         config={config}
         onExit={() => setView('menu')}
       />

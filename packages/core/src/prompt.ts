@@ -332,7 +332,7 @@ export class Prompt<
     const prompt = this as Component<TContext, TMetadata, TName, TInput, AsyncGenerator<PromptEvent<TOutput, TTools>, TOutput | undefined, unknown>, TTools>;
     const input = (inputMaybe || {}) as TInput;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
-    const preferStream = mode.startsWith('stream');
+    const preferStream = (mode || 'result').startsWith('stream');
     const toolsOnly = mode === 'tools';
     const stream = ctx.runner
       // @ts-ignore

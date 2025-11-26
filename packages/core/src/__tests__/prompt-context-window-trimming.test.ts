@@ -29,7 +29,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 700, outputTokens: 0, totalTokens: 700 },
+          usage: { text: { input: 700, output: 0, total: 700 } },
           model: 'model-abc',
         } as const;
       }
@@ -56,7 +56,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 500
     };
 
-    await prompt.get({}, 'result', ctx);
+    await prompt.get('result', {}, ctx);
 
     // estimateUsage should be called for messages without tokens
     expect(estimateCallCount).toBeGreaterThan(0);
@@ -77,7 +77,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 2500, outputTokens: 0, totalTokens: 2500 },
+          usage: { text: { input: 2500, output: 0, total: 2500 } },
           model: 'model-abc',
         } as const;
       }
@@ -100,7 +100,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 500
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
     expect(callCount).toBe(2);
   });
@@ -120,7 +120,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 500, outputTokens: 0, totalTokens: 500 },
+          usage: { text: { input: 500, output: 0, total: 500 } },
           model: 'model-abc',
         } as const;
       }
@@ -139,7 +139,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 400
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
   });
 
@@ -158,7 +158,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1000, outputTokens: 0, totalTokens: 1000 },
+          usage: { text: { input: 1000, output: 0, total: 1000 } },
           model: 'model-abc',
         } as const;
       }
@@ -180,7 +180,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 600
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
   });
 
@@ -199,7 +199,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 800, outputTokens: 0, totalTokens: 800 },
+          usage: { text: { input: 800, output: 0, total: 800 } },
           model: 'model-abc',
         } as const;
       }
@@ -219,7 +219,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 500
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
   });
 
@@ -240,7 +240,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 },
+          usage: { text: { input: 1500, output: 0, total: 1500 } },
           model: 'model-abc',
         } as const;
       }
@@ -264,7 +264,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 1000
     };
 
-    await prompt.get({}, 'result', ctx);
+    await prompt.get('result', {}, ctx);
 
     // System messages should be preserved even during trimming
     if (callCount >= 2 && lastRequest) {
@@ -288,7 +288,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+          usage: { text: { input: 2000, output: 0, total: 2000 } },
           model: 'model-abc',
         } as const;
       }
@@ -312,7 +312,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 500
     };
 
-    const result = await prompt.get({}, 'result', ctx);
+    const result = await prompt.get('result', {}, ctx);
     expect(result).toBe('success');
     expect(callCount).toBe(2);
   });
@@ -334,7 +334,7 @@ describe('Prompt Forget Function Coverage', () => {
         return {
           content: '',
           finishReason: 'length',
-          usage: { inputTokens: 1500, outputTokens: 0, totalTokens: 1500 },
+          usage: { text: { input: 1500, output: 0, total: 1500 } },
           model: 'model-abc',
         } as const;
       }
@@ -356,7 +356,7 @@ describe('Prompt Forget Function Coverage', () => {
       maxOutputTokens: 1200
     };
 
-    await prompt.get({}, 'result', ctx);
+    await prompt.get('result', {}, ctx);
 
     // The last user message should be kept
     if (callCount >= 2 && lastRequest) {

@@ -122,7 +122,7 @@ export const mockResponseWithRefusal: Response = {
 export const mockChunks: Chunk[] = [
   { content: 'Hello' },
   { content: ' there' },
-  { content: '!', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
+  { content: '!', finishReason: 'stop', usage: { text: { input: 5, output: 10, total: 15 } } }
 ];
 
 export const mockChunksWithToolCalls: Chunk[] = [
@@ -135,7 +135,7 @@ export const mockChunksWithToolCalls: Chunk[] = [
       name: 'get_weather',
       arguments: '{ "location": "San Francisco" }'
     },
-    usage: { inputTokens: 12, outputTokens: 8, totalTokens: 20 }
+    usage: { text: { input: 12, output: 8, total: 20 } }
   }
 ];
 

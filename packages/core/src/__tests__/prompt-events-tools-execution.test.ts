@@ -26,7 +26,7 @@ describe('Prompt 100% Coverage', () => {
       const streamer = createMockStreamer({
         chunks: [
           { content: 'Hello' },
-          { content: ' world', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
+          { content: ' world', finishReason: 'stop', usage: { text: { input: 5, output: 10, total: 15 } } }
         ],
       });
 
@@ -98,7 +98,7 @@ describe('Prompt 100% Coverage', () => {
       };
 
       // Use stream mode with events to trigger event emission
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         // @ts-ignore
         capturedEvents.push(event);
       }
@@ -151,7 +151,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         // @ts-ignore
         events.push(event);
       }
@@ -213,7 +213,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Results: 10 and 13');
     });
 
@@ -270,7 +270,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Both done');
     });
   });
@@ -316,7 +316,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered');
     });
 
@@ -362,7 +362,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Handled error');
     });
 
@@ -405,7 +405,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Done');
     });
   });
@@ -450,7 +450,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Final');
     });
 
@@ -482,7 +482,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Direct answer without tools');
     });
 
@@ -517,7 +517,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(reconfigCalls).toBeGreaterThan(0);
       expect(result).toEqual({ value: 42 });
     });
@@ -553,7 +553,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toEqual({ name: 'Alice', age: 25 });
     });
 
@@ -583,7 +583,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toEqual({ value: 'proper json' });
     });
   });
@@ -605,7 +605,7 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 3000, outputTokens: 0, totalTokens: 3000 },
+            usage: { text: { input: 3000, output: 0, total: 3000 } },
             model: 'model-xyz',
           } as const;
         }
@@ -630,7 +630,7 @@ describe('Prompt 100% Coverage', () => {
         maxOutputTokens: 1000
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
       expect(estimateCalls).toBeGreaterThan(0);
     });
 
@@ -649,7 +649,7 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            usage: { text: { input: 2000, output: 0, total: 2000 } },
             model: 'model-abc',
           } as const;
         } 
@@ -673,7 +673,7 @@ describe('Prompt 100% Coverage', () => {
         maxOutputTokens: 500
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Trimmed successfully');
       expect(callCount).toBe(2);
     });
@@ -695,7 +695,7 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            usage: { text: { input: 2000, output: 0, total: 2000 } },
             model: 'model-abc',
           } as const;
         }
@@ -717,7 +717,7 @@ describe('Prompt 100% Coverage', () => {
         maxOutputTokens: 500
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       // System message should be preserved
       const systemMessages = lastRequest.messages.filter((m: Message) => m.role === 'system');
@@ -739,7 +739,7 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            usage: { text: { input: 2000, output: 0, total: 2000 } },
             model: 'model-abc',
           } as const;
         }
@@ -758,7 +758,7 @@ describe('Prompt 100% Coverage', () => {
         maxOutputTokens: 500
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Done');
     });
 
@@ -777,7 +777,7 @@ describe('Prompt 100% Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 2000, outputTokens: 0, totalTokens: 2000 },
+            usage: { text: { input: 2000, output: 0, total: 2000 } },
             model: 'model-abc',
           } as const;
         }
@@ -799,7 +799,7 @@ describe('Prompt 100% Coverage', () => {
         maxOutputTokens: 500
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Done');
     });
   });
@@ -845,7 +845,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered from parse error');
     });
 
@@ -891,7 +891,7 @@ describe('Prompt 100% Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered from runtime error');
     });
   });

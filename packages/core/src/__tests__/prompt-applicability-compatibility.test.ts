@@ -98,7 +98,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeUndefined();
     });
 
@@ -128,7 +128,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeUndefined();
     });
   });
@@ -164,7 +164,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('success');
     });
 
@@ -182,7 +182,7 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 1000 },
+            usage: { text: {input : 1000 } },
             model: 'model-abc',
           } as const;
         }
@@ -198,7 +198,7 @@ describe('Prompt Final Coverage', () => {
         // No messages
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('success');
     });
 
@@ -216,7 +216,7 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 100 }, // Very few tokens
+            usage: { text: { input: 100 } }, // Very few tokens
             model: 'model-abc',
           } as const;
         }
@@ -235,7 +235,7 @@ describe('Prompt Final Coverage', () => {
         maxOutputTokens: 4096 // Large, will make available tokens negative
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('success');
     });
 
@@ -255,7 +255,7 @@ describe('Prompt Final Coverage', () => {
           return {
             content: '',
             finishReason: 'length',
-            usage: { inputTokens: 1000, totalTokens: 1000 },
+            usage: { text: { input: 1000, total: 1000 } },
             model: 'model-abc',
           } as const;
         }
@@ -278,7 +278,7 @@ describe('Prompt Final Coverage', () => {
         maxOutputTokens: 500
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
       expect(estimatorCalled).toBe(true);
     });
   });
@@ -307,7 +307,7 @@ describe('Prompt Final Coverage', () => {
 
       // Use stream mode to trigger streamify
       const events = [];
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -336,7 +336,7 @@ describe('Prompt Final Coverage', () => {
         ]
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       // Check that executor was called with only the prompt message
       const call = (executor as any).mock.calls[0][0];
@@ -362,7 +362,7 @@ describe('Prompt Final Coverage', () => {
         ]
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       const call = (executor as any).mock.calls[0][0];
       expect(call.messages.length).toBeGreaterThan(1); // Context messages + prompt message
@@ -409,7 +409,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('recovered');
     });
   });
@@ -488,7 +488,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('All parallel tools executed');
     });
 
@@ -552,7 +552,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('All tools executed');
     });
 
@@ -602,7 +602,7 @@ describe('Prompt Final Coverage', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeDefined();
     });
   });

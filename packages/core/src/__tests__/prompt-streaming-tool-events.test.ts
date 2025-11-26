@@ -96,7 +96,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -152,7 +152,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -203,7 +203,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -254,7 +254,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -300,7 +300,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('After max reached');
     });
   });
@@ -336,7 +336,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(reconfigCalled).toBe(true);
       expect(result).toEqual({ value: 42 });
     });
@@ -362,7 +362,7 @@ describe('Prompt Streaming and Tool Events', () => {
         responses: [{
           content: 'not valid json',
           finishReason: 'stop',
-          usage: { inputTokens: 5000, outputTokens: 0, totalTokens: 5000 },
+          usage: { text: { input: 5000, output: 0, total: 5000 } },
           model: 'test-model'
         }, {
           content: 'Success',
@@ -380,7 +380,7 @@ describe('Prompt Streaming and Tool Events', () => {
         maxOutputTokens: 500
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(reconfigCalled).toBe(true);
       expect(result).toBe('Success');
     });
@@ -434,7 +434,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(reconfigCalled).toBe(true);
       expect(result).toBe('Recovered without tools');
     });
@@ -476,7 +476,7 @@ describe('Prompt Streaming and Tool Events', () => {
       };
 
       // Should fail because it can't trim without token info
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow(
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow(
         'no token usage was provided'
       );
     });
@@ -521,7 +521,7 @@ describe('Prompt Streaming and Tool Events', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered');
     });
   });

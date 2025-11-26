@@ -17,6 +17,7 @@ import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
 
+
 function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
 function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
 function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
@@ -452,7 +453,7 @@ export const data_create = operationOf<
 });
 
 export const data_update = operationOf<
-  { name: string; id: string; fields: Record<string, any> },
+  { name: string; id: string; fields: { field: string, value: any }[] },
   { updated: boolean, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
@@ -471,7 +472,7 @@ export const data_update = operationOf<
       };
     }
 
-    const fieldNames = Object.keys(fields);
+    const fieldNames = fields.map(f => f.field);
     return {
       analysis: `This will update ${type.friendlyName} record "${id}" with fields: ${fieldNames.join(', ')}.`,
       doable: true,
@@ -479,13 +480,14 @@ export const data_update = operationOf<
   },
   do: async ({ name, id, fields }, ctx) => {
     const type = getType(ctx.config, name);
+    const updates = Object.fromEntries(fields.map(f => [f.field, f.value]));
     
     // Validate related field values
-    await validateRelatedFields(fields, type, ctx.config);
-    
+    await validateRelatedFields(updates, type, ctx.config);
+
     const dataManager = new DataManager(name);
     await dataManager.load();
-    await dataManager.update(id, fields);
+    await dataManager.update(id, updates);
 
     // Update knowledge base
     let libraryKnowledgeUpdated = true;
@@ -720,7 +722,7 @@ export const data_select = operationOf<
 });
 
 export const data_update_many = operationOf<
-  { name: string; set: Record<string, any>; where: WhereClause; limit?: number },
+  { name: string; set: { field: string, value: any }[]; where?: WhereClause; limit?: number },
   { updated: number, libraryKnowledgeUpdated: boolean }
 >({
   mode: 'update',
@@ -731,10 +733,10 @@ export const data_update_many = operationOf<
     const dataManager = new DataManager(name);
     await dataManager.load();
 
-    const matchingCount = countByWhere(dataManager.getAll(), where);
+    const matchingCount = where ? countByWhere(dataManager.getAll(), where) : dataManager.getAll().length;
     const actualCount = limit ? Math.min(matchingCount, limit) : matchingCount;
 
-    const setFields = Object.keys(set);
+    const setFields = set.map(f => f.field);
     const limitText = limit ? ` (limited to ${limit})` : '';
     return {
       analysis: `This will bulk update ${actualCount} ${type.friendlyName} record(s) matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
@@ -743,14 +745,16 @@ export const data_update_many = operationOf<
   },
   do: async ({ name, limit, set, where }, ctx) => {
     const type = getType(ctx.config, name);
+    const updates = Object.fromEntries(set.map(f => [f.field, f.value]));
     
     // Validate related field values
-    await validateRelatedFields(set, type, ctx.config);
+    await validateRelatedFields(updates, type, ctx.config);
     
     const dataManager = new DataManager(name);
     await dataManager.load();
 
-    let matchingRecords = filterByWhere(dataManager.getAll(), where);
+    const records = dataManager.getAll();
+    let matchingRecords = where ? filterByWhere(records, where) : records;
 
     // Apply limit if specified
     if (limit) {
@@ -759,7 +763,7 @@ export const data_update_many = operationOf<
 
     // Update all matching records
     await Promise.all(matchingRecords.map((record) =>
-      dataManager.update(record.id, set)
+      dataManager.update(record.id, updates)
     ));
 
     // Update knowledge base
@@ -918,7 +922,7 @@ export const data_count = operationOf<
   render: (op, ai, showInput, showOutput) => {
     const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
-    
+
     return renderOperation(
       op,
       `${formatName(typeName)}Count(${where})`,

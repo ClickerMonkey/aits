@@ -1,6 +1,35 @@
-import z, { json } from 'zod';
-import { tr } from 'zod/locales';
+import z from 'zod';
 
+
+type StrictTransformer = (schema: z.ZodType | z.core.$ZodType) => z.ZodType;
+
+/**
+* Recursively transforms a Zod schema to support strict mode.
+*
+* @param schema - input Zod schema
+* @returns transformed Zod schema
+*/
+export function strictify<S extends z.ZodType>(schema: S): S {
+  const map = new Map<z.ZodType | z.core.$ZodType, z.ZodType | (() => z.ZodType)>();
+
+  const transform: StrictTransformer = (s) => {
+    const cached = map.get(s);
+    if (cached) {
+      if (typeof cached === 'function') {
+        return z.lazy(cached);
+      } else {
+        return cached;
+      }
+    }
+    let result: z.ZodType;
+    map.set(s, () => result);
+    result = strictifySimple(s, transform);
+    map.set(s, result);
+    return result;
+  };
+
+  return transform(schema) as S;
+}
 
 /**
 * Transfer description and metadata from source Zod schema to target Zod schema
@@ -20,34 +49,26 @@ function transferMetadata(target: z.ZodType, source: z.ZodType) {
   return target;
 }
 
-type StrictTransformer = (schema: z.ZodType | z.core.$ZodType) => z.ZodType;
-
 /**
-* Recursively transforms a Zod schema to support strict mode.
-* 
-* @param schema - input Zod schema
-* @returns transformed Zod schema
-*/
-export function strictify(schema: z.ZodType): z.ZodType {
-  const map = new Map<z.ZodType | z.core.$ZodType, z.ZodType | (() => z.ZodType)>();
-
-  const transform: StrictTransformer = (s) => {
-    const cached = map.get(s);
-    if (cached) {
-      if (typeof cached === 'function') {
-        return z.lazy(cached);
-      } else {
-        return cached;
-      }
+ * Extracts the input schema from a transformed schema (codec or preprocess).
+ * For preprocess with optional, we need the nullable version for strict mode input.
+ * This is needed when building input schemas that contain transformed fields.
+ */
+function getInputSchema(schema: z.ZodType): z.ZodType {
+  if (schema instanceof z.ZodCodec) {
+    return schema.def.in as z.ZodType;
+  }
+  // For ZodPipe (which preprocess creates), check if the output is optional
+  // If so, we need to return a nullable version for the input schema
+  if (schema instanceof z.ZodPipe) {
+    const outputSchema = schema.def.out;
+    if (outputSchema instanceof z.ZodOptional) {
+      // The input from preprocess is already set up to handle null->undefined conversion
+      // So we just need to make sure the base type accepts null
+      return z.nullable(outputSchema.unwrap());
     }
-    let result: z.ZodType;
-    map.set(s, () => result);
-    result = strictifySimple(s, transform);
-    map.set(s, result);
-    return result;
-  };
-
-  return transform(schema);
+  }
+  return schema;
 }
 
 /**
@@ -62,16 +83,20 @@ function strictifySimple(
 ): z.ZodType {
   // Handle ZodOptional - get the inner schema and make it optional
   if (schema instanceof z.ZodOptional) {
-    const transformed = transform(schema.unwrap());
+    const innerSchema = schema.unwrap();
+    const transformed = transform(innerSchema);
+
+    // Check if the inner schema is nullable
+    // If it's nullable, don't convert null to undefined
+    const isNullable = innerSchema instanceof z.ZodNullable;
+
+    // Use a preprocess to convert null to undefined only for non-nullable schemas
+    // This avoids issues with codec output validation in recursive schemas
     return transferMetadata(
-      z.codec(
-        transformed.nullable(),
-        transformed.optional(),
-        {
-          decode: (val) => val === null ? undefined : val,
-          encode: (val) => val === undefined ? null : val,
-        }
-      ), 
+      z.preprocess(
+        (val) => (!isNullable && val === null) ? undefined : val,
+        transformed.optional()
+      ),
       schema
     );
   }
@@ -92,11 +117,11 @@ function strictifySimple(
   if (schema instanceof z.ZodCodec) {
     return transferMetadata(
       z.codec(
-        transform(schema.def.in), 
+        transform(schema.def.in),
         transform(schema.def.out),
         {
-          encode: schema.def.transform,
-          decode: schema.def.reverseTransform,
+          decode: schema.def.transform,
+          encode: schema.def.reverseTransform,
         }
       ),
       schema
@@ -132,26 +157,30 @@ function strictifySimple(
   
   // Handle ZodRecord
   if (schema instanceof z.ZodRecord) {
-    const key = schema.keyType ? transform(schema.keyType) as z.ZodType<PropertyKey, PropertyKey> : z.string();
-    const value = transform(schema.valueType);
+    const keyTransformed = schema.keyType ? transform(schema.keyType) as z.ZodType<PropertyKey, PropertyKey> : z.string();
+    const valueTransformed = transform(schema.valueType);
+
+    // For the input schema (array of {key, value}), use the input side of any codecs
+    const key = getInputSchema(keyTransformed);
+    const value = getInputSchema(valueTransformed);
 
     return transferMetadata(
       z.codec(
         z.array(z.object({ key, value })),
-        z.record(key, value),
+        z.record(keyTransformed, valueTransformed),
         {
           decode: (arr) => {
             const record: Record<PropertyKey, any> = {};
             for (const { key, value } of arr) {
               record[key as PropertyKey] = value;
-            } 
+            }
             return record;
           },
           encode: (rec) => Object.entries(rec).map(
             ([key, value]) => ({ key, value })
           ),
         }
-      ), 
+      ),
       schema
     );
   }
@@ -212,36 +241,70 @@ function strictifySimple(
 }
 
 /**
+ * Modify a JSON Schema property to make it optional (accept null)
+ * 
+ * @param prop - input JSON Schema property
+ * @returns 
+ */
+const makeOptional = (prop: z.core.JSONSchema.JSONSchema): z.core.JSONSchema.JSONSchema => {
+  if (prop.type) {
+    const values = Array.isArray(prop.type) ? prop.type : [prop.type];
+    if (!values.includes('null')) {
+      prop.type = [...values, 'null'] as any;
+    }
+
+    return prop;
+  } else {
+    const { title, description, default: defaultValue, ...rest } = prop;
+    return {
+      title,
+      description,
+      default: defaultValue,
+      anyOf: [
+        rest,
+        { type: 'null' }
+      ],
+    };
+  }
+};
+
+/**
  * Override function to modify JSON Schema generation
  * to make optional fields accept null values.
  */
-const typeOverride = ({ jsonSchema }: { 
+const typeOverride = ({ zodSchema, jsonSchema, path }: {
   zodSchema: z.core.$ZodTypes,
   jsonSchema: z.core.JSONSchema.BaseSchema,
   path: (string | number)[];
 }) => {
-  if (jsonSchema.type === 'object') {
+  if (jsonSchema.type === 'object' && zodSchema instanceof z.ZodObject) {
     const properties = jsonSchema.properties || {};
     const propertyKeys = Object.keys(properties);
     const required = jsonSchema.required || [];
     const optional = propertyKeys.filter((key) => !required.includes(key));
-    
+
+    // Add null to optional fields (those not in required array)
     for (const key of optional) {
-      const { title, description, default: defaultValue, ...rest } = properties[key] as z.core.JSONSchema.JSONSchema;
-      properties[key] = { 
-        title,
-        description,
-        default: defaultValue,
-        anyOf: [
-          rest,
-          { type: 'null' }
-        ],
-      };
+      properties[key] = makeOptional(properties[key] as z.core.JSONSchema.JSONSchema);
     }
-    
+
+    // Check fields that are required - if they use preprocess with optional, add null
+    for (const key of required) {
+      const fieldSchema = zodSchema.shape[key];
+      // Check if this is a ZodPipe (from preprocess) wrapping optional
+      if (fieldSchema instanceof z.ZodPipe) {
+        const outputSchema = fieldSchema.def.out;
+        if (outputSchema instanceof z.ZodOptional) {
+          properties[key] = makeOptional(properties[key] as z.core.JSONSchema.JSONSchema);
+        }
+      }
+    }
+
     jsonSchema.required = propertyKeys;
     jsonSchema.additionalProperties = false;
   }
+  // Convert allOf with single entry to that entry or anyOf. 
+  // allOf is not supported by some AI schema parsers.
   if (jsonSchema.allOf?.length) {
     if (jsonSchema.allOf.length === 1) {
       if (Object.keys(jsonSchema).length === 1) {
@@ -251,6 +314,37 @@ const typeOverride = ({ jsonSchema }: {
       }
       delete jsonSchema.allOf;
     }
+  }
+  // For anyOf with null, convert to type array
+  if (jsonSchema.anyOf?.length === 2) {
+    if (jsonSchema.anyOf[1].type === 'null'
+      && Object.keys(jsonSchema.anyOf[1]).length === 1
+      && jsonSchema.anyOf[0].type
+      && !Array.isArray(jsonSchema.anyOf[0].type))
+    {
+      const first = jsonSchema.anyOf[0];
+      const nullableType = [first.type!, 'null'] as any;
+      delete jsonSchema.anyOf;
+      Object.assign(jsonSchema, first);
+      // Set type after assign to avoid it being overwritten
+      jsonSchema.type = nullableType;
+    }
+  }
+  // anyOf in an anyOf - flatten
+  if (jsonSchema.anyOf?.length) {
+    const newAnyOf: z.core.JSONSchema.JSONSchema[] = [];
+    for (const subSchema of jsonSchema.anyOf) {
+      if (subSchema.anyOf?.length) {
+        newAnyOf.push(...subSchema.anyOf);
+      } else {
+        newAnyOf.push(subSchema);
+      }
+    }
+    jsonSchema.anyOf = newAnyOf;
+  }
+
+  if (path.length === 0) {
+    console.log('Transformed JSON Schema:', JSON.stringify(jsonSchema));
   }
 };
 
@@ -267,5 +361,5 @@ export function toJSONSchema(schema: z.ZodType, strict: boolean) {
     io: 'input',
     unrepresentable: 'any',
     override: strict ? typeOverride : undefined,
-  })
+  });
 }

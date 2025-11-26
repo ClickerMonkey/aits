@@ -104,6 +104,20 @@ export function buildFieldsSchema(type: TypeDefinition) {
 }
 
 /**
+ * Build a Zod object schema for a type's fields
+ */
+export function buildFieldSetSchema(type: TypeDefinition) {
+  return z.array(
+    z.union(type.fields.map(f => 
+      z.object({
+        field: z.literal(f.name),
+        value: buildFieldSchema(f),
+      })
+    ))
+  ).meta({ title: `${type.name}_fieldset` });
+}
+
+/**
  * Build a where clause schema that supports field equality, and/or logic
  */
 export function buildWhereSchema(type: TypeDefinition) {
@@ -187,17 +201,19 @@ export function buildWhereSchema(type: TypeDefinition) {
 }
 
 
-export function getSchemas(type: TypeDefinition, cache: Record<string, any> = {}): Record<string, any> {
+export function getSchemas(type: TypeDefinition, cache: Record<string, any> = {}) {
   const cacheKey = `${type.name}Schemas`;
   let schemas: {
     fields: ReturnType<typeof buildFieldsSchema>;
     where: ReturnType<typeof buildWhereSchema>;
+    set: ReturnType<typeof buildFieldSetSchema>;
     fieldNames: z.ZodEnum<Record<string, string>>;
   } = cache[cacheKey];
 
   if (!schemas) {
     schemas = {
       fields: buildFieldsSchema(type),
+      set: buildFieldSetSchema(type),
       fieldNames: z.enum(type.fields.map(f => f.name) as [string, ...string[]]).meta({ title: `${type.name}_fieldNames` }),
       where: buildWhereSchema(type),
     };

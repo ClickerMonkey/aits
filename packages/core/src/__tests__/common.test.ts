@@ -367,109 +367,96 @@ describe('Common Utilities', () => {
 
   describe('accumulateUsage', () => {
     it('should accumulate all usage fields', () => {
-      const target = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30,
-        cachedTokens: 5,
-        reasoningTokens: 3,
-        cost: 0.001,
-        seconds: 1.5,
+      const target: Usage = {
+        text: { input: 10, output: 20, cached: 5 },
+        reasoning: { output: 3 },
+        audio: { seconds: 1.5 },
+        cost: 0.001
       };
 
-      const add = {
-        inputTokens: 15,
-        outputTokens: 25,
-        totalTokens: 40,
-        cachedTokens: 8,
-        reasoningTokens: 5,
-        cost: 0.002,
-        seconds: 2.0,
+      const add: Usage = {
+        text: { input: 15, output: 25, cached: 8 },
+        reasoning: { output: 5 },
+        audio: { seconds: 2.0 },
+        cost: 0.002
       };
 
       accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(25);
-      expect(target.outputTokens).toBe(45);
-      expect(target.totalTokens).toBe(70);
-      expect(target.cachedTokens).toBe(13);
-      expect(target.reasoningTokens).toBe(8);
+      expect(target.text!.input).toBe(25);
+      expect(target.text!.output).toBe(45);
+      expect(target.text!.cached).toBe(13);
+      expect(target.reasoning!.output).toBe(8);
+      expect(target.audio!.seconds).toBe(3.5);
       expect(target.cost).toBe(0.003);
-      expect(target.seconds).toBe(3.5);
     });
 
     it('should handle undefined add parameter', () => {
-      const target = {
-        inputTokens: 10,
-        outputTokens: 20,
+      const target: Usage = {
+        text: { input: 10, output: 20 }
       };
 
       accumulateUsage(target, undefined);
 
-      expect(target.inputTokens).toBe(10);
-      expect(target.outputTokens).toBe(20);
+      expect(target.text!.input).toBe(10);
+      expect(target.text!.output).toBe(20);
     });
 
     it('should handle empty target', () => {
       const target: Usage = {};
       const add: Usage = {
-        inputTokens: 15,
-        outputTokens: 25,
+        text: { input: 15, output: 25 }
       };
 
       accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(15);
-      expect(target.outputTokens).toBe(25);
+      expect(target.text!.input).toBe(15);
+      expect(target.text!.output).toBe(25);
     });
 
     it('should handle partial add object', () => {
       const target: Usage = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30,
+        text: { input: 10, output: 20 }
       };
 
       const add: Usage = {
-        inputTokens: 5,
-        // Missing outputTokens
-        cost: 0.001,
+        text: { input: 5 },
+        cost: 0.001
       };
 
       accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(15);
-      expect(target.outputTokens).toBe(20); // Unchanged
-      expect(target.totalTokens).toBe(30); // Unchanged
+      expect(target.text!.input).toBe(15);
+      expect(target.text!.output).toBe(20); // Unchanged
       expect(target.cost).toBe(0.001);
     });
 
     it('should handle zero values', () => {
       const target: Usage = {
-        inputTokens: 10,
+        text: { input: 10 }
       };
 
       const add: Usage = {
-        inputTokens: 0,
-        outputTokens: 0,
+        text: { input: 0, output: 0 }
       };
 
       accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(10); // Not added because add.inputTokens is 0 (falsy)
-      expect(target.outputTokens).toBeUndefined(); // Not set because 0 is falsy
+      // Zero values ARE added (0 is a valid number)
+      expect(target.text!.input).toBe(10); // 10 + 0 = 10
+      expect(target.text!.output).toBe(0); // 0 is set
     });
 
     it('should initialize fields if target is empty', () => {
       const target: Usage = {};
       const add: Usage = {
-        inputTokens: 100,
-        cost: 0.05,
+        text: { input: 100 },
+        cost: 0.05
       };
 
       accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(100);
+      expect(target.text!.input).toBe(100);
       expect(target.cost).toBe(0.05);
     });
   });
@@ -583,25 +570,19 @@ describe('Common Utilities', () => {
       const chunks: Chunk[] = [
         {
           usage: {
-            inputTokens: 10,
-            outputTokens: 20,
-            totalTokens: 30
+            text: { input: 10, output: 20 }
           }
         },
         {
           usage: {
-            inputTokens: 5,
-            outputTokens: 10,
-            totalTokens: 15
+            text: { input: 5, output: 10 }
           }
         },
       ];
 
       const response = getResponseFromChunks(chunks);
       expect(response.usage).toEqual({
-        inputTokens: 15,
-        outputTokens: 30,
-        totalTokens: 45
+        text: { input: 15, output: 30 }
       });
     });
 
@@ -619,12 +600,12 @@ describe('Common Utilities', () => {
           content: 'Hello',
           reasoning: 'Thinking...',
           model: 'gpt-4',
-          usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+          usage: { text: { input: 10, output: 5 } }
         },
         {
           content: ' world',
           finishReason: 'stop',
-          usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 }
+          usage: { text: { input: 5, output: 10 } }
         },
       ];
 
@@ -634,9 +615,7 @@ describe('Common Utilities', () => {
       expect(response.finishReason).toBe('stop');
       expect(response.model).toBe('gpt-4');
       expect(response.usage).toEqual({
-        inputTokens: 15,
-        outputTokens: 15,
-        totalTokens: 30
+        text: { input: 15, output: 15 }
       });
     });
   });
@@ -747,18 +726,13 @@ describe('Common Utilities', () => {
         finishReason: 'stop',
         model: 'gpt-4',
         usage: {
-          inputTokens: 10,
-          outputTokens: 20,
-          totalTokens: 30
-        },
+          text: { input: 10, output: 20 } },
       };
 
       const chunks = getChunksFromResponse(response);
       expect(chunks).toHaveLength(1);
       expect(chunks[0].usage).toEqual({
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: { input: 10, output: 20 }
       });
     });
 
@@ -769,9 +743,7 @@ describe('Common Utilities', () => {
         finishReason: 'stop',
         model: 'gpt-4',
         usage: {
-          inputTokens: 50,
-          outputTokens: 100,
-          totalTokens: 150
+          text: { input: 50, output: 100 },
         },
         toolCalls: [
           {
@@ -805,6 +777,7 @@ describe('Common Utilities', () => {
 
     it('should call onChild when component has parent', async () => {
       const onChild = jest.fn();
+      // @ts-ignore
       const events: Events<any> = {
         onChild,
       };
@@ -840,6 +813,7 @@ describe('Common Utilities', () => {
 
     it('should handle error with interrupted status when signal is aborted', async () => {
       const onStatus = jest.fn();
+      // @ts-ignore
       const events: Events<any> = {
         onStatus,
       };
@@ -859,7 +833,11 @@ describe('Common Utilities', () => {
         return Promise.reject(error);
       });
 
-      runner(component, input, context, getOutput);
+      try {
+        await resolve(runner(component, input, context, getOutput));
+      } catch {
+        // Expected to throw
+      }
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -888,7 +866,11 @@ describe('Common Utilities', () => {
       const error = new Error('Regular error');
       const getOutput = jest.fn(() => Promise.reject(error));
 
-      runner(component, input, context, getOutput);
+      try {
+        await resolve(runner(component, input, context, getOutput));
+      } catch {
+        // Expected to throw
+      }
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -917,7 +899,11 @@ describe('Common Utilities', () => {
       const getOutput = jest.fn(() => Promise.reject(error));
 
       const startTime = Date.now();
-      runner(component, input, context, getOutput);
+      try {
+        await resolve(runner(component, input, context, getOutput));
+      } catch {
+        // Expected to throw
+      }
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -946,7 +932,11 @@ describe('Common Utilities', () => {
       const error = new Error('Error test');
       const getOutput = jest.fn(() => Promise.reject(error));
 
-      runner(component, input, context, getOutput);
+      try {
+        await resolve(runner(component, input, context, getOutput));
+      } catch {
+        // Expected to throw
+      }
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -973,7 +963,7 @@ describe('Common Utilities', () => {
       const result = 'success-result';
       const getOutput = jest.fn(() => Promise.resolve(result));
 
-      runner(component, input, context, getOutput);
+      await resolve(runner(component, input, context, getOutput));
 
       // Wait for async operations
       await new Promise(resolve => setTimeout(resolve, 10));

@@ -29,7 +29,7 @@ export function createDBAAgent(ai: CletusAI) {
     instructionsFn: ({ type }) => `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }`,
     schema: ({ type, cache }) => z.object({
       id: z.string().describe('Record ID'),
-      fields: getSchemas(type, cache).fields.partial().describe('Fields to update'),
+      fields: getSchemas(type, cache).set.describe('Fields to update'),
       ...globalToolProperties,
     }),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: ctx.type.name, id: input.id, fields: input.fields } }, ctx as unknown as CletusAIContext),
@@ -93,7 +93,7 @@ Example 2: Query with sorting:
       return `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }`;
     },
     schema: ({ type, cache }) => z.object({
-      set: getSchemas(type, cache).fields.partial().describe('Fields to set on matching records'),
+      set: getSchemas(type, cache).set.describe('Fields to set on matching records'),
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to update'),
       ...globalToolProperties,

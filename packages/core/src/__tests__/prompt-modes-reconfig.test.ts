@@ -55,7 +55,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      const tools = await prompt.get({}, 'tools', ctx);
+      const tools = await prompt.get('tools', {}, ctx);
 
       expect(tools).toBeDefined();
       expect(tools).toHaveLength(1);
@@ -103,7 +103,7 @@ describe('Prompt Advanced Features', () => {
       };
 
       const toolOutputs = [];
-      for await (const output of prompt.get({}, 'streamTools', ctx)) {
+      for await (const output of prompt.get('streamTools', {}, ctx)) {
         toolOutputs.push(output);
       }
 
@@ -142,7 +142,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(reconfigCalls).toBeGreaterThan(0);
       expect(result).toEqual({ value: 42 });
@@ -169,7 +169,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow();
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow();
     });
   });
 
@@ -231,7 +231,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       // In sequential mode, tool1 should finish before tool2 starts
       expect(executionOrder).toEqual(['tool1', 'tool2']);
@@ -297,7 +297,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       // Fast tool should finish before slow tool
       expect(endTimes.fast).toBeLessThan(endTimes.slow);
@@ -318,7 +318,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('No executor or streamer');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('No executor or streamer');
     });
 
     it('should handle retool function returning false', async () => {
@@ -348,7 +348,7 @@ describe('Prompt Advanced Features', () => {
       };
 
       // When retool returns false, prompt is not compatible and returns undefined
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeUndefined();
     });
 
@@ -369,7 +369,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeUndefined();
     });
 
@@ -393,7 +393,7 @@ describe('Prompt Advanced Features', () => {
         ]
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       // Executor should be called with only the prompt message, not context messages
       expect(executor).toHaveBeenCalled();
@@ -435,7 +435,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       // When toolsOnly is true and tools execute, result should be undefined
       expect(result).toBeUndefined();
     });
@@ -466,7 +466,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      const result = await prompt.get({ includeAge: false }, 'result', ctx);
+      const result = await prompt.get('result', { includeAge: false }, ctx);
       expect(result).toEqual({ name: 'Alice' });
     });
 
@@ -492,7 +492,7 @@ describe('Prompt Advanced Features', () => {
         messages: []
       };
 
-      await prompt.get({ name: 'Bob' }, 'result', ctx);
+      await prompt.get('result', { name: 'Bob' }, ctx);
 
       expect(capturedInput).toEqual({ name: 'Bob' });
     });

@@ -91,7 +91,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({ name: 'Alice' }, 'result', ctx);
+      await prompt.get('result', { name: 'Alice' }, ctx);
 
       // Check that executor was called with rendered template
       expect(executor).toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({ user: 'Bob', score: 100 }, 'result', ctx);
+      await prompt.get('result', { user: 'Bob', score: 100 }, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.messages[0].content).toContain('Bob scored 100 points');
@@ -139,7 +139,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({ items: ['A', 'B', 'C'] }, 'result', ctx);
+      await prompt.get('result', { items: ['A', 'B', 'C'] }, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.messages[0].content).toContain('- A');
@@ -164,7 +164,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({ isAdmin: true }, 'result', ctx);
+      await prompt.get('result', { isAdmin: true }, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.messages[0].content).toContain('Admin access');
@@ -195,7 +195,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(result).toEqual({ name: 'Alice', age: 30 });
     });
@@ -225,7 +225,7 @@ describe('Prompt', () => {
       };
 
       // Should throw when validation fails and no more retries
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow();
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow();
     });
 
     it('should support plain text output (no schema)', async () => {
@@ -247,7 +247,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(result).toBe('Hello, world!');
     });
@@ -286,7 +286,7 @@ describe('Prompt', () => {
           {
             content: '8',
             finishReason: 'stop',
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+            usage: { text: { input: 10, output: 5 } }
           }
         ]
       });
@@ -296,7 +296,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(result).toBe('8');
       // Executor should be called at least twice (tool call + final answer)
@@ -349,7 +349,7 @@ describe('Prompt', () => {
           {
             content: 'Results: 15 and 6',
             finishReason: 'stop',
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+            usage: { text: { input: 10, output: 5 } }
           }
         ]
       });
@@ -360,7 +360,7 @@ describe('Prompt', () => {
       };
 
       const startTime = Date.now();
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
       const duration = Date.now() - startTime;
 
       // Parallel should be faster than sequential (< 15ms instead of ~20ms)
@@ -403,7 +403,7 @@ describe('Prompt', () => {
           {
             content: 'Cannot divide by zero',
             finishReason: 'stop',
-            usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
+            usage: { text: { input: 10, output: 5 } }
           }
         ]
       });
@@ -413,7 +413,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(result).toBe('Cannot divide by zero');
     });
@@ -432,7 +432,7 @@ describe('Prompt', () => {
           { content: 'Hello' },
           { content: ' ' },
           { content: 'world' },
-          { content: '!', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 } }
+          { content: '!', finishReason: 'stop', usage: { text: { input: 5, output: 10 } } }
         ]
       });
 
@@ -442,7 +442,7 @@ describe('Prompt', () => {
       };
 
       const textChunks: string[] = [];
-      for await (const chunk of prompt.get({}, 'streamContent', ctx)) {
+      for await (const chunk of prompt.get('streamContent', {}, ctx)) {
         textChunks.push(chunk);
       }
 
@@ -464,7 +464,7 @@ describe('Prompt', () => {
         chunks: [
           { content: '1' },
           { content: ', 2' },
-          { content: ', 3', finishReason: 'stop', usage: { inputTokens: 5, outputTokens: 8, totalTokens: 13 } }
+          { content: ', 3', finishReason: 'stop', usage: { text: { input: 5, output: 8 } } }
         ]
       });
 
@@ -474,7 +474,7 @@ describe('Prompt', () => {
       };
 
       const events: any[] = [];
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -547,7 +547,7 @@ describe('Prompt', () => {
         ]
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.messages.length).toBeGreaterThan(1); // Should include context messages
@@ -572,7 +572,7 @@ describe('Prompt', () => {
         ]
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.messages).toHaveLength(1); // Only the prompt message
@@ -601,7 +601,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.temperature).toBe(0.5);
@@ -627,7 +627,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      await prompt.get({ temp: 0.8 }, 'result', ctx);
+      await prompt.get('result', { temp: 0.8 }, ctx);
 
       const request = (executor as any).mock.calls[0][0];
       expect(request.temperature).toBe(0.8);
@@ -651,7 +651,7 @@ describe('Prompt', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
 
       expect(result).toBe('OK');
     });
@@ -677,7 +677,7 @@ describe('Prompt', () => {
       };
 
       // Refusal is treated as an error by the prompt
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('Policy violation');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('Policy violation');
     });
   });
 });

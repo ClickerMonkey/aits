@@ -245,7 +245,7 @@ describe('Context Propagation', () => {
         messages: []
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       expect(receivedContext).toBeDefined();
       expect(receivedContext.tenantId).toBe('tenant-789');
@@ -298,7 +298,7 @@ describe('Context Propagation', () => {
         messages: []
       };
 
-      await prompt.get({}, 'result', ctx);
+      await prompt.get('result', {}, ctx);
 
       expect(executionLog).toContain('tool:10');
     });
@@ -339,7 +339,7 @@ describe('Context Propagation', () => {
           const modifiedCtx = { ...ctx, count: ctx.count + input.increment };
 
           // The prompt will call the tool with the modified context
-          return await p.get({}, 'result', modifiedCtx);
+          return await p.get('result', {}, modifiedCtx);
         },
         types: { context: {count: 0} }
       });

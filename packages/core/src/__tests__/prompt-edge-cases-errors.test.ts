@@ -212,7 +212,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('filtered due to content policy');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('filtered due to content policy');
     });
   });
 
@@ -237,7 +237,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('no token usage was provided');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('no token usage was provided');
     });
   });
 
@@ -282,7 +282,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -333,7 +333,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -382,7 +382,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      for await (const event of prompt.get({}, 'stream', ctx)) {
+      for await (const event of prompt.get('stream', {}, ctx)) {
         events.push(event);
       }
 
@@ -423,7 +423,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toEqual({ value: 15 });
     });
   });
@@ -462,7 +462,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(reconfigCalled).toBe(true);
       expect(result).toEqual({ value: 'success' });
     });
@@ -509,7 +509,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toEqual({ summary: 'completed' });
     });
   });
@@ -540,7 +540,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('Prompt max-iterations failed: The output was not valid JSON:\nUnexpected end of JSON input');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('Prompt max-iterations failed: The output was not valid JSON:\nUnexpected end of JSON input');
     });
   });
 
@@ -568,7 +568,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBeUndefined();
     });
   });
@@ -609,7 +609,7 @@ describe('Prompt Final Coverage Lines', () => {
         // No estimateUsage, no usage, messages have no tokens
       };
 
-      await expect(prompt.get({}, 'result', ctx)).rejects.toThrow('no token usage was provided');
+      await expect(prompt.get('result', {}, ctx)).rejects.toThrow('no token usage was provided');
     });
   });
 
@@ -653,7 +653,7 @@ describe('Prompt Final Coverage Lines', () => {
         messages: []
       };
 
-      const result = await prompt.get({}, 'result', ctx);
+      const result = await prompt.get('result', {}, ctx);
       expect(result).toBe('Recovered');
     });
   });

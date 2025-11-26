@@ -523,25 +523,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   // ============================================================================
 
   /**
-   * Convert @aeye MessageContent to OpenAI content string format.
-   * @param x 
-   * @param from 
-   * @returns 
-   */
-  protected convertContentString(x: MessageContent['content'], from: string): string {
-    if (typeof x === 'string') {
-      return x;
-    }
-    if (x instanceof Blob) {
-      return x.toString();
-    }
-    if (x instanceof URL) {
-      return x.toString();
-    }
-    return '';
-  }
-
-  /**
    * Convert @aeye MessageContent to OpenAI text content format.
    * @param x 
    * @param name 

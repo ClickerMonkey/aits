@@ -33,9 +33,11 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
         content: 'Mock response',
         finishReason: 'stop',
         usage: {
-          inputTokens: 10,
-          outputTokens: 20,
-          totalTokens: 30
+          text: {
+            input: 10,
+            output: 20,
+            total: 30
+          }
         },
         model: 'mock-model',
       };
@@ -69,9 +71,11 @@ export const createMockExecutor = (options?: MockExecutorOptions | { responses: 
       content: 'Mock response',
       finishReason: 'stop',
       usage: {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: {
+          input: 10,
+          output: 20,
+          total: 30
+        }
       },
       model: 'mock-model',
     };

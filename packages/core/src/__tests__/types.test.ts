@@ -11,81 +11,110 @@ describe('Type Utilities', () => {
   describe('accumulateUsage', () => {
     it('should accumulate usage stats', () => {
       const target: Usage = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: {
+          input: 10,
+          output: 20
+        }
       };
 
       const add: Usage = {
-        inputTokens: 5,
-        outputTokens: 15,
-        totalTokens: 20
+        text: {
+          input: 5,
+          output: 15
+        }
       };
 
       accumulateUsage(target, add);
 
       expect(target).toEqual({
-        inputTokens: 15,
-        outputTokens: 35,
-        totalTokens: 50
+        text: {
+          input: 15,
+          output: 35
+        }
       });
     });
 
     it('should handle partial usage stats', () => {
       const target: Usage = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: {
+          input: 10,
+          output: 20
+        }
       };
 
-      const add: Partial<Usage> = {
-        inputTokens: 5
+      const add: Usage = {
+        text: {
+          input: 5
+        }
       };
 
-      accumulateUsage(target, add as Usage);
+      accumulateUsage(target, add);
 
-      expect(target.inputTokens).toBe(15);
-      expect(target.outputTokens).toBe(20);
-      expect(target.totalTokens).toBe(30);
+      expect(target.text!.input).toBe(15);
+      expect(target.text!.output).toBe(20);
     });
 
     it('should handle undefined add parameter', () => {
       const target: Usage = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: {
+          input: 10,
+          output: 20
+        }
       };
 
       accumulateUsage(target, undefined);
 
       expect(target).toEqual({
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30
+        text: {
+          input: 10,
+          output: 20
+        }
       });
     });
 
     it('should accumulate optional fields', () => {
       const target: Usage = {
-        inputTokens: 10,
-        outputTokens: 20,
-        totalTokens: 30,
-        cachedTokens: 5,
+        text: {
+          input: 10,
+          output: 20,
+          cached: 5
+        },
         cost: 0.001
       };
 
       const add: Usage = {
-        inputTokens: 5,
-        outputTokens: 10,
-        totalTokens: 15,
-        cachedTokens: 3,
+        text: {
+          input: 5,
+          output: 10,
+          cached: 3
+        },
         cost: 0.002
       };
 
       accumulateUsage(target, add);
 
-      expect(target.cachedTokens).toBe(8);
+      expect(target.text!.input).toBe(15);
+      expect(target.text!.output).toBe(30);
+      expect(target.text!.cached).toBe(8);
       expect(target.cost).toBeCloseTo(0.003);
+    });
+
+    it('should handle missing text property in target', () => {
+      const target: Usage = {};
+
+      const add: Usage = {
+        text: {
+          input: 10,
+          output: 20
+        }
+      };
+
+      accumulateUsage(target, add);
+
+      expect(target.text).toEqual({
+        input: 10,
+        output: 20
+      });
     });
   });
 });
