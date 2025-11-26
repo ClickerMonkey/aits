@@ -1161,13 +1161,11 @@ describe('Schema Utilities', () => {
 
   describe('Type Helper Schema Generation', () => {
     describe('Recursive WhereClause with and/or arrays', () => {
-      it('should detect missing and/or properties in JSON schema with getters', () => {
-        // This test documents the issue: Zod's JSON schema generator doesn't properly
-        // handle getters in object schemas. The getters are not included in the generated
-        // JSON schema, which causes a divergence between the Zod schema (which works)
-        // and the JSON schema (which is incomplete).
+      it('should correctly generate JSON schema for recursive schemas with getters', () => {
+        // This test verifies that Zod's JSON schema generator + our typeOverride
+        // properly handles getters in object schemas for recursive types.
 
-        // Build the where schema recursively using getters (current implementation)
+        // Build the where schema recursively using getters (current implementation in type.ts)
         const whereSchema: z.ZodType<any> = z.object({
           get and() {
             return z.array(whereSchema).optional();
@@ -1195,21 +1193,23 @@ describe('Schema Utilities', () => {
         const strictSchema = strictify(whereSchema);
         const jsonSchema = toJSONSchema(strictSchema, true);
 
-        // This is the BUG: 'and' and 'or' properties ARE in the JSON schema,
-        // but they're incomplete - just anyOf with null, missing the array type
+        // Properties should be properly defined
         expect(jsonSchema.properties).toBeDefined();
         expect(jsonSchema.properties!.and).toBeDefined();
         expect(jsonSchema.properties!.or).toBeDefined();
         expect(jsonSchema.properties!.not).toBeDefined();
 
-        // But the properties are incomplete - they don't specify it's an array
+        // The properties should have proper $ref to definitions
         const andProp = js(jsonSchema.properties!.and);
-        // This should be an array type, but it's just anyOf: [{}, {type: "null"}]
-        expect(andProp.type).toBeUndefined();
-        expect(andProp.anyOf).toBeDefined();
-        // The anyOf doesn't properly specify it's an array of where clauses
 
-        // But the Zod schema itself DOES work for parsing (getters are evaluated at runtime)
+        // The 'and' property is an array of recursive references
+        // After our fix, it should be: { type: 'array', items: { $ref: '#' } }
+        // (Not an empty object!)
+        expect(andProp.type).toBe('array');
+        expect(andProp.items).toBeDefined();
+        expect(andProp.items.$ref).toBeDefined();
+
+        // The Zod schema also works for parsing (getters are evaluated at runtime)
         const testData = {
           and: [
             { name: { equals: 'test' } }
@@ -1218,10 +1218,8 @@ describe('Schema Utilities', () => {
         expect(() => strictSchema.parse(testData)).not.toThrow();
       });
 
-      it('should generate JSON schema with array types when not using getters', () => {
-        // Alternative approach: define the schema without using getters
-        // This works for JSON schema generation but doesn't allow true recursive references
-
+      it('should correctly generate JSON schema with z.lazy approach', () => {
+        // Define the schema using z.lazy for recursion
         const whereSchemaNoGetters = z.object({
           and: z.array(z.lazy(() => whereSchemaNoGetters)).optional(),
           or: z.array(z.lazy(() => whereSchemaNoGetters)).optional(),
@@ -1240,54 +1238,134 @@ describe('Schema Utilities', () => {
         const strictSchema = strictify(whereSchemaNoGetters);
         const jsonSchema = toJSONSchema(strictSchema, true);
 
-        // With this approach, properties should be properly defined
+        // Properties should be properly defined
         expect(jsonSchema.properties).toBeDefined();
         expect(jsonSchema.properties!.and).toBeDefined();
         expect(jsonSchema.properties!.or).toBeDefined();
         expect(jsonSchema.properties!.not).toBeDefined();
 
         const andProp = js(jsonSchema.properties!.and);
-        console.log('andProp with z.lazy:', JSON.stringify(andProp, null, 2));
 
-        // The 'and' property should be an array type (or union with null in strict mode)
-        if (Array.isArray(andProp.type)) {
-          expect(andProp.type).toContain('array');
-        } else if (andProp.anyOf) {
-          // Check if any of the anyOf options is an array
-          const hasArrayType = andProp.anyOf.some((opt: any) => {
-            if (opt.type === 'array' || (Array.isArray(opt.type) && opt.type.includes('array'))) {
-              return true;
-            }
-            // Check for $ref that might point to an array schema
-            if (opt.$ref) {
-              return true; // Refs are ok, they point to recursive definitions
-            }
-            return false;
-          });
-          expect(hasArrayType).toBe(true);
-        } else {
-          expect(andProp.type).toContain('array');
-        }
+        // After our fix, recursive references work correctly
+        // The 'and' property should be an array with items that have a $ref
+        expect(andProp.type).toBe('array');
+        expect(andProp.items).toBeDefined();
+        expect(andProp.items.$ref).toBeDefined();
+      });
 
-        // Similar check for 'or' property
-        const orProp = js(jsonSchema.properties!.or);
+      it('should correctly generate JSON schema with external z.lazy references', () => {
+        // External lazy reference approach with separate type definition
 
-        if (Array.isArray(orProp.type)) {
-          expect(orProp.type).toContain('array');
-        } else if (orProp.anyOf) {
-          const hasArrayType = orProp.anyOf.some((opt: any) => {
-            if (opt.type === 'array' || (Array.isArray(opt.type) && opt.type.includes('array'))) {
-              return true;
-            }
-            if (opt.$ref) {
-              return true;
-            }
-            return false;
-          });
-          expect(hasArrayType).toBe(true);
-        } else {
-          expect(orProp.type).toContain('array');
-        }
+        // Step 1: Create a placeholder type for the recursive reference
+        type WhereClauseType = {
+          and?: WhereClauseType[];
+          or?: WhereClauseType[];
+          not?: WhereClauseType;
+          name?: { equals?: string; contains?: string };
+          age?: { equals?: number; gte?: number };
+        };
+
+        // Step 2: Define the where list first (array of where clauses)
+        const whereList: z.ZodType<WhereClauseType[]> = z.lazy(() => z.array(whereClause));
+
+        // Step 3: Define the where clause object with proper recursive references
+        const whereClause: z.ZodType<WhereClauseType> = z.lazy(() => z.object({
+          and: whereList.optional(),
+          or: whereList.optional(),
+          not: whereClause.optional(),
+          name: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+          }).optional(),
+          age: z.object({
+            equals: z.number().optional(),
+            gte: z.number().optional(),
+          }).optional(),
+        })).meta({ title: 'TestType_where_fixed' });
+
+        // Generate JSON schema in strict mode
+        const strictSchema = strictify(whereClause);
+        const jsonSchema = toJSONSchema(strictSchema, true);
+
+        // Properties are defined
+        expect(jsonSchema.properties).toBeDefined();
+        expect(jsonSchema.properties!.and).toBeDefined();
+        expect(jsonSchema.properties!.or).toBeDefined();
+        expect(jsonSchema.properties!.not).toBeDefined();
+
+        const andProp = js(jsonSchema.properties!.and);
+
+        // After our fix, external lazy references also work correctly
+        // With external lazy, the property directly has a $ref to the array definition
+        expect(andProp.$ref).toBeDefined();
+
+        // The Zod schema itself works for parsing
+        const testData = {
+          and: [
+            { name: { contains: 'John' } },
+            {
+              or: [
+                { age: { gte: 18 } },
+              ]
+            },
+          ],
+        };
+        const result = strictSchema.parse(testData);
+        expect(result.and).toBeDefined();
+        expect(result.and![0].name?.contains).toBe('John');
+      });
+
+      it('should test whether the issue is in strictify or typeOverride', () => {
+        // Let's test the raw Zod schema without our custom processing
+
+        type WhereClauseType = {
+          and?: WhereClauseType[];
+          or?: WhereClauseType[];
+          not?: WhereClauseType;
+          name?: { equals?: string; contains?: string };
+        };
+
+        const whereList: z.ZodType<WhereClauseType[]> = z.lazy(() => z.array(whereClause));
+        const whereClause: z.ZodType<WhereClauseType> = z.lazy(() => z.object({
+          and: whereList.optional(),
+          or: whereList.optional(),
+          not: whereClause.optional(),
+          name: z.object({
+            equals: z.string().optional(),
+            contains: z.string().optional(),
+          }).optional(),
+        })).meta({ title: 'TestType_where_raw' });
+
+        // Test 1: Raw Zod toJSONSchema without strictify or typeOverride
+        const rawJsonSchema = z.toJSONSchema(whereClause, {
+          target: 'draft-7',
+          reused: 'ref',
+          io: 'input',
+          unrepresentable: 'any',
+          // NO override
+        });
+        console.log('\n=== RAW Zod toJSONSchema (no strictify, no override) ===');
+        console.log(JSON.stringify(rawJsonSchema, null, 2));
+
+        // Test 2: With strictify but no typeOverride
+        const strictSchema = strictify(whereClause);
+        const strictJsonSchema = z.toJSONSchema(strictSchema, {
+          target: 'draft-7',
+          reused: 'ref',
+          io: 'input',
+          unrepresentable: 'any',
+          // NO override
+        });
+        console.log('\n=== With strictify, no typeOverride ===');
+        console.log(JSON.stringify(strictJsonSchema, null, 2));
+
+        // Test 3: With both strictify and typeOverride (our current implementation)
+        const fullJsonSchema = toJSONSchema(strictSchema, true);
+        console.log('\n=== With strictify AND typeOverride (current) ===');
+        console.log(JSON.stringify(fullJsonSchema, null, 2));
+
+        // Let's see what we get
+        expect(rawJsonSchema.properties).toBeDefined();
       });
 
       it('should successfully parse nested where clauses with and/or', () => {

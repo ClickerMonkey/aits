@@ -242,9 +242,9 @@ function strictifySimple(
 
 /**
  * Modify a JSON Schema property to make it optional (accept null)
- * 
+ *
  * @param prop - input JSON Schema property
- * @returns 
+ * @returns
  */
 const makeOptional = (prop: z.core.JSONSchema.JSONSchema): z.core.JSONSchema.JSONSchema => {
   if (prop.type) {
@@ -254,6 +254,32 @@ const makeOptional = (prop: z.core.JSONSchema.JSONSchema): z.core.JSONSchema.JSO
     }
 
     return prop;
+  } else if (prop.$ref) {
+    // If it's a $ref, wrap it in anyOf with null
+    return {
+      anyOf: [
+        { $ref: prop.$ref },
+        { type: 'null' }
+      ],
+    };
+  } else if (prop.allOf) {
+    // If it's an allOf with a single entry containing a $ref, extract and wrap the $ref
+    // This handles the common case: { allOf: [{ $ref: "..." }] }
+    if (prop.allOf.length === 1 && prop.allOf[0].$ref) {
+      return {
+        anyOf: [
+          { $ref: prop.allOf[0].$ref },
+          { type: 'null' }
+        ],
+      };
+    }
+    // Otherwise preserve the allOf structure
+    return {
+      anyOf: [
+        { allOf: prop.allOf },
+        { type: 'null' }
+      ],
+    };
   } else {
     const { title, description, default: defaultValue, ...rest } = prop;
     return {
@@ -295,7 +321,12 @@ const typeOverride = ({ zodSchema, jsonSchema, path }: {
       if (fieldSchema instanceof z.ZodPipe) {
         const outputSchema = fieldSchema.def.out;
         if (outputSchema instanceof z.ZodOptional) {
-          properties[key] = makeOptional(properties[key] as z.core.JSONSchema.JSONSchema);
+          const prop = properties[key];
+          // Skip empty objects - they're placeholders for recursive schemas that will be filled in later
+          if (Object.keys(prop).length === 0) {
+            continue;
+          }
+          properties[key] = makeOptional(prop as z.core.JSONSchema.JSONSchema);
         }
       }
     }
@@ -303,16 +334,19 @@ const typeOverride = ({ zodSchema, jsonSchema, path }: {
     jsonSchema.required = propertyKeys;
     jsonSchema.additionalProperties = false;
   }
-  // Convert allOf with single entry to that entry or anyOf. 
+  // Convert allOf with single entry to that entry or anyOf.
   // allOf is not supported by some AI schema parsers.
   if (jsonSchema.allOf?.length) {
     if (jsonSchema.allOf.length === 1) {
       if (Object.keys(jsonSchema).length === 1) {
-        Object.assign(jsonSchema, jsonSchema.allOf[0]);
+        // Delete allOf first, THEN assign the content
+        const content = jsonSchema.allOf[0];
+        delete jsonSchema.allOf;
+        Object.assign(jsonSchema, content);
       } else {
         jsonSchema.anyOf = jsonSchema.allOf;
+        delete jsonSchema.allOf;
       }
-      delete jsonSchema.allOf;
     }
   }
   // For anyOf with null, convert to type array
@@ -331,21 +365,29 @@ const typeOverride = ({ zodSchema, jsonSchema, path }: {
     }
   }
   // anyOf in an anyOf - flatten
+  // BUT: Don't flatten if it would lose $ref or other important properties
   if (jsonSchema.anyOf?.length) {
     const newAnyOf: z.core.JSONSchema.JSONSchema[] = [];
     for (const subSchema of jsonSchema.anyOf) {
-      if (subSchema.anyOf?.length) {
-        newAnyOf.push(...subSchema.anyOf);
+      // Check if this sub-schema has a nested anyOf that should be flattened
+      // Only flatten if:
+      // 1. The sub-schema has an anyOf property
+      // 2. The sub-schema has no other properties except anyOf (it's a pure wrapper)
+      // 3. None of the elements in the nested anyOf are $refs (which should be preserved)
+      const isPureAnyOfWrapper = subSchema.anyOf?.length && Object.keys(subSchema).length === 1;
+      const hasRefInNested = subSchema.anyOf?.some((nested: any) => nested.$ref);
+
+      if (isPureAnyOfWrapper && !hasRefInNested) {
+        // Safe to flatten
+        newAnyOf.push(...subSchema.anyOf!);
       } else {
+        // Keep as-is
         newAnyOf.push(subSchema);
       }
     }
     jsonSchema.anyOf = newAnyOf;
   }
 
-  if (path.length === 0) {
-    console.log('Transformed JSON Schema:', JSON.stringify(jsonSchema));
-  }
 };
 
 /**
