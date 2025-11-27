@@ -7,6 +7,21 @@ import { Component, Context, Events, Executor, FinishReason, Message, Names, Opt
 import { strictify, toJSONSchema } from "./schema";
 
 /**
+ * Represents a tool that can be selected by the retool function.
+ * Can be either a tool name (string) to select from predefined tools,
+ * or a full tool object for dynamic tools.
+ */
+export type RetoolEntry<TContext, TMetadata> = string | ToolCompatible<TContext, TMetadata>;
+
+/**
+ * The return type for the retool function.
+ * Can return an array of tool names and/or tool objects, or false to indicate incompatibility.
+ */
+export type RetoolResult<TContext, TMetadata, TTools extends Tuple<ToolCompatible<TContext, TMetadata>>> = 
+  | (Names<TTools> | ToolCompatible<TContext, TMetadata>)[]
+  | false;
+
+/**
  * Input provided to the prompt reconfiguration function.
  * 
  * This allows the prompt to adjust its configuration based on runtime statistics.
@@ -101,8 +116,9 @@ export interface PromptInput<
   toolIterations?: number;
   // Maximum tool calls allowed. We can't enforce this exact number unless toolsOneAtATime=true, but we will stop sending tools if we have tool successes >= this number
   toolsMax?: number;
-  // A function/promise that returns an array of tool names to use, or false to indicate the prompt is not compatible with the context.
-  retool?: Fn<Names<TTools>[] | false, [TInput | undefined, Context<TContext, TMetadata>]>;
+  // A function/promise that returns an array of tool names and/or tool objects to use, or false to indicate the prompt is not compatible with the context.
+  // Tool names (strings) select from the predefined tools array, while tool objects allow for dynamic tools.
+  retool?: Fn<RetoolResult<TContext, TMetadata, TTools>, [TInput | undefined, Context<TContext, TMetadata>]>;
   // If true, the prompt is re-resolved at the end of each iteration, allowing input, content, config, schema, and tools to change dynamically. If resolve returns undefined, iteration ends.
   dynamic?: boolean;
   // Metadata about the prompt to be passed during execution/streaming. Typically contains which model, or requirements, etc.
@@ -1040,13 +1056,35 @@ export class Prompt<
     }
 
     // Extract tools, their instructions, and schemas.
-    const toolNames = this.input.retool && retooling
-      ? new Set(retooling)
-      : new Set(this.input.tools?.map(t => t.name) || []);
-    let selectedTools = this.input.tools?.filter(t => toolNames.has(t.name));
+    // Handle both tool names (strings) and tool objects from retool
+    let selectedTools: ToolCompatible<TContext, TMetadata>[] | undefined;
+    
+    if (this.input.retool && retooling) {
+      // Separate retool results into tool names (strings) and tool objects
+      const toolNames = new Set<string>();
+      const dynamicTools: ToolCompatible<TContext, TMetadata>[] = [];
+      
+      for (const entry of retooling) {
+        if (typeof entry === 'string') {
+          toolNames.add(entry);
+        } else {
+          // This is a tool object
+          dynamicTools.push(entry);
+        }
+      }
+      
+      // Select predefined tools by name
+      const predefinedTools = this.input.tools?.filter(t => toolNames.has(t.name)) || [];
+      
+      // Combine predefined tools with dynamic tools
+      selectedTools = [...predefinedTools, ...dynamicTools];
+    } else {
+      // Default: use all predefined tools
+      selectedTools = this.input.tools ? [...this.input.tools] : undefined;
+    }
 
     // Check tool applicability
-    if (selectedTools) {
+    if (selectedTools && selectedTools.length > 0) {
       const applicabilityResults = await Promise.all(
         selectedTools.map(async (tool) => ({
           tool,
@@ -1055,10 +1093,10 @@ export class Prompt<
       );
       selectedTools = applicabilityResults
         .filter(r => r.applicable)
-        .map(r => r.tool) as TTools;
+        .map(r => r.tool);
     }
 
-    const toolInstructions = selectedTools
+    const toolInstructions = selectedTools && selectedTools.length > 0
       ? (await Promise.all(selectedTools.map(t => t.compile(ctx)))).filter(t => !!t)
       : undefined;
     const instructions = toolInstructions

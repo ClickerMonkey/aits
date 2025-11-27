@@ -496,4 +496,321 @@ describe('Prompt dynamic', () => {
     await expect(prompt.get('result', {}, ctx)).rejects.toThrow();
     expect(callCount).toBe(1); // Should only call executor once
   });
+
+  it('should allow retool to return dynamic tool objects', async () => {
+    // Create a predefined tool
+    const predefinedTool = new Tool({
+      name: 'predefined-tool',
+      description: 'A predefined tool',
+      instructions: 'Use this predefined tool',
+      schema: z.object({ value: z.string() }),
+      call: (args) => `Predefined: ${args.value}`
+    });
+
+    // Create a dynamic tool that will be returned by retool
+    const dynamicTool = new Tool({
+      name: 'dynamic-tool',
+      description: 'A dynamic tool',
+      instructions: 'Use this dynamic tool',
+      schema: z.object({ query: z.string() }),
+      call: (args) => `Dynamic: ${args.query}`
+    });
+
+    const prompt = new Prompt({
+      name: 'dynamic-retool-test',
+      description: 'Test dynamic tools via retool',
+      content: 'Test',
+      tools: [predefinedTool],
+      retool: () => [dynamicTool], // Return only the dynamic tool
+      toolsOnly: true, // Only run tools
+      toolsMax: 1 // Stop after one successful tool call
+    });
+
+    let toolsReceived: any[] = [];
+    const executor = jest.fn(async (request) => {
+      toolsReceived = request.tools || [];
+      return {
+        content: '',
+        finishReason: 'tool_calls' as const,
+        toolCalls: [{
+          id: 'call_1',
+          name: 'dynamic-tool',
+          arguments: '{"query": "test"}'
+        }],
+        model: 'model-abc',
+      };
+    });
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    // Run the prompt in tools mode
+    const toolResults = await prompt.get('tools', {}, ctx);
+    
+    // Verify the dynamic tool was available
+    expect(toolsReceived.length).toBe(1);
+    expect(toolsReceived[0].name).toBe('dynamic-tool');
+    
+    // Verify the tool call worked
+    expect(toolResults?.length).toBe(1);
+    expect(toolResults?.[0].tool).toBe('dynamic-tool');
+    expect(toolResults?.[0].result).toBe('Dynamic: test');
+  });
+
+  it('should allow retool to return both predefined tool names and dynamic tool objects', async () => {
+    // Create predefined tools
+    const predefinedTool1 = new Tool({
+      name: 'predefined-1',
+      description: 'First predefined tool',
+      instructions: 'Use predefined 1',
+      schema: z.object({ val: z.string() }),
+      call: (args) => `P1: ${args.val}`
+    });
+
+    const predefinedTool2 = new Tool({
+      name: 'predefined-2',
+      description: 'Second predefined tool',
+      instructions: 'Use predefined 2',
+      schema: z.object({ val: z.string() }),
+      call: (args) => `P2: ${args.val}`
+    });
+
+    // Create a dynamic tool
+    const dynamicTool = new Tool({
+      name: 'dynamic-search',
+      description: 'Dynamic search tool',
+      instructions: 'Use dynamic search',
+      schema: z.object({ query: z.string() }),
+      call: (args) => `Search: ${args.query}`
+    });
+
+    const prompt = new Prompt({
+      name: 'mixed-retool-test',
+      description: 'Test mixed tool selection',
+      content: 'Test',
+      tools: [predefinedTool1, predefinedTool2],
+      // Return predefined-1 by name and dynamic tool by object
+      retool: () => ['predefined-1', dynamicTool]
+    });
+
+    let toolsReceived: any[] = [];
+    let callCount = 0;
+
+    const executor = jest.fn(async (request) => {
+      callCount++;
+      toolsReceived = request.tools || [];
+
+      if (callCount === 1) {
+        // Should have 2 tools: predefined-1 and dynamic-search
+        return {
+          content: '',
+          finishReason: 'tool_calls' as const,
+          toolCalls: [{
+            id: 'call_1',
+            name: 'dynamic-search',
+            arguments: '{"query": "hello"}'
+          }],
+          model: 'model-abc',
+        };
+      }
+
+      return {
+        content: 'Done',
+        finishReason: 'stop' as const,
+        model: 'model-abc',
+      };
+    });
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    const result = await prompt.get('result', {}, ctx);
+    
+    // Verify both tools were available
+    expect(toolsReceived.length).toBe(2);
+    expect(toolsReceived.map(t => t.name).sort()).toEqual(['dynamic-search', 'predefined-1']);
+    
+    expect(result).toBe('Done');
+  });
+
+  it('should check applicability for dynamic tools', async () => {
+    let applicableCalls = 0;
+
+    // Create a dynamic tool with applicability check
+    const dynamicTool = new Tool({
+      name: 'applicable-dynamic',
+      description: 'Dynamic tool with applicability',
+      instructions: 'Use this',
+      schema: z.object({}),
+      call: () => 'result',
+      applicable: async () => {
+        applicableCalls++;
+        return true;
+      }
+    });
+
+    const prompt = new Prompt({
+      name: 'applicable-dynamic-test',
+      description: 'Test applicability for dynamic tools',
+      content: 'Test',
+      tools: [],
+      retool: () => [dynamicTool]
+    });
+
+    const executor = jest.fn(async () => ({
+      content: 'Done',
+      finishReason: 'stop' as const,
+      model: 'model-abc',
+    }));
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    await prompt.get('result', {}, ctx);
+    
+    // The applicable function should have been called for the dynamic tool
+    expect(applicableCalls).toBe(1);
+  });
+
+  it('should filter out non-applicable dynamic tools', async () => {
+    // Create an applicable dynamic tool
+    const applicableTool = new Tool({
+      name: 'applicable-dynamic',
+      description: 'Applicable dynamic tool',
+      instructions: 'Use this',
+      schema: z.object({}),
+      call: () => 'applicable result',
+      applicable: async () => true
+    });
+
+    // Create a non-applicable dynamic tool
+    const notApplicableTool = new Tool({
+      name: 'not-applicable-dynamic',
+      description: 'Not applicable dynamic tool',
+      instructions: 'Should not appear',
+      schema: z.object({}),
+      call: () => 'should not be called',
+      applicable: async () => false
+    });
+
+    const prompt = new Prompt({
+      name: 'filter-dynamic-test',
+      description: 'Test filtering dynamic tools',
+      content: 'Test',
+      tools: [],
+      retool: () => [applicableTool, notApplicableTool]
+    });
+
+    let toolsReceived: any[] = [];
+    const executor = jest.fn(async (request) => {
+      toolsReceived = request.tools || [];
+      return {
+        content: 'Done',
+        finishReason: 'stop' as const,
+        model: 'model-abc',
+      };
+    });
+
+    const ctx: Context<{}, {}> = {
+      execute: executor,
+      messages: []
+    };
+
+    await prompt.get('result', {}, ctx);
+    
+    // Only the applicable dynamic tool should be available
+    expect(toolsReceived.length).toBe(1);
+    expect(toolsReceived[0].name).toBe('applicable-dynamic');
+  });
+
+  it('should support dynamic tool injection for type-based tool selection', async () => {
+    // Simulate the use case from the issue:
+    // A base "search" type could be satisfied by multiple implementations
+
+    // Create multiple search implementations
+    const personSearch = new Tool({
+      name: 'person_search',
+      description: 'Search for people',
+      instructions: 'Use to search for people by name',
+      schema: z.object({ query: z.string() }),
+      call: (args) => `Found person: ${args.query}`
+    });
+
+    const taskSearch = new Tool({
+      name: 'task_search',
+      description: 'Search for tasks',
+      instructions: 'Use to search for tasks by title',
+      schema: z.object({ query: z.string() }),
+      call: (args) => `Found task: ${args.query}`
+    });
+
+    const projectSearch = new Tool({
+      name: 'project_search',
+      description: 'Search for projects',
+      instructions: 'Use to search for projects',
+      schema: z.object({ query: z.string() }),
+      call: (args) => `Found project: ${args.query}`
+    });
+
+    // Create a prompt that dynamically selects search tools based on context
+    const prompt = new Prompt({
+      name: 'dynamic-search-test',
+      description: 'Test dynamic search tool selection',
+      content: 'Test',
+      tools: [],
+      retool: (_, ctx) => {
+        // Dynamically select search tools based on context
+        // In a real app, this could be based on user permissions, data model, etc.
+        const searchTools = [];
+        if ((ctx as any).enablePersonSearch) searchTools.push(personSearch);
+        if ((ctx as any).enableTaskSearch) searchTools.push(taskSearch);
+        if ((ctx as any).enableProjectSearch) searchTools.push(projectSearch);
+        return searchTools;
+      }
+    });
+
+    let toolsReceived: any[] = [];
+    const executor = jest.fn(async (request) => {
+      toolsReceived = request.tools || [];
+      return {
+        content: 'Done',
+        finishReason: 'stop' as const,
+        model: 'model-abc',
+      };
+    });
+
+    // Context with only person and task search enabled
+    const ctx1: Context<{ enablePersonSearch: boolean; enableTaskSearch: boolean; enableProjectSearch: boolean }, {}> = {
+      execute: executor,
+      messages: [],
+      enablePersonSearch: true,
+      enableTaskSearch: true,
+      enableProjectSearch: false
+    };
+
+    await prompt.get('result', {}, ctx1);
+    
+    expect(toolsReceived.length).toBe(2);
+    expect(toolsReceived.map(t => t.name).sort()).toEqual(['person_search', 'task_search']);
+
+    // Context with all search tools enabled
+    const ctx2: Context<{ enablePersonSearch: boolean; enableTaskSearch: boolean; enableProjectSearch: boolean }, {}> = {
+      execute: executor,
+      messages: [],
+      enablePersonSearch: true,
+      enableTaskSearch: true,
+      enableProjectSearch: true
+    };
+
+    await prompt.get('result', {}, ctx2);
+    
+    expect(toolsReceived.length).toBe(3);
+    expect(toolsReceived.map(t => t.name).sort()).toEqual(['person_search', 'project_search', 'task_search']);
+  });
 });
