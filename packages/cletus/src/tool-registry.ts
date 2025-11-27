@@ -192,9 +192,14 @@ export class ToolRegistry {
 export const toolRegistry = new ToolRegistry();
 
 /**
- * Available toolset names
+ * Static toolset names (non-DBA toolsets)
  */
-export type ToolsetName = 'planner' | 'librarian' | 'clerk' | 'secretary' | 'architect' | 'artist' | 'internet' | 'dba' | 'utility';
+export const STATIC_TOOLSETS = ['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet'] as const;
+
+/**
+ * Available static toolset names (DBA toolsets are dynamic based on type names)
+ */
+export type StaticToolsetName = typeof STATIC_TOOLSETS[number] | 'utility';
 
 /**
  * Get DBA toolset name for a type

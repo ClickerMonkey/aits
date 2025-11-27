@@ -135,6 +135,14 @@ export function createChatAgent(ai: CletusAI) {
   // Initialize the tool registry
   initializeToolRegistry(ai, toolsets);
 
+  // Register listener for type changes to update DBA tools dynamically
+  const config = ai.config.defaultContext?.config;
+  if (config) {
+    config.onTypeChange(() => {
+      updateDBATools(ai, toolsets);
+    });
+  }
+
   // Create utility tools (always available)
   const utilityTools = createUtilityTools(ai);
 

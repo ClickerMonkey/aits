@@ -5,7 +5,8 @@ import type { TypeDefinition, TypeField } from '../schemas';
 import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
 
 /**
- * Request prompt for toolset context
+ * Request prompt for toolset context.
+ * Empty by default - can be customized for specific use cases.
  */
 export const requestPrompt = '';
 

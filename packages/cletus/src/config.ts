@@ -81,9 +81,16 @@ const DEFAULT_TYPES: TypeDefinition[] = [
 ];
 
 /**
+ * Type change event listener type
+ */
+export type TypeChangeListener = () => void | Promise<void>;
+
+/**
  * Config file manager
  */
 export class ConfigFile extends JsonFile<Config> {
+  private typeChangeListeners: Set<TypeChangeListener> = new Set();
+
   constructor() {
     const initialData: Config = {
       updated: Date.now(),
@@ -115,6 +122,23 @@ export class ConfigFile extends JsonFile<Config> {
     };
 
     super(getConfigPath(), initialData);
+  }
+
+  /**
+   * Register a listener for type changes
+   */
+  onTypeChange(listener: TypeChangeListener): () => void {
+    this.typeChangeListeners.add(listener);
+    return () => this.typeChangeListeners.delete(listener);
+  }
+
+  /**
+   * Notify all type change listeners
+   */
+  private async notifyTypeChange(): Promise<void> {
+    for (const listener of this.typeChangeListeners) {
+      await listener();
+    }
   }
 
   protected validate(parsed: any): Config {
@@ -202,6 +226,24 @@ export class ConfigFile extends JsonFile<Config> {
       }
       config.types.push(type);
     });
+    await this.notifyTypeChange();
+  }
+
+  /**
+   * Save changes that may include type modifications
+   * @param modifier - Function to modify config
+   * @param mayModifyTypes - Whether this save may modify types (triggers listener notification)
+   */
+  async saveWithTypeCheck<R = void>(modifier: (current: Config) => R | Promise<R>): Promise<R> {
+    const typesBefore = JSON.stringify(this.data.types);
+    const result = await this.save(modifier);
+    const typesAfter = JSON.stringify(this.data.types);
+    
+    if (typesBefore !== typesAfter) {
+      await this.notifyTypeChange();
+    }
+    
+    return result;
   }
 
   /**
