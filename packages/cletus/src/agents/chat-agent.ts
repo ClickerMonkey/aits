@@ -136,9 +136,10 @@ export function createChatAgent(ai: CletusAI) {
   initializeToolRegistry(ai, toolsets);
 
   // Register listener for type changes to update DBA tools dynamically
+  // Using a named listener so subsequent chat agents replace the previous listener
   const config = ai.config.defaultContext?.config;
   if (config) {
-    config.onTypeChange(() => {
+    config.onTypeChange('chat-agent', () => {
       updateDBATools(ai, toolsets);
     });
   }
@@ -269,8 +270,8 @@ Tools:
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
 </importantRules>
 `,
-    // Dynamic tools based on adaptive selection
-    toolsFn: async (_, ctx) => {
+    // Dynamic tools based on adaptive selection using retool
+    retool: async (_, ctx) => {
       const activeTools = await getActiveTools(ctx);
       return activeTools.map(t => t.tool);
     },

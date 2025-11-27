@@ -89,7 +89,7 @@ export type TypeChangeListener = () => void | Promise<void>;
  * Config file manager
  */
 export class ConfigFile extends JsonFile<Config> {
-  private typeChangeListeners: Set<TypeChangeListener> = new Set();
+  private typeChangeListeners: Map<string, TypeChangeListener> = new Map();
 
   constructor() {
     const initialData: Config = {
@@ -125,18 +125,26 @@ export class ConfigFile extends JsonFile<Config> {
   }
 
   /**
-   * Register a listener for type changes
+   * Register a listener for type changes by name.
+   * Using the same name will replace any existing listener with that name.
    */
-  onTypeChange(listener: TypeChangeListener): () => void {
-    this.typeChangeListeners.add(listener);
-    return () => this.typeChangeListeners.delete(listener);
+  onTypeChange(name: string, listener: TypeChangeListener): () => void {
+    this.typeChangeListeners.set(name, listener);
+    return () => this.typeChangeListeners.delete(name);
+  }
+
+  /**
+   * Unregister a type change listener by name
+   */
+  offTypeChange(name: string): void {
+    this.typeChangeListeners.delete(name);
   }
 
   /**
    * Notify all type change listeners
    */
   private async notifyTypeChange(): Promise<void> {
-    for (const listener of this.typeChangeListeners) {
+    for (const listener of this.typeChangeListeners.values()) {
       await listener();
     }
   }
