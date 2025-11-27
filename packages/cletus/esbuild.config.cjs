@@ -83,25 +83,27 @@ const require = __createRequire(import.meta.url);
 `
 };
 
-// Build the embedding worker first (no shebang needed)
-esbuild.build({
-  entryPoints: ['src/embed-worker.ts'],
-  bundle: true,
-  platform: 'node',
-  target: 'node18',
-  outfile: 'dist/embed-worker.js',
-  external: commonExternal,
-  format: 'esm',
-  banner: esmBanner,
-  define: {
-    'process.env.NODE_ENV': '"production"'
-  },
-  minify: false,
-  sourcemap: false,
-  logLevel: 'info',
-}).then(() => {
-  // Build the main application after the worker
-  return esbuild.build({
+// Build both the worker and main application in parallel
+Promise.all([
+  // Build the embedding worker (no shebang needed)
+  esbuild.build({
+    entryPoints: ['src/embed-worker.ts'],
+    bundle: true,
+    platform: 'node',
+    target: 'node18',
+    outfile: 'dist/embed-worker.js',
+    external: commonExternal,
+    format: 'esm',
+    banner: esmBanner,
+    define: {
+      'process.env.NODE_ENV': '"production"'
+    },
+    minify: false,
+    sourcemap: false,
+    logLevel: 'info',
+  }),
+  // Build the main application
+  esbuild.build({
     entryPoints: ['src/index.tsx'],
     bundle: true,
     platform: 'node',
@@ -135,5 +137,5 @@ esbuild.build({
     minify: false,
     sourcemap: false,
     logLevel: 'info',
-  });
-}).catch(() => process.exit(1));
+  }),
+]).catch(() => process.exit(1));

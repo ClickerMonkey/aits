@@ -129,7 +129,7 @@ export async function canEmbed(): Promise<boolean> {
 
 /**
  * Generate embeddings for the given texts using a worker thread.
- * This runs in a separate process to avoid blocking the UI.
+ * This runs in a separate thread to avoid blocking the UI.
  */
 export async function embed(text: string[]): Promise<number[][] | null> {
     const initialized = await initWorker();
