@@ -479,8 +479,8 @@ CHAT MODES:
 • delete - Auto-approve all operations (least safe)
 
 AGENT MODES:
-• default - All sub-agents available (planner, librarian, clerk, secretary, architect, artist, dba)
-• plan    - Only planner sub-agent available (for focused task management)
+• default - All toolsets available (planner, librarian, clerk, secretary, architect, artist, dba)
+• plan    - Only planner toolset available (for focused task management)
 
 AVAILABLE COMMANDS:
 /help       - Show this help message

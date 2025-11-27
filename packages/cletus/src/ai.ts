@@ -33,6 +33,11 @@ export interface CletusContext {
     accumulated: Usage;
     accumulatedCost: number;
   };
+  /** 
+   * Current toolset name. When undefined, adaptive tool selection is used 
+   * based on embedding similarity. When set, only tools from that toolset are available.
+   */
+  toolset?: string;
 }
 
 /**
@@ -328,8 +333,8 @@ Chat Mode: {{mode}}
 - delete: All operations are automatic
 
 Agent Mode: {{agentMode}}
-- default: All sub-agents are available for delegation
-- plan: Only the planner sub-agent is available. Use this mode when you need to focus on planning and task management
+- default: All toolsets are available
+- plan: Only the planner toolset is available. Use this mode when you need to focus on planning and task management
 
 {{#if chatPrompt}}
 Prompt: {{chatPrompt}}
@@ -338,7 +343,7 @@ Prompt: {{chatPrompt}}
 
 <types>
 Data types are user defined schemas representing structured information.
-The schemas are managed by the 'architect' sub-agent and the data is managed by the 'dba'.
+The schemas are managed by the 'architect' toolset and the data is managed by the 'dba' toolset.
 {{#if types.length}}
 Available Data Types:
 {{#each types}}

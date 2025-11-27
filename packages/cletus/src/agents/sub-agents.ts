@@ -11,19 +11,14 @@ import { createLibrarianTools } from '../tools/librarian';
 import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
 
-
-export const requestPrompt = `` /*`You have been given the following request to perform by Cletus. 
-It is VERY IMPORTANT you follow this request. 
-Cletus will execute and receive the results and decide what to do next. 
-That's why it's VERY important to strictly follow the request because Cletus is relying on you to only do what is needed. 
-If you can't "see" something - trust that Cletus has.
-
-<cletusRequest>
-{{request}}
-</cletusRequest>`*/
+/**
+ * @deprecated Use requestPrompt from tools/dba.ts instead
+ */
+export const requestPrompt = '';
 
 /**
  * Create all sub-agents, each with their own prompt and tools
+ * @deprecated Use createToolsets from agents/toolsets.ts instead for direct tool access
  */
 export function createSubAgents(ai: CletusAI) {
   const plannerTools = createPlannerTools(ai);
@@ -51,11 +46,11 @@ export function createSubAgents(ai: CletusAI) {
     }
   }
 
-  // Planner sub-agent
+  // Planner toolset
   const planner = ai.prompt({
     name: 'planner',
     description: 'Manages todos and task planning',
-    content: `You are the Planner agent for Cletus, responsible for managing todos planning.
+    content: `You are the Planner toolset for Cletus, responsible for managing todos planning.
 
 Your role is to help break down complex requests into manageable todos, track progress, and keep todos organized.
 
@@ -72,11 +67,11 @@ ${requestPrompt}
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
-  // Librarian sub-agent
+  // Librarian toolset
   const librarian = ai.prompt({
     name: 'librarian',
     description: 'Manages knowledge base and semantic search',
-    content: `You are the Librarian agent for Cletus, responsible for managing the knowledge base.
+    content: `You are the Librarian toolset for Cletus, responsible for managing the knowledge base.
 
 Your role is to help search, add, and delete knowledge entries to assist with user requests.
 
@@ -100,11 +95,11 @@ Knowledge sources can be formatted as:
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
-  // Clerk sub-agent
+  // Clerk toolset
   const clerk = ai.prompt({
     name: 'clerk',
     description: 'Manages file operations within the current working directory',
-    content: `You are the Clerk agent for Cletus, responsible for file operations.
+    content: `You are the Clerk toolset for Cletus, responsible for file operations.
 
 Your role is to help search, read, create, modify, and organize files within the project directory.
 
@@ -127,11 +122,11 @@ ${requestPrompt}
     input: ({ request }: { request: string }, { userPrompt, cwd }) => ({ userPrompt, request, cwd }),
   });
 
-  // Secretary sub-agent
+  // Secretary toolset
   const secretary = ai.prompt({
     name: 'secretary',
     description: 'Manages user memory and assistant personas',
-    content: `You are the Secretary agent for Cletus, responsible for managing user memory and assistant personas.
+    content: `You are the Secretary toolset for Cletus, responsible for managing user memory and assistant personas.
 
 Your role is to help manage user memories, switch between assistant personas, and maintain assistant configurations.
 
@@ -159,11 +154,11 @@ Available Assistants: {{assistants}}
     },
   });
 
-  // Architect sub-agent
+  // Architect toolset
   const architect = ai.prompt({
     name: 'architect',
     description: 'Manages type definitions for custom data',
-    content: `You are the Architect agent for Cletus, responsible for managing type definitions.
+    content: `You are the Architect toolset for Cletus, responsible for managing type definitions.
     
 Your role is to help create and modify type definitions while maintaining data integrity.
 
@@ -186,11 +181,11 @@ IMPORTANT: When updating types, you MUST ensure backwards compatibility:
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
-  // Artist sub-agent
+  // Artist toolset
   const artist = ai.prompt({
     name: 'artist',
     description: 'Handles image generation, editing, and analysis',
-    content: `You are the Artist agent for Cletus, responsible for image operations.
+    content: `You are the Artist toolset for Cletus, responsible for image operations.
 
 Your role is to help with all image-related requests including creation, modification, and understanding visual content.
 
@@ -211,11 +206,11 @@ You can generate new images, edit existing ones, analyze images, describe them, 
     input: ({ request }: { request: string }, { userPrompt }) => ({ userPrompt, request }),
   });
 
-  // Internet sub-agent
+  // Internet toolset
   const internet = ai.prompt({
     name: 'internet',
     description: 'Handles web searches, page fetching, and REST API calls',
-    content: `You are the Internet agent for Cletus, responsible for web operations.
+    content: `You are the Internet toolset for Cletus, responsible for web operations.
 
 Your role is to help with web searches, fetching web page content, and making REST API calls.
 

@@ -1,15 +1,19 @@
 import { z } from 'zod';
-import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
+import { AnyTool } from '@aeye/core';
+import { globalToolProperties, type CletusAI, type CletusAIContext, type CletusTypeAI } from '../ai';
 import type { TypeDefinition, TypeField } from '../schemas';
 import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
-import { requestPrompt } from '../agents/sub-agents';
 
 /**
- * Create the DBA agent that identifies the type first, then creates specific tools.
+ * Request prompt for toolset context
  */
-export function createDBAAgent(ai: CletusAI) {
-  const aiTyped = ai.extend<{ type: TypeDefinition }>();
+export const requestPrompt = '';
 
+/**
+ * Create DBA tools for a specific type definition.
+ * Returns an array of tools that can be registered in the tool registry.
+ */
+export function createDBATools(aiTyped: CletusTypeAI, type: TypeDefinition): AnyTool[] {
   const dataCreate = aiTyped.tool({
     name: 'data_create',
     description: `Create a new record`,
@@ -224,6 +228,31 @@ Example: Search for relevant records:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: ctx.type.name, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
   });
 
+  return [
+    dataCreate,
+    dataUpdate,
+    dataDelete,
+    dataSelect,
+    dataUpdateMany,
+    dataDeleteMany,
+    dataCount,
+    dataAggregate,
+    dataIndex,
+    dataImport,
+    dataSearch,
+  ] as AnyTool[];
+}
+
+/**
+ * Create the DBA agent that identifies the type first, then creates specific tools.
+ * @deprecated Use createDBATools instead for direct tool access
+ */
+export function createDBAAgent(ai: CletusAI) {
+  const aiTyped = ai.extend<{ type: TypeDefinition }>();
+
+  // Get tools for the prompt
+  const getTools = (type: TypeDefinition) => createDBATools(aiTyped, type);
+
   const dba = aiTyped.prompt({
     name: 'dba',
     description: 'Database administrator agent for data operations',
@@ -246,19 +275,7 @@ ${requestPrompt}
 {{userPrompt}}
 </userInformation>
 `,
-    tools: [
-      dataCreate,
-      dataUpdate,
-      dataDelete,
-      dataSelect,
-      dataUpdateMany,
-      dataDeleteMany,
-      dataCount,
-      dataAggregate,
-      dataIndex,
-      dataImport,
-      dataSearch,
-    ],
+    toolsFn: (_, ctx) => getTools(ctx.type),
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),
