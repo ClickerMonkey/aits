@@ -61,40 +61,19 @@ const shebangPlugin = {
   },
 };
 
-esbuild.build({
-  entryPoints: ['src/index.tsx'],
-  bundle: true,
-  platform: 'node',
-  target: 'node18',
-  outfile: 'dist/index.js',
-  // Bundle most dependencies to avoid version conflicts
-  // Only externalize heavy binary dependencies that need native builds or assets
-  external: [
-    // Heavy dependencies with native bindings
-    'sharp',
-    'puppeteer',
-    'mic',
-    'fastembed',
-    'onnxruntime-node',
-    // Dependencies with assets (fonts, etc)
-    'ink-big-text',
-    'ink-gradient',
-    // React ecosystem (must be shared between bundled code and external ink)
-    'react',
-    'react-dom',
-    'ink',
-    'ink-select-input',
-    'ink-text-input',
-    'ink-syntax-highlight',
-  ],
-  format: 'esm',
-  plugins: [
-    stubPlugin,
-    markdownPlugin,
-    shebangPlugin  // Must run last to add shebang after banner
-  ],
-  banner: {
-    js: `
+// Common external dependencies shared between main and worker builds
+const commonExternal = [
+  // Heavy dependencies with native bindings
+  'sharp',
+  'puppeteer',
+  'mic',
+  'fastembed',
+  'onnxruntime-node',
+];
+
+// ESM banner for Node.js compatibility
+const esmBanner = {
+  js: `
 import { createRequire as __createRequire } from 'module';
 import { fileURLToPath as __fileURLToPath } from 'url';
 import { dirname as __dirname_func } from 'path';
@@ -102,11 +81,59 @@ const __filename = __fileURLToPath(import.meta.url);
 const __dirname = __dirname_func(__filename);
 const require = __createRequire(import.meta.url);
 `
-  },
+};
+
+// Build the embedding worker first (no shebang needed)
+esbuild.build({
+  entryPoints: ['src/embed-worker.ts'],
+  bundle: true,
+  platform: 'node',
+  target: 'node18',
+  outfile: 'dist/embed-worker.js',
+  external: commonExternal,
+  format: 'esm',
+  banner: esmBanner,
   define: {
-    'process.env.NODE_ENV': '"production"'  // This disables devtools
+    'process.env.NODE_ENV': '"production"'
   },
   minify: false,
   sourcemap: false,
   logLevel: 'info',
+}).then(() => {
+  // Build the main application after the worker
+  return esbuild.build({
+    entryPoints: ['src/index.tsx'],
+    bundle: true,
+    platform: 'node',
+    target: 'node18',
+    outfile: 'dist/index.js',
+    // Bundle most dependencies to avoid version conflicts
+    // Only externalize heavy binary dependencies that need native builds or assets
+    external: [
+      ...commonExternal,
+      // Dependencies with assets (fonts, etc)
+      'ink-big-text',
+      'ink-gradient',
+      // React ecosystem (must be shared between bundled code and external ink)
+      'react',
+      'react-dom',
+      'ink',
+      'ink-select-input',
+      'ink-text-input',
+      'ink-syntax-highlight',
+    ],
+    format: 'esm',
+    plugins: [
+      stubPlugin,
+      markdownPlugin,
+      shebangPlugin  // Must run last to add shebang after banner
+    ],
+    banner: esmBanner,
+    define: {
+      'process.env.NODE_ENV': '"production"'  // This disables devtools
+    },
+    minify: false,
+    sourcemap: false,
+    logLevel: 'info',
+  });
 }).catch(() => process.exit(1));
