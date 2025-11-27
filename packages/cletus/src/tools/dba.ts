@@ -15,11 +15,18 @@ export const requestPrompt = '';
  * Returns an array of tools that can be registered in the tool registry.
  */
 export function createDBATools(aiTyped: CletusTypeAI, type: TypeDefinition): AnyTool[] {
+  // Pre-compute instructions with the type for embedding purposes
+  const firstField = type.fields[0];
+  const sortField = type.fields.find(f => f.type === 'number' || f.type === 'date') || firstField;
+  const updateField = type.fields[1] || firstField;
+  const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
+  const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
+  const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
+
   const dataCreate = aiTyped.tool({
     name: 'data_create',
-    description: `Create a new record`,
-    descriptionFn: ({ type }) => `Create a new ${type.friendlyName} record`,
-    instructionsFn: ({ type }) => `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }`,
+    description: `Create a new ${type.friendlyName} record`,
+    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }`,
     schema: ({ type, cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
       ...globalToolProperties,
@@ -29,9 +36,8 @@ export function createDBATools(aiTyped: CletusTypeAI, type: TypeDefinition): Any
 
   const dataUpdate = aiTyped.tool({
     name: 'data_update',
-    description: `Update a record by ID`,
-    descriptionFn: ({ type }) => `Update a ${type.friendlyName} record by ID`,
-    instructionsFn: ({ type }) => `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }`,
+    description: `Update a ${type.friendlyName} record by ID`,
+    instructions: `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }`,
     schema: ({ type, cache }) => z.object({
       id: z.string().describe('Record ID'),
       fields: getSchemas(type, cache).set.describe('Fields to update'),
@@ -42,9 +48,8 @@ export function createDBATools(aiTyped: CletusTypeAI, type: TypeDefinition): Any
 
   const dataDelete = aiTyped.tool({
     name: 'data_delete',
-    description: `Delete a record by ID`,
-    descriptionFn: ({ type }) => `Delete a ${type.friendlyName} record by ID`,
-    instructionsFn: ({ type }) => `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }`,
+    description: `Delete a ${type.friendlyName} record by ID`,
+    instructions: `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }`,
     schema: z.object({
       id: z.string().describe('Record ID'),
       ...globalToolProperties,
@@ -54,13 +59,8 @@ export function createDBATools(aiTyped: CletusTypeAI, type: TypeDefinition): Any
 
   const dataSelect = aiTyped.tool({
     name: 'data_select',
-    description: `Query records`,
-    descriptionFn: ({ type }) => `Query ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => {
-      const firstField = type.fields[0];
-      const sortField = type.fields.find(f => f.type === 'number' || f.type === 'date') || firstField;
-
-      return `Use this to search and retrieve ${type.friendlyName} records. Supports:
+    description: `Query ${type.friendlyName} records`,
+    instructions: `Use this to search and retrieve ${type.friendlyName} records. Supports:
 - where: Filter by field values with and/or logic
 - offset/limit: Pagination
 - orderBy: Sort by field(s)
@@ -71,8 +71,7 @@ Example 1: Find records with filter:
 { "where": ${generateExampleWhere(firstField)}, "limit": 10 }
 
 Example 2: Query with sorting:
-{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }`;
-    },
+{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }`,
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Filter conditions with and/or logic'),
       offset: z.number().optional().default(0).describe('Starting position'),
@@ -90,13 +89,8 @@ Example 2: Query with sorting:
 
   const dataUpdateMany = aiTyped.tool({
     name: 'data_update_many',
-    description: `Update multiple records`,
-    descriptionFn: ({ type }) => `Update multiple ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => {
-      const firstField = type.fields[0];
-      const updateField = type.fields[1] || firstField;
-      return `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }`;
-    },
+    description: `Update multiple ${type.friendlyName} records`,
+    instructions: `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }`,
     schema: ({ type, cache }) => z.object({
       set: getSchemas(type, cache).set.describe('Fields to set on matching records'),
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
@@ -108,9 +102,8 @@ Example 2: Query with sorting:
 
   const dataDeleteMany = aiTyped.tool({
     name: 'data_delete_many',
-    description: `Delete multiple records`,
-    descriptionFn: ({ type }) => `Delete multiple ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
+    description: `Delete multiple ${type.friendlyName} records`,
+    instructions: `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
@@ -121,9 +114,8 @@ Example 2: Query with sorting:
 
   const dataCount = aiTyped.tool({
     name: 'data_count',
-    description: `Count records`,
-    descriptionFn: ({ type }) => `Count ${type.friendlyName} records`,
-    instructionsFn: ({ type }) => `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
+    description: `Count ${type.friendlyName} records`,
+    instructions: `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       ...globalToolProperties,
@@ -133,14 +125,8 @@ Example 2: Query with sorting:
 
   const dataAggregate = aiTyped.tool({
     name: 'data_aggregate',
-    description: `Perform aggregation queries`,
-    descriptionFn: ({ type }) => `Perform aggregation queries on ${type.friendlyName}`,
-    instructionsFn: ({ type }) => {
-      const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
-      const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
-      const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
-
-      return `Use this for analytics and reporting on ${type.friendlyName} data:
+    description: `Perform aggregation queries on ${type.friendlyName}`,
+    instructions: `Use this for analytics and reporting on ${type.friendlyName} data:
 - groupBy: Group by field(s)
 - where: Filter before aggregation
 - having: Filter after aggregation
@@ -153,8 +139,7 @@ Example 1: Count records by field:
 { "groupBy": ["${groupField.name}"], "select": [{ "function": "count", "alias": "total" }] }
 
 Example 2: Aggregate with filter:
-{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }`;
-    },
+{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }`,
     schema: ({ type, cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Pre-aggregation filter'),
       having: getSchemas(type, cache).where.optional().describe('Post-aggregation filter'),
@@ -179,9 +164,8 @@ Example 2: Aggregate with filter:
 
   const dataIndex = aiTyped.tool({
     name: 'data_index',
-    description: `Index data records for knowledge base. `,
-    descriptionFn: ({ type }) => `Index ${type.friendlyName} records for knowledge base`,
-    instructionsFn: ({ type }) => `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
+    description: `Index ${type.friendlyName} records for knowledge base`,
+    instructions: `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
 This should be done if an embedding model has changed or a knowledge template has changed.`,
     schema: z.object({
       ...globalToolProperties,
@@ -191,9 +175,8 @@ This should be done if an embedding model has changed or a knowledge template ha
 
   const dataImport = aiTyped.tool({
     name: 'data_import',
-    description: `Import data from files using AI extraction`,
-    descriptionFn: ({ type }) => `Import ${type.friendlyName} records from files`,
-    instructionsFn: ({ type }) => `Use this to import ${type.friendlyName} records from files. The tool will:
+    description: `Import ${type.friendlyName} records from files`,
+    instructions: `Use this to import ${type.friendlyName} records from files. The tool will:
 1. Find files matching the glob pattern
 2. Process readable files (text, PDF, Excel, Word documents)
 3. Extract structured data using AI with schema validation
@@ -215,9 +198,8 @@ Example: Import with image text extraction:
     
   const dataSearch = aiTyped.tool({
     name: 'data_search',
-    description: `Search data records by semantic similarity`,
-    descriptionFn: ({ type }) => `Search ${type.friendlyName} records by semantic similarity`,
-    instructionsFn: ({ type }) => `Use this to find relevant ${type.friendlyName} records from the knowledge base using semantic search. Provide a query and optionally specify the number of results.
+    description: `Search ${type.friendlyName} records by semantic similarity`,
+    instructions: `Use this to find relevant ${type.friendlyName} records from the knowledge base using semantic search. Provide a query and optionally specify the number of results.
 
 Example: Search for relevant records:
 { "query": "user preferences for notifications", "n": 5 }`,

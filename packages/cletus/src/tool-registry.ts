@@ -209,15 +209,15 @@ export function getDBAToolsetName(typeName: string): string {
 }
 
 /**
- * Extract instructions from a tool (uses description + instructions)
+ * Extract instructions from a tool (uses instructions first, falls back to description)
  */
 export function getToolInstructions(tool: AnyTool): string {
   const input = tool.input;
-  const parts: string[] = [input.description];
+  // Use instructions first if available, then fall back to description
   if (input.instructions) {
-    parts.push(input.instructions);
+    return `${input.description}\n\n${input.instructions}`;
   }
-  return parts.join('\n\n');
+  return input.description;
 }
 
 /**

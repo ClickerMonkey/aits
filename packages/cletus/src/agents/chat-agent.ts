@@ -151,19 +151,45 @@ export function createChatAgent(ai: CletusAI) {
     const toolsetNames = toolRegistry.getToolsets();
     const descriptions: string[] = [];
 
+    // Collect DBA toolsets separately to avoid duplicating signatures
+    const dbaToolsets: string[] = [];
+    let dbaToolSignatures: string | null = null;
+
     for (const name of toolsetNames) {
       if (name === 'utility') continue; // Skip utility, it's always available
       
-      const tools = toolRegistry.getToolset(name);
-      const toolSignatures = tools
-        .map(t => {
-          const opName = t.name as keyof typeof Operations;
-          return Operations[opName]?.signature || t.name;
-        })
-        .join('\n  - ');
-      
-      const desc = getToolsetDescription(name);
-      descriptions.push(`- **${name}**: ${desc}\n  - ${toolSignatures}`);
+      if (name.startsWith('dba:')) {
+        // Collect DBA toolset names
+        dbaToolsets.push(name);
+        // Get signatures from first DBA toolset (they're all the same)
+        if (!dbaToolSignatures) {
+          const tools = toolRegistry.getToolset(name);
+          dbaToolSignatures = tools
+            .map(t => {
+              const opName = t.name as keyof typeof Operations;
+              return Operations[opName]?.signature || t.name;
+            })
+            .join('\n  - ');
+        }
+      } else {
+        // Non-DBA toolsets
+        const tools = toolRegistry.getToolset(name);
+        const toolSignatures = tools
+          .map(t => {
+            const opName = t.name as keyof typeof Operations;
+            return Operations[opName]?.signature || t.name;
+          })
+          .join('\n  - ');
+        
+        const desc = getToolsetDescription(name);
+        descriptions.push(`- **${name}**: ${desc}\n  - ${toolSignatures}`);
+      }
+    }
+
+    // Add consolidated DBA toolsets description
+    if (dbaToolsets.length > 0 && dbaToolSignatures) {
+      const dbaNames = dbaToolsets.map(t => t.substring(4)).join(', ');
+      descriptions.push(`- **dba:[type]**: Data operations for types: ${dbaNames}\n  - ${dbaToolSignatures}`);
     }
 
     return descriptions.join('\n\n');
@@ -254,9 +280,6 @@ Tools:
         speed: 0.7,
         accuracy: 0.3,
       },
-    },
-    config: {
-      toolsOneAtATime: true,
     },
     dynamic: true,
     metadataFn: (_, { config, chat }) => ({
