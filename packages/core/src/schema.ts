@@ -241,167 +241,605 @@ function strictifySimple(
 }
 
 /**
- * Modify a JSON Schema property to make it optional (accept null)
- *
- * @param prop - input JSON Schema property
- * @returns
+ * Format specification for JSON Schema generation
  */
-const makeOptional = (prop: z.core.JSONSchema.JSONSchema): z.core.JSONSchema.JSONSchema => {
-  if (prop.type) {
-    const values = Array.isArray(prop.type) ? prop.type : [prop.type];
-    if (!values.includes('null')) {
-      prop.type = [...values, 'null'] as any;
-    }
-
-    return prop;
-  } else if (prop.$ref) {
-    // If it's a $ref, wrap it in anyOf with null
-    return {
-      anyOf: [
-        { $ref: prop.$ref },
-        { type: 'null' }
-      ],
-    };
-  } else if (prop.allOf) {
-    // If it's an allOf with a single entry containing a $ref, extract and wrap the $ref
-    // This handles the common case: { allOf: [{ $ref: "..." }] }
-    if (prop.allOf.length === 1 && prop.allOf[0].$ref) {
-      return {
-        anyOf: [
-          { $ref: prop.allOf[0].$ref },
-          { type: 'null' }
-        ],
-      };
-    }
-    // Otherwise preserve the allOf structure
-    return {
-      anyOf: [
-        { allOf: prop.allOf },
-        { type: 'null' }
-      ],
-    };
-  } else {
-    const { title, description, default: defaultValue, ...rest } = prop;
-    return {
-      title,
-      description,
-      default: defaultValue,
-      anyOf: [
-        rest,
-        { type: 'null' }
-      ],
-    };
-  }
-};
+export type JSONSchemaFormat = 'openai';
 
 /**
- * Override function to modify JSON Schema generation
- * to make optional fields accept null values.
+ * Options for toJSONSchemaV2
  */
-const typeOverride = ({ zodSchema, jsonSchema, path }: {
-  zodSchema: z.core.$ZodTypes,
-  jsonSchema: z.core.JSONSchema.BaseSchema,
-  path: (string | number)[];
-}) => {
-  if (jsonSchema.type === 'object' && zodSchema instanceof z.ZodObject) {
-    const properties = jsonSchema.properties || {};
-    const propertyKeys = Object.keys(properties);
-    const required = jsonSchema.required || [];
-    const optional = propertyKeys.filter((key) => !required.includes(key));
+export interface ToJSONSchemaOptions {
+  /**
+   * Whether to use strict mode (all fields required, additionalProperties: false)
+   */
+  strict: boolean;
+  /**
+   * The target format for the JSON Schema. Currently only 'openai' is supported.
+   * Different formats may have different constraints and supported features.
+   */
+  format?: JSONSchemaFormat;
+}
 
-    // Add null to optional fields (those not in required array)
-    for (const key of optional) {
-      properties[key] = makeOptional(properties[key] as z.core.JSONSchema.JSONSchema);
+export type JSONSchemaType = 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null' | 'integer';
+
+/**
+ * JSON Schema type definition
+ */
+export interface JSONSchema {
+  type?: JSONSchemaType | JSONSchemaType[];
+  properties?: Record<string, JSONSchema>;
+  items?: JSONSchema;
+  prefixItems?: JSONSchema[];
+  required?: string[];
+  additionalProperties?: boolean | JSONSchema;
+  propertyNames?: JSONSchema;
+  enum?: any[];
+  anyOf?: JSONSchema[];
+  allOf?: JSONSchema[];
+  additionalItems?: boolean | JSONSchema;
+  not?: JSONSchema;
+  $ref?: string;
+  description?: string;
+  default?: any;
+  pattern?: string;
+  format?: string;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  multipleOf?: number;
+  minItems?: number;
+  maxItems?: number;
+  const?: any;
+  title?: string;
+  $defs?: Record<string, JSONSchema>;
+  [metadata: string]: unknown;
+}
+
+/**
+ * Context for recursive schema conversion
+ */
+interface ConversionContext {
+  root: z.ZodType,
+  strict: boolean;
+  format: JSONSchemaFormat;
+  definitions: Map<z.ZodType | z.core.$ZodType, [JSONSchema, string]>; // schema to [js, id]
+  definitionSchemas: Map<string, JSONSchema>; // id to schema
+  refCounter: number;
+  path: string[];
+}
+
+/**
+ * Converts a Zod schema to JSON Schema V2 with support for different provider formats.
+ *
+ * This is a custom implementation that recursively inspects Zod schemas and converts them
+ * to JSON Schema following the pattern of strictify/strictifySimple.
+ *
+ * @param schema - The Zod schema to convert
+ * @param options - Configuration options for the conversion
+ * @returns JSON Schema object compatible with the specified format
+ *
+ * @example
+ * ```typescript
+ * const schema = z.object({
+ *   name: z.string(),
+ *   age: z.number().optional(),
+ * });
+ *
+ * // For OpenAI strict mode
+ * const strictSchema = strictify(schema);
+ * const jsonSchema = toJSONSchemaV2(strictSchema, { strict: true, format: 'openai' });
+ * ```
+ */
+export function toJSONSchema(
+  schema: z.ZodType, 
+  options: ToJSONSchemaOptions | boolean 
+): JSONSchema {
+  const resolvedOptions = typeof options === 'boolean' ? { strict: options } : options;
+  const { strict, format = 'openai' } = resolvedOptions;
+
+  // Currently only OpenAI format is supported
+  if (format !== 'openai') {
+    throw new Error(`Unsupported format: ${format}. Currently only 'openai' is supported.`);
+  }
+
+  const context: ConversionContext = {
+    root: schema,
+    strict,
+    format,
+    definitions: new Map(),
+    definitionSchemas: new Map(),
+    refCounter: 0,
+    path: [],
+  };
+
+  const result = convert(schema, context);
+
+  // Add definitions if any were created
+  if (context.definitionSchemas.size > 0) {
+    result.$defs = Object.fromEntries(context.definitionSchemas);
+  }
+
+  return result;
+}
+
+/**
+ * Main recursive conversion function
+ */
+function convert(schema: z.ZodType | z.core.$ZodType, context: ConversionContext): JSONSchema {
+  const [js, jsId] = context.definitions.get(schema) || [];
+  // If we've seen this schema before
+  if (jsId && js) {
+    // If it's the root, return the # ref
+    if (schema === context.root) {
+      return { $ref: `#` };
+    }
+    
+    // If we haven't promoted the definition schema yet, do so now
+    if (!context.definitionSchemas.has(jsId)) {
+      // Add to global definitions
+      context.definitionSchemas.set(jsId, { ...js });
+      // Update reference to point to $defs
+      for (const prop in js) {
+        delete js[prop as keyof JSONSchema];
+      }
+      // Schema is now just a $ref
+      js.$ref = `#/$defs/${jsId}`;
     }
 
-    // Check fields that are required - if they use preprocess with optional, add null
-    for (const key of required) {
-      const fieldSchema = zodSchema.shape[key];
-      // Check if this is a ZodPipe (from preprocess) wrapping optional
-      if (fieldSchema instanceof z.ZodPipe) {
-        const outputSchema = fieldSchema.def.out;
-        if (outputSchema instanceof z.ZodOptional) {
-          const prop = properties[key];
-          // Skip empty objects - they're placeholders for recursive schemas that will be filled in later
-          if (Object.keys(prop).length === 0) {
-            continue;
-          }
-          properties[key] = makeOptional(prop as z.core.JSONSchema.JSONSchema);
+    return { $ref: `#/$defs/${jsId}` };
+  }
+
+  // Capture metadata
+  const metadata: {
+    id?: string;
+    aid?: string;
+    title?: string;
+    description?: string;
+    deprecated?: boolean;
+    [x: string]: unknown;
+  } = {};
+  if (schema instanceof z.ZodType) {
+    Object.assign(metadata, schema.meta() || {});
+    if (!metadata.description && schema.description) {
+      metadata.description = schema.description;
+    }
+  }
+
+  // If the schema has an 'aid' or 'id' in meta, promote it to a definition
+  const id = (metadata.aid ? String(metadata.aid) : 0) || metadata.id || `__schema${context.refCounter++}`;
+  const save = !!(metadata.aid || metadata.id) && context.root !== schema;
+
+  // A schema target - will hold either the converted schema or a $ref
+  const target: JSONSchema = {};
+
+  // Before converting, register this schema to handle recursion
+  context.definitions.set(schema, [target, id]);
+
+  // Convert the schema and copy properties to target
+  const result = convertSchema(schema, context);
+  Object.assign(result, metadata);
+
+  // Promote it because user requested it or it's recursive
+  if (save || context.definitionSchemas.has(id)) {
+    context.definitionSchemas.set(id, result);
+    target.$ref = `#/$defs/${id}`;
+  } else {
+    // Inline schema
+    Object.assign(target, result);
+  }
+
+  return target;
+}
+
+/**
+ * Main conversion function
+ */
+function convertSchema(schema: z.ZodType | z.core.$ZodType, context: ConversionContext): JSONSchema {
+  // TODO: Map, Set, File, ReadOnly, Nan, Catch, Prefault, NonOptional, Transform, Function, Promise, Custom
+
+  // Handle ZodOptional
+  if (schema instanceof z.ZodOptional) {
+    const innerSchema = schema.unwrap();
+    const innerJson = convert(innerSchema, context);
+
+    if (context.strict) {
+      // In strict mode, optional fields become nullable
+      return makeNullable(innerJson);
+    } else {
+      // In non-strict mode, optional fields are just not required
+      return innerJson;
+    }
+  }
+
+  // Handle ZodNullable
+  if (schema instanceof z.ZodNullable) {
+    const innerSchema = schema.unwrap();
+    const innerJson = convert(innerSchema, context);
+    return makeNullable(innerJson);
+  }
+
+  // Handle ZodObject
+  if (schema instanceof z.ZodObject) {
+    const properties: Record<string, JSONSchema> = {};
+    const required: string[] = [];
+    const shape = schema.shape;
+
+    for (const key in shape) {
+      const fieldSchema = shape[key];
+      const isRequired = context.strict || !isOptional(fieldSchema);
+      
+      properties[key] = convert(fieldSchema, context);
+
+      if (isRequired) {
+        required.push(key);
+      }
+    }
+
+    const result: JSONSchema = {
+      type: 'object',
+      properties,
+      required,
+    };
+
+    if (context.strict || schema.def.catchall?._zod.def.type === "never") {
+      result.additionalProperties = false;
+    } else if (schema.def.catchall) {
+      result.additionalProperties = convert(schema.def.catchall, context);
+    }
+
+    return result;
+  }
+
+  // Handle ZodArray
+  if (schema instanceof z.ZodArray) {
+    const result: JSONSchema = {
+      type: 'array',
+      items: convert(schema.element, context),
+    };
+    const { minimum, maximum } = schema._zod.bag;
+    if (typeof minimum === 'number') {
+      result.minItems = minimum;
+    }
+    if (typeof maximum === 'number') {
+      result.maxItems = maximum;
+    }
+    return result;
+  }
+
+  // Handle ZodRecord - convert to array of {key, value} pairs in strict mode
+  if (schema instanceof z.ZodRecord) {
+    if (context.strict) {
+      // In strict mode, records become arrays of {key, value} objects
+      return {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            key: convert(schema.keyType, context),
+            value: convert(schema.valueType, context),
+          },
+          required: ['key', 'value'],
+          additionalProperties: false,
+        },
+      };
+    } else {
+      // In non-strict mode, use additionalProperties
+      return {
+        type: 'object',
+        propertyNames: convert(schema.keyType, context),
+        additionalProperties: convert(schema.valueType, context),
+      };
+    }
+  }
+
+  // Handle ZodUnion
+  if (schema instanceof z.ZodUnion) {
+    const anyOf = schema.options.map(option => convert(option, context));
+    return { anyOf };
+  }
+
+  // Handle ZodDiscriminatedUnion
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    const anyOf = schema.options.map(option => convert(option, context));
+    return { anyOf };
+  }
+
+  // Handle ZodIntersection - not supported in OpenAI strict mode, convert to anyOf
+  if (schema instanceof z.ZodIntersection) {
+    const left = convert(schema.def.left, context);
+    const right = convert(schema.def.right, context);
+    const allOf = [
+      ...(left.allOf && Object.keys(left).length === 1 ? left.allOf! : [left]),
+      ...(right.allOf && Object.keys(right).length === 1 ? right.allOf! : [right]),
+    ];
+
+    // TODO merge types to support allOf directly for strict mode
+    return context.strict ? { anyOf: allOf } : { allOf };
+  }
+
+  // Handle ZodTuple
+  if (schema instanceof z.ZodTuple) {
+    // Tuples in JSON Schema can be represented as arrays with prefixItems
+    // For simplicity, we'll use an array type
+    const items = schema.def.items.map(item => convert(item, context));
+    const rest = schema.def.rest ? convert(schema.def.rest, context) : undefined;
+    const result: JSONSchema = { type: 'array' };
+
+    if (context.strict && rest) {
+      items.push(rest);
+    }
+
+    // If all items are the same type, simplify to a single items schema
+    if (items.length > 0 && items.every((item) => JSON.stringify(item) === JSON.stringify(items[0]))) {
+      result.items = items[0];
+    } else {
+      if (context.strict) {
+        result.items = { anyOf: items };
+      } else {
+        result.prefixItems = items;
+      }
+    }
+
+    if (!context.strict && rest) {
+      result.additionalItems = rest;
+    }
+    if (!rest) {
+      let minItems = items.length;
+      while (minItems > 0 && isOptional(schema.def.items[minItems - 1])) {
+        minItems--;
+      }
+      result.minItems = minItems;
+      result.maxItems = items.length;
+    }
+
+    const { minimum, maximum } = schema._zod.bag;
+    if (typeof minimum === 'number') {
+      result.minItems = minimum;
+    }
+    if (typeof maximum === 'number') {
+      result.maxItems = maximum;
+    }
+
+    return result;
+  }
+
+  // Handle ZodEnum
+  if (schema instanceof z.ZodEnum) {
+    const numericValues = Object.values(schema.def.entries).filter((v) => typeof v === "number");
+    const values = Object.entries(schema.def.entries)
+        .filter(([k, _]) => numericValues.indexOf(+k) === -1)
+        .map(([_, v]) => v);
+    return {
+      type: values.every((v) => typeof v === 'number') 
+        ? 'number' 
+        : values.every((v) => typeof v === 'string') 
+          ? 'string' 
+          : undefined,
+      enum: values,
+    };
+  }
+
+  // Handle ZodLiteral
+  if (schema instanceof z.ZodLiteral) {
+    const values = Array.from(schema.values).filter(v => v !== undefined && typeof v !== 'function' && typeof v !== 'symbol' && typeof v !== 'bigint');
+    const types = Array.from(new Set(values.map(v => v === null ? 'null' : typeof v) as ('string' | 'number' | 'boolean' | 'null')[]));
+    
+    return {
+      ...(types.length === 1 ? { type: types[0] } : {}),
+      ...(values.length === 1 ? { const: values[0] } : { enum: values }),
+    };
+  }
+
+  // Handle ZodDefault
+  if (schema instanceof z.ZodDefault) {
+    const innerJson = convert(schema.def.innerType, context);
+    innerJson.default = JSON.parse(JSON.stringify(schema.def.defaultValue));
+    return innerJson;
+  }
+
+  // Handle ZodLazy
+  if (schema instanceof z.ZodLazy) {
+    return convert(schema.def.getter(), context);
+  }
+
+  // Handle ZodCodec
+  if (schema instanceof z.ZodCodec) {
+    // For codecs, use the input schema for JSON Schema generation
+    return convert(schema.def.in, context);
+  }
+
+  // Handle ZodPipe (from preprocess)
+  if (schema instanceof z.ZodPipe) {
+    const innerType = schema.def.in._zod.def.type === "transform" ? schema.def.out : schema.def.in;
+    return convert(innerType, context);
+  }
+
+  // Handle primitive types
+  if (schema instanceof z.ZodString) {
+    const result: JSONSchema = { type: 'string' };
+
+    const { minimum, maximum, format, patterns, contentEncoding } = schema._zod.bag;
+
+    if (context.strict) {
+      const strictFormats = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'];
+      if (typeof format === 'string' && strictFormats.includes(format)) {
+        result.format = format;
+      }
+
+      if (patterns && patterns.size > 0) {
+        result.pattern = Array.from(patterns)[0].source;
+      }  
+    } else {
+      if (typeof minimum === 'number') {
+        result.minLength = minimum;
+      }
+      if (typeof maximum === 'number') {
+        result.maxLength = maximum;
+      }
+      if (typeof format === 'string') {
+        result.format = format;
+      }
+      if (typeof contentEncoding === 'string') {
+        result.contentEncoding = contentEncoding;
+      }
+      if (patterns) {
+        if (patterns.size === 1) {
+          result.pattern = Array.from(patterns)[0].source;
+        } else {
+          result.allOf = Array.from(patterns).map((regex) => ({
+            type: 'string',
+            pattern: regex.source,
+          }));
         }
       }
     }
 
-    jsonSchema.required = propertyKeys;
-    jsonSchema.additionalProperties = false;
-  }
-  // Convert allOf with single entry to that entry or anyOf.
-  // allOf is not supported by some AI schema parsers.
-  if (jsonSchema.allOf?.length) {
-    if (jsonSchema.allOf.length === 1) {
-      if (Object.keys(jsonSchema).length === 1) {
-        // Delete allOf first, THEN assign the content
-        const content = jsonSchema.allOf[0];
-        delete jsonSchema.allOf;
-        Object.assign(jsonSchema, content);
-      } else {
-        jsonSchema.anyOf = jsonSchema.allOf;
-        delete jsonSchema.allOf;
-      }
-    }
-  }
-  // For anyOf with null, convert to type array
-  if (jsonSchema.anyOf?.length === 2) {
-    if (jsonSchema.anyOf[1].type === 'null'
-      && Object.keys(jsonSchema.anyOf[1]).length === 1
-      && jsonSchema.anyOf[0].type
-      && !Array.isArray(jsonSchema.anyOf[0].type))
-    {
-      const first = jsonSchema.anyOf[0];
-      const nullableType = [first.type!, 'null'] as any;
-      delete jsonSchema.anyOf;
-      Object.assign(jsonSchema, first);
-      // Set type after assign to avoid it being overwritten
-      jsonSchema.type = nullableType;
-    }
-  }
-  // anyOf in an anyOf - flatten
-  // BUT: Don't flatten if it would lose $ref or other important properties
-  if (jsonSchema.anyOf?.length) {
-    const newAnyOf: z.core.JSONSchema.JSONSchema[] = [];
-    for (const subSchema of jsonSchema.anyOf) {
-      // Check if this sub-schema has a nested anyOf that should be flattened
-      // Only flatten if:
-      // 1. The sub-schema has an anyOf property
-      // 2. The sub-schema has no other properties except anyOf (it's a pure wrapper)
-      // 3. None of the elements in the nested anyOf are $refs (which should be preserved)
-      const isPureAnyOfWrapper = subSchema.anyOf?.length && Object.keys(subSchema).length === 1;
-      const hasRefInNested = subSchema.anyOf?.some((nested: any) => nested.$ref);
-
-      if (isPureAnyOfWrapper && !hasRefInNested) {
-        // Safe to flatten
-        newAnyOf.push(...subSchema.anyOf!);
-      } else {
-        // Keep as-is
-        newAnyOf.push(subSchema);
-      }
-    }
-    jsonSchema.anyOf = newAnyOf;
+    return result;
   }
 
-};
+  if (schema instanceof z.ZodNumber) {
+    const result: JSONSchema = { type: 'number' };
+
+    // Add number constraints if present
+    const { minimum, maximum, format, multipleOf, exclusiveMaximum, exclusiveMinimum } = schema._zod.bag;
+    if (typeof format === 'string' && format.includes("int")) {
+      result.type = 'integer';
+    }
+    if (typeof exclusiveMinimum === 'number') {
+      result.exclusiveMinimum = exclusiveMinimum;
+    } else if (typeof minimum === 'number') {
+      result.minimum = minimum;
+    }
+    if (typeof exclusiveMaximum === 'number') {
+      result.exclusiveMaximum = exclusiveMaximum;
+    } else if (typeof maximum === 'number') {
+      result.maximum = maximum;
+    }
+    if (typeof multipleOf === 'number') {
+      result.multipleOf = multipleOf;
+    }
+
+    return result;
+  }
+
+  if (schema instanceof z.ZodBoolean || schema instanceof z.ZodSuccess) {
+    return { type: 'boolean' };
+  }
+
+  if (schema instanceof z.ZodBigInt) {
+    return { type: 'integer' };
+  }
+
+  if (schema instanceof z.ZodDate || schema instanceof z.ZodISODateTime) {
+    return { type: 'string', format: 'date-time' };
+  }
+
+  if (schema instanceof z.ZodISODate) {
+    return { type: 'string', format: 'date' };
+  }
+
+  if (schema instanceof z.ZodISOTime) {
+    return { type: 'string', format: 'time' };
+  }
+
+  if (schema instanceof z.ZodISODuration) {
+    return { type: 'string', format: 'duration' };
+  }
+
+  if (schema instanceof z.ZodEmail) {
+    return { type: 'string', format: 'email' };
+  }
+
+  if (schema instanceof z.ZodIPv4) {
+    return { type: 'string', format: 'ipv4' };
+  }
+
+  if (schema instanceof z.ZodIPv6) {
+    return { type: 'string', format: 'ipv6' };
+  }
+
+  if (schema instanceof z.ZodUUID) {
+    return { type: 'string', format: 'uuid' };
+  }
+
+  if (schema instanceof z.ZodNull) {
+    return { type: 'null' };
+  }
+
+  if (schema instanceof z.ZodTemplateLiteral) {
+    return { type: 'string', pattern: schema._zod.pattern?.source };
+  }
+
+  if (schema instanceof z.ZodUndefined) {
+    return { type: 'null' }; // Treat undefined as null in JSON
+  }
+
+  if (schema instanceof z.ZodAny) {
+    return {}; // Any type has no constraints
+  }
+
+  if (schema instanceof z.ZodUnknown) {
+    return {}; // Unknown type has no constraints
+  }
+
+  if (schema instanceof z.ZodTransform) {
+    return {}; // Transforms are not represented in JSON Schema
+  }
+
+  // Fallback for unknown types
+  console.warn(`Unknown Zod schema type: ${schema.constructor.name}`);
+
+  return {};
+}
 
 /**
- * Converts a Zod schema to JSON Schema that's compatible with AI schemas.
- * 
- * @param schema - input Zod schema
- * @returns - JSON Schema object
+ * Makes a JSON Schema nullable by adding null to the type
  */
-export function toJSONSchema(schema: z.ZodType, strict: boolean) {
-  return z.toJSONSchema(schema, {
-    target: 'draft-7',
-    reused: 'ref',
-    io: 'input',
-    unrepresentable: 'any',
-    override: strict ? typeOverride : undefined,
-  });
+function makeNullable(schema: JSONSchema): JSONSchema {
+  if (schema.$ref) {
+    // If it's a reference, wrap in anyOf with null
+    return {
+      anyOf: [
+        { $ref: schema.$ref },
+        { type: 'null' },
+      ],
+    };
+  }
+
+  if (schema.type) {
+    // Add null to the type
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (!types.includes('null')) {
+      return {
+        ...schema,
+        type: [...types, 'null'],
+      };
+    }
+    return schema;
+  }
+
+  if (schema.anyOf) {
+    // Already has anyOf, add null option if not present
+    const hasNull = schema.anyOf.some((s) => s.type === 'null');
+    if (!hasNull) {
+      return {
+        ...schema,
+        anyOf: [...schema.anyOf, { type: 'null' }],
+      };
+    }
+    return schema;
+  }
+
+  // For complex schemas without type, wrap in anyOf
+  return {
+    anyOf: [
+      schema,
+      { type: 'null' },
+    ],
+  };
+}
+
+function isOptional(schema: z.ZodType | z.core.$ZodType): boolean {
+  return schema._zod.optin !== undefined;
 }

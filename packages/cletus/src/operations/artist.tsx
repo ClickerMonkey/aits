@@ -8,6 +8,7 @@ import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
+import { canEmbed, embed } from "../embed";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
@@ -304,6 +305,13 @@ export const image_find = operationOf<
       };
     }
 
+    if (!await canEmbed()) {
+      return {
+        analysis: 'This would fail - image finding requires embedding capabilities, which are not available.',
+        doable: false,
+      };
+    }
+
     const searchCount = Math.min(images.length, maxImages);
     return {
       analysis: `This will search ${searchCount} image(s) matching pattern "${input.glob}", returning top ${n} matches for: "${input.query}"`,
@@ -323,18 +331,13 @@ export const image_find = operationOf<
       };
     }
 
-    // Perferred search method is to use image embeddings and cosine similarity
-    // Not all providers have an image embedding model.
-    const embedModel = config.getData().user.models?.imageEmbed;
-    const embeddingModels: ScoredModel[] = []; // ai.models.search({ required: ['embedding', 'vision'] });
+    if (!await canEmbed()) {
+      throw new Error('Image finding requires embedding capabilities, which are not available.');
+    }
 
-    // If we have a suitable image embedding model, use that
-    if ((embedModel && embeddingModels.find(m => m.model.id === embedModel)) || embeddingModels.length > 0) {
-      throw new Error('Image embedding search not yet implemented');
-    } else {
-      // Fallback to using image analysis with text prompt
-      const model = config.getData().user.models?.imageAnalyze;
-      const prompt = `The user is looking for images that match this description
+    // Fallback to using image analysis with text prompt
+    const model = config.getData().user.models?.imageAnalyze;
+    const prompt = `The user is looking for images that match this description
 <description>
 ${input.query}
 </description>
@@ -343,85 +346,71 @@ If the description does not match the image in anyway, return an empty string.
 If the description perfectly matches the image, return the entire description.
 Do not return any additional text other than the matching description subset.`;
 
-      let analyzeCount = 0;
-      chatStatus(`Step 1/3: Describing ${images.length} images...`);
+    let analyzeCount = 0;
+    chatStatus(`Step 1/3: Describing ${images.length} images...`);
 
-      // Generate descriptions for all images concurrently
-      const imagesDescribed = await Promise.all(images.map(async ({ file }) => {
-        try {
-          const imageData = await loadImageAsDataUrl(cwd, file);
-          
-          const response = await ai.image.analyze.get({
-            model,
-            prompt,
-            images: [imageData],
-          });
+    // Generate descriptions for all images concurrently
+    const imagesDescribed = await Promise.all(images.map(async ({ file }) => {
+      try {
+        const imageData = await loadImageAsDataUrl(cwd, file);
+        
+        const response = await ai.image.analyze.get({
+          model,
+          prompt,
+          images: [imageData],
+        });
 
-          analyzeCount++;
-          chatStatus(`Step 1/3: Described ${analyzeCount}/${images.length} images...`);
+        analyzeCount++;
+        chatStatus(`Step 1/3: Described ${analyzeCount}/${images.length} images...`);
 
-          return {
-            path: file,
-            description: response.content,
-          };
-        } catch (error) {
-          return {
-            path: file,
-            description: '',
-          };
-        }
-      }));
+        return {
+          path: file,
+          description: response.content,
+        };
+      } catch (error) {
+        return {
+          path: file,
+          description: '',
+        };
+      }
+    }));
 
-      // Filter out failed descriptions
-      const imagesValid = imagesDescribed.filter((d) => d.description);
-      const chunks = chunkArray(imagesValid, CONSTS.EMBED_CHUNK_SIZE);
+    // Filter out failed descriptions
+    const imagesValid = imagesDescribed.filter((d) => d.description);
 
-      // Track embedding progress
-      let embeddedCount = 0;
-      chatStatus(`Step 2/3: Embedding descriptions...`);
+    // Embed descriptions
+    chatStatus(`Step 2/3: Embedding descriptions...`);
+    const imagesEmbeddings = await embed(imagesValid.map((d) => d.description));
+    const imagesEmbedded = imagesValid.map((d, i) => ({
+      ...d,
+      embedding: imagesEmbeddings![i],
+    }));
 
-      // Embed descriptions in chunks
-      const imagesEmbeddedChunks = await Promise.all(chunks.map(async (chunk, chunkIndex) => {
-        const texts = chunk.map((d) => d.description);
-        const embeddings = await ai.embed.get({ texts });
+    chatStatus(`Step 3/3: Scoring and selecting top ${n} images...`);
 
-        embeddedCount += chunk.length;
-        chatStatus(`Step 2/3: Embedded ${embeddedCount}/${chunk.length} descriptions...`);
+    // Score images by cosine similarity to prompt embedding
+    const [promptEmbedding] = await embed([input.query]) || [];
 
-        return embeddings.embeddings.map(({ embedding, index }, i) => ({
-          embedding,
-          ...chunk[index],
-        }));
-      }));
+    const imagesScored = imagesEmbedded.map((item) => ({
+      score: cosineSimilarity(promptEmbedding, item.embedding),
+      ...item,
+    }));
 
-      const imagesEmbedded = imagesEmbeddedChunks.flat();
+    // Sort by score descending
+    imagesScored.sort((a, b) => b.score - a.score);
 
-      chatStatus(`Step 3/3: Scoring and selecting top ${n} images...`);
+    // Return top N results
+    const topResults = imagesScored.slice(0, n).map((item) => ({
+      path: item.path,
+      link: linkImage(item.path),
+      score: item.score,
+      matches: item.description,
+    }));
 
-      // Score images by cosine similarity to prompt embedding
-      const { embeddings: [{ embedding: promptEmbedding }] } = await ai.embed.get({ texts: [input.query] });
-
-      const imagesScored = imagesEmbedded.map((item) => ({
-        score: cosineSimilarity(promptEmbedding, item.embedding),
-        ...item,
-      }));
-
-      // Sort by score descending
-      imagesScored.sort((a, b) => b.score - a.score);
-
-      // Return top N results
-      const topResults = imagesScored.slice(0, n).map((item) => ({
-        path: item.path,
-        link: linkImage(item.path),
-        score: item.score,
-        matches: item.description,
-      }));
-
-      return {
-        searched: images.length,
-        results: topResults, 
-      };
-    }
+    return {
+      searched: images.length,
+      results: topResults, 
+    };
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,

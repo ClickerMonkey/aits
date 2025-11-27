@@ -74,6 +74,8 @@ esbuild.build({
     'sharp',
     'puppeteer',
     'mic',
+    'fastembed',
+    'onnxruntime-node',
     // Dependencies with assets (fonts, etc)
     'ink-big-text',
     'ink-gradient',

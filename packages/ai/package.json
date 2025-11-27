@@ -1,6 +1,6 @@
 {
   "name": "@aeye/ai",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "@aeye AI - AI TypeScript library main functionality",
   "type": "module",
   "main": "dist/index.js",

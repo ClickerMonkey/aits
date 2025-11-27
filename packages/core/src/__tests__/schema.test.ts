@@ -9,13 +9,13 @@
  */
 
 import z from 'zod';
-import { strictify, toJSONSchema } from '../schema';
+import { strictify, toJSONSchema, JSONSchema } from '../schema';
 
-type JS = z.core.JSONSchema.JSONSchema;
+type JS = JSONSchema; //z.core.JSONSchema.JSONSchema;
 
-function js(schema: z.core.JSONSchema._JSONSchema): JS
-function js(schema: z.core.JSONSchema._JSONSchema[]): JS[]
-function js(schema: z.core.JSONSchema._JSONSchema | z.core.JSONSchema._JSONSchema[]): JS | JS[] {
+function js(schema?: JS): JS
+function js(schema?: JS[]): JS[]
+function js(schema?: JS | JS[]): JS | JS[] {
   if (Array.isArray(schema)) {
     return schema.map(s => js(s));
   }
@@ -870,6 +870,8 @@ describe('Schema Utilities', () => {
         const strictSchema = strictify(schema);
         const jsonSchema = toJSONSchema(strictSchema, true);
 
+        console.log(jsonSchema); // TODO REMOVE
+
         expect(js(jsonSchema.properties!.role).default).toBe('user');
       });
 
@@ -1205,9 +1207,9 @@ describe('Schema Utilities', () => {
         // The 'and' property is an array of recursive references
         // After our fix, it should be: { type: 'array', items: { $ref: '#' } }
         // (Not an empty object!)
-        expect(andProp.type).toBe('array');
+        expect(andProp.type).toEqual(['array', 'null']);
         expect(andProp.items).toBeDefined();
-        expect(andProp.items.$ref).toBeDefined();
+        expect((andProp.items as JS).$ref).toBeDefined();
 
         // The Zod schema also works for parsing (getters are evaluated at runtime)
         const testData = {
@@ -1220,7 +1222,15 @@ describe('Schema Utilities', () => {
 
       it('should correctly generate JSON schema with z.lazy approach', () => {
         // Define the schema using z.lazy for recursion
-        const whereSchemaNoGetters = z.object({
+        type Where = {
+          and?: Where[];
+          or?: Where[];
+          not?: Where;
+          name?: { equals?: string; contains?: string };
+          age?: { equals?: number; gte?: number };
+        }
+
+        const whereSchemaNoGetters: z.ZodType<Where> = z.object({
           and: z.array(z.lazy(() => whereSchemaNoGetters)).optional(),
           or: z.array(z.lazy(() => whereSchemaNoGetters)).optional(),
           not: z.lazy(() => whereSchemaNoGetters).optional(),
@@ -1248,9 +1258,9 @@ describe('Schema Utilities', () => {
 
         // After our fix, recursive references work correctly
         // The 'and' property should be an array with items that have a $ref
-        expect(andProp.type).toBe('array');
+        expect(andProp.type).toEqual(['array', 'null']);
         expect(andProp.items).toBeDefined();
-        expect(andProp.items.$ref).toBeDefined();
+        expect((andProp.items as JS).$ref).toBeDefined();
       });
 
       it('should correctly generate JSON schema with external z.lazy references', () => {

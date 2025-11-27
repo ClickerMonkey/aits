@@ -3,6 +3,7 @@ import { abbreviate } from "../common";
 import { KnowledgeFile } from "../knowledge";
 import { operationOf } from "./types";
 import { renderOperation } from "../helpers/render";
+import { embed } from "../embed";
 
 export const knowledge_search = operationOf<
   { query: string; limit?: number; sourcePrefix?: string },
@@ -26,12 +27,10 @@ export const knowledge_search = operationOf<
     const limit = input.limit || 10;
     
     // Generate embedding for query
-    const embeddingResult = await ai.embed.get({ texts: [input.query] });
-    const modelId = getModel(embeddingResult.model).id;
-    const queryVector = embeddingResult.embeddings[0].embedding;
+    const [queryVector] = await embed([input.query]) || [];
 
     // Search for similar entries, optionally filtering by source prefix
-    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit, input.sourcePrefix);
+    const similarEntries = knowledge.searchBySimilarity(queryVector, limit, input.sourcePrefix);
 
     return {
       query: input.query,
@@ -73,11 +72,9 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
     const sources = new Set<string>();
     const data = knowledge.getData();
 
-    for (const entries of Object.values(data.knowledge)) {
-      for (const entry of entries) {
-        const prefix = entry.source.substring(0, entry.source.lastIndexOf(':'));
-        sources.add(prefix);
-      }
+    for (const entry of data.knowledge) {
+      const prefix = entry.source.substring(0, entry.source.lastIndexOf(':'));
+      sources.add(prefix);
     }
 
     return { sources: Array.from(sources) };
@@ -170,12 +167,10 @@ export const knowledge_delete = operationOf<
     let count = 0;
 
     // Find all matching sources
-    for (const entries of Object.values(data.knowledge)) {
-      for (const entry of entries) {
-        if (regex.test(entry.source)) {
-          matchingSources.add(entry.source);
-          count++;
-        }
+    for (const entry of data.knowledge) {
+      if (regex.test(entry.source)) {
+        matchingSources.add(entry.source);
+        count++;
       }
     }
 

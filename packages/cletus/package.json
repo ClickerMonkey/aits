@@ -1,6 +1,6 @@
 {
   "name": "@aeye/cletus",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Interactive CLI demo showcasing @aeye capabilities",
   "type": "module",
   "main": "dist/index.js",
@@ -37,13 +37,13 @@
   ],
   "dependencies": {
     "cli-highlight": "^2.1.11",
+    "fastembed": "^2.0.0",
     "ink": "^6.4.0",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
     "mic": "^2.1.2",
-    "puppeteer": "^24.31.0",
     "react": "^19.2.0",
     "sharp": "^0.34.3"
   },

@@ -9,7 +9,7 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
   constructor() {
     const initialData: Knowledge = {
       updated: Date.now(),
-      knowledge: {},
+      knowledge: [],
     };
 
     super(getKnowledgePath(), initialData);
@@ -32,10 +32,10 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
    */
   async addEntry(model: string, entry: Omit<KnowledgeEntry, 'created'>): Promise<void> {
     await this.save((knowledge) => {
-      if (!knowledge.knowledge[model]) {
-        knowledge.knowledge[model] = [];
+      if (!knowledge.knowledge) {
+        knowledge.knowledge = [];
       }
-      knowledge.knowledge[model].push({
+      knowledge.knowledge.push({
         ...entry,
         created: Date.now(),
       });
@@ -45,12 +45,9 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
   /**
    * Add a knowledge entry for a specific embedding model
    */
-  async addEntries(model: string, entries: KnowledgeEntry[]): Promise<void> {
+  async addEntries(entries: KnowledgeEntry[]): Promise<void> {
     await this.save((knowledge) => {
-      if (!knowledge.knowledge[model]) {
-        knowledge.knowledge[model] = [];
-      }
-      knowledge.knowledge[model].push(...entries);
+      knowledge.knowledge.push(...entries);
     });
   }
 
@@ -63,7 +60,7 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
     updates: Partial<Omit<KnowledgeEntry, 'source' | 'created'>>
   ): Promise<void> {
     await this.save((knowledge) => {
-      const entries = knowledge.knowledge[model];
+      const entries = knowledge.knowledge;
       if (!entries) {
         throw new Error(`No entries for model ${model}`);
       }
@@ -83,11 +80,9 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
    */
   async deleteBySource(source: string): Promise<void> {
     await this.save((knowledge) => {
-      for (const model in knowledge.knowledge) {
-        knowledge.knowledge[model] = knowledge.knowledge[model].filter(
-          (e) => e.source !== source
-        );
-      }
+      knowledge.knowledge = knowledge.knowledge.filter(
+        (e) => e.source !== source
+      );
     });
   }
 
@@ -96,35 +91,30 @@ export class KnowledgeFile extends JsonFile<Knowledge> {
    */
   async deleteWhere(predicate: (entry: KnowledgeEntry) => boolean): Promise<number> {
     return this.save((knowledge) => {
-      let deletedCount = 0;
-      for (const model in knowledge.knowledge) {
-        const originalLength = knowledge.knowledge[model].length;
-        knowledge.knowledge[model] = knowledge.knowledge[model].filter(
-          (e) => !predicate(e)
-        );
-        deletedCount += originalLength - knowledge.knowledge[model].length;
-      }
-      return deletedCount;
+      const originalLength = knowledge.knowledge.length;
+      knowledge.knowledge = knowledge.knowledge.filter(
+        (e) => !predicate(e)
+      );
+      return originalLength - knowledge.knowledge.length;
     });
   }
 
   /**
    * Get all entries for a specific model
    */
-  getEntries(model: string): KnowledgeEntry[] {
-    return this.data.knowledge[model] || [];
+  getEntries(): KnowledgeEntry[] {
+    return this.data.knowledge || [];
   }
 
   /**
    * Search entries by similarity (cosine similarity)
    */
   searchBySimilarity(
-    model: string,
     queryVector: number[],
     topK: number = 5,
     sourcePrefix?: string
   ): Array<{ entry: KnowledgeEntry; similarity: number }> {
-    let entries = this.getEntries(model);
+    let entries = this.getEntries();
 
     // Filter by source prefix before computing similarities to optimize performance
     if (sourcePrefix) {

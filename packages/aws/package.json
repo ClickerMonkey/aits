@@ -1,6 +1,6 @@
 {
   "name": "@aeye/aws",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "@aeye AWS - AWS Bedrock integration for @aeye",
   "type": "module",
   "main": "dist/index.js",

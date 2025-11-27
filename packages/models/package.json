@@ -1,6 +1,6 @@
 {
   "name": "@aeye/models",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Static model information scraped from OpenAI, OpenRouter, Replicate, and AWS Bedrock",
   "type": "module",
   "main": "dist/src/index.js",

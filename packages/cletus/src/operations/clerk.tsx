@@ -1,20 +1,20 @@
-import { getModel } from "@aeye/core";
 import * as Diff from 'diff';
-import { Box, Text } from "ink";
-import React from 'react';
 import fs from 'fs/promises';
 import { glob } from 'glob';
+import { Box, Text } from "ink";
 import path from 'path';
+import React from 'react';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunk, chunkArray, fileProtocol, linkFile, paginateText, pluralize } from "../common";
-import { COLORS, CONSTS } from "../constants";
+import { abbreviate, chunk, fileProtocol, linkFile, paginateText, pluralize } from "../common";
+import { Link } from "../components/Link";
+import { CONSTS } from "../constants";
+import { canEmbed, embed } from "../embed";
 import { getAssetPath } from "../file-manager";
 import { categorizeFile, fileExists, fileIsDirectory, fileIsReadable, fileIsWritable, isAudioFile, processFile, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry } from "../schemas";
 import { operationOf } from "./types";
-import { Link } from "../components/Link";
 
 // Constants for file_attach operation
 const ALLOWED_FILE_TYPES = ['text', 'pdf'];
@@ -135,7 +135,7 @@ export const file_index = operationOf<
   { glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
   { files: string[], knowledge: number }
 >({
-  mode: 'create',
+  mode: (input) => input.transcribeImages || input.extractImages || input.describeImages ? 'read' : 'local',
   signature: 'file_index(glob: string, index: "content" | "summary"...)',
   status: (input) => `Indexing files: ${input.glob}`,
   async analyze(input, { cwd }) {
@@ -145,6 +145,7 @@ export const file_index = operationOf<
     const unknown = files.filter(f => f.fileType === 'unknown').map(f => f.file);
     const indexable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable').map(f => f.file);
 
+    let doable = indexable.length > 0;
     let analysis = '';
     if (unreadable.length > 0) {
       analysis += `Found ${unreadable.length} unreadable file(s): ${unreadable.join(', ')}\n`;
@@ -154,17 +155,26 @@ export const file_index = operationOf<
     }
     analysis += `Found ${indexable.length} indexable file(s).\n`;
 
-    return {
-      analysis,
-      doable: indexable.length > 0,
-    };
+    if (indexable.length > 0 && !await canEmbed()) {
+      analysis = 'Embedding model is not configured or available.';
+      doable = false;
+    }
+
+    return { analysis, doable };
   },
   async do(input, { cwd, ai, chatStatus }) {
     const files = await searchFiles(cwd, input.glob);
     const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
     const indexingPromises: Promise<any>[] = [];
     const knowledge: KnowledgeEntry[] = [];
-    let embeddingModel: string = 'default';
+
+    if (indexableFiles.length === 0) {
+      throw new Error('No indexable files found.');
+    }
+
+    if (!await canEmbed()) {
+      throw new Error('Embedding model is not configured or available.');
+    }
 
     let filesProcessed = 0;
     let filesEmbedded = 0;
@@ -196,30 +206,26 @@ export const file_index = operationOf<
         ? parsed.sections 
         : [parsed.description || ''];
 
-      const embedChunks = chunkArray(chunkables.filter(s => s && s.length > 0), CONSTS.EMBED_CHUNK_SIZE);
-      indexingPromises.push(...embedChunks.map(async (texts, textIndex) => {
-        const offset = textIndex * CONSTS.EMBED_CHUNK_SIZE;
-        const { embeddings, model } = await ai.embed.get({ texts });
-        embeddings.forEach(({ embedding: vector, index }, i) => {
-          knowledge.push({
-            source: getSource(index + offset),
-            text: texts[index],
-            vector: vector,
-            created: Date.now()
-          });
-        });
-        embeddingModel = getModel(model).id;
+      const embeddable = chunkables.filter(s => s && s.length > 0);
+      const embeddings = await embed(embeddable) || [];
 
-        filesEmbedded++;
-        chatStatus(`Parsed/embedded ${filesProcessed}/${filesEmbedded} out of ${indexableFiles.length} files...`);
-      }));
+      knowledge.push(...embeddings.map((vector, index) => ({
+        source: getSource(index),
+        text: embeddable[index],
+        vector: vector,
+        created: Date.now()
+      })));
+
+    
+      filesEmbedded++;
+      chatStatus(`Parsed/embedded ${filesProcessed}/${filesEmbedded} out of ${indexableFiles.length} files...`);
     }));
 
     await Promise.all(indexingPromises);
 
     const knowledgeFile = new KnowledgeFile();
     await knowledgeFile.load();
-    await knowledgeFile.addEntries(embeddingModel, knowledge);
+    await knowledgeFile.addEntries(knowledge);
     
     return {
       files: indexableFiles.map(f => f.file),

@@ -89,7 +89,7 @@ export function buildFieldSchema(field: TypeField): z.ZodTypeAny {
     schema = schema.default(field.default);
   }
 
-  return schema.meta({ title: field.name });
+  return schema.meta({ aid: field.name });
 }
 
 /**
@@ -100,7 +100,7 @@ export function buildFieldsSchema(type: TypeDefinition) {
   for (const field of type.fields) {
     shape[field.name] = buildFieldSchema(field);
   }
-  return z.object(shape).meta({ title: `${type.name}_fields` });
+  return z.object(shape).meta({ aid: `${type.name}_fields` });
 }
 
 /**
@@ -114,7 +114,7 @@ export function buildFieldSetSchema(type: TypeDefinition) {
         value: buildFieldSchema(f),
       })
     ))
-  ).meta({ title: `${type.name}_fieldset` });
+  ).meta({ aid: `${type.name}_fieldset` });
 }
 
 /**
@@ -134,7 +134,7 @@ export function buildWhereSchema(type: TypeDefinition) {
           endsWith: z.string().optional(),
           oneOf: z.array(z.string()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
       case 'number':
         fieldConditions[field.name] = z.object({
@@ -145,13 +145,13 @@ export function buildWhereSchema(type: TypeDefinition) {
           gte: z.number().optional(),
           oneOf: z.array(z.number()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
       case 'boolean':
         fieldConditions[field.name] = z.object({
           equals: z.boolean().optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
       case 'date':
         fieldConditions[field.name] = z.object({
@@ -160,7 +160,7 @@ export function buildWhereSchema(type: TypeDefinition) {
           after: z.iso.date().optional(),
           oneOf: z.array(z.iso.date()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
       case 'enum':
         const enumSchema = z.enum(field.enumOptions as [string, ...string[]]);
@@ -168,7 +168,7 @@ export function buildWhereSchema(type: TypeDefinition) {
           equals: enumSchema.optional(),
           oneOf: z.array(enumSchema).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
       default:
         // references a data type
@@ -176,7 +176,7 @@ export function buildWhereSchema(type: TypeDefinition) {
           equals: z.string().optional(),
           oneOf: z.array(z.string()).optional(),
           isEmpty: z.boolean().optional(),
-        }).optional().meta({ title: `${type.name}_${field.name}_condition` });
+        }).optional().meta({ aid: `${type.name}_${field.name}_condition` });
         break;
     }
   }
@@ -195,7 +195,7 @@ export function buildWhereSchema(type: TypeDefinition) {
     ...fieldConditions,
   }).meta({ title: `${type.name}_where` });
 
-  const whereList = z.array(whereSchema).meta({ title: `${type.name}_where_list` });
+  const whereList = z.array(whereSchema).meta({ aid: `${type.name}_where_list` });
 
   return whereSchema;
 }

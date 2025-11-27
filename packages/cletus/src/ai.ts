@@ -73,7 +73,10 @@ export function createCletusAI(configFile: ConfigFile) {
         chat: {
           beforeRequest: (request, params, ctx, metadata) => {
             logger.log(`OpenAI Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
-          }
+          },
+          afterRequest: (request, response, responseComplete, ctx, metadata) => {
+            logger.log(`OpenAI Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
+          },
         }
       }
     })} : {}),

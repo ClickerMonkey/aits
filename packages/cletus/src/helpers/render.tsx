@@ -97,11 +97,11 @@ export function renderOperation<TOperation extends Operation>(
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Box>
-        <Text color={statusColor as any}>● </Text>
-        <Text>{operationLabel} </Text>
-        <Text dimColor>[{statusLabel}] </Text>
-        <Text dimColor>({elapsed})</Text>
+      <Box flexGrow={1}>
+        <Text color={statusColor as any}>●{' '}</Text>
+        <Text wrap="truncate-end">{operationLabel}</Text>
+        <Text dimColor>{' '}[{statusLabel}]</Text>
+        <Text dimColor>{' '}({elapsed})</Text>
       </Box>
 
       {typeof summary === 'string' ? (

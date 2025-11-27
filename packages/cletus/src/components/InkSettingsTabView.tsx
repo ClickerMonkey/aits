@@ -16,7 +16,7 @@ import { DEFAULT_PROMPT_FILES } from '../constants';
 import { AWSBedrockProvider } from '@aeye/aws';
 
 type Tab = 'user' | 'prompts' | 'memory' | 'deletions' | 'providers' | 'tavily' | 'models' | 'autonomous' | 'debug';
-type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'embedding' | 'summary' | 'describe' | 'transcribe' | 'edit';
+type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'summary' | 'describe' | 'transcribe' | 'edit';
 
 interface InkSettingsTabViewProps {
   config: ConfigFile;
@@ -286,7 +286,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       imageEmbed: ['vision', 'embedding'],
       transcription: ['hearing'],
       speech: ['audio'],
-      embedding: ['embedding'],
       summary: ['chat'],
       describe: ['vision', 'chat'],
       transcribe: ['vision', 'chat'],
@@ -301,7 +300,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       imageEmbed: 'Image Embedding',
       transcription: 'Transcription',
       speech: 'Text-to-Speech',
-      embedding: 'Embeddings',
       summary: 'Summarize Text',
       describe: 'Describe Image',
       transcribe: 'Transcribe Image',
@@ -1287,7 +1285,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         { label: `Image Embed: ${currentModels.imageEmbed || '(none)'}`, value: 'imageEmbed' },
         { label: `Transcription: ${currentModels.transcription || '(none)'}`, value: 'transcription' },
         { label: `Text-to-Speech: ${currentModels.speech || '(none)'}`, value: 'speech' },
-        { label: `Embeddings: ${currentModels.embedding || '(none)'}`, value: 'embedding' },
         { label: `Summary: ${currentModels.summary || '(none)'}`, value: 'summary' },
         { label: `Describe: ${currentModels.describe || '(none)'}`, value: 'describe' },
         { label: `Transcribe: ${currentModels.transcribe || '(none)'}`, value: 'transcribe' },

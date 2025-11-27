@@ -25,7 +25,6 @@ export const UserSchema = z.object({
     imageEmbed: z.string().optional(),
     transcription: z.string().optional(),
     speech: z.string().optional(),
-    embedding: z.string().optional(),
     summary: z.string().optional(),
     describe: z.string().optional(),
     transcribe: z.string().optional(),
@@ -222,7 +221,7 @@ export const KnowledgeEntrySchema = z.object({
 
 export const KnowledgeSchema = z.object({
   updated: z.number(),
-  knowledge: z.record(z.string(), z.array(KnowledgeEntrySchema)),
+  knowledge: z.array(KnowledgeEntrySchema),
 });
 
 // ============================================================================

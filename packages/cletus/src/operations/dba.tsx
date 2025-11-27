@@ -16,6 +16,7 @@ import { buildFieldsSchema } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
+import { canEmbed, embed } from "../embed";
 
 
 function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
@@ -502,11 +503,12 @@ export const data_update = operationOf<
   },
   render: (op, ai, showInput, showOutput) => {
     const type = getType(ai.config.defaultContext!.config!, op.input.name, true);
-    const fields = type?.fields.filter(f => f.name in op.input.fields).map(f => f.friendlyName);
+    const typeName = type?.friendlyName || op.input.name;
+    const fields = type?.fields.filter(f => op.input.fields.some(x => x.field === f.name)).map(f => f.friendlyName);
     
     return renderOperation(
       op,
-      `${formatName(type?.friendlyName || op.input.name)}Update(${fields?.map(f => `"${f}"`).join(', ') || '?'})`,
+      `${formatName(typeName)}Update(${fields?.map(f => `"${f}"`).join(', ') || '?'})`,
       (op) => {
         if (op.output?.updated) {
           return `Updated record ID: ${op.input.id}`;
@@ -779,7 +781,7 @@ export const data_update_many = operationOf<
   },
   render: (op, ai, showInput, showOutput) => {
     const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
-    const set = 'set=' + Object.keys(op.input.set).join(',');
+    const set = 'set=' + op.input.set.map(f => f.field).join(',');
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const params = [set, where, limit].filter(p => p).join(', ');
@@ -1408,31 +1410,44 @@ export const data_search = operationOf<
   { name: string; query: string; n?: number },
   { query: string; results: Array<{ source: string; text: string; similarity: number }> }
 >({
-  mode: 'read',
+  mode: 'local',
   signature: 'data_search(query: string, n?)',
   status: ({ name, query }) => `Searching ${name}: ${abbreviate(query, 25)}`,
   analyze: async ({ name, query, n }, { config }) => {
     const type = getType(config, name);
     const limit = n || 10;
+
+    if (!await canEmbed()) {
+      return {
+        analysis: 'Embedding model is not configured, cannot perform vector search.',
+        doable: false,
+      };
+    }
+
     return {
       analysis: `This will search ${type.friendlyName} knowledge for "${query}", returning up to ${limit} results.`,
       doable: true,
     };
   },
   do: async ({ name, query, n }, { ai }) => {
+    if (!await canEmbed()) {
+      throw new Error('Embedding model is not configured');
+    }
+
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
     const limit = n || 10;
     
     // Generate embedding for query
-    const embeddingResult = await ai.embed.get({ texts: [query] });
-    const modelId = getModel(embeddingResult.model).id;
-    const queryVector = embeddingResult.embeddings[0].embedding;
+    const [queryVector] = await embed([query]) || [];
+    if (!queryVector) {
+      throw new Error('Failed to generate embedding for query');
+    }
 
     // Search for similar entries with source prefix matching the type name
     const sourcePrefix = `${name}:`;
-    const similarEntries = knowledge.searchBySimilarity(modelId, queryVector, limit, sourcePrefix);
+    const similarEntries = knowledge.searchBySimilarity(queryVector, limit, sourcePrefix);
 
     return {
       query,
@@ -1477,6 +1492,10 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
     return false;
   }
 
+  if (!await canEmbed()) {
+    return false;
+  }
+
   const dataFile = new DataManager(type.name);
   await dataFile.load();
   
@@ -1491,23 +1510,12 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
     })
     .filter(t => t !== null && t.text.trim().length > 0) as { id: string; text: string }[];
 
-  const knowledge: KnowledgeEntry[] = [];
-  const templateChunks = chunkArray(updateTemplates, CONSTS.EMBED_CHUNK_SIZE);
-
-  let embeddingModel: string | null = null;
-
-  await Promise.all(templateChunks.map(async (records) => {
-    const texts = records.map(r => r.text);
-    const { embeddings, model } = await ctx.ai.embed.get({ texts });
-    embeddings.forEach(({ embedding: vector, index }, i) => {
-      knowledge.push({
-        source: `${typeName}:${records[index].id}`,
-        text: texts[index],
-        vector: vector,
-        created: Date.now()
-      });
-    });
-    embeddingModel = getModel(model).id;
+  const embeddings = await embed(updateTemplates.map(t => t.text)) || [];
+  const knowledge: KnowledgeEntry[] = embeddings.map((vector, i) => ({
+    source: `${typeName}:${updateTemplates[i].id}`,
+    text: updateTemplates[i].text,
+    vector: vector,
+    created: Date.now()
   }));
 
   const removing = new Set(remove.map(id => `${typeName}:${id}`));
@@ -1516,24 +1524,17 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
   await knowledgeFile.load();
   await knowledgeFile.save(async (data) => {
     // Do delete first, check all models.
-    for (const [model, entries] of Object.entries(data.knowledge)) {
-      data.knowledge[model] = entries.filter(e => !removing.has(e.source));
-    }
+    data.knowledge = data.knowledge.filter(e => !removing.has(e.source));
+  
     // Do update/insert
-    if (embeddingModel) {
-      let entryList = data.knowledge[embeddingModel];
-      if (!entryList) {
-        entryList = data.knowledge[embeddingModel] = [];
-      }
-      for (const entry of knowledge) {
-        const existing = entryList.find(e => e.source === entry.source);
-        if (existing) {
-          existing.updated = Date.now();
-          existing.text = entry.text;
-          existing.vector = entry.vector;
-        } else {
-          entryList.push(entry);
-        }
+    for (const entry of knowledge) {
+      const existing = data.knowledge.find(e => e.source === entry.source);
+      if (existing) {
+        existing.updated = Date.now();
+        existing.text = entry.text;
+        existing.vector = entry.vector;
+      } else {
+        data.knowledge.push(entry);
       }
     }
   });
@@ -1556,6 +1557,9 @@ function whereString(where: WhereClause | undefined): string {
 
   const conditions: string[] = [];
   for (const [field, condition] of Object.entries(where)) {
+    if (!condition) {
+      continue;
+    }
     switch (field) {
       case 'and':
       case 'or':
@@ -1568,30 +1572,32 @@ function whereString(where: WhereClause | undefined): string {
       default:
         const fieldCondition = condition as FieldCondition;
         for (const [op, value] of Object.entries(fieldCondition)) {
-          conditions.push(`${field} ${OPERATOR_MAP[op]} ${valueString(value)}`);
+          if (value === undefined) {
+            continue;
+          }
+          conditions.push(`${field}${OPERATOR_MAP[op]}${valueString(value)}`);
         }
         break;
     }
   }
 
-  return conditions.length > 1
-   ? `(${conditions.join(' AND ')})`
-   : conditions[0];
+  const text = `(${conditions.join(' AND ')})`;
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 const OPERATOR_MAP: Record<string, string> = {
   equals: "=",
-  contains: " CONTAINS ",
-  startsWith: " STARTS WITH ",
-  endsWith: " ENDS WITH ", 
+  contains: " contains ",
+  startsWith: " startsWith ",
+  endsWith: " endsWith ", 
   lt: "<",
   lte: "≤",
   gt: ">",
   gte: "≥",
   before: "≤",
   after: "≥",
-  oneOf: " ONE OF ",
-  isEmpty: "IS EMPTY",
+  oneOf: " oneOf ",
+  isEmpty: " isEmpty ",
 };
 
 /**

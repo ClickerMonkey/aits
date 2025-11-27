@@ -27,3 +27,6 @@ coverage/
 *.log
 node_modules/
 .DS_Store
+
+# Models
+local_cache/

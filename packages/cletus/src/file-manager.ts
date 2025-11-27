@@ -138,6 +138,13 @@ export function getConfigPath(): string {
 }
 
 /**
+ * Get path to model cache directory
+ */
+export function getModelCachePath(): string {
+  return path.join(getCletusHome(), 'local_cache');
+}
+
+/**
  * Get path to knowledge file
  */
 export function getKnowledgePath(): string {
