@@ -25,9 +25,8 @@ export function createToolsets(ai: CletusAI) {
   const internetTools = createInternetTools(ai);
 
   // Create DBA tools factory for dynamic type-specific tools
-  const aiTyped = ai.extend<{ type: TypeDefinition }>();
   const createDBAToolsForType = (type: TypeDefinition): AnyTool[] => {
-    return createDBATools(aiTyped, type);
+    return createDBATools(ai, type);
   };
 
   return {

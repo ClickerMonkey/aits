@@ -359,7 +359,7 @@ No custom data types defined.
 - Base your responses in what you know based on the context or what tool results you have.
 - If your response is not based on tool results or context, clearly state that you are not basing it on any known information.
 - Do not assume anything about a data type based on it's name - always use the architect to understand the schema first.
-- Todos are mainly managed by the planner agent; only reference them if specifically asked about them. Do not misinterpret anything else as todos - they are explicitly referred to as "todos". They simply have a name and a done status. Todos are meant for cletus, not the user.
+- Todos are mainly managed by the planner toolsets; only reference them if specifically asked about them. Do not misinterpret anything else as todos - they are explicitly referred to as "todos". They simply have a name and a done status. Todos are meant for cletus, not the user.
 </IMPORTANT>
 `);
 

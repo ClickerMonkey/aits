@@ -83,8 +83,8 @@ const MODETEXT: Record<ChatMode, string> = {
 };
 
 const AGENTMODETEXT: Record<AgentMode, string> = {
-  default: 'all agents',
-  plan: 'planner only',
+  default: 'run mode',
+  plan: 'plan mode',
 };
 
 
@@ -480,7 +480,7 @@ CHAT MODES:
 
 AGENT MODES:
 • default - All toolsets available (planner, librarian, clerk, secretary, architect, artist, dba)
-• plan    - Only planner toolset available (for focused task management)
+• plan    - Only planning related tools available (for focused task management)
 
 AVAILABLE COMMANDS:
 /help       - Show this help message
@@ -1179,8 +1179,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
             <Text bold color="cyan">Agent Modes:</Text>
             <Box flexDirection="row" gap={2}>
               <Box flexDirection="column">
-                <Text dimColor>default: all agents</Text>
-                <Text dimColor>plan: planner only</Text>
+                <Text dimColor>default: run mode</Text>
+                <Text dimColor>plan: plan mode</Text>
               </Box>
               <Box flexDirection="column" marginLeft={2}>
                 <Text dimColor>({altKeyLabel}+M to toggle)</Text>

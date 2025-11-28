@@ -61,7 +61,10 @@ function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof create
 export function updateDBATools(ai: CletusAI, toolsets: ReturnType<typeof createToolsets>) {
   const { createDBATools } = toolsets;
   const config = ai.config.defaultContext?.config;
-  if (!config) return;
+
+  if (!config) {
+    return;
+  }
   
   const types = config.getData().types;
 
@@ -157,7 +160,9 @@ export function createChatAgent(ai: CletusAI) {
     let dbaToolSignatures: string | null = null;
 
     for (const name of toolsetNames) {
-      if (name === 'utility') continue; // Skip utility, it's always available
+      if (name === 'utility') {
+        continue; // Skip utility, it's always available
+      }
       
       if (name.startsWith('dba:')) {
         // Collect DBA toolset names
@@ -270,6 +275,16 @@ Tools:
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
 </importantRules>
 `,
+    tools: [
+      ...toolsets.architectTools,
+      ...toolsets.artistTools,
+      ...toolsets.clerkTools,
+      ...toolsets.internetTools,
+      ...toolsets.librarianTools,
+      ...toolsets.plannerTools,
+      ...toolsets.secretaryTools,
+      ...utilityTools,
+    ],
     // Dynamic tools based on adaptive selection using retool
     retool: async (_, ctx) => {
       const activeTools = await getActiveTools(ctx);

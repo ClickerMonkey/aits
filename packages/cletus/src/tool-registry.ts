@@ -1,4 +1,4 @@
-import { AnyTool } from '@aeye/core';
+import { AnyTool, Message } from '@aeye/core';
 import { cosineSimilarity } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
@@ -224,7 +224,7 @@ export function getToolInstructions(tool: AnyTool): string {
  * Build query from recent user messages for tool selection
  */
 export function buildToolSelectionQuery(
-  messages: Array<{ role: string; content: string | Array<{ type: string; content: string }> }>,
+  messages: Message[],
   maxMessages: number = ADAPTIVE_TOOLING.USER_MESSAGES_FOR_EMBEDDING
 ): string {
   // Get last N user messages
