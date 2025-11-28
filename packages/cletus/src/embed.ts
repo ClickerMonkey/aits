@@ -2,6 +2,7 @@ import { Worker } from 'worker_threads';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getModelCachePath } from './file-manager';
+import { logger } from './logger';
 
 interface WorkerMessage {
     type: 'init' | 'embed' | 'canEmbed';
@@ -53,7 +54,7 @@ function createWorker(): Worker {
     });
 
     newWorker.on('error', (error) => {
-        console.error('Embedding worker error:', error);
+        logger.log(`Embedding: Worker error: ${error}`);
         // Reject all pending messages
         for (const [id, pending] of pendingMessages) {
             pending.reject(error);
@@ -63,7 +64,7 @@ function createWorker(): Worker {
 
     newWorker.on('exit', (code) => {
         if (code !== 0) {
-            console.error(`Embedding worker exited with code ${code}`);
+            logger.log(`Embedding: Worker exited with code ${code}`);
         }
         // Reset worker state so it can be recreated
         worker = null;
@@ -86,18 +87,23 @@ function sendMessage<T>(message: Omit<WorkerMessage, 'id'>): Promise<T> {
     });
 }
 
-async function initWorker(): Promise<boolean> {
+export async function initWorker(): Promise<boolean> {
     if (!workerReady) {
         workerReady = (async () => {
+            const start = performance.now();
             try {
                 worker = createWorker();
                 const cacheDir = getModelCachePath();
                 const success = await sendMessage<boolean>({ type: 'init', cacheDir });
+                logger.log(`Embedding: Worker initialized successfully: ${success}`);
                 return success;
             } catch (err) {
-                console.error('Failed to initialize embedding worker:', err);
+                logger.log(`Embedding: Failed to initialize: ${err}`);
                 worker = null;
                 return false;
+            } finally {
+                const duration = performance.now() - start;
+                logger.log(`Embedding: Worker initialized in ${duration.toFixed(2)} ms`);
             }
         })();
     }
@@ -105,17 +111,10 @@ async function initWorker(): Promise<boolean> {
 }
 
 /**
- * Initialize the embedding model in a worker thread.
- * Call this early in the application lifecycle to pre-load the model.
- */
-export async function getEmbeddingModel(): Promise<boolean> {
-    return initWorker();
-}
-
-/**
  * Check if embedding is available.
  */
 export async function canEmbed(): Promise<boolean> {
+    const started = performance.now();
     const initialized = await initWorker();
     if (!initialized || !worker) {
         return false;
@@ -124,6 +123,9 @@ export async function canEmbed(): Promise<boolean> {
         return await sendMessage<boolean>({ type: 'canEmbed' });
     } catch {
         return false;
+    } finally {
+        const duration = performance.now() - started;
+        logger.log(`Embedding: canEmbed check took ${duration.toFixed(2)} ms`);
     }
 }
 
@@ -132,6 +134,7 @@ export async function canEmbed(): Promise<boolean> {
  * This runs in a separate thread to avoid blocking the UI.
  */
 export async function embed(text: string[]): Promise<number[][] | null> {
+    const start = performance.now();
     const initialized = await initWorker();
     if (!initialized || !worker) {
         return null;
@@ -141,7 +144,10 @@ export async function embed(text: string[]): Promise<number[][] | null> {
         const result = await sendMessage<number[][]>({ type: 'embed', texts: text });
         return result;
     } catch (err) {
-        console.error('Embedding failed:', err);
+        logger.log(`Embedding: Embedding failed: ${err}`);
         return null;
+    } finally {
+        const duration = performance.now() - start;
+        logger.log(`Embedding: Embedding ${text.length} texts took ${duration.toFixed(2)} ms`);
     }
 }

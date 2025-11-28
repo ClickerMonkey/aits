@@ -10,7 +10,7 @@ import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
 import { configExists, setProfile } from './file-manager';
-import { getEmbeddingModel } from './embed';
+import { initWorker } from './embed';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
@@ -116,7 +116,7 @@ async function main() {
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
-  getEmbeddingModel();
+  initWorker();
 
   const { waitUntilExit } = render(React.createElement(App), {
     exitOnCtrlC: false,

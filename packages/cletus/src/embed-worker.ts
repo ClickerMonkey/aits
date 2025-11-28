@@ -47,6 +47,7 @@ async function handleMessage(message: WorkerMessage): Promise<WorkerResponse> {
                     type: 'init',
                     id,
                     success: embeddingModel !== null,
+                    result: embeddingModel !== null,
                 };
             }
             case 'canEmbed': {

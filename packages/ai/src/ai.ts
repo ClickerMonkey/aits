@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, Tool, ToolCompatible, Tuple } from '@aeye/core';
+import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, RetoolResult, Tool, ToolCompatible, Tuple } from '@aeye/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';
@@ -770,8 +770,8 @@ export class AI<T extends AIBaseTypes> {
       reconfig: hydrateFn(reconfig, (r) => (async (newConfig, ctxPartial) => {
         return r(newConfig, await getContext(ctxPartial));
       })),
-      retool: hydrateFn(retool, (r) => (async (newTools, ctxPartial) => {
-        return r(newTools, await getContext(ctxPartial));
+      retool: hydrateFn(retool, (r) => (async (input, ctxPartial) => {
+        return r(input, await getContext(ctxPartial)) as Promise<RetoolResult<AIContextRequired<T>, AIMetadataRequired<T>, TTools>>;
       })),
       metadataFn: hydrateFn(metadataFn, (r) => (async (input, ctxPartial) => {
         return r(input, await getContext(ctxPartial));
