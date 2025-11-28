@@ -33,11 +33,6 @@ export interface CletusContext {
     accumulated: Usage;
     accumulatedCost: number;
   };
-  /** 
-   * Current toolset name. When undefined, adaptive tool selection is used 
-   * based on embedding similarity. When set, only tools from that toolset are available.
-   */
-  toolset?: string;
 }
 
 /**

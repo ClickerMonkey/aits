@@ -116,11 +116,26 @@ Example 3: Focus on data operations for a specific type:
       });
     },
     call: async ({ toolset }, _, ctx) => {
-      const previousToolset = ctx.toolset;
+      const previousToolset = ctx.chat?.toolset;
+      
+      // Update chat metadata with new toolset
+      if (ctx.chatData && ctx.chat) {
+        const newToolset = toolset === null ? undefined : toolset;
+        ctx.chat.toolset = newToolset;
+        await ctx.chatData.save((chat) => {
+          // Note: chatData saves to messages file, need to update config for chat meta
+        });
+        // Update chat meta in config
+        await ctx.config.save((cfg) => {
+          const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
+          if (chatMeta) {
+            chatMeta.toolset = newToolset;
+          }
+        });
+      }
       
       if (toolset === null) {
         // Switch to adaptive mode
-        ctx.toolset = undefined;
         ctx.chatStatus('Switched to adaptive tool selection');
         
         // Select tools based on recent messages
@@ -134,7 +149,6 @@ Example 3: Focus on data operations for a specific type:
         return `Switched from ${previousToolset || 'adaptive'} to adaptive tool selection.`;
       } else {
         // Switch to specific toolset
-        ctx.toolset = toolset;
         ctx.chatStatus(`Switched to ${toolset} toolset`);
         
         const toolsetTools = toolRegistry.getToolset(toolset);

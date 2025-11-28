@@ -98,7 +98,7 @@ export function updateDBATools(ai: CletusAI, toolsets: ReturnType<typeof createT
  * Get tools based on current toolset or adaptive selection
  */
 async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
-  const toolset = ctx.toolset;
+  const toolset = ctx.chat?.toolset;
 
   if (toolset) {
     // Use specific toolset
@@ -304,7 +304,7 @@ Tools:
     input: (input: {}, ctx) => ({ 
       userPrompt: ctx.userPrompt,
       toolsetDescriptions: buildToolsetDescriptions(ctx),
-      toolset: ctx.toolset,
+      toolset: ctx.chat?.toolset,
     }),
   });
 
