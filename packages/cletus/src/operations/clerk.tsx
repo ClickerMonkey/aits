@@ -34,14 +34,14 @@ export const file_search = operationOf<
 
     files.sort();
 
-    return { glob: input.glob, count: files.length, files: files.slice(offset, limit) };
+    return { count: files.length, files: files.slice(offset, offset + limit) };
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Files("${op.input.glob}")`,
     (op) => {
       if (op.output) {
-        return `Found ${op.output.count} file${op.output.count !== 1 ? 's' : ''}`;
+        return `Found ${pluralize(op.output.count, 'file')}`;
       }
       return null;
     },
@@ -133,7 +133,9 @@ export const file_summary = operationOf<
 
 export const file_index = operationOf<
   { glob: string, index: 'content' | 'summary', describeImages?: boolean, extractImages?: boolean, transcribeImages?: boolean },
-  { files: string[], knowledge: number }
+  { files: string[], knowledge: number },
+  {},
+  { indexableFiles: Array<{ file: string; fileType: string }> }
 >({
   mode: (input) => input.transcribeImages || input.extractImages || input.describeImages ? 'read' : 'local',
   signature: 'file_index(glob: string, index: "content" | "summary"...)',
@@ -143,9 +145,9 @@ export const file_index = operationOf<
 
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
     const unknown = files.filter(f => f.fileType === 'unknown').map(f => f.file);
-    const indexable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable').map(f => f.file);
+    const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
 
-    let doable = indexable.length > 0;
+    let doable = indexableFiles.length > 0;
     let analysis = '';
     if (unreadable.length > 0) {
       analysis += `Found ${unreadable.length} unreadable file(s): ${unreadable.join(', ')}\n`;
@@ -153,19 +155,25 @@ export const file_index = operationOf<
     if (unknown.length > 0) {
       analysis += `Found ${unknown.length} file(s) of unknown/unsupported format: ${unknown.join(', ')}.\n`;
     }
-    analysis += `Found ${indexable.length} indexable file(s).\n`;
+    analysis += `Found ${indexableFiles.length} indexable file(s).\n`;
 
-    if (indexable.length > 0 && !await canEmbed()) {
+    if (indexableFiles.length > 0 && !await canEmbed()) {
       analysis = 'Embedding model is not configured or available.';
       doable = false;
     }
 
-    return { analysis, doable };
+    return { analysis, doable, cache: { indexableFiles } };
   },
-  async do({ input }, { cwd, ai, chatStatus }) {
-    const files = await searchFiles(cwd, input.glob);
-    const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
-    const indexingPromises: Promise<any>[] = [];
+  async do({ input, cache }, { cwd, ai, chatStatus }) {
+    // Use cached indexable files if available, otherwise search again
+    let indexableFiles: Array<{ file: string; fileType: string }>;
+    if (cache?.indexableFiles) {
+      indexableFiles = cache.indexableFiles;
+    } else {
+      const files = await searchFiles(cwd, input.glob);
+      indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
+    }
+
     const knowledge: KnowledgeEntry[] = [];
 
     if (indexableFiles.length === 0) {
@@ -221,8 +229,6 @@ export const file_index = operationOf<
       chatStatus(`Parsed/embedded ${filesProcessed}/${filesEmbedded} out of ${indexableFiles.length} files...`);
     }));
 
-    await Promise.all(indexingPromises);
-
     const knowledgeFile = new KnowledgeFile();
     await knowledgeFile.load();
     await knowledgeFile.addEntries(knowledge);
@@ -236,8 +242,14 @@ export const file_index = operationOf<
     op,
     `Index("${op.input.glob}", ${op.input.index})`,
     (op) => {
-      if (op.output) {
-        return `Indexed **${op.output.files.length}** file${op.output.files.length !== 1 ? 's' : ''}, **${op.output.knowledge}** knowledge entries`;
+      // Use cache for consistent rendering even if files change
+      const fileCount = op.cache?.indexableFiles?.length ?? op.output?.files.length;
+      if (fileCount !== undefined) {
+        const knowledgeCount = op.output?.knowledge;
+        if (knowledgeCount !== undefined) {
+          return `Indexed **${pluralize(fileCount, 'file')}**, **${pluralize(knowledgeCount, 'knowledge entry', 'knowledge entries')}**`;
+        }
+        return `Will index **${pluralize(fileCount, 'file')}**`;
       }
       return null;
     }
@@ -295,76 +307,99 @@ export const file_create = operationOf<
 
 export const file_copy = operationOf<
   { glob: string; target: string },
-  { fullTarget: string, source: string[] }
+  { fullTarget: string, source: string[] },
+  {},
+  { sourceFiles: Array<{ file: string; fullPath: string; readable: boolean }>; fullTarget: string }
 >({
   mode: 'create',
   signature: 'file_copy(glob: string, target: string)',
   status: (input) => `Copying: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
   analyze: async ({ input }, { cwd }) => {
     const source = await glob(input.glob, { cwd });
-    const targetPath = path.resolve(cwd, input.target);
-    const sourceReadable = await Promise.all(source.map(s => fileIsReadable(path.resolve(cwd, s))));
+    const fullTarget = path.resolve(cwd, input.target);
+    
+    // Build array with full path and readability for each file
+    const sourceFiles = await Promise.all(source.map(async (file) => {
+      const fullPath = path.resolve(cwd, file);
+      const readable = await fileIsReadable(fullPath);
+      return { file, fullPath, readable };
+    }));
 
-    if (source.length === 0) {
+    if (sourceFiles.length === 0) {
       return {
         analysis: `This would fail - no files match pattern "${input.glob}".`,
         doable: false,
       };
     }
 
-    if (sourceReadable.some(r => !r)) {
+    if (sourceFiles.some(f => !f.readable)) {
       return {
         analysis: `This would fail - one or more source files are not readable.`,
         doable: false,
       };
     }
 
-    if (source.length > 1) {
-      const { isDirectory } = await fileIsDirectory(targetPath);
+    if (sourceFiles.length > 1) {
+      const { isDirectory } = await fileIsDirectory(fullTarget);
       if (!isDirectory) {
         return {
-          analysis: `This would fail - target ${linkFile(targetPath)} must be a directory when copying multiple files.`,
+          analysis: `This would fail - target ${linkFile(fullTarget)} must be a directory when copying multiple files.`,
           doable: false,
         };
       }
     } else {
-      if (await fileExists(targetPath)) {
+      if (await fileExists(fullTarget)) {
         return {
-          analysis: `This would fail - target ${linkFile(targetPath)} already exists.`,
+          analysis: `This would fail - target ${linkFile(fullTarget)} already exists.`,
           doable: false,
         };
       }
     }
 
     return {
-      analysis: source.length === 1
-        ? `This will copy the file "${source[0]}" to "${input.target}".`
-        :  `This will copy ${source.length} file(s) matching "${input.glob}" to "${input.target}".`,
+      analysis: sourceFiles.length === 1
+        ? `This will copy the file "${sourceFiles[0].file}" to "${input.target}".`
+        : `This will copy ${pluralize(sourceFiles.length, 'file')} matching "${input.glob}" to "${input.target}".`,
       doable: true,
+      cache: { sourceFiles, fullTarget },
     };
   },
-  do: async ({ input }, { cwd }) => {
-    const source = await glob(input.glob, { cwd });
-    const fullTarget = path.resolve(cwd, input.target);
+  do: async ({ input, cache }, { cwd }) => {
+    // Use cached source files if available, otherwise search again
+    const sourceFiles = cache?.sourceFiles ?? await Promise.all(
+      (await glob(input.glob, { cwd })).map(async (file) => {
+        const fullPath = path.resolve(cwd, file);
+        const readable = await fileIsReadable(fullPath);
+        return { file, fullPath, readable };
+      })
+    );
+    const fullTarget = cache?.fullTarget ?? path.resolve(cwd, input.target);
+
+    // Verify source files still exist and are readable
+    if (sourceFiles.some(f => !f.readable)) {
+      throw new Error('One or more source files are no longer readable. State has changed since analysis.');
+    }
 
     await fs.mkdir(path.dirname(fullTarget), { recursive: true });
 
-    await Promise.all(source.map(async (file) => {
-      const sourcePath = path.resolve(cwd, file);
-      const targetPath = path.join(fullTarget, path.basename(file));
-
-      await fs.copyFile(sourcePath, targetPath);
+    await Promise.all(sourceFiles.map(async ({ fullPath, file }) => {
+      const targetFilePath = path.join(fullTarget, path.basename(file));
+      await fs.copyFile(fullPath, targetFilePath);
     }));
 
-    return { fullTarget, source };
+    return { fullTarget, source: sourceFiles.map(f => f.file) };
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,
     `Copy("${op.input.glob}", "${op.input.target}")`,
     (op) => {
-      if (op.output) {
-        const count = op.output.source.length;
-        return `Copied ${count} file${count !== 1 ? 's' : ''} to ${linkFile(op.output.fullTarget)}`;
+      // Use cache for consistent rendering
+      const count = op.cache?.sourceFiles?.length ?? op.output?.source?.length;
+      const fullTarget = op.cache?.fullTarget ?? op.output?.fullTarget;
+      if (count !== undefined) {
+        return op.output 
+          ? `Copied ${pluralize(count, 'file')} to ${fullTarget ? linkFile(fullTarget) : op.input.target}`
+          : `Will copy ${pluralize(count, 'file')} to ${fullTarget ? linkFile(fullTarget) : op.input.target}`;
       }
       return null;
     },
@@ -374,7 +409,9 @@ export const file_copy = operationOf<
 
 export const file_move = operationOf<
   { glob: string; target: string },
-  { targetPath: string, count: number; files: string[] }
+  { targetPath: string, count: number; files: string[] },
+  {},
+  { files: string[]; targetPath: string }
 >({
   mode: 'update',
   signature: 'file_move(glob: string, target: string)',
@@ -411,15 +448,24 @@ export const file_move = operationOf<
     return {
       analysis: `This will move ${files.length} file(s) matching "${input.glob}" to ${linkFile(targetPath)}.`,
       doable: true,
+      cache: { files, targetPath },
     };
   },
-  do: async ({ input }, { cwd, chatStatus }) => {
-    const files = await glob(input.glob, { cwd });
+  do: async ({ input, cache }, { cwd, chatStatus }) => {
+    // Use cached files if available
+    const files = cache?.files ?? await glob(input.glob, { cwd });
+    const targetPath = cache?.targetPath ?? path.resolve(cwd, input.target);
+
     if (files.length === 0) {
       throw new Error(`No files match pattern "${input.glob}".`);
     }
 
-    const targetPath = path.resolve(cwd, input.target);
+    // Verify source files still exist
+    const filesExist = await Promise.all(files.map(f => fileIsReadable(path.resolve(cwd, f))));
+    if (filesExist.some(e => !e)) {
+      throw new Error('One or more source files no longer exist. State has changed since analysis.');
+    }
+
     const targetDirectory = await fileIsDirectory(targetPath);
 
     const fileToFile = path.extname(targetPath) == path.extname(files[0]);
@@ -466,8 +512,14 @@ export const file_move = operationOf<
     op,
     `Move("${op.input.glob}", "${op.input.target}")`,
     (op) => {
-      if (op.output) {
-        return `Moved ${op.output.count} file${op.output.count !== 1 ? 's' : ''} to ${linkFile(op.output.targetPath)}`;
+      // Use cache for consistent rendering
+      const files = op.cache?.files ?? op.output?.files;
+      const targetPath = op.cache?.targetPath ?? op.output?.targetPath;
+      if (files) {
+        const count = files.length;
+        return op.output
+          ? `Moved ${pluralize(count, 'file')} to ${targetPath ? linkFile(targetPath) : op.input.target}`
+          : `Will move ${pluralize(count, 'file')} to ${targetPath ? linkFile(targetPath) : op.input.target}`;
       }
       return null;
     },
@@ -954,7 +1006,9 @@ export const file_edit = operationOf<
 
 export const text_search = operationOf<
   { glob: string; regex: string; surrounding?: number, transcribeImages?: boolean, caseInsensitive?: boolean, output?: 'file-count' | 'files' | 'match-count' | 'matches', offset?: number, limit?: number },
-  { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> }
+  { searched?: number, fileCount?: number; files?: Array<{ file: string; matches: number }>, matchCount?: number, matches?: Array<{ file: string, matches: string[] }> },
+  {},
+  { searchableFiles: Array<{ file: string; fileType: string }> }
 >({
   mode: (input) => input.transcribeImages ? 'read' : 'local',
   signature: 'text_search(glob: string, regex: string, surrounding?: number, ...)',
@@ -967,27 +1021,30 @@ export const text_search = operationOf<
       return {
         analysis: `This would search 0 files matching "${input.glob}" - no files match the pattern.`,
         doable: true,
+        cache: { searchableFiles: [] },
       };
     }
 
-    const supported = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
-    if (supported.length === 0) {
+    const searchableFiles = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
+    if (searchableFiles.length === 0) {
       return {
         analysis: `This would search 0 files matching "${input.glob}" - no readable files of supported types found.`,
         doable: true,
+        cache: { searchableFiles: [] },
       }
     }
 
     // TODO update analysis to reflect case insensitivity, limit, & offset
 
     return {
-      analysis: `This will search ${supported.length} file(s)${files.length !== supported.length ? ` (of ${files.length} total files)` : ``} for ${input.output || 'matches'} matching "${input.glob}" for pattern "${input.regex}" with ${surrounding} surrounding lines.`,
+      analysis: `This will search ${searchableFiles.length} file(s)${files.length !== searchableFiles.length ? ` (of ${files.length} total files)` : ``} for ${input.output || 'matches'} matching "${input.glob}" for pattern "${input.regex}" with ${surrounding} surrounding lines.`,
       doable: true,
+      cache: { searchableFiles },
     };
   },
-  do: async ({ input }, { cwd, ai, chatStatus }) => {
-    const files = await searchFiles(cwd, input.glob);
-    const readable = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
+  do: async ({ input, cache }, { cwd, ai, chatStatus }) => {
+    // Use cached searchable files if available, otherwise search again
+    const readable = cache?.searchableFiles ?? (await searchFiles(cwd, input.glob)).filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
     if (readable.length === 0) {
       return { searched: 0 };
@@ -1124,17 +1181,21 @@ export const text_search = operationOf<
     op,
     `Search("${abbreviate(op.input.regex, 20)}", "${op.input.glob}")`,
     (op) => {
+      // Use cache for consistent rendering when results are available
+      const searchedCount = op.cache?.searchableFiles?.length ?? op.output?.searched;
       if (op.output) {
         const output = op.output;
         if (output.fileCount !== undefined) {
-          return `Found ${output.fileCount} file${output.fileCount !== 1 ? 's' : ''} (searched ${output.searched})`;
+          return `Found ${pluralize(output.fileCount, 'file')} (searched ${searchedCount ?? output.searched})`;
         } else if (output.matchCount !== undefined) {
-          return `Found ${output.matchCount} match${output.matchCount !== 1 ? 'es' : ''} (searched ${output.searched} files)`;
+          return `Found ${pluralize(output.matchCount, 'match', 'matches')} (searched ${pluralize(searchedCount ?? output.searched, 'file')})`;
         } else if (output.matches) {
-          return `Found matches in ${output.matches.length} file${output.matches.length !== 1 ? 's' : ''}`;
+          return `Found matches in ${pluralize(output.matches.length, 'file')}`;
         } else {
-          return `Searched ${output.searched} files`;
+          return `Searched ${pluralize(searchedCount ?? output.searched, 'file')}`;
         }
+      } else if (searchedCount !== undefined) {
+        return `Will search ${pluralize(searchedCount, 'file')}`;
       }
       return null;
     },
