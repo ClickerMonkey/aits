@@ -12,7 +12,7 @@ export const knowledge_search = operationOf<
   mode: 'read',
   signature: 'knowledge_search(query: string, limit?: number, sourcePrefix?: string)',
   status: (input) => `Searching knowledge: ${abbreviate(input.query, 35)}`,
-  analyze: async (input, ctx) => {
+  analyze: async ({ input }, ctx) => {
     const limit = input.limit || 10;
     const prefix = input.sourcePrefix ? ` with source prefix "${input.sourcePrefix}"` : '';
     return {
@@ -20,7 +20,7 @@ export const knowledge_search = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai }) => {
+  do: async ({ input }, { ai }) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
@@ -59,13 +59,13 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
   mode: 'local',
   signature: 'knowledge_sources()',
   status: () => 'Listing knowledge sources',
-  analyze: async (input, ctx) => {
+  analyze: async ({ input }, ctx) => {
     return {
       analysis: 'This will list all unique source prefixes in the knowledge base.',
       doable: true,
     };
   },
-  do: async (input, ctx) => {
+  do: async ({ input }, ctx) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
@@ -100,13 +100,13 @@ export const knowledge_add = operationOf<
   mode: 'create',
   signature: 'knowledge_add(text: string)',
   status: (input) => `Adding knowledge: ${abbreviate(input.text, 40)}`,
-  analyze: async (input, ctx) => {
+  analyze: async ({ input }, ctx) => {
     return {
       analysis: `This will add user knowledge: "${abbreviate(input.text, 50)}"`,
       doable: true,
     };
   },
-  do: async (input, { ai }) => {
+  do: async ({ input }, { ai }) => {
     const knowledge = new KnowledgeFile();
     await knowledge.load();
 
@@ -146,7 +146,7 @@ export const knowledge_delete = operationOf<
   mode: 'delete',
   signature: 'knowledge_delete(sourcePattern: string, caseSensitive?: boolean)',
   status: (input) => `Deleting knowledge: ${input.sourcePattern}`,
-  analyze: async (input, ctx) => {
+  analyze: async ({ input }, ctx) => {
     // Validate regex pattern
     let regex: RegExp;
     try {
@@ -198,7 +198,7 @@ export const knowledge_delete = operationOf<
       doable: true,
     };
   },
-  do: async (input, ctx) => {
+  do: async ({ input }, ctx) => {
     // Validate regex pattern
     let regex: RegExp;
     try {

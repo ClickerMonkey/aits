@@ -26,8 +26,8 @@ export const file_search = operationOf<
   mode: 'local',
   signature: 'file_search(glob: string, limit?: number, offset?: number)',
   status: (input) => `Searching files: ${input.glob}`,
-  async analyze(input, { cwd }) { return { analysis: `N/A`, doable: true }; },
-  async do(input, { cwd }) {
+  async analyze({ input }, { cwd }) { return { analysis: `N/A`, doable: true }; },
+  async do({ input }, { cwd }) {
     const limit = input.limit || 50;
     const offset = input.offset || 0;
     const files = await glob(input.glob, { cwd });
@@ -65,7 +65,7 @@ export const file_summary = operationOf<
   signature: 'file_summary(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Summarizing: ${paginateText(input.path, 100, -100)}`,
   instructions: 'This is a summary of the file content. The original file content may have specific formatting and whitespace that is not preserved in the summary.',
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
 
@@ -94,7 +94,7 @@ export const file_summary = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai, config }) => {
+  do: async ({ input }, { cwd, ai, config }) => {
     const fullPath = path.resolve(cwd, input.path);
     
     const summarized = await processFile(fullPath, input.path, {
@@ -138,7 +138,7 @@ export const file_index = operationOf<
   mode: (input) => input.transcribeImages || input.extractImages || input.describeImages ? 'read' : 'local',
   signature: 'file_index(glob: string, index: "content" | "summary"...)',
   status: (input) => `Indexing files: ${input.glob}`,
-  async analyze(input, { cwd }) {
+  async analyze({ input }, { cwd }) {
     const files = await searchFiles(cwd, input.glob);
 
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
@@ -162,7 +162,7 @@ export const file_index = operationOf<
 
     return { analysis, doable };
   },
-  async do(input, { cwd, ai, chatStatus }) {
+  async do({ input }, { cwd, ai, chatStatus }) {
     const files = await searchFiles(cwd, input.glob);
     const indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
     const indexingPromises: Promise<any>[] = [];
@@ -252,7 +252,7 @@ export const file_create = operationOf<
   signature: 'file_create(path: string, content: string)',
   status: (input) => `Creating file: ${paginateText(input.path, 100, -100)}`,
   instructions: 'Preserve content formatting (like whitespace) when creating files. Ensure proper line breaks and indentation are maintained.',
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const exists = await fileIsReadable(fullPath);
 
@@ -271,7 +271,7 @@ export const file_create = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, input.content, 'utf-8');
@@ -300,7 +300,7 @@ export const file_copy = operationOf<
   mode: 'create',
   signature: 'file_copy(glob: string, target: string)',
   status: (input) => `Copying: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const source = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
     const sourceReadable = await Promise.all(source.map(s => fileIsReadable(path.resolve(cwd, s))));
@@ -343,7 +343,7 @@ export const file_copy = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async ({ input }, { cwd }) => {
     const source = await glob(input.glob, { cwd });
     const fullTarget = path.resolve(cwd, input.target);
 
@@ -379,7 +379,7 @@ export const file_move = operationOf<
   mode: 'update',
   signature: 'file_move(glob: string, target: string)',
   status: (input) => `Moving: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const files = await glob(input.glob, { cwd });
     const targetPath = path.resolve(cwd, input.target);
 
@@ -413,7 +413,7 @@ export const file_move = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, chatStatus }) => {
+  do: async ({ input }, { cwd, chatStatus }) => {
     const files = await glob(input.glob, { cwd });
     if (files.length === 0) {
       throw new Error(`No files match pattern "${input.glob}".`);
@@ -482,7 +482,7 @@ export const file_stats = operationOf<
   status: (input) => `Getting stats: ${paginateText(input.path, 100, -100)}`,
   mode: 'local',
   signature: 'file_stats(path: string)',
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const fileExists = await fileIsReadable(fullPath);
 
@@ -498,7 +498,7 @@ export const file_stats = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const stats = await fs.stat(fullPath);
 
@@ -557,7 +557,7 @@ export const file_delete = operationOf<
   mode: 'delete',
   signature: 'file_delete(path: string)',
   status: (input) => `Deleting: ${paginateText(input.path, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
 
     const deletable = await fileIsWritable(fullPath);
@@ -572,7 +572,7 @@ export const file_delete = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     await fs.unlink(fullPath);
 
@@ -599,7 +599,7 @@ export const file_read = operationOf<
   signature: 'file_read(path: string, limit?: number, offset?: number, limitOffsetMode...)',
   status: (input) => `Reading: ${paginateText(input.path, 100, -100)}`,
   instructions: 'Preserve content formatting (like whitespace) to present it clearly (like at the beginning of the line).',
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
 
@@ -630,7 +630,7 @@ export const file_read = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai }) => {
+  do: async ({ input }, { cwd, ai }) => {
     const fullPath = path.resolve(cwd, input.path);
     const limitOffsetMode = input.limitOffsetMode || 'characters';
 
@@ -700,6 +700,11 @@ export const file_edit = operationOf<
       fileContent: string,
       ai: CletusAI
     ) => Promise<{ newFileContent: string; diff: string; changed: boolean }> 
+  },
+  {
+    newFileContent: string;
+    changed: boolean;
+    diff: string;
   }
 >({
   mode: 'update',
@@ -759,7 +764,7 @@ export const file_edit = operationOf<
       changed: fileContent !== newFileContent,
     };
   },
-  async analyze(input, { cwd, ai }) {
+  async analyze({ input }, { cwd, ai }) {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
 
@@ -788,26 +793,35 @@ export const file_edit = operationOf<
 
     // Read the file content and generate diff in analyze phase
     const fileContent = await fs.readFile(fullPath, 'utf-8');
-    const { diff } = await this.diff(input, fileContent, ai);
+    const { diff, newFileContent, changed } = await this.diff(input, fileContent, ai);
 
     return {
       analysis: diff,
       doable: true,
+      cache: {
+        newFileContent,
+        changed,
+        diff,
+      }
     };
   },
-  async do(input, { cwd, ai }) {
+  async do({ input, cache }, { cwd, ai }) {
     const fullPath = path.resolve(cwd, input.path);
 
-    // Read the file content
-    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    // Retrieve diff from analyze phase if available
+    const { newFileContent, changed, diff } = cache || await this.diff(input, await fs.readFile(fullPath, 'utf-8'), ai);
     
-    // Generate new content and diff
-    const { newFileContent, diff } = await this.diff(input, fileContent, ai);
-
     // Write the new content back to the file
     await fs.writeFile(fullPath, newFileContent, 'utf-8');
 
-    return diff;
+    return {
+      output: diff,
+      cache: {
+        newFileContent,
+        changed,
+        diff,
+      }
+    };
   },
   render: (op, ai, showInput) => renderOperation(
     op,
@@ -832,7 +846,7 @@ export const file_edit = operationOf<
       // ... divider
       let additions = 0;
       let subtractions = 0;
-      const diff = op.output || op.analysis || '';
+      const diff = op.cache?.diff || op.output || op.analysis || '';
       const diffLines = diff.split('\n');
       const relevantLines = diffLines.slice(4).filter(line => !line.startsWith('\\'));
       const changeSetLines = chunk(relevantLines, (_, line) => line.startsWith('@@'));
@@ -920,7 +934,7 @@ export const text_search = operationOf<
   mode: (input) => input.transcribeImages ? 'read' : 'local',
   signature: 'text_search(glob: string, regex: string, surrounding?: number, ...)',
   status: (input) => `Searching text: ${abbreviate(input.regex, 35)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const surrounding = input.surrounding || 0;
     const files = await searchFiles(cwd, input.glob);
 
@@ -946,7 +960,7 @@ export const text_search = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd, ai, chatStatus }) => {
+  do: async ({ input }, { cwd, ai, chatStatus }) => {
     const files = await searchFiles(cwd, input.glob);
     const readable = files.filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
@@ -1110,7 +1124,7 @@ export const dir_create = operationOf<
   mode: 'create',
   signature: 'dir_create(path: string)',
   status: (input) => `Creating directory: ${paginateText(input.path, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     const { exists, isDirectory } = await fileIsDirectory(fullPath);
 
@@ -1132,7 +1146,7 @@ export const dir_create = operationOf<
       doable: true,
     };
   },
-  do: async (input, { cwd }) => {
+  do: async ({ input }, { cwd }) => {
     const fullPath = path.resolve(cwd, input.path);
     await fs.mkdir(fullPath, { recursive: true });
 
@@ -1158,7 +1172,7 @@ export const file_attach = operationOf<
   mode: 'create',
   signature: 'file_attach({ path })',
   status: ({ path: filePath }) => `Attaching file: ${paginateText(filePath, 100, -100)}`,
-  analyze: async ({ path: filePath }, { cwd }) => {
+  analyze: async ({ input: { path: filePath } }, { cwd }) => {
     const fullPath = path.resolve(cwd, filePath);
 
     // Check if file exists and is readable
@@ -1186,7 +1200,7 @@ export const file_attach = operationOf<
       doable: true,
     };
   },
-  do: async ({ path: filePath }, { cwd, chatMessage }) => {
+  do: async ({ input: { path: filePath } }, { cwd, chatMessage }) => {
     const fullPath = path.resolve(cwd, filePath);
     const fileLink = linkFile(fullPath);
 

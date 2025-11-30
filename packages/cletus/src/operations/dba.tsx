@@ -1,13 +1,13 @@
-import { getModel } from "@aeye/core";
 import Handlebars from "handlebars";
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { CletusAIContext, transcribe } from "../ai";
-import { abbreviate, chunkArray, formatName, groupMap, pluralize } from "../common";
+import { abbreviate, formatName, groupMap, pluralize } from "../common";
 import { ConfigFile } from "../config";
 import { CONSTS } from "../constants";
 import { DataManager } from "../data";
+import { canEmbed, embed } from "../embed";
 import { getAssetPath } from "../file-manager";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
 import { processFile, searchFiles } from "../helpers/files";
@@ -16,7 +16,6 @@ import { buildFieldsSchema } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
-import { canEmbed, embed } from "../embed";
 
 
 function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
@@ -404,7 +403,7 @@ export const data_create = operationOf<
   mode: 'create',
   signature: 'data_create(fields)',
   status: ({ name }) => `Creating ${name} record`,
-  analyze: async ({ name, fields }, { config })=> {
+  analyze: async ({ input: { name, fields } }, { config })=> {
     const type = getType(config, name);
     const fieldNames = Object.keys(fields);
     return {
@@ -412,7 +411,7 @@ export const data_create = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, fields }, ctx) => {
+  do: async ({ input: { name, fields } }, ctx) => {
     const type = getType(ctx.config, name);
     
     // Validate related field values
@@ -460,7 +459,7 @@ export const data_update = operationOf<
   mode: 'update',
   signature: 'data_update(id: string, fields)',
   status: ({ name, id }) => `Updating ${name}: ${id.slice(0, 8)}`,
-  analyze: async ({ name, id, fields }, { config }) => {
+  analyze: async ({ input: { name, id, fields } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(type.name);
     await dataManager.load();
@@ -479,7 +478,7 @@ export const data_update = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, id, fields }, ctx) => {
+  do: async ({ input: { name, id, fields } }, ctx) => {
     const type = getType(ctx.config, name);
     const updates = Object.fromEntries(fields.map(f => [f.field, f.value]));
     
@@ -527,7 +526,7 @@ export const data_delete = operationOf<
   mode: 'delete',
   signature: 'data_delete(id: string)',
   status: ({ name, id }) => `Deleting ${name}: ${id.slice(0, 8)}`,
-  analyze: async ({ name, id }, { config }) => {
+  analyze: async ({ input: { name, id } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -585,7 +584,7 @@ export const data_delete = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, id }, ctx) => {
+  do: async ({ input: { name, id } }, ctx) => {
     const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -643,7 +642,7 @@ export const data_select = operationOf<
   mode: 'local',
   signature: 'data_select(where?, offset?, limit?, orderBy?)',
   status: ({ name }) => `Selecting ${name} records`,
-  analyze: async ({ name, where, offset, limit, orderBy }, { config }) => {
+  analyze: async ({ input: { name, where, offset, limit, orderBy } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -661,7 +660,7 @@ export const data_select = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, offset, limit, orderBy }, ctx) => {
+  do: async ({ input: { name, where, offset, limit, orderBy } }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -730,7 +729,7 @@ export const data_update_many = operationOf<
   mode: 'update',
   signature: 'data_update_many(set, where, limit?)',
   status: ({ name }) => `Updating multiple ${name} records`,
-  analyze: async ({ name, limit, set, where }, { config }) => {
+  analyze: async ({ input: { name, limit, set, where } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -745,7 +744,7 @@ export const data_update_many = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, limit, set, where }, ctx) => {
+  do: async ({ input: { name, limit, set, where } }, ctx) => {
     const type = getType(ctx.config, name);
     const updates = Object.fromEntries(set.map(f => [f.field, f.value]));
     
@@ -807,7 +806,7 @@ export const data_delete_many = operationOf<
   mode: 'delete',
   signature: 'data_delete_many(where, limit?)',
   status: ({ name }) => `Deleting multiple ${name} records`,
-  analyze: async ({ name, where, limit }, { config }) => {
+  analyze: async ({ input: { name, where, limit } }, { config }) => {
     const type = getType(config, name);
     
     const dataManager = new DataManager(name);
@@ -822,7 +821,7 @@ export const data_delete_many = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, limit }, ctx) => {
+  do: async ({ input: { name, where, limit } }, ctx) => {
     const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -898,7 +897,7 @@ export const data_count = operationOf<
   mode: 'local',
   signature: 'data_count(where?)',
   status: ({ name }) => `Counting ${name} records`,
-  analyze: async ({ name, where }, { config }) => {
+  analyze: async ({ input: { name, where } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -911,7 +910,7 @@ export const data_count = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where }) => {
+  do: async ({ input: { name, where } }) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -953,7 +952,7 @@ export const data_aggregate = operationOf<
   mode: 'local',
   signature: 'data_aggregate(select, where?, having?, groupBy?, orderBy?)',
   status: ({ name }) => `Aggregating ${name} records`,
-  analyze: async ({ name, where }, { config }) => {
+  analyze: async ({ input: { name, where } }, { config }) => {
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
@@ -970,7 +969,7 @@ export const data_aggregate = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, where, having, groupBy, select, orderBy }) => {
+  do: async ({ input: { name, where, having, groupBy, select, orderBy } }) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -1111,7 +1110,7 @@ export const data_index = operationOf<
   mode: 'update',
   signature: 'data_index()',
   status: ({ name }) => `Indexing ${name}`,
-  analyze: async ({ name }, { config }) => {
+  analyze: async ({ input: { name } }, { config }) => {
     const type = getType(config, name);
     
     return {
@@ -1119,7 +1118,7 @@ export const data_index = operationOf<
       doable: true,
     };
   },
-  do: async ({ name }, ctx) => {
+  do: async ({ input: { name } }, ctx) => {
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -1154,7 +1153,7 @@ export const data_import = operationOf<
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
   status: ({ name, glob }) => `Importing ${name} from ${glob}`,
-  analyze: async ({ name, glob }, { config, cwd }) => {
+  analyze: async ({ input: { name, glob } }, { config, cwd }) => {
     const type = getType(config, name);
     const files = await searchFiles(cwd, glob);
     
@@ -1180,7 +1179,7 @@ export const data_import = operationOf<
       doable: importable.length > 0,
     };
   },
-  do: async ({ name, glob, transcribeImages = false }, ctx) => {
+  do: async ({ input: { name, glob, transcribeImages = false } }, ctx) => {
     const { chatStatus, ai, config, cwd, log } = ctx;
     const type = getType(config, name);
     const dataManager = new DataManager(name);
@@ -1413,7 +1412,7 @@ export const data_search = operationOf<
   mode: 'local',
   signature: 'data_search(query: string, n?)',
   status: ({ name, query }) => `Searching ${name}: ${abbreviate(query, 25)}`,
-  analyze: async ({ name, query, n }, { config }) => {
+  analyze: async ({ input: { name, query, n } }, { config }) => {
     const type = getType(config, name);
     const limit = n || 10;
 
@@ -1429,7 +1428,7 @@ export const data_search = operationOf<
       doable: true,
     };
   },
-  do: async ({ name, query, n }, { ai }) => {
+  do: async ({ input: { name, query, n } }, { ai }) => {
     if (!await canEmbed()) {
       throw new Error('Embedding model is not configured');
     }

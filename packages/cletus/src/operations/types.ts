@@ -22,7 +22,7 @@ export type OperationMode = ChatMode | 'local';
 /**
  * Analysis result from an operation.
  */
-export type OperationAnalysis = {
+export type OperationAnalysis<TCache = Record<string, any>> = {
   /**
    * Description of what the operation would do.
    */
@@ -31,14 +31,19 @@ export type OperationAnalysis = {
    * Whether the operation can actually be performed (validation passed).
    */
   doable: boolean;
+  /**
+   * Optional cache data to store between analysis, execution, and rendering.
+   */
+  cache?: TCache;
 };
 
 /**
  * Operation with typed input and output.
  */
-export type OperationOf<TInput, TOutput> = Omit<Operation, 'input' | 'output'> & {
+export type OperationOf<TInput, TOutput, TCache> = Omit<Operation, 'input' | 'output' | 'cache'> & {
   input: TInput;
   output?: TOutput;
+  cache?: TCache;
 }
 
 /**
@@ -47,7 +52,7 @@ export type OperationOf<TInput, TOutput> = Omit<Operation, 'input' | 'output'> &
  * @param TInput  Type of the operation input
  * @param TOutput Type of the operation output
  */
-export type OperationDefinition<TInput, TOutput> = {
+export type OperationDefinition<TInput, TOutput, TCache> = {
   /**
    * Operation mode required to perform this operation.
    */
@@ -67,7 +72,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param context - Cletus core context
    * @returns Analysis result with description and doability
    */
-  analyze: (input: TInput, context: CletusAIContext) => Promise<OperationAnalysis>;
+  analyze: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<OperationAnalysis>;
 
   /**
    * Run the operation and return the output.
@@ -76,7 +81,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param context - Cletus core context
    * @returns - Operation output
    */
-  do: (input: TInput, context: CletusAIContext) => Promise<TOutput>;
+  do: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<TOutput | { output: TOutput; cache: TCache }>;
 
   /**
    * Optional custom content formatter for operation messages sent to the LLM.
@@ -86,7 +91,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param op - The operation to format
    * @returns - Formatted string content for the LLM
    */
-  content?: (op: OperationOf<TInput, TOutput>) => string;
+  content?: (op: OperationOf<TInput, TOutput, TCache>) => string;
 
   /**
    * Optional custom renderer for displaying this operation in the UI.
@@ -98,7 +103,7 @@ export type OperationDefinition<TInput, TOutput> = {
    * @param showOutput - Whether to show detailed output
    * @returns - React component to display
    */
-  render?: (op: OperationOf<TInput, TOutput>, ai: CletusAI, showInput?: boolean, showOutput?: boolean) => React.ReactNode;
+  render?: (op: OperationOf<TInput, TOutput, TCache>, ai: CletusAI, showInput?: boolean, showOutput?: boolean) => React.ReactNode;
 
   /**
    * A signature passed into the chat-agent's prompt to identify this operation.
@@ -114,10 +119,10 @@ export type OperationDefinition<TInput, TOutput> = {
 };
 
 // Operation definition for a specific operation kind
-export type OperationDefinitionFor<K extends OperationKind> = OperationDefinition<OperationInputFor<K>, OperationOutputFor<K>>;
+export type OperationDefinitionFor<K extends OperationKind> = OperationDefinition<OperationInputFor<K>, OperationOutputFor<K>, OperationCacheFor<K>>;
 
 // Helper to define an operation
-export function operationOf<TInput, TOutput, TExtension extends object = {}>(def: OperationDefinition<TInput, TOutput> & TExtension): OperationDefinition<TInput, TOutput> {
+export function operationOf<TInput, TOutput, TExtension extends object = {}, TCache = {}>(def: OperationDefinition<TInput, TOutput, TCache> & TExtension): OperationDefinition<TInput, TOutput, TCache> {
   return def;
 }
 
@@ -137,10 +142,13 @@ export const Operations = {
 export type OperationFor<K extends OperationKind> = typeof Operations[K];
 
 // Operation input and output types for a specific operation kind
-export type OperationInputFor<K extends OperationKind> = OperationFor<K> extends { do: (input: infer I, context: infer C) => Promise<infer R> } ? I : never;
+export type OperationInputFor<K extends OperationKind> = OperationFor<K> extends OperationDefinition<infer I, infer O, infer C> ? I : never;
 
 // Operation output type for a specific operation kind
-export type OperationOutputFor<K extends OperationKind> = OperationFor<K> extends { do: (input: infer I, context: infer C) => Promise<infer R> } ? R : never;
+export type OperationOutputFor<K extends OperationKind> = OperationFor<K> extends OperationDefinition<infer I, infer O, infer C> ? O : never;
+
+// Operation cache type for a specific operation kind
+export type OperationCacheFor<K extends OperationKind> = OperationFor<K> extends OperationDefinition<infer I, infer O, infer C> ? C : never;
 
 // Operation input structure
 export type OperationInput<K extends OperationKind> = {
@@ -166,7 +174,7 @@ export const OperationModeOrder = {
  * @param def - Operation definition
  * @returns 
  */
-export function getOperationInstructions(ctx: CletusAIContext, def: OperationDefinition<any, any>): string {
+export function getOperationInstructions(ctx: CletusAIContext, def: OperationDefinition<any, any, any>): string {
   const mode = typeof def.mode === 'function' ? def.mode({}, ctx) : def.mode;
   const chatMode = ctx.chat?.mode || 'none';
   const modeOrder = OperationModeOrder[mode];

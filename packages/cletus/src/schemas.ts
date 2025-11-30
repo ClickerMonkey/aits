@@ -1,5 +1,6 @@
 import { any, z } from 'zod';
 import { AUTONOMOUS } from './constants';
+import { cache } from 'sharp';
 
 // ============================================================================
 // User Schema
@@ -306,6 +307,7 @@ export const OperationSchema = z.object({
   status: OperationStatusSchema,
   input: z.any(),
   output: z.any().optional(),
+  cache: z.any().optional(),
   analysis: z.string().optional(),
   start: z.number(),
   end: z.number().optional(),

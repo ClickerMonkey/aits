@@ -82,7 +82,7 @@ export const image_generate = operationOf<
   mode: 'create',
   signature: 'image_generate(prompt: string, n?: number)',
   status: (input) => `Generating image: ${abbreviate(input.prompt, 35)}`,
-  analyze: async (input, ctx) => {
+  analyze: async ({ input }, ctx) => {
     const count = input.n || 1;
 
     return {
@@ -90,7 +90,7 @@ export const image_generate = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config, chatMessage }) => {
+  do: async ({ input }, { ai, cwd, config, chatMessage }) => {
     // Generate images
     const response = await ai.image.generate.get({
       model: config.getData().user.models?.imageGenerate,
@@ -129,7 +129,7 @@ export const image_edit = operationOf<
   mode: 'update',
   signature: 'image_edit(path: string, prompt: string)',
   status: (input) => `Editing image: ${paginateText(input.path, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullImagePath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullImagePath)) {
@@ -144,7 +144,7 @@ export const image_edit = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config, chatMessage }) => {
+  do: async ({ input }, { ai, cwd, config, chatMessage }) => {
     const image = await loadImageAsDataUrl(cwd, input.path);
 
     // Edit image
@@ -181,7 +181,7 @@ export const image_analyze = operationOf<
   mode: 'read',
   signature: 'image_analyze(imagePaths: string[], prompt: string, maxCharacters?: number)',
   status: (input) => `Analyzing ${input.paths.length} image(s)`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const maxChars = input.maxCharacters || 2084;
     const imageCount = input.paths.length;
 
@@ -204,7 +204,7 @@ export const image_analyze = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config }) => {
+  do: async ({ input }, { ai, cwd, config }) => {
     const imageUrls = await Promise.all(input.paths.map(async (imagePath) => {
       return loadImageAsDataUrl(cwd, imagePath);
     }));
@@ -242,7 +242,7 @@ export const image_describe = operationOf<
   mode: 'read',
   signature: 'image_describe(path: string)',
   status: (input) => `Describing image: ${paginateText(input.path, 100, -100)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const fullPath = resolveImage(cwd, input.path);
 
     if (!await fileIsReadable(fullPath)) {
@@ -257,7 +257,7 @@ export const image_describe = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config }) => {
+  do: async ({ input }, { ai, cwd, config }) => {
     const fullPath = resolveImage(cwd, input.path);
     const image = await loadImageAsDataUrl(cwd, input.path);
 
@@ -293,7 +293,7 @@ export const image_find = operationOf<
   mode: 'read',
   signature: 'image_find(query: string, glob: string, maxImages?: number, n?: number)',
   status: (input) => `Finding images: ${abbreviate(input.query, 35)}`,
-  analyze: async (input, { cwd }) => {
+  analyze: async ({ input }, { cwd }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
     const files = await searchFiles(cwd, input.glob);
@@ -319,7 +319,7 @@ export const image_find = operationOf<
       doable: true,
     };
   },
-  do: async (input, { ai, cwd, config, chatStatus }) => {
+  do: async ({ input }, { ai, cwd, config, chatStatus }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
     const files = await searchFiles(cwd, input.glob);
@@ -435,7 +435,7 @@ export const image_attach = operationOf<
   mode: 'create',
   signature: 'image_attach({ path })',
   status: ({ path: imagePath }) => `Attaching image: ${paginateText(imagePath, 100, -100)}`,
-  analyze: async ({ path: imagePath }, { cwd }) => {
+  analyze: async ({ input: { path: imagePath } }, { cwd }) => {
     // Resolve path (supports both absolute and relative)
     const fullPath = path.isAbsolute(imagePath) ? imagePath : path.resolve(cwd, imagePath);
 
@@ -453,7 +453,7 @@ export const image_attach = operationOf<
       doable: true,
     };
   },
-  do: async ({ path: imagePath }, { cwd, chatMessage }) => {
+  do: async ({ input: { path: imagePath } }, { cwd, chatMessage }) => {
     // Resolve path (supports both absolute and relative)
     const fullPath = resolveImage(cwd, imagePath);
     const imageLink = linkFile(fullPath);

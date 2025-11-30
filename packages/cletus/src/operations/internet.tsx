@@ -15,7 +15,7 @@ export const web_search = operationOf<
   mode: 'read',
   signature: 'web_search(query: string, maxResults?: number)',
   status: (input) => `Searching web: ${abbreviate(input.query, 35)}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     const tavilyConfig = config.getData().tavily;
     
     if (!tavilyConfig?.apiKey) {
@@ -30,7 +30,7 @@ export const web_search = operationOf<
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const tavilyConfig = config.getData().tavily;
     
     if (!tavilyConfig?.apiKey) {
@@ -78,7 +78,7 @@ export const web_get_page = operationOf<
   mode: 'read',
   signature: 'web_get_page(url: string, type: "html" | "text", regex?, surrounding?, lineStart?, lineEnd?)',
   status: (input) => `Fetching page: ${abbreviate(input.url, 35)}`,
-  analyze: async (input) => {
+  analyze: async ({ input }) => {
     const parts: string[] = [`This will fetch the ${input.type} content from "${input.url}"`];
     
     // Validate URL
@@ -135,7 +135,7 @@ export const web_get_page = operationOf<
       doable: true,
     };
   },
-  do: async (input) => {
+  do: async ({ input }) => {
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -247,7 +247,7 @@ export const web_api_call = operationOf<
   mode: 'read',
   signature: 'web_api_call(url: string, method: string, headers?, body?, requestType?, responseType?)',
   status: (input) => `API ${input.method}: ${abbreviate(input.url, 35)}`,
-  analyze: async (input) => {
+  analyze: async ({ input }) => {
     // Validate URL
     try {
       new URL(input.url);
@@ -278,7 +278,7 @@ export const web_api_call = operationOf<
       doable: true,
     };
   },
-  do: async (input) => {
+  do: async ({ input }) => {
     const headers: Record<string, string> = { ...(input.headers || {}) };
     
     // Set appropriate Content-Type header based on requestType

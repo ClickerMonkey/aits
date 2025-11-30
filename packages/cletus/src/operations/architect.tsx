@@ -43,13 +43,13 @@ export const type_info = operationOf<
   mode: 'local',
   signature: 'type_info(name: string)',
   status: (input) => `Getting type info: ${input.name}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     return {
       analysis: `This will get information about data type "${input.name}".`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const types = config.getData().types;
     const type = types.find((t) => t.name === input.name);
     
@@ -77,13 +77,13 @@ export const type_list = operationOf<
   mode: 'local',
   signature: 'type_list()',
   status: () => `Listing all types`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     return {
       analysis: `This will list all existing data types.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const types = config.getData().types;
     const typeSummaries = types.map(t => ({
       name: t.name,
@@ -222,7 +222,7 @@ export const type_update = operationOf<
     }
     return newFields;
   },
-  async analyze(input, { config }) {
+  async analyze({ input }, { config }) {
     const validation = this.validate(input, config);
     if (validation) {
       return {
@@ -250,7 +250,7 @@ export const type_update = operationOf<
       doable: true,
     };
   },
-  async do(input, { config }) {
+  async do({ input }, { config }) {
     const validation = this.validate(input, config);
     if (validation) {
       throw new Error(`Type update failed - ${validation}`);
@@ -332,7 +332,7 @@ export const type_create = operationOf<
 
     return '';
   },
-  async analyze(input, { config }) {
+  async analyze({ input }, { config }) {
     const validation = this.validate(input, config);
     
     if (validation) {
@@ -347,7 +347,7 @@ export const type_create = operationOf<
       doable: true,
     };
   },
-  async do(input, { config }) {
+  async do({ input }, { config }) {
     const validation = this.validate(input, config);
     if (validation) {
       throw new Error(`Type creation failed - ${validation}`);
@@ -388,7 +388,7 @@ export const type_delete = operationOf<
   mode: 'delete',
   signature: 'type_delete(name: string)',
   status: (input) => `Deleting type: ${input.name}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     const types = config.getData().types;
     const type = types.find((t) => t.name === input.name);
     
@@ -417,7 +417,7 @@ export const type_delete = operationOf<
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const types = config.getData().types;
     const type = types.find((t) => t.name === input.name);
     
@@ -459,7 +459,7 @@ export const type_import = operationOf<
   mode: 'read',
   signature: 'type_import(glob: string, hints?, max?)',
   status: ({ glob }) => `Importing types from ${glob}`,
-  analyze: async ({ glob, hints, max }, { config, cwd }) => {
+  analyze: async ({ input: { glob, hints, max } }, { config, cwd }) => {
     const files = await searchFiles(cwd, glob);
     const importable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image');
     
@@ -479,7 +479,7 @@ export const type_import = operationOf<
       doable: importable.length > 0,
     };
   },
-  do: async ({ glob, hints, max }, ctx) => {
+  do: async ({ input: { glob, hints, max } }, ctx) => {
     const { ai, config, cwd, log, chatStatus } = ctx;
     
     // Find and filter files

@@ -7,7 +7,7 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
   mode: 'delete',
   signature: 'todos_clear()',
   status: () => 'Clearing all todos',
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todoCount = chatObject?.todos.length || 0;
     const doneCount = chatObject?.todos.filter((t) => t.done).length || 0;
@@ -18,7 +18,7 @@ export const todos_clear = operationOf<{}, { cleared: boolean }>({
       doable: !!chatObject,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     if (chatObject) {
       await config.updateChat(chatObject.id, { todos: [] });
@@ -43,7 +43,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
   mode: 'local',
   signature: 'todos_list()',
   status: () => 'Listing todos',
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todoCount = chatObject?.todos.length || 0;
     return {
@@ -51,7 +51,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
       doable: !!chatObject,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return { todos: chatObject?.todos || [] };
   },
@@ -72,14 +72,14 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
   mode: 'create',
   signature: 'todos_add(name: string)',
   status: (input) => `Adding todo: ${abbreviate(input.name, 40)}`,
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return {
       analysis: `This will add a new todo: "${input.name}"`,
       doable: !!chatObject,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     if (!chatObject) {
       throw new Error('Chat not found');
@@ -110,7 +110,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
   mode: 'update',
   signature: 'todos_done(id: string)',
   status: () => 'Marking todo as done',
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todo = chatObject?.todos.find((t) => t.id === input.id);
 
@@ -126,7 +126,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
       doable: true,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     if (!chatObject) {
       throw new Error('Chat not found');
@@ -162,14 +162,14 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
   mode: 'local',
   signature: 'todos_get(id: string)',
   status: () => 'Getting todo details',
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     return {
       analysis: `This will get details for todo with id "${input.id}"`,
       doable: !!chatObject,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todo = chatObject?.todos.find((t) => t.id === input.id);
     return { todo: todo || null };
@@ -191,7 +191,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
   mode: 'delete',
   signature: 'todos_remove(id: string)',
   status: () => 'Removing todo',
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const todo = chatObject?.todos.find((t) => t.id === input.id);
 
@@ -207,7 +207,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
       doable: true,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     if (!chatObject) {
       throw new Error('Chat not found');
@@ -235,7 +235,7 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
   mode: 'update',
   signature: 'todos_replace(todos)',
   status: (input) => `Replacing with ${input.todos.length} todos`,
-  analyze: async (input, { chat, config }) => {
+  analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     const currentCount = chatObject?.todos.length || 0;
     const newCount = input.todos.length;
@@ -245,7 +245,7 @@ export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number 
       doable: !!chatObject,
     };
   },
-  do: async (input, { chat, config }) => {
+  do: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
     if (!chatObject) {
       throw new Error('Chat not found');

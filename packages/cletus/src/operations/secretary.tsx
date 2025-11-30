@@ -9,7 +9,7 @@ export const assistant_switch = operationOf<
   mode: 'update',
   signature: 'assistant_switch(name: string)',
   status: (input) => `Switching to assistant: ${input.name}`,
-  analyze: async (input, { config, chat }) => {
+  analyze: async ({ input }, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
       return {
@@ -22,7 +22,7 @@ export const assistant_switch = operationOf<
       doable: !!chat,
     };
   },
-  do: async (input, { config, chat }) => {
+  do: async ({ input }, { config, chat }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
       throw new Error(`Assistant not found: ${input.name}`);
@@ -55,7 +55,7 @@ export const assistant_update = operationOf<
   mode: 'update',
   signature: 'assistant_update(name: string, prompt: string)',
   status: (input) => `Updating assistant: ${input.name}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     const assistant = config.getData().assistants.find((a) => a.name === input.name);
     if (!assistant) {
       return {
@@ -69,7 +69,7 @@ export const assistant_update = operationOf<
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const assistants = config.getData().assistants;
     const assistant = assistants.find((a) => a.name === input.name);
 
@@ -106,7 +106,7 @@ export const assistant_add = operationOf<
   mode: 'create',
   signature: 'assistant_add(name: string, prompt: string)',
   status: (input) => `Adding assistant: ${input.name}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
     if (existing) {
       return {
@@ -120,7 +120,7 @@ export const assistant_add = operationOf<
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const existing = config.getData().assistants.find((a) => a.name === input.name);
     if (existing) {
       throw new Error(`Assistant already exists: ${input.name}`);
@@ -153,14 +153,14 @@ export const memory_list = operationOf<
   mode: 'local',
   signature: 'memory_list()',
   status: () => 'Listing user memories',
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     const memoryCount = config.getData().user.memory.length;
     return {
       analysis: `This will list ${memoryCount} user memories.`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     const user = config.getData().user;
     return { memories: user.memory.map((m) => ({
       text: m.text,
@@ -188,13 +188,13 @@ export const memory_update = operationOf<
   mode: 'update',
   signature: 'memory_update(content: string)',
   status: (input) => `Adding memory: ${abbreviate(input.content, 35)}`,
-  analyze: async (input, { config }) => {
+  analyze: async ({ input }, { config }) => {
     return {
       analysis: `This will add a new user memory: "${abbreviate(input.content, 50)}"`,
       doable: true,
     };
   },
-  do: async (input, { config }) => {
+  do: async ({ input }, { config }) => {
     await config.addMemory(input.content);
     return { added: true };
   },

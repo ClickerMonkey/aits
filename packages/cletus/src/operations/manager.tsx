@@ -1,7 +1,7 @@
 
 import { CletusAIContext } from "../ai";
 import { ANALYSIS_END, ANALYSIS_START, formatName, formatValue, INPUT_END, INPUT_START, INSTRUCTIONS_END, INSTRUCTIONS_START, OUTPUT_END, OUTPUT_START } from "../common";
-import { ChatMode, Operation, OperationKind } from "../schemas";
+import { Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
 
@@ -101,7 +101,7 @@ export class OperationManager {
    * @returns Result message
    */
   public async execute(op: Operation, doit: boolean, ctx: CletusAIContext): Promise<string> {
-    const def = Operations[op.type] as OperationDefinition<any, any>;
+    const def = Operations[op.type] as OperationDefinition<any, any, any>;
 
     if (doit && op.status !== 'created' && op.status !== 'analyzed') {
       throw new Error(`Operation ${op.type} is not in a doable state. Current status: ${op.status}`);
@@ -117,13 +117,20 @@ export class OperationManager {
     try {
       if (doit) {
         op.status = 'doing';
-        op.output = await def.do(op.input, ctx);
+        const result = await def.do(op, ctx);
+        if (typeof result === 'object' && 'output' in result && 'cache' in result) {
+          op.output = result.output;
+          op.cache = result.cache;
+        } else {
+          op.output = result;
+        }
         op.status = 'done';
       } else {
         op.status = 'analyzing';
-        const analysisResult = await def.analyze(op.input, ctx);
+        const analysisResult = await def.analyze(op, ctx);
         op.analysis = analysisResult.analysis;
         op.status = analysisResult.doable ? 'analyzed' : 'analyzedBlocked';
+        op.cache = analysisResult.cache;
       }
     } catch (e: any) {
       ctx.log(`op error: ${op.type} error=${e.message || String(e)} stack=${e.stack}`);
