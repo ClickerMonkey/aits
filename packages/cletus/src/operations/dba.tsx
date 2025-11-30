@@ -414,8 +414,9 @@ export const data_create = operationOf<
       cache: { typeName: type.friendlyName },
     };
   },
-  do: async ({ input: { name, fields } }, ctx) => {
+  do: async ({ input: { name, fields }, cache }, ctx) => {
     const type = getType(ctx.config, name);
+    const typeName = cache?.typeName ?? type.friendlyName;
     
     // Validate related field values
     await validateRelatedFields(fields, type, ctx.config);
@@ -433,7 +434,10 @@ export const data_create = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { id, libraryKnowledgeUpdated };
+    return {
+      output: { id, libraryKnowledgeUpdated },
+      cache: { typeName },
+    };
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
@@ -490,6 +494,8 @@ export const data_update = operationOf<
   },
   do: async ({ input: { name, id, fields }, cache }, ctx) => {
     const type = getType(ctx.config, name);
+    const typeName = cache?.typeName ?? type.friendlyName;
+    const fieldNames = cache?.fieldNames ?? fields.map(f => f.field);
 
     // Verify record still exists
     const dataManager = new DataManager(name);
@@ -515,7 +521,10 @@ export const data_update = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { updated: true, libraryKnowledgeUpdated };
+    return {
+      output: { updated: true, libraryKnowledgeUpdated },
+      cache: { typeName, fieldNames },
+    };
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
@@ -572,11 +581,11 @@ export const data_delete = operationOf<
         const count = records.length;
         
         if (onDelete === 'restrict') {
-          restrictions.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+          restrictions.push(`${refType.friendlyName} (${pluralize(count, 'record')})`);
         } else if (onDelete === 'cascade') {
-          cascades.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+          cascades.push(`${refType.friendlyName} (${pluralize(count, 'record')})`);
         } else if (onDelete === 'setNull') {
-          setNulls.push(`${refType.friendlyName} (${count} record${count !== 1 ? 's' : ''})`);
+          setNulls.push(`${refType.friendlyName} (${pluralize(count, 'record')})`);
         }
       }
       
@@ -607,6 +616,7 @@ export const data_delete = operationOf<
   },
   do: async ({ input: { name, id }, cache }, ctx) => {
     const { config } = ctx;
+    const typeName = cache?.typeName ?? getTypeName(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -631,11 +641,14 @@ export const data_delete = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { 
-      deleted: true, 
-      libraryKnowledgeUpdated,
-      cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
-      setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+    return {
+      output: { 
+        deleted: true, 
+        libraryKnowledgeUpdated,
+        cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
+        setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+      },
+      cache: { typeName },
     };
   },
   render: (op, ai, showInput, showOutput) => {
@@ -649,10 +662,10 @@ export const data_delete = operationOf<
         if (op.output?.deleted) {
           let msg = `Deleted record ID: ${op.input.id}`;
           if (op.output.cascadedDeletes) {
-            msg += `, cascaded ${op.output.cascadedDeletes} record(s)`;
+            msg += `, cascaded ${pluralize(op.output.cascadedDeletes, 'record')}`;
           }
           if (op.output.setNullUpdates) {
-            msg += `, set null in ${op.output.setNullUpdates} record(s)`;
+            msg += `, set null in ${pluralize(op.output.setNullUpdates, 'record')}`;
           }
           return msg;
         }
@@ -777,13 +790,14 @@ export const data_update_many = operationOf<
     const setFields = set.map(f => f.field);
     const limitText = limit ? ` (limited to ${limit})` : '';
     return {
-      analysis: `This will bulk update ${actualCount} ${type.friendlyName} record(s) matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
+      analysis: `This will bulk update ${pluralize(actualCount, `${type.friendlyName} record`)} matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
       doable: true,
       cache: { typeName: type.friendlyName, matchingCount: actualCount },
     };
   },
-  do: async ({ input: { name, limit, set, where } }, ctx) => {
+  do: async ({ input: { name, limit, set, where }, cache }, ctx) => {
     const type = getType(ctx.config, name);
+    const typeName = cache?.typeName ?? type.friendlyName;
     const updates = Object.fromEntries(set.map(f => [f.field, f.value]));
     
     // Validate related field values
@@ -814,7 +828,10 @@ export const data_update_many = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { updated: matchingRecords.length, libraryKnowledgeUpdated };
+    return {
+      output: { updated: matchingRecords.length, libraryKnowledgeUpdated },
+      cache: { typeName, matchingCount: matchingRecords.length },
+    };
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
@@ -829,10 +846,10 @@ export const data_update_many = operationOf<
       `${formatName(typeName)}UpdateMany(${params})`,
       (op) => {
         const count = op.output?.updated ?? op.cache?.matchingCount;
-        if (op.output) {
-          return `Updated ${op.output.updated} record(s)`;
-        } else if (count !== undefined) {
-          return `Will update ${count} record(s)`;
+        if (count !== undefined) {
+          return op.output
+            ? `Updated ${pluralize(count, 'record')}`
+            : `Will update ${pluralize(count, 'record')}`;
         }
         return null;
       },
@@ -861,13 +878,14 @@ export const data_delete_many = operationOf<
 
     const limitText = limit ? ` (limited to ${limit})` : '';
     return {
-      analysis: `This will bulk delete ${actualCount} ${type.friendlyName} record(s) matching the specified criteria${limitText}.`,
+      analysis: `This will bulk delete ${pluralize(actualCount, `${type.friendlyName} record`)} matching the specified criteria${limitText}.`,
       doable: true,
       cache: { typeName: type.friendlyName, matchingCount: actualCount },
     };
   },
-  do: async ({ input: { name, where, limit } }, ctx) => {
+  do: async ({ input: { name, where, limit }, cache }, ctx) => {
     const { config } = ctx;
+    const typeName = cache?.typeName ?? getTypeName(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -880,7 +898,10 @@ export const data_delete_many = operationOf<
     
     // If no matching records, return early
     if (matchingRecords.length === 0) {
-      return { deleted: 0, libraryKnowledgeUpdated: false };
+      return {
+        output: { deleted: 0, libraryKnowledgeUpdated: false },
+        cache: { typeName, matchingCount: 0 },
+      };
     }
 
     // Handle cascade deletes for all matching records using reusable function
@@ -901,11 +922,14 @@ export const data_delete_many = operationOf<
       libraryKnowledgeUpdated = false;
     }
 
-    return { 
-      deleted: matchingRecords.length, 
-      libraryKnowledgeUpdated,
-      cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
-      setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+    return {
+      output: { 
+        deleted: matchingRecords.length, 
+        libraryKnowledgeUpdated,
+        cascadedDeletes: cascadedDeletes > 0 ? cascadedDeletes : undefined,
+        setNullUpdates: setNullUpdates > 0 ? setNullUpdates : undefined,
+      },
+      cache: { typeName, matchingCount: matchingRecords.length },
     };
   },
   render: (op, ai, showInput, showOutput) => {
@@ -920,17 +944,17 @@ export const data_delete_many = operationOf<
       `${formatName(typeName)}DeleteMany(${params})`,
       (op) => {
         const count = op.output?.deleted ?? op.cache?.matchingCount;
-        if (op.output) {
-          let msg = `Deleted ${op.output.deleted} record(s)`;
-          if (op.output.cascadedDeletes) {
-            msg += `, cascaded ${op.output.cascadedDeletes} record(s)`;
+        if (count !== undefined) {
+          let msg = op.output
+            ? `Deleted ${pluralize(count, 'record')}`
+            : `Will delete ${pluralize(count, 'record')}`;
+          if (op.output?.cascadedDeletes) {
+            msg += `, cascaded ${pluralize(op.output.cascadedDeletes, 'record')}`;
           }
-          if (op.output.setNullUpdates) {
-            msg += `, set null in ${op.output.setNullUpdates} record(s)`;
+          if (op.output?.setNullUpdates) {
+            msg += `, set null in ${pluralize(op.output.setNullUpdates, 'record')}`;
           }
           return msg;
-        } else if (count !== undefined) {
-          return `Will delete ${count} record(s)`;
         }
         return null;
       },
