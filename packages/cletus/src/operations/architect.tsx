@@ -8,7 +8,8 @@ import { operationOf } from "./types";
 import { renderOperation } from '../helpers/render';
 import { searchFiles, processFile } from '../helpers/files';
 import { getAssetPath } from '../file-manager';
-import { get } from 'http';
+import { executeQuery, QueryResult } from '../helpers/dba-query';
+import type { Query } from '../helpers/dba';
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
@@ -1098,3 +1099,215 @@ When managing types:
     showInput, showOutput
   ),
 });
+
+/**
+ * Get the kind of a query statement for display
+ */
+function getQueryKind(query: Query): string {
+  if ('kind' in query) {
+    if (query.kind === 'withs') {
+      return 'CTE';
+    }
+    return query.kind.toUpperCase();
+  }
+  return 'QUERY';
+}
+
+/**
+ * Get a brief description of the query for display
+ */
+function describeQuery(query: Query): string {
+  if ('kind' in query) {
+    switch (query.kind) {
+      case 'select':
+        const selectParts: string[] = [];
+        if (query.from?.kind === 'table') {
+          selectParts.push(`from ${query.from.table}`);
+        }
+        if (query.joins?.length) {
+          selectParts.push(`${query.joins.length} join(s)`);
+        }
+        if (query.where?.length) {
+          selectParts.push('filtered');
+        }
+        if (query.groupBy?.length) {
+          selectParts.push('grouped');
+        }
+        return selectParts.length > 0 ? selectParts.join(', ') : 'simple';
+        
+      case 'insert':
+        return `into ${query.table}`;
+        
+      case 'update':
+        return `${query.table}`;
+        
+      case 'delete':
+        return `from ${query.table}`;
+        
+      case 'union':
+      case 'intersect':
+      case 'except':
+        return `${query.kind}`;
+        
+      case 'withs':
+        const cteNames = query.withs.map(w => w.name).join(', ');
+        return `CTEs: ${cteNames}`;
+        
+      default:
+        return '';
+    }
+  }
+  return '';
+}
+
+export const dba_query = operationOf<
+  { query: Query },
+  QueryResult
+>({
+  mode: 'update', // Can modify data, so requires update mode
+  signature: 'dba_query(query: Query)',
+  status: ({ query }) => `Executing ${getQueryKind(query)} query`,
+  analyze: async ({ input: { query } }, { config }) => {
+    const types = config.getData().types;
+    
+    // Validate that referenced tables exist
+    const referencedTables = new Set<string>();
+    collectReferencedTables(query, referencedTables);
+    
+    const missingTables = Array.from(referencedTables).filter(
+      table => !types.some(t => t.name === table)
+    );
+    
+    if (missingTables.length > 0) {
+      return {
+        analysis: `This would fail - referenced tables not found: ${missingTables.join(', ')}`,
+        doable: false,
+      };
+    }
+    
+    const kind = getQueryKind(query);
+    const description = describeQuery(query);
+    
+    return {
+      analysis: `This will execute a ${kind} query${description ? ` (${description})` : ''}.`,
+      doable: true,
+    };
+  },
+  do: async ({ input: { query } }, { config }) => {
+    return executeQuery(query, config);
+  },
+  render: (op, ai, showInput, showOutput) => {
+    const kind = getQueryKind(op.input.query);
+    const description = describeQuery(op.input.query);
+    
+    return renderOperation(
+      op,
+      `DbaQuery(${kind}${description ? `: ${description}` : ''})`,
+      (op) => {
+        if (op.output) {
+          const parts: string[] = [];
+          if (op.output.rows.length > 0) {
+            parts.push(`${op.output.rows.length} row(s)`);
+          }
+          if (op.output.insertedIds?.length) {
+            parts.push(`${op.output.insertedIds.length} inserted`);
+          }
+          if (op.output.updatedIds?.length) {
+            parts.push(`${op.output.updatedIds.length} updated`);
+          }
+          if (op.output.deletedIds?.length) {
+            parts.push(`${op.output.deletedIds.length} deleted`);
+          }
+          return parts.length > 0 ? parts.join(', ') : 'Query executed';
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
+});
+
+/**
+ * Collect all table names referenced in a query
+ */
+function collectReferencedTables(query: Query, tables: Set<string>): void {
+  if (!query || typeof query !== 'object') return;
+  
+  if ('kind' in query) {
+    switch (query.kind) {
+      case 'select':
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTables(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'insert':
+        tables.add(query.table);
+        if (query.select) {
+          collectReferencedTables(query.select, tables);
+        }
+        break;
+        
+      case 'update':
+        tables.add(query.table);
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTables(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'delete':
+        tables.add(query.table);
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'union':
+      case 'intersect':
+      case 'except':
+        collectReferencedTables(query.left, tables);
+        collectReferencedTables(query.right, tables);
+        break;
+        
+      case 'withs':
+        for (const withStmt of query.withs) {
+          if (withStmt.kind === 'cte') {
+            collectReferencedTables(withStmt.statement, tables);
+          } else if (withStmt.kind === 'cte-recursive') {
+            collectReferencedTables(withStmt.statement, tables);
+            collectReferencedTables(withStmt.recursiveStatement, tables);
+          }
+        }
+        collectReferencedTables(query.final, tables);
+        break;
+    }
+  }
+}

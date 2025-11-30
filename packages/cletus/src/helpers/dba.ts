@@ -330,43 +330,107 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     limit: z.number().nullable().optional().describe('Maximum number of rows to return'),
   })).meta({ aid: 'Select' }).describe('SELECT statement');
 
-  // TODO insert union for each type where table is literal and columns are enums
-  const InsertSchema: z.ZodType<Insert> = z.object({
-    kind: z.literal('insert'),
-    table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
-    columns: z.array(ColumnSchema).describe('Columns to insert into'),
-    values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
-    select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
-    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-    onConflict: z.object({
-      columns: z.array(ColumnSchema).describe('Conflict target columns'),
-      doNothing: z.boolean().nullable().optional().describe('Whether to do nothing on conflict'),
-      update: z.array(ColumnValueSchema).nullable().optional().describe('Column updates on conflict'),
-    }).nullable().optional().describe('ON CONFLICT clause'),
-  }).meta({ aid: 'Insert' }).describe('INSERT statement');
+  // Create typed insert schemas for each table type
+  const typedInsertSchemas = types.map(t => {
+    const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
+    const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
+    const TypedColumnValueSchema = z.object({
+      column: TypedColumnSchema.describe('Column name'),
+      value: ValueSchema.describe('Value to assign'),
+    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name}`);
+    
+    return z.object({
+      kind: z.literal('insert'),
+      table: z.literal(t.name).describe(`Insert into ${t.name} table`),
+      as: z.string().nullable().optional().describe('Table alias'),
+      columns: z.array(TypedColumnSchema).describe(`Columns to insert into ${t.name}`),
+      values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
+      select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
+      returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+      onConflict: z.object({
+        columns: z.array(TypedColumnSchema).describe('Conflict target columns'),
+        doNothing: z.boolean().nullable().optional().describe('Whether to do nothing on conflict'),
+        update: z.array(TypedColumnValueSchema).nullable().optional().describe('Column updates on conflict'),
+      }).nullable().optional().describe('ON CONFLICT clause'),
+    }).meta({ aid: `Insert_${t.name}` }).describe(`INSERT statement for ${t.name}`);
+  });
+  
+  // Union of typed insert schemas, or generic fallback if no types defined
+  const InsertSchema: z.ZodType<Insert> = types.length > 0
+    ? z.union(typedInsertSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
+    : z.object({
+        kind: z.literal('insert'),
+        table: TableSchema.describe('Target table'),
+        as: z.string().nullable().optional().describe('Table alias'),
+        columns: z.array(ColumnSchema).describe('Columns to insert into'),
+        values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
+        select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
+        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+        onConflict: z.object({
+          columns: z.array(ColumnSchema).describe('Conflict target columns'),
+          doNothing: z.boolean().nullable().optional().describe('Whether to do nothing on conflict'),
+          update: z.array(ColumnValueSchema).nullable().optional().describe('Column updates on conflict'),
+        }).nullable().optional().describe('ON CONFLICT clause'),
+      }).meta({ aid: 'Insert' }).describe('INSERT statement');
 
-  // TODO update union for each type where table is literal and columns are enums
-  const UpdateSchema: z.ZodType<Update> = z.object({
-    kind: z.literal('update'),
-    set: z.array(ColumnValueSchema).describe('Column assignments'),
-    table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
-    from: DataSourceSchema.nullable().optional().describe('FROM data source'),
-    joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
-    where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
-    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-  }).meta({ aid: 'Update' }).describe('UPDATE statement');
+  // Create typed update schemas for each table type
+  const typedUpdateSchemas = types.map(t => {
+    const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
+    const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
+    const TypedColumnValueSchema = z.object({
+      column: TypedColumnSchema.describe('Column name'),
+      value: ValueSchema.describe('Value to assign'),
+    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name}`);
+    
+    return z.object({
+      kind: z.literal('update'),
+      set: z.array(TypedColumnValueSchema).describe(`Column assignments for ${t.name}`),
+      table: z.literal(t.name).describe(`Update ${t.name} table`),
+      as: z.string().nullable().optional().describe('Table alias'),
+      from: DataSourceSchema.nullable().optional().describe('FROM data source'),
+      joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+      where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+      returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+    }).meta({ aid: `Update_${t.name}` }).describe(`UPDATE statement for ${t.name}`);
+  });
+  
+  // Union of typed update schemas, or generic fallback if no types defined
+  const UpdateSchema: z.ZodType<Update> = types.length > 0
+    ? z.union(typedUpdateSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
+    : z.object({
+        kind: z.literal('update'),
+        set: z.array(ColumnValueSchema).describe('Column assignments'),
+        table: TableSchema.describe('Target table'),
+        as: z.string().nullable().optional().describe('Table alias'),
+        from: DataSourceSchema.nullable().optional().describe('FROM data source'),
+        joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+        where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+      }).meta({ aid: 'Update' }).describe('UPDATE statement');
 
-  // TODO delete union for each type where table is literal and columns are enums
-  const DeleteSchema: z.ZodType<Delete> = z.object({
-    kind: z.literal('delete'),
-    table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
-    joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
-    where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
-    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-  }).meta({ aid: 'Delete' }).describe('DELETE statement');
+  // Create typed delete schemas for each table type
+  const typedDeleteSchemas = types.map(t => {
+    return z.object({
+      kind: z.literal('delete'),
+      table: z.literal(t.name).describe(`Delete from ${t.name} table`),
+      as: z.string().nullable().optional().describe('Table alias'),
+      joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+      where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+      returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+    }).meta({ aid: `Delete_${t.name}` }).describe(`DELETE statement for ${t.name}`);
+  });
+  
+  // Union of typed delete schemas, or generic fallback if no types defined
+  const DeleteSchema: z.ZodType<Delete> = types.length > 0
+    ? z.union(typedDeleteSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
+    : z.object({
+        kind: z.literal('delete'),
+        table: TableSchema.describe('Target table'),
+        as: z.string().nullable().optional().describe('Table alias'),
+        joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+        where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+      }).meta({ aid: 'Delete' }).describe('DELETE statement');
 
   const SetOperationSchema: z.ZodType<SetOperation> = z.lazy(() => z.object({
     kind: z.enum(['union', 'intersect', 'except']).describe('Set operation type'),

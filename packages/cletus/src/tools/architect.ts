@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { getOperationInput } from '../operations/types';
+import { createDBASchemas } from '../helpers/dba';
 
 /**
  * Create architect tools for type definition management
@@ -183,6 +184,72 @@ Example 3: Limit discovery to top types:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
   });
 
+  // Create DBA schemas based on current type definitions
+  const dbaSchemas = createDBASchemas(configData.types.map(t => ({
+    name: t.name,
+    fields: t.fields.map(f => ({ name: f.name }))
+  })));
+
+  const dbaQuery = ai.tool({
+    name: 'dba_query',
+    description: 'Execute complex SQL-like queries across data types',
+    instructions: `Use this to execute complex queries that span multiple data types, including:
+- SELECT with joins, subqueries, aggregations, window functions
+- INSERT with conflict handling and returning
+- UPDATE with joins and complex conditions
+- DELETE with joins and complex conditions
+- UNION, INTERSECT, EXCEPT set operations
+- WITH (CTE) statements including recursive CTEs
+
+Available tables: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+
+The query is a structured JSON object representing SQL operations.
+
+Example 1: Simple SELECT with filter:
+{
+  "kind": "select",
+  "values": [{ "alias": "name", "value": { "source": "users", "column": "name" } }],
+  "from": { "kind": "table", "table": "users" },
+  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": true }],
+  "limit": 10
+}
+
+Example 2: JOIN query:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "userName", "value": { "source": "u", "column": "name" } },
+    { "alias": "orderTotal", "value": { "source": "o", "column": "total" } }
+  ],
+  "from": { "kind": "table", "table": "users", "as": "u" },
+  "joins": [{
+    "source": { "kind": "table", "table": "orders", "as": "o" },
+    "type": "inner",
+    "on": [{ "kind": "comparison", "left": { "source": "u", "column": "id" }, "cmp": "=", "right": { "source": "o", "column": "userId" } }]
+  }]
+}
+
+Example 3: Aggregation with GROUP BY:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "category", "value": { "source": "products", "column": "category" } },
+    { "alias": "avgPrice", "value": { "kind": "aggregate", "aggregate": "avg", "value": { "source": "products", "column": "price" } } }
+  ],
+  "from": { "kind": "table", "table": "products" },
+  "groupBy": [{ "source": "products", "column": "category" }]
+}
+
+{{modeInstructions}}`,
+    schema: z.object({
+      query: dbaSchemas.QuerySchema.describe('The query to execute'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('dba_query'),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'dba_query', input }, ctx),
+  });
+
   return [
     typeInfo,
     typeUpdate,
@@ -190,6 +257,7 @@ Example 3: Limit discovery to top types:
     typeDelete,
     typeImport,
     typeList,
+    dbaQuery,
   ] as [
     typeof typeInfo,
     typeof typeUpdate,
@@ -197,5 +265,6 @@ Example 3: Limit discovery to top types:
     typeof typeDelete,
     typeof typeImport,
     typeof typeList,
+    typeof dbaQuery,
   ];
 }

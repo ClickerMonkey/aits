@@ -278,6 +278,8 @@ export const OperationKindSchema = z.enum([
   'data_index',
   'data_import',
   'data_search',
+  // architect (dba query)
+  'dba_query',
   // librarian
   'knowledge_search',
   'knowledge_sources',
