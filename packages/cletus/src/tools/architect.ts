@@ -184,12 +184,6 @@ Example 3: Limit discovery to top types:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
   });
 
-  // Create DBA schemas based on current type definitions
-  const dbaSchemas = createDBASchemas(configData.types.map(t => ({
-    name: t.name,
-    fields: t.fields.map(f => ({ name: f.name }))
-  })));
-
   const dbaQuery = ai.tool({
     name: 'dba_query',
     description: 'Execute complex SQL-like queries across data types',
@@ -241,10 +235,18 @@ Example 3: Aggregation with GROUP BY:
 }
 
 {{modeInstructions}}`,
-    schema: z.object({
-      query: dbaSchemas.QuerySchema.describe('The query to execute'),
-      ...globalToolProperties,
-    }),
+    schema: ({ config }) => {
+      // Build schema dynamically from current config types
+      const currentTypes = config.getData().types;
+      const dbaSchemas = createDBASchemas(currentTypes.map(t => ({
+        name: t.name,
+        fields: t.fields.map(f => ({ name: f.name }))
+      })));
+      return z.object({
+        query: dbaSchemas.QuerySchema.describe('The query to execute'),
+        ...globalToolProperties,
+      });
+    },
     input: getOperationInput('dba_query'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'dba_query', input }, ctx),

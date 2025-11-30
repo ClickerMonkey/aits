@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { DataManager } from "../data";
 import { ConfigFile } from "../config";
 import { DataRecord, TypeDefinition } from "../schemas";
@@ -14,13 +15,12 @@ import type {
   BooleanValue,
   DataSource,
   Join,
-  AliasValue,
-  ColumnValue,
   Sort,
   WithStatement,
   SourceColumn,
   FunctionCall,
   WindowValue,
+  SelectOrSet,
 } from "./dba";
 
 /**
@@ -40,7 +40,23 @@ export interface QueryResult {
 }
 
 /**
- * Context for query execution containing resolved CTEs and source aliases
+ * Transactional state for a table - tracks original data and pending changes
+ */
+interface TableState {
+  /** Original records loaded from disk */
+  original: DataRecord[];
+  /** Current records including pending changes */
+  current: DataRecord[];
+  /** Set of IDs that have been deleted */
+  deletedIds: Set<string>;
+  /** Map of IDs to their updated fields */
+  updatedIds: Map<string, Record<string, unknown>>;
+  /** Map of IDs to their insert fields (for new records) */
+  insertedIds: Map<string, Record<string, unknown>>;
+}
+
+/**
+ * Context for query execution containing transactional state
  */
 interface QueryContext {
   /** Map of CTE names to their result sets */
@@ -49,34 +65,249 @@ interface QueryContext {
   aliases: Map<string, DataRecord[]>;
   /** Configuration file for type definitions */
   config: ConfigFile;
-  /** Data managers cache */
+  /** Type definitions cache */
+  types: Map<string, TypeDefinition>;
+  /** Transactional table state */
+  tableStates: Map<string, TableState>;
+  /** Data managers for committing */
   dataManagers: Map<string, DataManager>;
 }
 
 /**
- * Load data manager for a table, using cache if available
+ * Collect all table names referenced in a query for upfront loading
  */
-async function getDataManager(
-  tableName: string,
-  ctx: QueryContext
-): Promise<DataManager> {
-  let manager = ctx.dataManagers.get(tableName);
-  if (!manager) {
-    manager = new DataManager(tableName);
-    await manager.load();
-    ctx.dataManagers.set(tableName, manager);
+function collectReferencedTables(query: Query, tables: Set<string>): void {
+  if (!query || typeof query !== 'object') return;
+  
+  if ('kind' in query) {
+    switch (query.kind) {
+      case 'select':
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTablesFromSelectOrSet(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'insert':
+        tables.add(query.table);
+        if (query.select) {
+          collectReferencedTablesFromSelectOrSet(query.select, tables);
+        }
+        break;
+        
+      case 'update':
+        tables.add(query.table);
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTablesFromSelectOrSet(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'delete':
+        tables.add(query.table);
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'union':
+      case 'intersect':
+      case 'except':
+        collectReferencedTables(query.left, tables);
+        collectReferencedTables(query.right, tables);
+        break;
+        
+      case 'withs':
+        for (const withStmt of query.withs) {
+          if (withStmt.kind === 'cte') {
+            collectReferencedTables(withStmt.statement, tables);
+          } else if (withStmt.kind === 'cte-recursive') {
+            collectReferencedTables(withStmt.statement, tables);
+            collectReferencedTables(withStmt.recursiveStatement, tables);
+          }
+        }
+        collectReferencedTables(query.final, tables);
+        break;
+    }
   }
-  return manager;
+}
+
+function collectReferencedTablesFromSelectOrSet(query: SelectOrSet, tables: Set<string>): void {
+  collectReferencedTables(query, tables);
 }
 
 /**
- * Get type definition for a table
+ * Load table state, initializing if needed
  */
-function getTypeDefinition(
-  tableName: string,
-  ctx: QueryContext
-): TypeDefinition | undefined {
-  return ctx.config.getData().types.find((t) => t.name === tableName);
+async function getTableState(tableName: string, ctx: QueryContext): Promise<TableState> {
+  let state = ctx.tableStates.get(tableName);
+  if (!state) {
+    let manager = ctx.dataManagers.get(tableName);
+    if (!manager) {
+      manager = new DataManager(tableName);
+      await manager.load();
+      ctx.dataManagers.set(tableName, manager);
+    }
+    
+    const original = manager.getAll();
+    state = {
+      original,
+      current: [...original],
+      deletedIds: new Set(),
+      updatedIds: new Map(),
+      insertedIds: new Map(),
+    };
+    ctx.tableStates.set(tableName, state);
+  }
+  return state;
+}
+
+/**
+ * Get current records from table state (includes pending changes)
+ */
+function getRecords(state: TableState): DataRecord[] {
+  return state.current;
+}
+
+/**
+ * Add insert operation to table state
+ */
+function addInsert(state: TableState, id: string, fields: Record<string, unknown>): DataRecord {
+  const now = Date.now();
+  const record: DataRecord = {
+    id,
+    created: now,
+    updated: now,
+    fields,
+  };
+  
+  // If this ID was previously deleted, remove the delete
+  if (state.deletedIds.has(id)) {
+    state.deletedIds.delete(id);
+  }
+  
+  state.current.push(record);
+  state.insertedIds.set(id, fields);
+  
+  return record;
+}
+
+/**
+ * Add update operation to table state
+ */
+function addUpdate(state: TableState, id: string, fields: Record<string, unknown>): void {
+  // Find the record in current state
+  const record = state.current.find(r => r.id === id);
+  if (!record) return;
+  
+  // Apply update to current state
+  Object.assign(record.fields, fields);
+  record.updated = Date.now();
+  
+  // If this was a new insert, just update the insert's fields in the map
+  if (state.insertedIds.has(id)) {
+    const existingFields = state.insertedIds.get(id);
+    if (existingFields) {
+      Object.assign(existingFields, fields);
+    }
+  } else {
+    // Merge with existing updates or add new update
+    const existing = state.updatedIds.get(id);
+    if (existing) {
+      Object.assign(existing, fields);
+    } else {
+      state.updatedIds.set(id, { ...fields });
+    }
+  }
+}
+
+/**
+ * Add delete operation to table state
+ */
+function addDelete(state: TableState, id: string): void {
+  // Remove from current state
+  state.current = state.current.filter(r => r.id !== id);
+  
+  // If this was a new insert, just remove the insert
+  if (state.insertedIds.has(id)) {
+    state.insertedIds.delete(id);
+  } else {
+    // Remove any pending updates for this record
+    state.updatedIds.delete(id);
+    
+    // Add delete operation
+    state.deletedIds.add(id);
+  }
+}
+
+/**
+ * Commit all pending changes to disk
+ */
+async function commitChanges(ctx: QueryContext): Promise<{
+  insertedIds: string[];
+  updatedIds: string[];
+  deletedIds: string[];
+}> {
+  const result = {
+    insertedIds: [] as string[],
+    updatedIds: [] as string[],
+    deletedIds: [] as string[],
+  };
+  
+  for (const [tableName, state] of ctx.tableStates) {
+    const manager = ctx.dataManagers.get(tableName);
+    if (!manager) continue;
+    
+    // Process inserts - DataManager.create returns the actual ID
+    for (const [tempId, fields] of state.insertedIds) {
+      const actualId = await manager.create(fields);
+      result.insertedIds.push(actualId);
+    }
+    
+    // Process updates (only for records that weren't inserted)
+    for (const [id, fields] of state.updatedIds) {
+      if (!state.insertedIds.has(id)) {
+        await manager.update(id, fields);
+        result.updatedIds.push(id);
+      }
+    }
+    
+    // Process deletes (only for records that weren't inserted)
+    for (const id of state.deletedIds) {
+      if (!state.insertedIds.has(id)) {
+        await manager.delete(id);
+        result.deletedIds.push(id);
+      }
+    }
+  }
+  
+  return result;
 }
 
 /**
@@ -86,17 +317,69 @@ export async function executeQuery(
   query: Query,
   config: ConfigFile
 ): Promise<QueryResult> {
+  // Collect all referenced tables upfront
+  const referencedTables = new Set<string>();
+  collectReferencedTables(query, referencedTables);
+  
+  // Build type definitions cache
+  const types = new Map<string, TypeDefinition>();
+  for (const type of config.getData().types) {
+    types.set(type.name, type);
+  }
+  
   const ctx: QueryContext = {
     ctes: new Map(),
     aliases: new Map(),
     config,
+    types,
+    tableStates: new Map(),
     dataManagers: new Map(),
   };
-
-  if ("kind" in query && query.kind === "withs") {
-    return executeCTEStatement(query, ctx);
+  
+  // Pre-load all referenced tables
+  for (const tableName of referencedTables) {
+    // Only load tables that exist as types (skip CTE names)
+    if (types.has(tableName)) {
+      await getTableState(tableName, ctx);
+    }
   }
-  return executeStatement(query, ctx);
+
+  let result: QueryResult;
+  if ("kind" in query && query.kind === "withs") {
+    result = await executeCTEStatement(query, ctx);
+  } else {
+    result = await executeStatement(query, ctx);
+  }
+  
+  // Commit all changes at the end
+  const { insertedIds, updatedIds, deletedIds } = await commitChanges(ctx);
+  
+  // Merge commit results into result using Sets for deduplication
+  const existingInserted = new Set(result.insertedIds || []);
+  const existingUpdated = new Set(result.updatedIds || []);
+  const existingDeleted = new Set(result.deletedIds || []);
+  
+  for (const id of insertedIds) {
+    existingInserted.add(id);
+  }
+  for (const id of updatedIds) {
+    existingUpdated.add(id);
+  }
+  for (const id of deletedIds) {
+    existingDeleted.add(id);
+  }
+  
+  if (existingInserted.size > 0) {
+    result.insertedIds = Array.from(existingInserted);
+  }
+  if (existingUpdated.size > 0) {
+    result.updatedIds = Array.from(existingUpdated);
+  }
+  if (existingDeleted.size > 0) {
+    result.deletedIds = Array.from(existingDeleted);
+  }
+  
+  return result;
 }
 
 /**
@@ -224,9 +507,7 @@ async function executeSelect(
 
   // Apply WHERE clause
   if (stmt.where?.length) {
-    records = records.filter((record) =>
-      stmt.where!.every((cond) => evaluateBooleanValue(cond, record, ctx))
-    );
+    records = await filterRecordsAsync(records, stmt.where, ctx);
   }
 
   // Apply GROUP BY and aggregations
@@ -236,14 +517,14 @@ async function executeSelect(
     const groups = groupRecords(records, stmt.groupBy, ctx);
     rows = [];
 
-    for (const [, groupRecords] of groups) {
+    for (const [, groupRecs] of groups) {
       const row: Record<string, unknown> = {};
       for (const aliasValue of stmt.values) {
-        row[aliasValue.alias] = evaluateValue(
+        row[aliasValue.alias] = await evaluateValueAsync(
           aliasValue.value,
-          groupRecords[0],
+          groupRecs[0],
           ctx,
-          groupRecords
+          groupRecs
         );
       }
       rows.push(row);
@@ -251,17 +532,19 @@ async function executeSelect(
 
     // Apply HAVING clause
     if (stmt.having?.length) {
-      rows = rows.filter((row) => {
+      const filteredRows: Record<string, unknown>[] = [];
+      for (const row of rows) {
         const tempRecord: DataRecord = {
           id: "",
           created: 0,
           updated: 0,
           fields: row as Record<string, unknown>,
         };
-        return stmt.having!.every((cond) =>
-          evaluateBooleanValue(cond, tempRecord, ctx)
-        );
-      });
+        if (await evaluateBooleanValueAsync(stmt.having, tempRecord, ctx)) {
+          filteredRows.push(row);
+        }
+      }
+      rows = filteredRows;
     }
   } else {
     // No grouping - evaluate values for each record
@@ -271,7 +554,7 @@ async function executeSelect(
       // Single aggregate result
       const row: Record<string, unknown> = {};
       for (const aliasValue of stmt.values) {
-        row[aliasValue.alias] = evaluateValue(
+        row[aliasValue.alias] = await evaluateValueAsync(
           aliasValue.value,
           records[0],
           ctx,
@@ -284,7 +567,7 @@ async function executeSelect(
       if (hasAggregates) {
         const row: Record<string, unknown> = {};
         for (const aliasValue of stmt.values) {
-          row[aliasValue.alias] = evaluateValue(
+          row[aliasValue.alias] = await evaluateValueAsync(
             aliasValue.value,
             null,
             ctx,
@@ -296,13 +579,14 @@ async function executeSelect(
         rows = [];
       }
     } else {
-      rows = records.map((record) => {
+      rows = [];
+      for (const record of records) {
         const row: Record<string, unknown> = {};
         for (const aliasValue of stmt.values) {
-          row[aliasValue.alias] = evaluateValue(aliasValue.value, record, ctx);
+          row[aliasValue.alias] = await evaluateValueAsync(aliasValue.value, record, ctx);
         }
-        return row;
-      });
+        rows.push(row);
+      }
     }
   }
 
@@ -319,7 +603,7 @@ async function executeSelect(
 
   // Apply ORDER BY
   if (stmt.orderBy?.length) {
-    rows = sortRows(rows, stmt.orderBy, ctx);
+    rows = await sortRowsAsync(rows, stmt.orderBy, ctx);
   }
 
   // Apply OFFSET and LIMIT
@@ -340,7 +624,7 @@ async function executeInsert(
   stmt: Insert,
   ctx: QueryContext
 ): Promise<QueryResult> {
-  const dataManager = await getDataManager(stmt.table, ctx);
+  const state = await getTableState(stmt.table, ctx);
   const insertedIds: string[] = [];
   const insertedRecords: DataRecord[] = [];
 
@@ -351,7 +635,7 @@ async function executeInsert(
     // Direct values
     const record: Record<string, unknown> = {};
     for (let i = 0; i < stmt.columns.length; i++) {
-      record[stmt.columns[i]] = evaluateValue(stmt.values[i], null, ctx);
+      record[stmt.columns[i]] = await evaluateValueAsync(stmt.values[i], null, ctx);
     }
     valuesToInsert = [record];
   } else if (stmt.select) {
@@ -372,14 +656,14 @@ async function executeInsert(
   // Insert records
   for (const fields of valuesToInsert) {
     if (stmt.onConflict) {
-      // Check for conflict
-      const conflictKey = stmt.onConflict.columns
-        .map((col) => String(fields[col]))
-        .join("_");
-      const existing = dataManager.getAll().find((record) => {
-        const existingKey = stmt.onConflict!.columns
-          .map((col) => String(record.fields[col]))
-          .join("_");
+      // Check for conflict using JSON.stringify for key
+      const conflictKey = JSON.stringify(
+        stmt.onConflict.columns.map((col) => fields[col])
+      );
+      const existing = getRecords(state).find((record) => {
+        const existingKey = JSON.stringify(
+          stmt.onConflict!.columns.map((col) => record.fields[col])
+        );
         return existingKey === conflictKey;
       });
 
@@ -390,9 +674,9 @@ async function executeInsert(
           // Update on conflict
           const updates: Record<string, unknown> = {};
           for (const cv of stmt.onConflict.update) {
-            updates[cv.column] = evaluateValue(cv.value, existing, ctx);
+            updates[cv.column] = await evaluateValueAsync(cv.value, existing, ctx);
           }
-          await dataManager.update(existing.id, updates);
+          addUpdate(state, existing.id, updates);
           insertedIds.push(existing.id);
           insertedRecords.push({ ...existing, fields: { ...existing.fields, ...updates } });
           continue;
@@ -400,24 +684,22 @@ async function executeInsert(
       }
     }
 
-    const id = await dataManager.create(fields as Record<string, unknown>);
+    const id = uuidv4();
+    const record = addInsert(state, id, fields);
     insertedIds.push(id);
-    const record = dataManager.getById(id);
-    if (record) {
-      insertedRecords.push(record);
-    }
+    insertedRecords.push(record);
   }
 
   // Handle RETURNING
   let rows: Record<string, unknown>[] = [];
   if (stmt.returning?.length) {
-    rows = insertedRecords.map((record) => {
+    for (const record of insertedRecords) {
       const row: Record<string, unknown> = {};
-      for (const av of stmt.returning!) {
-        row[av.alias] = evaluateValue(av.value, record, ctx);
+      for (const av of stmt.returning) {
+        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
       }
-      return row;
-    });
+      rows.push(row);
+    }
   }
 
   return {
@@ -434,8 +716,8 @@ async function executeUpdate(
   stmt: Update,
   ctx: QueryContext
 ): Promise<QueryResult> {
-  const dataManager = await getDataManager(stmt.table, ctx);
-  let records = dataManager.getAll();
+  const state = await getTableState(stmt.table, ctx);
+  let records = getRecords(state);
 
   // Set up alias if specified
   if (stmt.as) {
@@ -461,9 +743,7 @@ async function executeUpdate(
 
   // Apply WHERE clause
   if (stmt.where?.length) {
-    records = records.filter((record) =>
-      stmt.where!.every((cond) => evaluateBooleanValue(cond, record, ctx))
-    );
+    records = await filterRecordsAsync(records, stmt.where, ctx);
   }
 
   const updatedIds: string[] = [];
@@ -473,12 +753,13 @@ async function executeUpdate(
   for (const record of records) {
     const updates: Record<string, unknown> = {};
     for (const cv of stmt.set) {
-      updates[cv.column] = evaluateValue(cv.value, record, ctx);
+      updates[cv.column] = await evaluateValueAsync(cv.value, record, ctx);
     }
-    await dataManager.update(record.id, updates);
+    addUpdate(state, record.id, updates);
     updatedIds.push(record.id);
 
-    const updated = dataManager.getById(record.id);
+    // Get updated record from current state
+    const updated = getRecords(state).find(r => r.id === record.id);
     if (updated) {
       updatedRecords.push(updated);
     }
@@ -487,13 +768,13 @@ async function executeUpdate(
   // Handle RETURNING
   let rows: Record<string, unknown>[] = [];
   if (stmt.returning?.length) {
-    rows = updatedRecords.map((record) => {
+    for (const record of updatedRecords) {
       const row: Record<string, unknown> = {};
-      for (const av of stmt.returning!) {
-        row[av.alias] = evaluateValue(av.value, record, ctx);
+      for (const av of stmt.returning) {
+        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
       }
-      return row;
-    });
+      rows.push(row);
+    }
   }
 
   return {
@@ -510,8 +791,8 @@ async function executeDelete(
   stmt: Delete,
   ctx: QueryContext
 ): Promise<QueryResult> {
-  const dataManager = await getDataManager(stmt.table, ctx);
-  let records = dataManager.getAll();
+  const state = await getTableState(stmt.table, ctx);
+  let records = getRecords(state);
 
   // Set up alias if specified
   if (stmt.as) {
@@ -527,9 +808,7 @@ async function executeDelete(
 
   // Apply WHERE clause
   if (stmt.where?.length) {
-    records = records.filter((record) =>
-      stmt.where!.every((cond) => evaluateBooleanValue(cond, record, ctx))
-    );
+    records = await filterRecordsAsync(records, stmt.where, ctx);
   }
 
   // Collect records for RETURNING before deletion
@@ -539,18 +818,18 @@ async function executeDelete(
   // Handle RETURNING before deletion
   let rows: Record<string, unknown>[] = [];
   if (stmt.returning?.length) {
-    rows = recordsToDelete.map((record) => {
+    for (const record of recordsToDelete) {
       const row: Record<string, unknown> = {};
-      for (const av of stmt.returning!) {
-        row[av.alias] = evaluateValue(av.value, record, ctx);
+      for (const av of stmt.returning) {
+        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
       }
-      return row;
-    });
+      rows.push(row);
+    }
   }
 
   // Delete matching records
   for (const record of recordsToDelete) {
-    await dataManager.delete(record.id);
+    addDelete(state, record.id);
     deletedIds.push(record.id);
   }
 
@@ -624,9 +903,9 @@ async function resolveDataSource(
       return cteRecords;
     }
 
-    // Load from data manager
-    const dataManager = await getDataManager(source.table, ctx);
-    return dataManager.getAll();
+    // Load from table state
+    const state = await getTableState(source.table, ctx);
+    return getRecords(state);
   } else if (source.kind === "subquery") {
     const result = await executeStatement(source.subquery, ctx);
     return result.rows.map((row, index) => ({
@@ -664,9 +943,7 @@ async function applyJoin(
       for (const left of leftRecords) {
         for (const right of rightRecords) {
           const combined = combineRecords(left, right);
-          if (
-            join.on.every((cond) => evaluateBooleanValue(cond, combined, ctx))
-          ) {
+          if (await evaluateBooleanValueAsync(join.on, combined, ctx)) {
             result.push(combined);
           }
         }
@@ -678,9 +955,7 @@ async function applyJoin(
         let matched = false;
         for (const right of rightRecords) {
           const combined = combineRecords(left, right);
-          if (
-            join.on.every((cond) => evaluateBooleanValue(cond, combined, ctx))
-          ) {
+          if (await evaluateBooleanValueAsync(join.on, combined, ctx)) {
             result.push(combined);
             matched = true;
           }
@@ -696,9 +971,7 @@ async function applyJoin(
         let matched = false;
         for (const left of leftRecords) {
           const combined = combineRecords(left, right);
-          if (
-            join.on.every((cond) => evaluateBooleanValue(cond, combined, ctx))
-          ) {
+          if (await evaluateBooleanValueAsync(join.on, combined, ctx)) {
             result.push(combined);
             matched = true;
           }
@@ -715,9 +988,7 @@ async function applyJoin(
         let matched = false;
         for (const right of rightRecords) {
           const combined = combineRecords(left, right);
-          if (
-            join.on.every((cond) => evaluateBooleanValue(cond, combined, ctx))
-          ) {
+          if (await evaluateBooleanValueAsync(join.on, combined, ctx)) {
             result.push(combined);
             matched = true;
             rightMatched.add(right.id);
@@ -752,14 +1023,122 @@ function combineRecords(left: DataRecord, right: DataRecord): DataRecord {
 }
 
 /**
- * Evaluate a value expression
+ * Filter records by WHERE conditions (async for subquery support)
  */
-function evaluateValue(
+async function filterRecordsAsync(
+  records: DataRecord[],
+  conditions: BooleanValue[],
+  ctx: QueryContext
+): Promise<DataRecord[]> {
+  const result: DataRecord[] = [];
+  for (const record of records) {
+    if (await evaluateBooleanValueAsync(conditions, record, ctx)) {
+      result.push(record);
+    }
+  }
+  return result;
+}
+
+/**
+ * Evaluate an array of boolean conditions (ANDed together) - async version
+ */
+async function evaluateBooleanValueAsync(
+  conditions: BooleanValue[],
+  record: DataRecord,
+  ctx: QueryContext
+): Promise<boolean> {
+  for (const cond of conditions) {
+    if (!(await evaluateSingleBooleanAsync(cond, record, ctx))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Evaluate a single boolean value expression - async version
+ */
+async function evaluateSingleBooleanAsync(
+  value: BooleanValue,
+  record: DataRecord,
+  ctx: QueryContext
+): Promise<boolean> {
+  switch (value.kind) {
+    case "comparison": {
+      const left = await evaluateValueAsync(value.left, record, ctx);
+      const right = await evaluateValueAsync(value.right, record, ctx);
+      return evaluateComparison(left, value.cmp, right);
+    }
+
+    case "in": {
+      const val = await evaluateValueAsync(value.value, record, ctx);
+      if (Array.isArray(value.in)) {
+        for (const v of value.in) {
+          if ((await evaluateValueAsync(v, record, ctx)) === val) {
+            return true;
+          }
+        }
+        return false;
+      }
+      // Subquery IN - execute the subquery
+      const subResult = await executeStatement(value.in, ctx);
+      const subValues = subResult.rows.map(r => Object.values(r)[0]);
+      return subValues.includes(val);
+    }
+
+    case "between": {
+      const val = await evaluateValueAsync(value.value, record, ctx);
+      const low = await evaluateValueAsync(value.between[0], record, ctx);
+      const high = await evaluateValueAsync(value.between[1], record, ctx);
+      return val >= low && val <= high;
+    }
+
+    case "isNull": {
+      const val = await evaluateValueAsync(value.isNull, record, ctx);
+      return val === null || val === undefined;
+    }
+
+    case "exists": {
+      // Execute the EXISTS subquery
+      const subResult = await executeStatement(value.exists, ctx);
+      return subResult.rows.length > 0;
+    }
+
+    case "and": {
+      for (const v of value.and) {
+        if (!(await evaluateSingleBooleanAsync(v, record, ctx))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    case "or": {
+      for (const v of value.or) {
+        if (await evaluateSingleBooleanAsync(v, record, ctx)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    case "not":
+      return !(await evaluateSingleBooleanAsync(value.not, record, ctx));
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluate a value expression - async version for subquery support
+ */
+async function evaluateValueAsync(
   value: Value,
   record: DataRecord | null,
   ctx: QueryContext,
   groupRecords?: DataRecord[]
-): unknown {
+): Promise<unknown> {
   // Handle null/undefined
   if (value === null || value === undefined) {
     return value;
@@ -793,24 +1172,23 @@ function evaluateValue(
   if (typeof value === "object" && "kind" in value) {
     switch (value.kind) {
       case "select": {
-        // Subquery in value position - this would require async handling
-        // but evaluateValue is synchronous. This limitation affects scalar
-        // subqueries in SELECT expressions. For proper subquery support,
-        // consider restructuring to use CTEs instead.
-        console.warn(
-          "Subquery in value position is not fully supported. Consider using CTEs for complex queries."
-        );
-        return null;
+        // Execute the scalar subquery
+        const subResult = await executeSelect(value, ctx);
+        if (subResult.rows.length === 0) return null;
+        // Return the first value from the first row
+        const firstRow = subResult.rows[0];
+        const keys = Object.keys(firstRow);
+        return keys.length > 0 ? firstRow[keys[0]] : null;
       }
 
       case "binary": {
-        const left = evaluateValue(value.left, record, ctx, groupRecords);
-        const right = evaluateValue(value.right, record, ctx, groupRecords);
+        const left = await evaluateValueAsync(value.left, record, ctx, groupRecords);
+        const right = await evaluateValueAsync(value.right, record, ctx, groupRecords);
         return evaluateBinaryOp(left, value.op, right);
       }
 
       case "unary": {
-        const operand = evaluateValue(value.value, record, ctx, groupRecords);
+        const operand = await evaluateValueAsync(value.value, record, ctx, groupRecords);
         if (value.unary === "-" && typeof operand === "number") {
           return -operand;
         }
@@ -819,7 +1197,7 @@ function evaluateValue(
 
       case "aggregate": {
         const records = groupRecords || (record ? [record] : []);
-        return evaluateAggregate(
+        return await evaluateAggregateAsync(
           value.aggregate,
           value.value,
           records,
@@ -828,21 +1206,21 @@ function evaluateValue(
       }
 
       case "function": {
-        return evaluateFunction(value, record, ctx, groupRecords);
+        return await evaluateFunctionAsync(value, record, ctx, groupRecords);
       }
 
       case "window": {
-        return evaluateWindow(value, record, ctx, groupRecords);
+        return await evaluateWindowAsync(value, record, ctx, groupRecords);
       }
 
       case "case": {
         for (const branch of value.case) {
-          if (record && evaluateBooleanValue(branch.when, record, ctx)) {
-            return evaluateValue(branch.then, record, ctx, groupRecords);
+          if (record && await evaluateSingleBooleanAsync(branch.when, record, ctx)) {
+            return await evaluateValueAsync(branch.then, record, ctx, groupRecords);
           }
         }
         return value.else !== undefined && value.else !== null
-          ? evaluateValue(value.else, record, ctx, groupRecords)
+          ? await evaluateValueAsync(value.else, record, ctx, groupRecords)
           : null;
       }
 
@@ -861,7 +1239,7 @@ function evaluateValue(
       case "or":
       case "not":
         return record
-          ? evaluateBooleanValue(value as BooleanValue, record, ctx)
+          ? await evaluateSingleBooleanAsync(value as BooleanValue, record, ctx)
           : false;
     }
   }
@@ -916,14 +1294,14 @@ function evaluateBinaryOp(
 }
 
 /**
- * Evaluate an aggregate function
+ * Evaluate an aggregate function - async version
  */
-function evaluateAggregate(
+async function evaluateAggregateAsync(
   aggregate: string,
   valueExpr: Value | "*",
   records: DataRecord[],
   ctx: QueryContext
-): unknown {
+): Promise<unknown> {
   if (valueExpr === "*") {
     if (aggregate === "count") {
       return records.length;
@@ -931,9 +1309,13 @@ function evaluateAggregate(
     return null;
   }
 
-  const values = records
-    .map((r) => evaluateValue(valueExpr, r, ctx))
-    .filter((v) => v !== null && v !== undefined);
+  const values: unknown[] = [];
+  for (const r of records) {
+    const v = await evaluateValueAsync(valueExpr, r, ctx);
+    if (v !== null && v !== undefined) {
+      values.push(v);
+    }
+  }
 
   switch (aggregate) {
     case "count":
@@ -962,17 +1344,18 @@ function evaluateAggregate(
 }
 
 /**
- * Evaluate a function call
+ * Evaluate a function call - async version
  */
-function evaluateFunction(
+async function evaluateFunctionAsync(
   func: FunctionCall,
   record: DataRecord | null,
   ctx: QueryContext,
   groupRecords?: DataRecord[]
-): unknown {
-  const args = func.args.map((arg) =>
-    evaluateValue(arg, record, ctx, groupRecords)
-  );
+): Promise<unknown> {
+  const args: unknown[] = [];
+  for (const arg of func.args) {
+    args.push(await evaluateValueAsync(arg, record, ctx, groupRecords));
+  }
 
   switch (func.function) {
     // String functions
@@ -1108,14 +1491,14 @@ function evaluateFunction(
 }
 
 /**
- * Evaluate a window function
+ * Evaluate a window function - async version
  */
-function evaluateWindow(
+async function evaluateWindowAsync(
   window: WindowValue,
   record: DataRecord | null,
   ctx: QueryContext,
   groupRecords?: DataRecord[]
-): unknown {
+): Promise<unknown> {
   // Window functions need access to the full partition
   // For simplicity, use groupRecords if available
   const records = groupRecords || (record ? [record] : []);
@@ -1123,25 +1506,34 @@ function evaluateWindow(
   // Apply partition if specified
   let partitionedRecords = records;
   if (window.partitionBy?.length && record) {
-    const partitionKey = window.partitionBy
-      .map((v) => JSON.stringify(evaluateValue(v, record, ctx)))
-      .join("_");
+    const partitionKeyValues: unknown[] = [];
+    for (const v of window.partitionBy) {
+      partitionKeyValues.push(await evaluateValueAsync(v, record, ctx));
+    }
+    const partitionKey = JSON.stringify(partitionKeyValues);
 
-    partitionedRecords = records.filter((r) => {
-      const key = window.partitionBy!
-        .map((v) => JSON.stringify(evaluateValue(v, r, ctx)))
-        .join("_");
-      return key === partitionKey;
-    });
+    const filtered: DataRecord[] = [];
+    for (const r of records) {
+      const keyValues: unknown[] = [];
+      for (const v of window.partitionBy) {
+        keyValues.push(await evaluateValueAsync(v, r, ctx));
+      }
+      if (JSON.stringify(keyValues) === partitionKey) {
+        filtered.push(r);
+      }
+    }
+    partitionedRecords = filtered;
   }
 
   // Apply ordering if specified
   if (window.orderBy?.length) {
     partitionedRecords = [...partitionedRecords];
+    // Use a simple sync sort since values should already be evaluated
     partitionedRecords.sort((a, b) => {
       for (const sort of window.orderBy!) {
-        const aVal = evaluateValue(sort.value, a, ctx);
-        const bVal = evaluateValue(sort.value, b, ctx);
+        // Evaluate synchronously for sorting (simplified)
+        const aVal = evaluateValueSync(sort.value, a, ctx);
+        const bVal = evaluateValueSync(sort.value, b, ctx);
         const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
         if (cmp !== 0) {
           return sort.dir === "desc" ? -cmp : cmp;
@@ -1152,7 +1544,7 @@ function evaluateWindow(
   }
 
   // Evaluate the window function
-  return evaluateAggregate(
+  return await evaluateAggregateAsync(
     window.function,
     window.value,
     partitionedRecords,
@@ -1161,64 +1553,29 @@ function evaluateWindow(
 }
 
 /**
- * Evaluate a boolean value expression
+ * Synchronous value evaluation for simple cases (sorting)
  */
-function evaluateBooleanValue(
-  value: BooleanValue,
-  record: DataRecord,
+function evaluateValueSync(
+  value: Value,
+  record: DataRecord | null,
   ctx: QueryContext
-): boolean {
-  switch (value.kind) {
-    case "comparison": {
-      const left = evaluateValue(value.left, record, ctx);
-      const right = evaluateValue(value.right, record, ctx);
-      return evaluateComparison(left, value.cmp, right);
-    }
-
-    case "in": {
-      const val = evaluateValue(value.value, record, ctx);
-      if (Array.isArray(value.in)) {
-        return value.in.some((v) => evaluateValue(v, record, ctx) === val);
-      }
-      // Subquery - would need async handling
-      return false;
-    }
-
-    case "between": {
-      const val = evaluateValue(value.value, record, ctx);
-      const low = evaluateValue(value.between[0], record, ctx);
-      const high = evaluateValue(value.between[1], record, ctx);
-      return val >= low && val <= high;
-    }
-
-    case "isNull": {
-      const val = evaluateValue(value.isNull, record, ctx);
-      return val === null || val === undefined;
-    }
-
-    case "exists": {
-      // EXISTS subquery - would require async handling in synchronous context.
-      // The executeStatement function is async, but evaluateBooleanValue is sync.
-      // For proper EXISTS support, consider restructuring to use CTEs or
-      // implement an async version of boolean evaluation.
-      console.warn(
-        "EXISTS subquery is not fully supported. Consider using CTEs for complex queries."
-      );
-      return false;
-    }
-
-    case "and":
-      return value.and.every((v) => evaluateBooleanValue(v, record, ctx));
-
-    case "or":
-      return value.or.some((v) => evaluateBooleanValue(v, record, ctx));
-
-    case "not":
-      return !evaluateBooleanValue(value.not, record, ctx);
-
-    default:
-      return false;
+): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
+    return value;
   }
+  if (isSourceColumn(value)) {
+    if (!record) return null;
+    const aliasRecords = ctx.aliases.get(value.source);
+    if (aliasRecords?.length) {
+      const aliasRecord = aliasRecords.find((r) => r.id === record.id);
+      if (aliasRecord) {
+        return aliasRecord.fields[value.column];
+      }
+    }
+    return record.fields[value.column];
+  }
+  return null;
 }
 
 /**
@@ -1260,7 +1617,7 @@ function evaluateComparison(
 }
 
 /**
- * Group records by specified values
+ * Group records by specified values - uses JSON.stringify for key
  */
 function groupRecords(
   records: DataRecord[],
@@ -1270,9 +1627,11 @@ function groupRecords(
   const groups = new Map<string, DataRecord[]>();
 
   for (const record of records) {
-    const key = groupBy
-      .map((v) => JSON.stringify(evaluateValue(v, record, ctx)))
-      .join("_");
+    const keyValues: unknown[] = [];
+    for (const v of groupBy) {
+      keyValues.push(evaluateValueSync(v, record, ctx));
+    }
+    const key = JSON.stringify(keyValues);
 
     const group = groups.get(key) || [];
     group.push(record);
@@ -1283,38 +1642,47 @@ function groupRecords(
 }
 
 /**
- * Sort rows by specified criteria
+ * Sort rows by specified criteria - async version
  */
-function sortRows(
+async function sortRowsAsync(
   rows: Record<string, unknown>[],
   orderBy: Sort[],
   ctx: QueryContext
-): Record<string, unknown>[] {
-  return [...rows].sort((a, b) => {
+): Promise<Record<string, unknown>[]> {
+  // Create temp records and evaluate sort values
+  const rowsWithValues: Array<{
+    row: Record<string, unknown>;
+    sortValues: unknown[];
+  }> = [];
+
+  for (const row of rows) {
+    const tempRecord: DataRecord = {
+      id: "",
+      created: 0,
+      updated: 0,
+      fields: row as Record<string, unknown>,
+    };
+    const sortValues: unknown[] = [];
     for (const sort of orderBy) {
-      const tempRecordA: DataRecord = {
-        id: "",
-        created: 0,
-        updated: 0,
-        fields: a as Record<string, unknown>,
-      };
-      const tempRecordB: DataRecord = {
-        id: "",
-        created: 0,
-        updated: 0,
-        fields: b as Record<string, unknown>,
-      };
+      sortValues.push(await evaluateValueAsync(sort.value, tempRecord, ctx));
+    }
+    rowsWithValues.push({ row, sortValues });
+  }
 
-      const aVal = evaluateValue(sort.value, tempRecordA, ctx);
-      const bVal = evaluateValue(sort.value, tempRecordB, ctx);
-
+  // Sort using pre-evaluated values
+  rowsWithValues.sort((a, b) => {
+    for (let i = 0; i < orderBy.length; i++) {
+      const aVal = a.sortValues[i];
+      const bVal = b.sortValues[i];
       const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
       if (cmp !== 0) {
-        return sort.dir === "desc" ? -cmp : cmp;
+        return orderBy[i].dir === "desc" ? -cmp : cmp;
       }
     }
     return 0;
   });
+
+  return rowsWithValues.map((r) => r.row);
 }
 
 /**
@@ -1337,9 +1705,7 @@ function containsAggregate(value: Value): boolean {
     }
     if (value.kind === "case") {
       return (
-        value.case.some(
-          (c) => containsAggregate(c.then)
-        ) ||
+        value.case.some((c) => containsAggregate(c.then)) ||
         (value.else !== undefined &&
           value.else !== null &&
           containsAggregate(value.else))

@@ -358,7 +358,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     }).meta({ aid: `Insert_${t.name}` }).describe(`INSERT statement for ${t.name}`);
   });
 
-  // Generic insert schema for fallback
+  // Generic insert schema for when no types are defined
   const genericInsertSchema = z.object({
     kind: z.literal('insert'),
     table: TableSchema.describe('Target table'),
@@ -374,11 +374,11 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     }).nullable().optional().describe('ON CONFLICT clause'),
   }).meta({ aid: 'Insert' }).describe('INSERT statement');
   
-  // Union of typed insert schemas with generic fallback, handling 0, 1, or multiple schemas
+  // Union of typed insert schemas only (no generic fallback when types exist)
   const InsertSchema: z.ZodType<Insert> = typedInsertSchemas.length >= 2
-    ? z.union([...typedInsertSchemas, genericInsertSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
+    ? z.union(typedInsertSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
     : typedInsertSchemas.length === 1
-      ? z.union([typedInsertSchemas[0], genericInsertSchema]).meta({ aid: 'Insert' }).describe('INSERT statement')
+      ? typedInsertSchemas[0].meta({ aid: 'Insert' }).describe('INSERT statement')
       : genericInsertSchema;
 
   // Create typed update schemas for each table type with fields
@@ -402,7 +402,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     }).meta({ aid: `Update_${t.name}` }).describe(`UPDATE statement for ${t.name}`);
   });
 
-  // Generic update schema for fallback
+  // Generic update schema for when no types are defined
   const genericUpdateSchema = z.object({
     kind: z.literal('update'),
     set: z.array(ColumnValueSchema).describe('Column assignments'),
@@ -414,11 +414,11 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
   }).meta({ aid: 'Update' }).describe('UPDATE statement');
   
-  // Union of typed update schemas with generic fallback, handling 0, 1, or multiple schemas
+  // Union of typed update schemas only (no generic fallback when types exist)
   const UpdateSchema: z.ZodType<Update> = typedUpdateSchemas.length >= 2
-    ? z.union([...typedUpdateSchemas, genericUpdateSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
+    ? z.union(typedUpdateSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
     : typedUpdateSchemas.length === 1
-      ? z.union([typedUpdateSchemas[0], genericUpdateSchema]).meta({ aid: 'Update' }).describe('UPDATE statement')
+      ? typedUpdateSchemas[0].meta({ aid: 'Update' }).describe('UPDATE statement')
       : genericUpdateSchema;
 
   // Create typed delete schemas for each table type (doesn't require fields)
@@ -433,7 +433,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     }).meta({ aid: `Delete_${t.name}` }).describe(`DELETE statement for ${t.name}`);
   });
 
-  // Generic delete schema for fallback
+  // Generic delete schema for when no types are defined
   const genericDeleteSchema = z.object({
     kind: z.literal('delete'),
     table: TableSchema.describe('Target table'),
@@ -443,11 +443,11 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
   }).meta({ aid: 'Delete' }).describe('DELETE statement');
   
-  // Union of typed delete schemas with generic fallback, handling 0, 1, or multiple schemas
+  // Union of typed delete schemas only (no generic fallback when types exist)
   const DeleteSchema: z.ZodType<Delete> = typedDeleteSchemas.length >= 2
-    ? z.union([...typedDeleteSchemas, genericDeleteSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
+    ? z.union(typedDeleteSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
     : typedDeleteSchemas.length === 1
-      ? z.union([typedDeleteSchemas[0], genericDeleteSchema]).meta({ aid: 'Delete' }).describe('DELETE statement')
+      ? typedDeleteSchemas[0].meta({ aid: 'Delete' }).describe('DELETE statement')
       : genericDeleteSchema;
 
   const SetOperationSchema: z.ZodType<SetOperation> = z.lazy(() => z.object({
