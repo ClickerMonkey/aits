@@ -1186,16 +1186,16 @@ export const text_search = operationOf<
       if (op.output) {
         const output = op.output;
         if (output.fileCount !== undefined) {
-          return `Found ${output.fileCount} file${output.fileCount !== 1 ? 's' : ''} (searched ${searchedCount ?? output.searched})`;
+          return `Found ${pluralize(output.fileCount, 'file')} (searched ${searchedCount ?? output.searched})`;
         } else if (output.matchCount !== undefined) {
-          return `Found ${output.matchCount} match${output.matchCount !== 1 ? 'es' : ''} (searched ${searchedCount ?? output.searched} files)`;
+          return `Found ${pluralize(output.matchCount, 'match', 'matches')} (searched ${pluralize(searchedCount ?? output.searched, 'file')})`;
         } else if (output.matches) {
-          return `Found matches in ${output.matches.length} file${output.matches.length !== 1 ? 's' : ''}`;
+          return `Found matches in ${pluralize(output.matches.length, 'file')}`;
         } else {
-          return `Searched ${searchedCount ?? output.searched} files`;
+          return `Searched ${pluralize(searchedCount ?? output.searched, 'file')}`;
         }
       } else if (searchedCount !== undefined) {
-        return `Will search ${searchedCount} file${searchedCount !== 1 ? 's' : ''}`;
+        return `Will search ${pluralize(searchedCount, 'file')}`;
       }
       return null;
     },
