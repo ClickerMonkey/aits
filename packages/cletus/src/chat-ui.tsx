@@ -151,6 +151,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
   const operationApprovalPending = showApprovalMenu && !pendingMessage && !!lastAssistantMessage?.operations?.some((op) => op.status === 'analyzed');
   
+  // Calculate total cost of all messages in chat
+  const totalMessageCost = chatMessages.reduce((sum, msg) => sum + (msg.cost || 0), 0);
+  
   // Function to save messages to chat file
   const saveMessages = () => {
     chatFileRef.current.save((chat) => {
@@ -1259,11 +1262,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
           {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
           {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
-          {accumulatedCost > 0 && (
+          {(pendingMessage ? accumulatedCost : totalMessageCost) > 0 && (
             <>
               {' │ '}
               <Text color="yellow">
-                ${accumulatedCost.toFixed(4)}
+                ${(pendingMessage ? accumulatedCost : totalMessageCost).toFixed(4)}
               </Text>
             </>
           )}
