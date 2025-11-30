@@ -10,179 +10,382 @@
 import type { ModelInfo } from '@aeye/ai';
 
 export const replicateModels: ModelInfo[] = [{
-  id: 'lucataco/animate-diff',
+  id: 'abiruyt/text-extract-ocr',
   provider: 'replicate',
-  name: 'animate-diff',
+  name: 'text-extract-ocr',
   contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.00032
+  },
+  metrics: {
+    averageRequestDuration: 1645
+  },
+  metadata: {
+    owner: "abiruyt",
+    description: "A simple OCR Model that can easily extract text from an image.",
+    runCount: 89983299,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'adidoes/whisperx-video-transcribe',
+  provider: 'replicate',
+  name: 'whisperx-video-transcribe',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.0005
+    },
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 51628
+  },
+  metadata: {
+    owner: "adidoes",
+    description: "ASR from video URL based on whisperx using large-v2 model",
+    runCount: 19598,
+    githubUrl: "https://github.com/adidoes/cog-whisperx-video-transcribe",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "481284a2a2ff72a031689481ca92fb1d20b194980a4b435d93f6f4c9520fea61",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'adirik/e5-mistral-7b-instruct',
+  provider: 'replicate',
+  name: 'e5-mistral-7b-instruct',
+  contextWindow: 32768,
+  tier: 'efficient',
+  tokenizer: 'Mistral',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 623
+  },
+  metadata: {
+    owner: "adirik",
+    description: "E5-mistral-7b-instruct language embedding model",
+    runCount: 649,
+    githubUrl: "https://github.com/replicate/cog-e5-embeddings",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "68a9e0387243c2aa73d8e1aa81303f9859e6e4365622a832f7a582722e5d3283",
+    cogVersion: "0.8.3"
+  }
+}, {
+  id: 'adirik/kosmos-g',
+  provider: 'replicate',
+  name: 'kosmos-g',
+  contextWindow: 77,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 4639
+  },
+  metadata: {
+    owner: "adirik",
+    description: "Kosmos-G: Generating Images in Context with Multimodal Large Language Models",
+    runCount: 4509,
+    githubUrl: "https://github.com/microsoft/unilm/tree/master/kosmos-g",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "56f9fde586eeecfd03c9c34da1c40f5e513af2d511d4b1961f810df1334cc6e9",
+    cogVersion: "0.9.0-beta10"
+  }
+}, {
+  id: 'adirik/owlvit-base-patch32',
+  provider: 'replicate',
+  name: 'owlvit-base-patch32',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'json']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5497
+  },
+  metadata: {
+    owner: "adirik",
+    description: "Zero-shot / open vocabulary object detection",
+    runCount: 24461,
+    githubUrl: "https://github.com/google-research/scenic/tree/main/scenic/projects/owl_vit",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5e899f155a1913c4b7304d09082d842ca7fe6cb1f22e066c83eb1d7849dc37c2",
+    cogVersion: "0.8.3"
+  }
+}, {
+  id: 'adirik/realvisxl-v3.0-turbo',
+  provider: 'replicate',
+  name: 'realvisxl-v3.0-turbo',
+  contextWindow: 77,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 768,
+              height: 768,
+              cost: 0.0032
+            },
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0045
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5453
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Animate Your Personalized Text-to-Image Diffusion Models",
-    runCount: 320359,
-    githubUrl: "https://github.com/lucataco/cog-animatediff",
+    owner: "adirik",
+    description: "Photorealism with RealVisXL V3.0 Turbo based on SDXL",
+    runCount: 545269,
+    githubUrl: "https://github.com/alaradirik/cog-RealVisXL",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "beecf59c4aee8d81bf04f0381033dfa10dc16e845b4ae00d281e2fa377e48a9f",
-    cogVersion: "0.8.6"
+    latestVersionId: "3dc73c805b11b4b01a60555e532fd3ab3f0e60d26f6584d9b8ba7e1b95858243",
+    cogVersion: "0.9.0-beta10"
   }
 }, {
-  id: 'zsxkib/animate-diff',
+  id: 'adirik/styletts2',
   provider: 'replicate',
-  name: 'animate-diff',
+  name: 'styletts2',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 7222
+  },
+  metadata: {
+    owner: "adirik",
+    description: "Generates speech from text",
+    runCount: 132005,
+    githubUrl: "https://github.com/yl4579/StyleTTS2",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "989cb5ea6d2401314eb30685740cb9f6fd1c9001b8940659b406f952837ab5ac",
+    cogVersion: "0.9.0-beta10"
+  }
+}, {
+  id: 'adirik/udop-large',
+  provider: 'replicate',
+  name: 'udop-large',
+  contextWindow: 512,
+  maxOutputTokens: 512,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 3157
+  },
+  metadata: {
+    owner: "adirik",
+    description: "Performs document image classification, document parsing and document visual question answering",
+    runCount: 220,
+    githubUrl: "https://github.com/replicate/cog-udop",
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'afiaka87/tortoise-tts',
+  provider: 'replicate',
+  name: 'tortoise-tts',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 235452
+  },
+  metadata: {
+    owner: "afiaka87",
+    description: "Generate speech from text, clone voices from mp3 files. From James Betker AKA \"neonbjb\".",
+    runCount: 172844,
+    githubUrl: "https://github.com/afiaka87/tortoise-tts",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e9658de4b325863c4fcdc12d94bb7c9b54cbfe351b7ca1b36860008172b91c71",
+    cogVersion: "0.3.13"
+  }
+}, {
+  id: 'ai-forever/kandinsky-2',
+  provider: 'replicate',
+  name: 'kandinsky-2',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 512,
+              height: 512,
+              cost: 0.041
+            },
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.082
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 71555
+  },
   metadata: {
-    owner: "zsxkib",
-    description: "🎨 AnimateDiff (w/ MotionLoRAs for Panning, Zooming, etc): Animate Your Personalized Text-to-Image Diffusion Models without Specific Tuning",
-    runCount: 58948,
-    githubUrl: "https://github.com/guoyww/AnimateDiff",
+    owner: "ai-forever",
+    description: "text2img model trained on LAION HighRes and fine-tuned on internal datasets",
+    runCount: 6180317,
+    githubUrl: "https://github.com/chenxwh/Kandinsky-2",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "269a616c8b0c2bbc12fc15fd51bb202b11e94ff0f7786c026aa905305c4ed9fb",
-    cogVersion: "0.8.6"
+    latestVersionId: "3c6374e7a9a17e01afe306a5218cc67de55b19ea536466d6ea2602cfecea40a9",
+    cogVersion: "v0.9.5+dev"
   }
 }, {
-  id: 'zsxkib/animatediff-illusions',
+  id: 'ai-forever/kandinsky-2.2',
   provider: 'replicate',
-  name: 'animatediff-illusions',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "Monster Labs' Controlnet QR Code Monster v2 For SD-1.5 on top of AnimateDiff Prompt Travel (Motion Module SD 1.5 v2)",
-    runCount: 10499,
-    githubUrl: "https://github.com/s9roll7/animatediff-cli-prompt-travel",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b3ccb0101402aafd04bfea042950be606223e2abedbad93cf848bfffa072bb61",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'zsxkib/animatediff-prompt-travel',
-  provider: 'replicate',
-  name: 'animatediff-prompt-travel',
-  contextWindow: 0,
-  tier: 'flagship',
+  name: 'kandinsky-2.2',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 9000
+  },
   metadata: {
-    owner: "zsxkib",
-    description: "🎨AnimateDiff Prompt Travel🧭 Seamlessly Navigate and Animate Between Text-to-Image Prompts for Dynamic Visual Narratives",
-    runCount: 5677,
-    githubUrl: "https://github.com/s9roll7/animatediff-cli-prompt-travel",
+    owner: "ai-forever",
+    description: "multilingual text2image latent diffusion model",
+    runCount: 10027610,
+    githubUrl: "https://github.com/chenxwh/Kandinsky-2/tree/v2.2",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "1b8a8f2725c03b1ff4a0b960079899131c384149d1feba45e4ef43653deb3b5f",
+    latestVersionId: "ad9d7879fbffa2874e1d909d1d37d9bc682889cc65b31f7bb00d2362619f194a",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'alexgenovese/upscaler',
+  provider: 'replicate',
+  name: 'upscaler',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2483
+  },
+  metadata: {
+    owner: "alexgenovese",
+    description: "GFPGAN aims at developing Practical Algorithms for Real-world Face and Object Restoration",
+    runCount: 7665703,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4f7eb3da655b5182e559d50a0437440f242992d47e5e20bd82829a79dee61ff3",
     cogVersion: "0.8.6"
-  }
-}, {
-  id: 'comfyui/any-comfyui-workflow',
-  provider: 'replicate',
-  name: 'any-comfyui-workflow',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "comfyui",
-    description: "Run any ComfyUI workflow. Guide: https://github.com/replicate/cog-comfyui",
-    runCount: 6921869,
-    githubUrl: "https://github.com/replicate/cog-comfyui",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "16d0a881fbfc066f0471a3519a347db456fe8cbcbd53abb435a50a74efaeb427",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'zsxkib/aura-sr',
-  provider: 'replicate',
-  name: 'aura-sr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "AuraSR: GAN-based Super-Resolution for real-world",
-    runCount: 3197,
-    githubUrl: "https://github.com/zsxkib/cog-aura-sr",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "7231d40ac06e74c6d1bc287309c396fa4791e4cf4fdcb91fb4b191c6c485fc1c",
-    cogVersion: "0.9.9"
-  }
-}, {
-  id: 'zsxkib/aura-sr-v2',
-  provider: 'replicate',
-  name: 'aura-sr-v2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "AuraSR v2: Second-gen GAN-based Super-Resolution for real-world applications",
-    runCount: 17251,
-    githubUrl: "https://github.com/zsxkib/cog-aura-sr-v2",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5c137257cce8d5ce16e8a334b70e9e025106b5580affed0bc7d48940b594e74c",
-    cogVersion: "0.9.14"
-  }
-}, {
-  id: 'suno-ai/bark',
-  provider: 'replicate',
-  name: 'bark',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "suno-ai",
-    description: "🔊 Text-Prompted Generative Audio Model",
-    runCount: 302397,
-    githubUrl: "https://github.com/chenxwh/bark",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b76242b40d67c76ab6742e987628a2a9ac019e11d56ab96c4e91ce03b79b2787",
-    cogVersion: "0.7.0-beta19"
-  }
-}, {
-  id: 'salesforce/blip',
-  provider: 'replicate',
-  name: 'blip',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "salesforce",
-    description: "Generate image captions",
-    runCount: 168893657,
-    githubUrl: "https://github.com/salesforce/BLIP",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
-    cogVersion: "0.4.1"
   }
 }, {
   id: 'andreasjansson/blip-2',
   provider: 'replicate',
   name: 'blip-2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set(['temperature']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 1010
+  },
   metadata: {
     owner: "andreasjansson",
     description: "Answers questions about images",
-    runCount: 31027990,
+    runCount: 31066051,
     githubUrl: "https://github.com/daanelson/cog-blip-2",
     visibility: "public",
     source: "replicate",
@@ -190,519 +393,276 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.8.3"
   }
 }, {
-  id: 'zsxkib/blip-3',
+  id: 'andreasjansson/clip-features',
   provider: 'replicate',
-  name: 'blip-3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'clip-features',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 562
+  },
   metadata: {
-    owner: "zsxkib",
-    description: "Blip 3 / XGen-MM, Answers questions about images ({blip3,xgen-mm}-phi3-mini-base-r-v1)",
-    runCount: 1331207,
-    githubUrl: "https://github.com/zsxkib/cog-blip-3",
+    owner: "andreasjansson",
+    description: "Return CLIP features for the clip-vit-large-patch14 model",
+    runCount: 123156365,
+    githubUrl: "https://github.com/andreasjansson/cog-clip",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "499bec581d8f64060fd695ec0c34d7595c6824c4118259aa8b0788e0d2d903e1",
-    cogVersion: "v0.9.5+dev"
-  }
-}, {
-  id: 'cjwbw/canary-1b',
-  provider: 'replicate',
-  name: 'canary-1b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "Nvidia Automatic speech-to-text recognition (ASR) in 4 languages (English, German, French, Spanish)",
-    runCount: 277,
-    githubUrl: "https://github.com/chenxwh/cog-canary",
-    visibility: "public",
-    source: "replicate"
-  }
-}, {
-  id: 'resemble-ai/chatterbox',
-  provider: 'replicate',
-  name: 'chatterbox',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "resemble-ai",
-    description: "Generate expressive, natural speech. Features unique emotion control, instant voice cloning from short audio, and built-in watermarking.",
-    runCount: 162417,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "1b8422bc49635c20d0a84e387ed20879c0dd09254ecdb4e75dc4bec10ff94e97",
-    cogVersion: "0.15.5"
-  }
-}, {
-  id: 'resemble-ai/chatterbox-multilingual',
-  provider: 'replicate',
-  name: 'chatterbox-multilingual',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "resemble-ai",
-    description: "Generate expressive, natural speech in 23 languages. Features instant voice cloning from short audio, emotion control, and seamless cross-language voice transfer.",
-    runCount: 3735,
-    githubUrl: "https://github.com/zsxkib/cog-ResembleAI-Chatterbox-Multilingual-TTS",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "9cfba4c265e685f840612be835424f8c33bdee685d7466ece7684b0d9d4c0b1c",
-    cogVersion: "0.16.2"
-  }
-}, {
-  id: 'resemble-ai/chatterbox-pro',
-  provider: 'replicate',
-  name: 'chatterbox-pro',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "resemble-ai",
-    description: "Generate expressive, natural speech with Resemble AI's Chatterbox.",
-    runCount: 15435,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "301e12652e84fbba1524e5f2758a9a92c6bd205792304f53c057b7f9ab091342",
-    cogVersion: "0.15.5"
-  }
-}, {
-  id: 'philz1337x/clarity-upscaler',
-  provider: 'replicate',
-  name: 'clarity-upscaler',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "philz1337x",
-    description: "High resolution image Upscaler and Enhancer. Use at ClarityAI.co. A free Magnific alternative. Twitter/X: @philz1337x",
-    runCount: 23366880,
-    githubUrl: "https://github.com/philz1337x/clarity-upscaler",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "dfad41707589d68ecdccd1dfa600d55a208f9310748e44bfe35b4a6291453d5e",
-    cogVersion: "0.8.0-beta11"
-  }
-}, {
-  id: 'rmokady/clip_prefix_caption',
-  provider: 'replicate',
-  name: 'clip_prefix_caption',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "rmokady",
-    description: "Simple image captioning model using CLIP and GPT-2",
-    runCount: 1735930,
-    githubUrl: "https://github.com/rmokady/CLIP_prefix_caption",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "9a34a6339872a03f45236f114321fb51fc7aa8269d38ae0ce5334969981e4cd8",
-    cogVersion: "0.4.1"
-  }
-}, {
-  id: 'j-min/clip-caption-reward',
-  provider: 'replicate',
-  name: 'clip-caption-reward',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "j-min",
-    description: "Fine-grained Image Captioning with CLIP Reward",
-    runCount: 296124,
-    githubUrl: "https://github.com/j-min/CLIP-Caption-Reward",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "de37751f75135f7ebbe62548e27d6740d5155dfefdf6447db35c9865253d7e06",
-    cogVersion: "0.3.4"
-  }
-}, {
-  id: 'pharmapsychotic/clip-interrogator',
-  provider: 'replicate',
-  name: 'clip-interrogator',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "pharmapsychotic",
-    description: "The CLIP Interrogator is a prompt engineering tool that combines OpenAI's CLIP and Salesforce's BLIP to optimize text prompts to match a given image. Use the resulting prompts with text-to-image models like Stable Diffusion to create cool art!",
-    runCount: 4693729,
-    githubUrl: "https://github.com/pharmapsychotic/clip-interrogator",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "8151e1c9f47e696fa316146a2e35812ccf79cfc9eba05b11c7f450155102af70",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'sczhou/codeformer',
-  provider: 'replicate',
-  name: 'codeformer',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "sczhou",
-    description: "Robust face restoration algorithm for old photos / AI-generated faces",
-    runCount: 46381471,
-    githubUrl: "https://github.com/sczhou/CodeFormer",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "cc4956dd26fa5a7185d5660cc9100fab1b8070a1d1654a8bb5eb6d443b020bb2",
-    cogVersion: "0.8.5"
-  }
-}, {
-  id: 'cuuupid/cogvideox-5b',
-  provider: 'replicate',
-  name: 'cogvideox-5b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cuuupid",
-    description: "Generate high quality videos from a prompt",
-    runCount: 2523,
-    githubUrl: "https://github.com/cuuupid/cog-cogvideox",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5b14e2c2c648efecc8d36c6353576552f8a124e690587212f8e8bb17ecda3d8c",
-    cogVersion: "v0.10.0-alpha13+dev"
-  }
-}, {
-  id: 'jagilley/controlnet-scribble',
-  provider: 'replicate',
-  name: 'controlnet-scribble',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "jagilley",
-    description: "Generate detailed images from scribbled drawings",
-    runCount: 38304423,
-    githubUrl: "https://github.com/replicate/controlnet",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "435061a1b5a4c1e26740464bf786efdfa9cb3a3ac488595a2de23e143fdb0117",
+    latestVersionId: "75b33f253f7714a281ad3e9b28f63e3232d583716ef6718f2e46641077ea040a",
     cogVersion: "0.6.1"
   }
 }, {
-  id: 'lucataco/controlnet-tile',
+  id: 'andreasjansson/llama-2-13b-embeddings',
   provider: 'replicate',
-  name: 'controlnet-tile',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'llama-2-13b-embeddings',
+  contextWindow: 4096,
+  tier: 'legacy',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 516
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Controlnet v1.1 - Tile Version",
-    runCount: 4189,
-    githubUrl: "https://github.com/lllyasviel/ControlNet",
+    owner: "andreasjansson",
+    description: "Llama2 13B with embedding output",
+    runCount: 243110,
+    githubUrl: "https://github.com/andreasjansson/llama-embeddings",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "f688ff774c27a4843c819c9264c0f949925970bb278669ed9140364c8389869c",
-    cogVersion: "0.8.6"
+    latestVersionId: "7115a4c65b86815e31412e53de1211c520164c190945a84c425b59dccbc47148",
+    cogVersion: "0.8.2"
   }
 }, {
-  id: 'cjwbw/controlvideo',
+  id: 'andreasjansson/musicgen-looper',
   provider: 'replicate',
-  name: 'controlvideo',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'musicgen-looper',
+  contextWindow: 1000,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature', 'topP', 'seed', 'responseFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 74091
+  },
   metadata: {
-    owner: "cjwbw",
-    description: "Training-free Controllable Text-to-Video Generation",
-    runCount: 2424,
-    githubUrl: "https://github.com/chenxwh/ControlVideo",
+    owner: "andreasjansson",
+    description: "Generate fixed-bpm loops from text prompts",
+    runCount: 59799,
+    githubUrl: "https://github.com/andreasjansson/cog-musicgen-looper",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "91710b3f53c9c1cb958e7bf0ea982d21b666f6a3ff28c1670ee0c08355ced925",
+    latestVersionId: "f8140d0457c2b39ad8728a80736fea9a67a0ec0cd37b35f40b68cce507db2366",
     cogVersion: "0.7.2"
   }
 }, {
-  id: 'philz1337x/crystal-upscaler',
+  id: 'anthropic/claude-3.5-sonnet',
   provider: 'replicate',
-  name: 'crystal-upscaler',
-  contextWindow: 0,
+  name: 'claude-3.5-sonnet',
+  contextWindow: 200000,
+  maxOutputTokens: 8192,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Claude',
+  capabilities: new Set(['chat', 'vision', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'stop', 'seed']),
+  pricing: {
+    text: {
+      input: 3,
+      output: 15,
+      cached: 0.3
+    }
+  },
+  metrics: {
+    tokensPerSecond: 54,
+    timeToFirstToken: 17,
+    averageRequestDuration: 6000,
+    accuracyScore: 0.98
+  },
   metadata: {
-    owner: "philz1337x",
-    description: "High-precision image upscaler optimized for portraits, faces and products. One of the upscale modes powered by Clarity AI. X:https://x.com/philz1337x",
-    runCount: 186516,
+    owner: "anthropic",
+    description: "Anthropic's most intelligent language model to date, with a 200K token context window and image understanding (claude-3-5-sonnet-20241022)",
+    runCount: 593348,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "676970c41ea5c90570e8f723374b9a394c446cc34a353b8dddf1a41083471943",
-    cogVersion: "0.16.8"
+    latestVersionId: "b7bb89fa62c9ba7da1ed4b70a91b4381ca2e48a5771ec86254d8c13509c31820",
+    cogVersion: "0.14.0-alpha1"
   }
 }, {
-  id: 'lucataco/csm-1b',
+  id: 'anthropic/claude-3.7-sonnet',
   provider: 'replicate',
-  name: 'csm-1b',
-  contextWindow: 0,
+  name: 'claude-3.7-sonnet',
+  contextWindow: 200000,
+  maxOutputTokens: 64000,
   tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
+  tokenizer: 'Claude',
+  capabilities: new Set(['chat', 'vision', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {
+    text: {
+      input: 3,
+      output: 15,
+      cached: 0.3
+    }
+  },
+  metrics: {
+    tokensPerSecond: 53.6,
+    timeToFirstToken: 15.86,
+    averageRequestDuration: 5817
+  },
   metadata: {
-    owner: "lucataco",
-    description: "CSM (Conversational Speech Model) is a speech generation model from Sesame that generates RVQ audio codes from text and audio inputs",
-    runCount: 993,
-    githubUrl: "https://github.com/lucataco/cog-csm",
+    owner: "anthropic",
+    description: "The most intelligent Claude model and the first hybrid reasoning model on the market (claude-3-7-sonnet-20250219)",
+    runCount: 3270789,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "3e59b10a9894c54ae5f2fc0347e3a2f5c82f0574407e53a7d9f76ec7c502ad03",
-    cogVersion: "0.14.2"
+    latestVersionId: "81a891bd00c339f3565bda15b255b372eb8bf6c669fe996b66eea5d677454a46",
+    cogVersion: "0.14.0-alpha1"
   }
 }, {
-  id: 'cjwbw/damo-text-to-video',
+  id: 'anthropic/claude-4-sonnet',
   provider: 'replicate',
-  name: 'damo-text-to-video',
-  contextWindow: 0,
+  name: 'claude-4-sonnet',
+  contextWindow: 200000,
+  maxOutputTokens: 64000,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tokenizer: 'Claude',
+  capabilities: new Set(['chat', 'vision', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'reason']),
   pricing: {},
+  metrics: {
+    tokensPerSecond: 49.36,
+    timeToFirstToken: 10.65,
+    averageRequestDuration: 7344
+  },
   metadata: {
-    owner: "cjwbw",
-    description: "Multi-stage text-to-video generation",
-    runCount: 153688,
-    githubUrl: "https://github.com/chenxwh/cog-damo-text2video",
+    owner: "anthropic",
+    description: "Claude Sonnet 4 is a significant upgrade to 3.7, delivering superior coding and reasoning while responding more precisely to your instructions",
+    runCount: 1114736,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "1e205ea73084bd17a0a3b43396e49ba0d6bc2e754e9283b2df49fad2dcf95755",
-    cogVersion: "0.6.1"
+    latestVersionId: "3380fe4ca9cac053c89d1df86a5ba850e61cbef1d474a24abded9516e5a73a04",
+    cogVersion: "0.15.5"
   }
 }, {
-  id: 'deforum/deforum_stable_diffusion',
+  id: 'arielreplicate/deoldify_image',
   provider: 'replicate',
-  name: 'deforum_stable_diffusion',
+  name: 'deoldify_image',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageStyle']),
   pricing: {},
-  metadata: {
-    owner: "deforum",
-    description: "Animating prompts with stable diffusion",
-    runCount: 265864,
-    githubUrl: "https://github.com/deforum/stable-diffusion",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e22e77495f2fb83c34d5fae2ad8ab63c0a87b6b573b6208e1535b23b89ea66d6",
-    cogVersion: "0.4.2"
-  }
-}, {
-  id: 'lucataco/demofusion-enhance',
-  provider: 'replicate',
-  name: 'demofusion-enhance',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "Image to Image enhancer using DemoFusion",
-    runCount: 11109,
-    githubUrl: "https://github.com/lucataco/cog-demofusion-enhance",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5bcfe11066c820e8c08232c6efa3c8a7ab2cd667ad136ca173633f352170691e",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'arielreplicate/deoldify_video',
-  provider: 'replicate',
-  name: 'deoldify_video',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  metrics: {
+    averageRequestDuration: 27593
+  },
   metadata: {
     owner: "arielreplicate",
-    description: "Add colours to old video footage.",
-    runCount: 7259,
+    description: "Add colours to old images",
+    runCount: 448748,
     githubUrl: "https://github.com/ArielReplicate/DeOldify",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "8f1189b476fcb54cfbe1d07d97b025c571a2ce4e9a7a9558640c78647576e16f",
+    latestVersionId: "0da600fab0c45a66211339f1c16b71345d22f26ef5fea3dca1bb90bb5711e950",
     cogVersion: "0.6.1"
   }
 }, {
-  id: 'fofr/deprecated-batch-image-captioning',
+  id: 'awerks/neon-tts',
   provider: 'replicate',
-  name: 'deprecated-batch-image-captioning',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "A wrapper model for captioning multiple images using GPT, Claude or Gemini, useful for lora training",
-    runCount: 1559,
-    githubUrl: "https://github.com/fofr/cog-batch-image-captioning",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d0adb15f4826881a68f1d82e0b10fe2ee1af536632dc8313f7f777ed8d264726",
-    cogVersion: "0.9.14"
-  }
-}, {
-  id: 'zsxkib/dia',
-  provider: 'replicate',
-  name: 'dia',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "Dia 1.6B by Nari Labs, Generates realistic dialogue audio from text, including non-verbal cues and voice cloning",
-    runCount: 9705,
-    githubUrl: "https://github.com/zsxkib/cog-dia",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "2119e338ca5c0dacd3def83158d6c80d431f2ac1024146d8cca9220b74385599",
-    cogVersion: "0.15.10"
-  }
-}, {
-  id: 'zsxkib/diffbir',
-  provider: 'replicate',
-  name: 'diffbir',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "✨DiffBIR: Towards Blind Image Restoration with Generative Diffusion Prior",
-    runCount: 137194,
-    githubUrl: "https://github.com/XPixelGroup/DiffBIR",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "51ed1464d8bbbaca811153b051d3b09ab42f0bdeb85804ae26ba323d7a66a4ac",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'lucataco/dreamshaper-xl-turbo',
-  provider: 'replicate',
-  name: 'dreamshaper-xl-turbo',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "DreamShaper is a general purpose SD model that aims at doing everything well, photos, art, anime, manga. It's designed to match Midjourney and DALL-E.",
-    runCount: 226305,
-    githubUrl: "https://github.com/lucataco/cog-dreamshaper-xl-turbo",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0a1710e0187b01a255302738ca0158ff02a22f4638679533e111082f9dd1b615",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'xinntao/esrgan',
-  provider: 'replicate',
-  name: 'esrgan',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "xinntao",
-    description: "Image 4x super-resolution",
-    runCount: 174240,
-    githubUrl: "https://github.com/xinntao/ESRGAN",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "c263265e04b16fda1046d1828997fc27b46610647a3348df1c72fbffbdbac912",
-    cogVersion: "0.4.1"
-  }
-}, {
-  id: 'x-lance/f5-tts',
-  provider: 'replicate',
-  name: 'f5-tts',
-  contextWindow: 0,
-  tier: 'flagship',
+  name: 'neon-tts',
+  contextWindow: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['audio']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 33230
+  },
   metadata: {
-    owner: "x-lance",
-    description: "F5-TTS, the new state-of-the-art in open source voice cloning",
-    runCount: 34238,
-    githubUrl: "https://github.com/cuuupid/cog-f5-tts",
+    owner: "awerks",
+    description: "NeonAI Coqui AI TTS Plugin.",
+    runCount: 168038,
+    githubUrl: "https://github.com/NeonGeckoCom/neon-tts-plugin-coqui",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "87faf6dd7a692dd82043f662e76369cab126a2cf1937e25a9d41e0b834fd230e",
-    cogVersion: "0.9.20"
+    latestVersionId: "139606fe1536f85a9f07d87982400b8140c9a9673733d47913af96738894128f",
+    cogVersion: "0.8.3"
   }
 }, {
-  id: 'bria/fibo',
+  id: 'awilliamson10/meta-nougat',
   provider: 'replicate',
-  name: 'fibo',
+  name: 'meta-nougat',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 2749
+  },
   metadata: {
-    owner: "bria",
-    description: "SOTA Open source model trained on licensed data, transforming intent into structured control for precise, high-quality AI image generation in enterprise and agentic workflows.",
-    runCount: 1665,
-    githubUrl: "https://github.com/Bria-AI/FIBO",
+    owner: "awilliamson10",
+    description: "Nougat: Neural Optical Understanding for Academic Documents",
+    runCount: 4919,
+    githubUrl: "https://github.com/awilliamson10/replicate-nougat",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "fc593da8b504094d9b68f3b7d35c29d4947cca3d143cb09e11d4ebcaf917700a",
-    cogVersion: "0.16.8"
+    latestVersionId: "872fa99400b0eeb8bfc82ef433aa378976b4311178ff64fed439470249902071",
+    cogVersion: "0.8.6"
   }
 }, {
-  id: 'lucataco/florence-2-base',
+  id: 'beautyyuyanli/multilingual-e5-large',
   provider: 'replicate',
-  name: 'florence-2-base',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'multilingual-e5-large',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 96
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Florence-2: Advancing a Unified Representation for a Variety of Vision Tasks",
-    runCount: 127033,
-    githubUrl: "https://github.com/lucataco/cog-florence-2-base",
+    owner: "beautyyuyanli",
+    description: "multilingual-e5-large: A multi-language text embedding model",
+    runCount: 35294664,
+    githubUrl: "https://github.com/BeautyyuYanli/cog-models",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "c81609117f666d3a86b262447f80d41ac5158a76adb56893301843a23165eaf8",
-    cogVersion: "0.9.9"
+    latestVersionId: "a06276a89f1a902d5fc225a9ca32b6e8e6292b7f3b136518878da97c458e2bad",
+    cogVersion: "0.8.6"
   }
 }, {
   id: 'black-forest-labs/flux-1.1-pro',
   provider: 'replicate',
   name: 'flux-1.1-pro',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    perRequest: 0.04
+  },
+  metrics: {
+    averageRequestDuration: 3815
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "Faster, better FLUX Pro. Text-to-image model with excellent image quality, prompt adherence, and output diversity.",
-    runCount: 64166114,
+    runCount: 64512414,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -713,14 +673,35 @@ export const replicateModels: ModelInfo[] = [{
   id: 'black-forest-labs/flux-1.1-pro-ultra',
   provider: 'replicate',
   name: 'flux-1.1-pro-ultra',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.06
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.06
+  },
+  metrics: {
+    averageRequestDuration: 8141
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "FLUX1.1 [pro] in ultra and raw modes. Images are up to 4 megapixels. Use raw mode for realism.",
-    runCount: 19030635,
+    runCount: 19175746,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -728,17 +709,277 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.16.8"
   }
 }, {
+  id: 'black-forest-labs/flux-2-dev',
+  provider: 'replicate',
+  name: 'flux-2-dev',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5212
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Quality image generation and editing with support for reference images",
+    runCount: 12223,
+    githubUrl: "https://github.com/black-forest-labs/flux2",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7bba46bdde863cfd7aaee87649a5aa49f39f368495dbea500998d1fcbb262050",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'black-forest-labs/flux-2-flex',
+  provider: 'replicate',
+  name: 'flux-2-flex',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 22602
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Max-quality image generation and editing with support for ten reference images",
+    runCount: 8919,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "57df51f07c4bc4457b768277b1bb754a0c35b9f02c2ce48582a8b3a48fe0a2c3",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'black-forest-labs/flux-2-pro',
+  provider: 'replicate',
+  name: 'flux-2-pro',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5598
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "High-quality image generation and editing with support for eight reference images",
+    runCount: 66383,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "285631b5656a1839331cd9af0d82da820e2075db12046d1d061c681b2f206bc6",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'black-forest-labs/flux-canny-dev',
+  provider: 'replicate',
+  name: 'flux-canny-dev',
+  contextWindow: 512,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 6619
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Open-weight edge-guided image generation. Control structure and composition using Canny edge detection.",
+    runCount: 172416,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "aeb2a8dbfe2580e25d41d8881cc1df1a0b1e52c87de99c1a65fc587ac3918179",
+    cogVersion: "0.9.21"
+  }
+}, {
+  id: 'black-forest-labs/flux-canny-pro',
+  provider: 'replicate',
+  name: 'flux-canny-pro',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.055
+  },
+  metrics: {
+    averageRequestDuration: 16036
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Professional edge-guided image generation. Control structure and composition using Canny edge detection",
+    runCount: 386152,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "835f0372c2cf4b2e494c2b8626288212ea5c2694ccc2e29f00dfb8cbf2a5e0ce",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'black-forest-labs/flux-depth-dev',
+  provider: 'replicate',
+  name: 'flux-depth-dev',
+  contextWindow: 512,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 10601
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Open-weight depth-aware image generation. Edit images while preserving spatial relationships.",
+    runCount: 886996,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "fc4f1401056237174d207056c49cd2afd44ede232ba286a3d40eb6376b726600",
+    cogVersion: "0.9.21"
+  }
+}, {
+  id: 'black-forest-labs/flux-depth-pro',
+  provider: 'replicate',
+  name: 'flux-depth-pro',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.055
+  },
+  metrics: {
+    averageRequestDuration: 25574
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Professional depth-aware image generation. Edit images while preserving spatial relationships.",
+    runCount: 271500,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0e370dce5fdf15aa8b5fe2491474be45628756e8fba97574bfb3bcab46d09fff",
+    cogVersion: "0.16.8"
+  }
+}, {
   id: 'black-forest-labs/flux-dev',
   provider: 'replicate',
   name: 'flux-dev',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 1800
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "A 12 billion parameter rectified flow transformer capable of generating images from text descriptions",
-    runCount: 32156436,
+    runCount: 32979167,
     githubUrl: "https://github.com/replicate/cog-flux",
     visibility: "public",
     source: "replicate",
@@ -749,14 +990,23 @@ export const replicateModels: ModelInfo[] = [{
   id: 'black-forest-labs/flux-dev-lora',
   provider: 'replicate',
   name: 'flux-dev-lora',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2836
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "A version of flux-dev, a text to image model, that supports fast fine-tuned lora inference",
-    runCount: 5082693,
+    runCount: 5153559,
     githubUrl: "https://github.com/replicate/cog-flux",
     visibility: "public",
     source: "replicate",
@@ -764,35 +1014,153 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.15.8"
   }
 }, {
-  id: 'prunaai/flux-fast',
+  id: 'black-forest-labs/flux-fill-dev',
   provider: 'replicate',
-  name: 'flux-fast',
-  contextWindow: 0,
+  name: 'flux-fill-dev',
+  contextWindow: 512,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 9555
+  },
   metadata: {
-    owner: "prunaai",
-    description: "This is the fastest Flux endpoint in the world.",
-    runCount: 33534395,
-    githubUrl: "https://github.com/black-forest-labs/flux",
+    owner: "black-forest-labs",
+    description: "Open-weight inpainting model for editing and extending images. Guidance-distilled from FLUX.1 Fill [pro].",
+    runCount: 1163361,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "4f22c6cd75e0f95f12f55d1616a4d163e9166087ed4979f5cecc40418a522703",
-    cogVersion: "0.16.0"
+    latestVersionId: "a053f84125613d83e65328a289e14eb6639e10725c243e8fb0c24128e5573f4c",
+    cogVersion: "0.9.21"
+  }
+}, {
+  id: 'black-forest-labs/flux-fill-pro',
+  provider: 'replicate',
+  name: 'flux-fill-pro',
+  contextWindow: 512,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 8224
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Professional inpainting and outpainting model with state-of-the-art performance. Edit or extend images with natural, seamless results.",
+    runCount: 3356662,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "2d4197724d8ed13cc78191e794ebbe6aeedcfe4c5b36f464794732d5ccb9735f",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'black-forest-labs/flux-kontext-dev',
+  provider: 'replicate',
+  name: 'flux-kontext-dev',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.02
+  },
+  metrics: {
+    averageRequestDuration: 6110
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Open-weight version of FLUX.1 Kontext",
+    runCount: 3808405,
+    githubUrl: "https://github.com/replicate/cog-flux-kontext",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "85723d503c17da3f9fd9cecfb9987a8bf60ef747fd8f68a25d7636f88260eb59",
+    cogVersion: "0.15.9"
   }
 }, {
   id: 'black-forest-labs/flux-kontext-max',
   provider: 'replicate',
   name: 'flux-kontext-max',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image', 'vision']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.05
+  },
+  metrics: {
+    averageRequestDuration: 4930
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "A premium text-based image editing model that delivers maximum performance and improved typography generation for transforming images through natural language prompts",
-    runCount: 8707558,
+    runCount: 8882711,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -805,12 +1173,33 @@ export const replicateModels: ModelInfo[] = [{
   name: 'flux-kontext-pro',
   contextWindow: 0,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image', 'vision']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.055
+  },
+  metrics: {
+    averageRequestDuration: 4400
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "A state-of-the-art text-based image editing model that delivers high-quality outputs with excellent prompt following and consistent results for transforming images through natural language",
-    runCount: 35746699,
+    runCount: 37215294,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -821,14 +1210,35 @@ export const replicateModels: ModelInfo[] = [{
   id: 'black-forest-labs/flux-pro',
   provider: 'replicate',
   name: 'flux-pro',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.055
+  },
+  metrics: {
+    averageRequestDuration: 14093
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "State-of-the-art image generation with top of the line prompt following, visual quality, image detail and output diversity.",
-    runCount: 13637175,
+    runCount: 13677313,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -836,17 +1246,164 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.16.8"
   }
 }, {
+  id: 'black-forest-labs/flux-pro-finetuned',
+  provider: 'replicate',
+  name: 'flux-pro-finetuned',
+  contextWindow: 512,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 15461
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Inference model for FLUX.1 [pro] using custom `finetune_id`",
+    runCount: 10588,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0515c6ddb21c9de66774a3b14be551de7030e4c1d06d5ca1c7f6038420647028",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'black-forest-labs/flux-pro-trainer',
+  provider: 'replicate',
+  name: 'flux-pro-trainer',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 680372
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Train FLUX.1 [pro] and FLUX 1.1 [pro] Ultra. Upload images to create a custom finetune_id to use with the inference model",
+    runCount: 4048,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "04e652c9c01dcae177b3e3e716aecf3d4f6a671c9533e3fa4b5ae7617a694fe4",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'black-forest-labs/flux-redux-dev',
+  provider: 'replicate',
+  name: 'flux-redux-dev',
+  contextWindow: 0,
+  tier: 'flagship',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 7530
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Open-weight image variation model. Create new versions while preserving key elements of your original.",
+    runCount: 269096,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "96b56814e57dfa601f3f524f82a2b336ef49012cda68828cb37cde66f481b7cb",
+    cogVersion: "0.9.21"
+  }
+}, {
+  id: 'black-forest-labs/flux-redux-schnell',
+  provider: 'replicate',
+  name: 'flux-redux-schnell',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1418
+  },
+  metadata: {
+    owner: "black-forest-labs",
+    description: "Fast, efficient image variation model for rapid iteration and experimentation.",
+    runCount: 63813,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8a9ff6ce228b950c7079005fd0804f54c74c0113cda3f3c07eff10ab943f32a1",
+    cogVersion: "0.9.21"
+  }
+}, {
   id: 'black-forest-labs/flux-schnell',
   provider: 'replicate',
   name: 'flux-schnell',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 840
+  },
   metadata: {
     owner: "black-forest-labs",
     description: "The fastest image generation model tailored for local development and personal use",
-    runCount: 549495280,
+    runCount: 556240213,
     githubUrl: "https://github.com/replicate/cog-flux",
     visibility: "public",
     source: "replicate",
@@ -854,1071 +1411,487 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.15.8"
   }
 }, {
-  id: 'lucataco/fuyu-8b',
+  id: 'bria/eraser',
   provider: 'replicate',
-  name: 'fuyu-8b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "Fuyu-8B is a multi-modal text and image transformer trained by Adept AI",
-    runCount: 14632,
-    githubUrl: "https://github.com/lucataco/cog-fuyu",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "42f23bc876570a46f5a90737086fbc4c3f79dd11753a28eaa39544dd391815e9",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'google/gemini-3-pro',
-  provider: 'replicate',
-  name: 'gemini-3-pro',
+  name: 'eraser',
   contextWindow: 0,
   tier: 'efficient',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.004
+  },
+  metrics: {
+    averageRequestDuration: 6623
+  },
   metadata: {
-    owner: "google",
-    description: "Google's most advanced reasoning Gemini model",
-    runCount: 1383,
+    owner: "bria",
+    description: "SOTA Object removal, enables precise removal of unwanted objects from images while maintaining high-quality outputs. Trained exclusively on licensed data for safe and risk-free commercial use",
+    runCount: 157473,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "f58d3bef5d4caca32632a8105e31e93e7103e91a698228166d5016a38a3566db",
+    latestVersionId: "b07c36a13108a9a2e37ead2e49e33a5717184e92e1ba7c4bb3526732554e9149",
     cogVersion: "0.16.9"
   }
 }, {
-  id: 'tencentarc/gfpgan',
+  id: 'bria/expand-image',
   provider: 'replicate',
-  name: 'gfpgan',
+  name: 'expand-image',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 7383
+  },
   metadata: {
-    owner: "tencentarc",
-    description: "Practical face restoration algorithm for *old photos* or *AI-generated faces*",
-    runCount: 101255954,
-    githubUrl: "https://github.com/replicate/GFPGAN",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0fbacf7afc6c144e5be9767cff80f25aff23e52b0708f17e20f9879b2f21516c",
-    cogVersion: "0.4.2"
-  }
-}, {
-  id: 'openai/gpt-4o-mini-transcribe',
-  provider: 'replicate',
-  name: 'gpt-4o-mini-transcribe',
-  contextWindow: 0,
-  tier: 'efficient',
-  capabilities: new Set(['hearing', 'chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "openai",
-    description: "A speech-to-text model that uses GPT-4o mini to transcribe audio",
-    runCount: 6990,
+    owner: "bria",
+    description: "Bria Expand expands images beyond their borders in high quality. Resizing the image by generating new pixels to expand to the desired aspect ratio. Trained exclusively on licensed data for safe and risk-free commercial use",
+    runCount: 117831,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "684265b6c4d23a4f5b3536a76e0b9e022ce5084f6da95fd7d0b5ebbc573a8261",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'openai/gpt-4o-transcribe',
-  provider: 'replicate',
-  name: 'gpt-4o-transcribe',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing', 'chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "openai",
-    description: "A speech-to-text model that uses GPT-4o to transcribe audio",
-    runCount: 31372,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "cc7638666fc85e9defb010d99e304c0c0e94dcdbd3d31385f28f2730b4cdcc6d",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/hailuo-02',
-  provider: 'replicate',
-  name: 'hailuo-02',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Hailuo 2 is a text-to-video and image-to-video model that can make 6s or 10s videos at 768p (standard) or 1080p (pro). It excels at real world physics.",
-    runCount: 225027,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "baaadb886e09b1e711387e270d841930e8253f08775bc6cb176580658f0f2fd9",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/hailuo-2.3',
-  provider: 'replicate',
-  name: 'hailuo-2.3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "A high-fidelity video generation model optimized for realistic human motion, cinematic VFX, expressive characters, and strong prompt and style adherence across both text-to-video and image-to-video workflows",
-    runCount: 9585,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "23a02633b5a44780345a59d4d43f8bd510efa239c56f08f29639ff24fa6615e1",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/hailuo-2.3-fast',
-  provider: 'replicate',
-  name: 'hailuo-2.3-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "A lower-latency image-to-video version of Hailuo 2.3 that preserves core motion quality, visual consistency, and stylization performance while enabling faster iteration cycles.",
-    runCount: 4691,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "c92f075dfd04541f1c1913a9689f778ecf76bfec3dd9fdfe19903a86e07f2cdc",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'jingyunliang/hcflow-sr',
-  provider: 'replicate',
-  name: 'hcflow-sr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "jingyunliang",
-    description: "Image Super-Resolution",
-    runCount: 222862,
-    githubUrl: "https://github.com/JingyunLiang/HCFlow",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "567785261e974455ede3b0644d1d7e5aa8d9e40a22217a8726900acdcd9e19ce",
-    cogVersion: "0.4.1"
-  }
-}, {
-  id: 'prunaai/hidream-l1-dev',
-  provider: 'replicate',
-  name: 'hidream-l1-dev',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "prunaai",
-    description: "This is an optimised version of the hidream-l1-dev model using the pruna ai optimisation toolkit!",
-    runCount: 45930,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "4dfcd146c0def4812455415f55556f6bc84025dcb15193cf1977f01bd384d191",
-    cogVersion: "0.14.7"
-  }
-}, {
-  id: 'prunaai/hidream-l1-fast',
-  provider: 'replicate',
-  name: 'hidream-l1-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "prunaai",
-    description: "This is an optimised version of the hidream-l1 model using the pruna ai optimisation toolkit!",
-    runCount: 5339398,
-    githubUrl: "https://github.com/HiDream-ai/HiDream-I1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "07299025e97b39a8b2a4dbf99af63bf1eb79c39cfea654014e57d013c2043070",
-    cogVersion: "0.16.0"
-  }
-}, {
-  id: 'prunaai/hidream-l1-full',
-  provider: 'replicate',
-  name: 'hidream-l1-full',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "prunaai",
-    description: "This is an optimised version of the hidream-full model using the pruna ai optimisation toolkit!",
-    runCount: 31366,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "03d58532fd29e39fd2ed80e86c3da1cebec28ef2734081cf1366710d30388f42",
-    cogVersion: "0.14.7"
-  }
-}, {
-  id: 'fermatresearch/high-resolution-controlnet-tile',
-  provider: 'replicate',
-  name: 'high-resolution-controlnet-tile',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fermatresearch",
-    description: "UPDATE: new upscaling algorithm for a much improved image quality. Fermat.app open-source implementation of an efficient ControlNet 1.1 tile for high-quality upscales. Increase the creativity to encourage hallucination.",
-    runCount: 647111,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "8e6a54d7b2848c48dc741a109d3fb0ea2a7f554eb4becd39a25cc532536ea975",
-    cogVersion: "0.9.13"
-  }
-}, {
-  id: 'lucataco/hotshot-xl',
-  provider: 'replicate',
-  name: 'hotshot-xl',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "😊 Hotshot-XL is an AI text-to-GIF model trained to work alongside Stable Diffusion XL",
-    runCount: 850933,
-    githubUrl: "https://github.com/lucataco/cog-hotshot-xl",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "78b3a6257e16e4b241245d65c8b2b81ea2e1ff7ed4c55306b511509ddbfd327a",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'tencent/hunyuan-image-3',
-  provider: 'replicate',
-  name: 'hunyuan-image-3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "tencent",
-    description: "A powerful native multimodal model for image generation (PrunaAI squeezed)",
-    runCount: 25194,
-    githubUrl: "https://github.com/Tencent-Hunyuan/HunyuanImage-3.0",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "080dbbefcd1504ca5aeebaa2815fd51467d5bb793d2b1fb4eb4eb32ac22a3377",
+    latestVersionId: "18d2dffd371ca05b45b7a4e9d82bae0f1f356563633f48d48dca4ccf82ec489d",
     cogVersion: "0.16.7"
   }
 }, {
-  id: 'tencent/hunyuan-video',
+  id: 'bria/fibo',
   provider: 'replicate',
-  name: 'hunyuan-video',
+  name: 'fibo',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 15468
+  },
   metadata: {
-    owner: "tencent",
-    description: "A state-of-the-art text-to-video generation model capable of creating high-quality videos with realistic motion from text descriptions",
-    runCount: 115155,
-    githubUrl: "https://github.com/zsxkib/HunyuanVideo/tree/replicate",
+    owner: "bria",
+    description: "SOTA Open source model trained on licensed data, transforming intent into structured control for precise, high-quality AI image generation in enterprise and agentic workflows.",
+    runCount: 1934,
+    githubUrl: "https://github.com/Bria-AI/FIBO",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "6c9132aee14409cd6568d030453f1ba50f5f3412b844fe67f78a9eb62d55664f",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'wavespeedai/hunyuan-video-fast',
-  provider: 'replicate',
-  name: 'hunyuan-video-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set([]),
-  pricing: {},
-  metadata: {
-    owner: "wavespeedai",
-    description: "Accelerated inference for HunyuanVideo with high resolution (1280x720), a state-of-the-art text-to-video generation model capable of creating high-quality videos with realistic motion from text descriptions",
-    runCount: 5007,
-    githubUrl: "https://github.com/Tencent/HunyuanVideo",
-    visibility: "public",
-    source: "replicate"
-  }
-}, {
-  id: 'zsxkib/hunyuan-video2video',
-  provider: 'replicate',
-  name: 'hunyuan-video2video',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "A state-of-the-art text-to-video generation model capable of creating high-quality videos with realistic motion from text descriptions",
-    runCount: 2889,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d550f226f28b1030c2fedd2947f39f19b4b0233b50364904538caaf037fb18d3",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'ali-vilab/i2vgen-xl',
-  provider: 'replicate',
-  name: 'i2vgen-xl',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ali-vilab",
-    description: "RESEARCH/NON-COMMERCIAL USE ONLY: High-Quality Image-to-Video Synthesis via Cascaded Diffusion Models",
-    runCount: 128044,
-    githubUrl: "https://github.com/chenxwh/i2vgen-xl",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5821a338d00033abaaba89080a17eb8783d9a17ed710a6b4246a18e0900ccad4",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'zsxkib/idefics3',
-  provider: 'replicate',
-  name: 'idefics3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "Idefics3-8B-Llama3, Answers questions and caption about images",
-    runCount: 2534,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b06f5f6b6249b27d0b00d1b794240e5641190d1582ad68c40ef53778459bb593",
-    cogVersion: "0.9.14"
-  }
-}, {
-  id: 'ideogram-ai/ideogram-v2',
-  provider: 'replicate',
-  name: 'ideogram-v2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ideogram-ai",
-    description: "An excellent image model with state of the art inpainting, prompt comprehension and text rendering",
-    runCount: 2548222,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "3e6071946ab5319b3bcc37a4d00083e743dfdff5be386df6a2ff1f212fc7365b",
+    latestVersionId: "fc593da8b504094d9b68f3b7d35c29d4947cca3d143cb09e11d4ebcaf917700a",
     cogVersion: "0.16.8"
   }
 }, {
-  id: 'ideogram-ai/ideogram-v2-turbo',
+  id: 'bria/generate-background',
   provider: 'replicate',
-  name: 'ideogram-v2-turbo',
+  name: 'generate-background',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 9540
+  },
   metadata: {
-    owner: "ideogram-ai",
-    description: "A fast image model with state of the art inpainting, prompt comprehension and text rendering.",
-    runCount: 2750597,
+    owner: "bria",
+    description: "Bria Background Generation allows for efficient swapping of backgrounds in images via text prompts or reference image, delivering realistic and polished results. Trained exclusively on licensed data for safe and risk-free commercial use",
+    runCount: 35051,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "7cef9d520d672bb802588ad0d13151bc51aee9a408c270aebf25d6530045dd29",
-    cogVersion: "0.16.8"
+    latestVersionId: "ba437a62603f1205b253fd7bad0d0b5c326d7857242d11753c0cbcd2c5008602",
+    cogVersion: "0.16.9"
   }
 }, {
-  id: 'ideogram-ai/ideogram-v2a',
+  id: 'bria/genfill',
   provider: 'replicate',
-  name: 'ideogram-v2a',
-  contextWindow: 0,
+  name: 'genfill',
+  contextWindow: 77,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.013
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 11397
+  },
   metadata: {
-    owner: "ideogram-ai",
-    description: "Like Ideogram v2, but faster and cheaper",
-    runCount: 1941451,
+    owner: "bria",
+    description: "Bria GenFill enables high-quality object addition or visual transformation. Trained exclusively on licensed data for safe and risk-free commercial use.",
+    runCount: 8154,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "8b85e4363b03c25f1d248d0f7e3e118503f2b33773a51bab414603bd52f6112d",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'ideogram-ai/ideogram-v2a-turbo',
-  provider: 'replicate',
-  name: 'ideogram-v2a-turbo',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ideogram-ai",
-    description: "Like Ideogram v2 turbo, but now faster and cheaper",
-    runCount: 365850,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0afb968f42d1f96ab92f9c8d669c0e819fa36ccc74f02a7cd057595c9e42da01",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'ideogram-ai/ideogram-v3-balanced',
-  provider: 'replicate',
-  name: 'ideogram-v3-balanced',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ideogram-ai",
-    description: "Balance speed, quality and cost. Ideogram v3 creates images with stunning realism, creative designs, and consistent styles",
-    runCount: 324109,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "41f9f0d4bf6c470dd0f5085dadc6c14ffb8ed4ce1f6bffbbc10b03ecf5b053fb",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'ideogram-ai/ideogram-v3-quality',
-  provider: 'replicate',
-  name: 'ideogram-v3-quality',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ideogram-ai",
-    description: "The highest quality Ideogram v3 model. v3 creates images with stunning realism, creative designs, and consistent styles",
-    runCount: 2006943,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6dafa89a04b1547f0d1c1680b8dcd41ebb2f82c4e2f0c8a92d4bf5ea5250150b",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'ideogram-ai/ideogram-v3-turbo',
-  provider: 'replicate',
-  name: 'ideogram-v3-turbo',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ideogram-ai",
-    description: "Turbo is the fastest and cheapest Ideogram v3. v3 creates images with stunning realism, creative designs, and consistent styles",
-    runCount: 4401735,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d9b3748f95c0fe3e71f010f8cc5d80e8f5252acd0e74b1c294ee889eea52a47b",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/image-01',
-  provider: 'replicate',
-  name: 'image-01',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Minimax's first image model, with character reference support",
-    runCount: 2058418,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "928f3bd6ac899108d0ab8cf7f91dfa39a03eda0175e94c9b4cd075776dececf0",
-    cogVersion: "0.16.8"
+    latestVersionId: "797f0f06f83cbf44562f704989c06d1d00d637fb41b505828947524385740352",
+    cogVersion: "0.16.9"
   }
 }, {
   id: 'bria/image-3.2',
   provider: 'replicate',
   name: 'image-3.2',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 8747
+  },
   metadata: {
     owner: "bria",
     description: "Commercial-ready, trained entirely on licensed data, text-to-image model. With only 4B parameters provides exceptional aesthetics and text rendering. Evaluated to be on par to other leading models in the market",
-    runCount: 92135,
+    runCount: 99383,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "5a686caeba643ce41f4bd29ffd90da30b269fad94fb89a2798c0cfdaba81355d",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'nohamoamary/image-captioning-with-visual-attention',
-  provider: 'replicate',
-  name: 'image-captioning-with-visual-attention',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "nohamoamary",
-    description: "datasets: Flickr8k",
-    runCount: 11292,
-    githubUrl: "https://github.com/NohaMoAmary/image-captioning-with-visual-attention.git",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "9bb60a6baa58801aa7cd4c4fafc95fcf1531bf59b84962aff5a718f4d1f58986",
-    cogVersion: "0.6.1"
-  }
-}, {
-  id: 'topazlabs/image-upscale',
-  provider: 'replicate',
-  name: 'image-upscale',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "topazlabs",
-    description: "Professional-grade image upscaling, from Topaz Labs",
-    runCount: 985728,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "2fdc3b86a01d338ae89ad58e5d9241398a8a01de9b0dda41ba8a0434c8a00dc3",
-    cogVersion: "0.14.4"
-  }
-}, {
-  id: 'google/imagen-3',
-  provider: 'replicate',
-  name: 'imagen-3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Google's highest quality text-to-image model, capable of generating images with detail, rich lighting and beauty",
-    runCount: 1804491,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "034772fa4aa88662095bb029e926205b561edd19e8926a197c3893f149183a27",
+    latestVersionId: "72f4442b385377dac4717f1100d311eb939e4c59708b65f1c72b1208837383d1",
     cogVersion: "0.16.9"
-  }
-}, {
-  id: 'google/imagen-3-fast',
-  provider: 'replicate',
-  name: 'imagen-3-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "A faster and cheaper Imagen 3 model, for when price or speed are more important than final image quality",
-    runCount: 499406,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "c47d64c2735909a9d1d1150ce3a72db5ce21c867c2cd61d88beb81d4e05faf40",
-    cogVersion: "0.16.9"
-  }
-}, {
-  id: 'google/imagen-4',
-  provider: 'replicate',
-  name: 'imagen-4',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Google's Imagen 4 flagship model",
-    runCount: 5842161,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "87eddde6a7974171fdba871f646102196ab8a35e923b99807860fe3938a4776d",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/imagen-4-fast',
-  provider: 'replicate',
-  name: 'imagen-4-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Use this fast version of Imagen 4 when speed and cost are more important than quality",
-    runCount: 2076623,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "379ae26d34baa545cf3238afec9624f2c7f436f9f6335ff4e2b690bd23baea15",
-    cogVersion: "0.16.9"
-  }
-}, {
-  id: 'google/imagen-4-ultra',
-  provider: 'replicate',
-  name: 'imagen-4-ultra',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Use this ultra version of Imagen 4 when quality matters more than speed and cost",
-    runCount: 1107054,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "aaa4b26a47db69b33cd3ad8f4acc848c32b9fea2d7cec0a2af2f442a96bfa570",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'methexis-inc/img2prompt',
-  provider: 'replicate',
-  name: 'img2prompt',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "methexis-inc",
-    description: "Get an approximate text prompt, with style, matching an image.  (Optimized for stable-diffusion (clip ViT-L/14))",
-    runCount: 2658754,
-    githubUrl: "https://github.com/pharmapsychotic/clip-interrogator",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "50adaf2d3ad20a6f911a8a9e3ccf777b263b8596fbd2c8fc26e8888f8a0edbb5",
-    cogVersion: "0.4.1"
   }
 }, {
   id: 'bria/increase-resolution',
   provider: 'replicate',
   name: 'increase-resolution',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 5928
+  },
   metadata: {
     owner: "bria",
     description: "Bria Increase resolution upscales the resolution of any image. It increases resolution using a dedicated upscaling method that preserves the original image content without regeneration.",
-    runCount: 81242,
+    runCount: 85558,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "19266ced4be9ec28f269ab20a2622104cac9c518158b7761e7edeb30954bd01a",
-    cogVersion: "0.16.8"
+    latestVersionId: "ef056a00ed926814fbbc20b1c93e123da309a94773985571deb20a73d658184f",
+    cogVersion: "0.16.9"
   }
 }, {
-  id: 'vaibhavs10/incredibly-fast-whisper',
+  id: 'bytedance/bagel',
   provider: 'replicate',
-  name: 'incredibly-fast-whisper',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
-  metadata: {
-    owner: "vaibhavs10",
-    description: "whisper-large-v3, incredibly fast, powered by Hugging Face Transformers! 🤗",
-    runCount: 20058922,
-    githubUrl: "https://github.com/chenxwh/insanely-fast-whisper",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
-    cogVersion: "0.9.4"
-  }
-}, {
-  id: 'joehoover/instructblip-vicuna13b',
-  provider: 'replicate',
-  name: 'instructblip-vicuna13b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "joehoover",
-    description: "An instruction-tuned multi-modal model based on BLIP-2 and Vicuna-13B",
-    runCount: 257514,
-    githubUrl: "https://github.com/replicate/cog-lavis",
-    visibility: "public",
-    source: "replicate"
-  }
-}, {
-  id: 'zsyoaoa/invsr',
-  provider: 'replicate',
-  name: 'invsr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsyoaoa",
-    description: "Arbitrary-steps Image Super-resolution via Diffusion Inversion",
-    runCount: 5353,
-    githubUrl: "https://github.com/zsyOAOA/InvSR",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "37eebabfb6cdc4be2892b884b96b361d6fedc9f6a934d2fa3c1a2f85f004b0f0",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'ai-forever/kandinsky-2',
-  provider: 'replicate',
-  name: 'kandinsky-2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ai-forever",
-    description: "text2img model trained on LAION HighRes and fine-tuned on internal datasets",
-    runCount: 6180277,
-    githubUrl: "https://github.com/chenxwh/Kandinsky-2",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "3c6374e7a9a17e01afe306a5218cc67de55b19ea536466d6ea2602cfecea40a9",
-    cogVersion: "v0.9.5+dev"
-  }
-}, {
-  id: 'ai-forever/kandinsky-2.2',
-  provider: 'replicate',
-  name: 'kandinsky-2.2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "ai-forever",
-    description: "multilingual text2image latent diffusion model",
-    runCount: 10027464,
-    githubUrl: "https://github.com/chenxwh/Kandinsky-2/tree/v2.2",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "ad9d7879fbffa2874e1d909d1d37d9bc682889cc65b31f7bb00d2362619f194a",
-    cogVersion: "0.9.4"
-  }
-}, {
-  id: 'kwaivgi/kling-v1.6-pro',
-  provider: 'replicate',
-  name: 'kling-v1.6-pro',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "Generate 5s and 10s videos in 1080p resolution",
-    runCount: 775545,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "974c9c5bc69f8f9c178ddea80d8936ba46c48081ad6b6ccca8843d44010c0642",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'kwaivgi/kling-v1.6-standard',
-  provider: 'replicate',
-  name: 'kling-v1.6-standard',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "Generate 5s and 10s videos in 720p resolution at 30fps",
-    runCount: 1389290,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e6f571e8d6990da3c96abf8d3082894024d652822f0ca3cd244acece84a1cc3e",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'kwaivgi/kling-v2.0',
-  provider: 'replicate',
-  name: 'kling-v2.0',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "Generate 5s and 10s videos in 720p resolution",
-    runCount: 80323,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "52b5e4c10d12e89be0b8f8e9462412cecc5d041f4201a8d8b05dc7e29a70f938",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'kwaivgi/kling-v2.1',
-  provider: 'replicate',
-  name: 'kling-v2.1',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "Use Kling v2.1 to generate 5s and 10s videos in 720p and 1080p resolution from a starting image (image-to-video)",
-    runCount: 2643509,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "daad218feb714b03e2a1ac445986aebb9d05243cd00da2af17be2e4049f48f69",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'kwaivgi/kling-v2.1-master',
-  provider: 'replicate',
-  name: 'kling-v2.1-master',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "A premium version of Kling v2.1 with superb dynamics and prompt adherence. Generate 1080p 5s and 10s videos from text or an image",
-    runCount: 74482,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6a190b5a360fcfd057b6e702f9cdc7352a8e3f08dba0ded31cd1988991bf14a2",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'kwaivgi/kling-v2.5-turbo-pro',
-  provider: 'replicate',
-  name: 'kling-v2.5-turbo-pro',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "kwaivgi",
-    description: "Kling 2.5 Turbo Pro: Unlock pro-level text-to-video and image-to-video creation with smooth motion, cinematic depth, and remarkable prompt adherence.",
-    runCount: 1230848,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "939cd1851c5b112f284681b57ee9b0f36d0f913ba97de5845a7eef92d52837df",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'jaaari/kokoro-82m',
-  provider: 'replicate',
-  name: 'kokoro-82m',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "jaaari",
-    description: "Kokoro v1.0 - text-to-speech (82M params, based on StyleTTS2)",
-    runCount: 60299601,
-    githubUrl: "https://github.com/hexgrad/kokoro",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "f559560eb822dc509045f3921a1921234918b91739db4bf3daab2169b71c7a13",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'fofr/latent-consistency-model',
-  provider: 'replicate',
-  name: 'latent-consistency-model',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "Super-fast, 0.6s per image. LCM with img2img, large batching and canny controlnet",
-    runCount: 1533852,
-    githubUrl: "https://github.com/fofr/cog-lcm",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "683d19dc312f7a9f0428b04429a9ccefd28dbf7785fef083ad5cf991b65f406f",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'nightmareai/latent-sr',
-  provider: 'replicate',
-  name: 'latent-sr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "nightmareai",
-    description: "Upscale images with the latent diffusion superresolution model",
-    runCount: 116523,
-    githubUrl: "https://github.com/NightmareAI/latent-diffusion",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "9117a98dd15e931011b8b960963a2dec20ab493c6c0d3a134525273da1616abc",
-    cogVersion: "v0.3.13+dev"
-  }
-}, {
-  id: 'lucataco/llama-3-vision-alpha',
-  provider: 'replicate',
-  name: 'llama-3-vision-alpha',
-  contextWindow: 0,
+  name: 'bagel',
+  contextWindow: 4096,
   tier: 'experimental',
-  capabilities: new Set(['vision', 'chat', 'streaming']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision', 'reasoning']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'reason']),
+  pricing: {
+    perRequest: 0.05
+  },
+  metrics: {
+    averageRequestDuration: 83017
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Projection module trained to add vision capabilties to Llama 3 using SigLIP",
-    runCount: 5901,
-    githubUrl: "https://github.com/lucataco/cog-llama-3-vision-alpha",
+    owner: "bytedance",
+    description: "🥯ByteDance Seed's Bagel Unified multimodal AI that generates images, edits images, and understands images in one 7B parameter model🥯",
+    runCount: 246974,
+    githubUrl: "https://github.com/zsxkib/cog-bagel",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "79f9f3418f65fb5d180978a969d5646e33f8ca67430a2fe903c9a4be82565925",
-    cogVersion: "0.12.0"
+    latestVersionId: "7dd8def79e503990740db4704fa81af995d440fefe714958531d7044d2757c9c",
+    cogVersion: "0.14.9"
   }
 }, {
-  id: 'yorickvp/llava-13b',
+  id: 'bytedance/dolphin',
   provider: 'replicate',
-  name: 'llava-13b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'dolphin',
+  contextWindow: 2048,
+  maxOutputTokens: 4096,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'json']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 8315
+  },
   metadata: {
-    owner: "yorickvp",
-    description: "Visual instruction tuning towards large language and vision models with GPT-4 level capabilities",
-    runCount: 32510087,
-    githubUrl: "https://github.com/haotian-liu/LLaVA",
+    owner: "bytedance",
+    description: "Document Image Parsing via Heterogeneous Anchor Prompting",
+    runCount: 1058,
+    githubUrl: "https://github.com/lucataco/cog-dolphin",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb",
-    cogVersion: "0.9.5"
-  }
-}, {
-  id: 'lightricks/ltx-video',
-  provider: 'replicate',
-  name: 'ltx-video',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lightricks",
-    description: "LTX-Video is the first DiT-based video generation model capable of generating high-quality videos in real-time. It produces 24 FPS videos at a 768x512 resolution faster than they can be watched.",
-    runCount: 161490,
-    githubUrl: "https://github.com/Lightricks/LTX-Video",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "8c47da666861d081eeb4d1261853087de23923a268a69b63febdf5dc1dee08e4",
-    cogVersion: "0.13.0"
-  }
-}, {
-  id: 'leonardoai/lucid-origin',
-  provider: 'replicate',
-  name: 'lucid-origin',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "leonardoai",
-    description: "Artistic and high-quality visuals with improved prompt adherence, diversity, and definition",
-    runCount: 147830,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "589fc21af967c3912ac0f04986604ee6a695067eb62890f53e0f805db4ff4aef",
+    latestVersionId: "3076d1f489b2365a2cc7d20d440a9a93e469a1eb145d85a7913a5c920b26d126",
     cogVersion: "0.16.8"
   }
 }, {
-  id: 'fermatresearch/magic-image-refiner',
+  id: 'bytedance/flux-pulid',
   provider: 'replicate',
-  name: 'magic-image-refiner',
-  contextWindow: 0,
+  name: 'flux-pulid',
+  contextWindow: 512,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.06
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.06
+  },
+  metrics: {
+    averageRequestDuration: 40000
+  },
   metadata: {
-    owner: "fermatresearch",
-    description: "A better alternative to SDXL refiners, providing a lot of quality and detail. Can also be used for inpainting or upscaling.",
-    runCount: 947591,
-    githubUrl: "https://github.com/BatouResearch/magic-image-refiner",
+    owner: "bytedance",
+    description: "⚡️FLUX PuLID: FLUX-dev based Pure and Lightning ID Customization via Contrastive Alignment🎭",
+    runCount: 2414411,
+    githubUrl: "https://github.com/zsxkib/PuLID/tree/cog-flux-pulid",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "507ddf6f977a7e30e46c0daefd30de7d563c72322f9e4cf7cbac52ef0f667b13",
-    cogVersion: "0.8.6"
+    latestVersionId: "8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b",
+    cogVersion: "0.9.20"
   }
 }, {
-  id: 'platform-kit/mars5-tts',
+  id: 'bytedance/pulid',
   provider: 'replicate',
-  name: 'mars5-tts',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
+  name: 'pulid',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 7500
+  },
   metadata: {
-    owner: "platform-kit",
-    description: "A novel speech model for insane prosody.",
-    runCount: 525,
-    githubUrl: "https://github.com/Camb-ai/MARS5-TTS",
+    owner: "bytedance",
+    description: "📖 PuLID: Pure and Lightning ID Customization via Contrastive Alignment",
+    runCount: 3584745,
+    githubUrl: "https://github.com/zsxkib/PuLID/tree/cog-sdxl-pulid",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "6aed0f11f3ba7b13d59ab3228355e7b1ea943479673cc57e10e99ba766536811",
-    cogVersion: "0.8.6"
+    latestVersionId: "43d309c37ab4e62361e5e29b8e9e867fb2dcbcec77ae91206a8d95ac5dd451a0",
+    cogVersion: "0.9.7"
   }
 }, {
-  id: 'tstramer/material-diffusion',
+  id: 'bytedance/sdxl-lightning-4step',
   provider: 'replicate',
-  name: 'material-diffusion',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  name: 'sdxl-lightning-4step',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0006
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 953
+  },
   metadata: {
-    owner: "tstramer",
-    description: "Stable diffusion fork for generating tileable outputs using v1.5 model",
-    runCount: 2347739,
+    owner: "bytedance",
+    description: "SDXL-Lightning by ByteDance: a fast text-to-image model that makes high-quality images in 4 steps",
+    runCount: 1029724075,
+    githubUrl: "https://github.com/lucataco/cog-sdxl-lightning-4step",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "6f7a773af6fc3e8de9d5a3c00be77c17308914bf67772726aff83496ba1e3bbe",
+    cogVersion: "0.14.1"
+  }
+}, {
+  id: 'bytedance/seededit-3.0',
+  provider: 'replicate',
+  name: 'seededit-3.0',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 13100
+  },
+  metadata: {
+    owner: "bytedance",
+    description: "Text-guided image editing model that preserves original details while making targeted modifications like lighting changes, object removal, and style conversion",
+    runCount: 654613,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "a42692c54c0f407f803a0a8a9066160976baedb77c91171a01730f9b0d7beeff",
-    cogVersion: "0.4.4"
+    latestVersionId: "528afa5354e3ea8c8038276c6fecb5c4877e739e4914d918f133f398762eb058",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'bytedance/seedream-3',
+  provider: 'replicate',
+  name: 'seedream-3',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "regular",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            },
+            {
+              width: 2048,
+              height: 2048,
+              cost: 0.008
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5676
+  },
+  metadata: {
+    owner: "bytedance",
+    description: "A text-to-image model with support for native high-resolution (2K) image generation",
+    runCount: 2940272,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ed344813bc9f4996be6de4febd8b9c14c7849ad7b21ab047572e3620ee374ee7",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'bytedance/seedream-4',
+  provider: 'replicate',
+  name: 'seedream-4',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.03
+            },
+            {
+              width: 2048,
+              height: 2048,
+              cost: 0.06
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 14365
+  },
+  metadata: {
+    owner: "bytedance",
+    description: "Unified text-to-image generation and precise single-sentence editing at up to 4K resolution",
+    runCount: 14690368,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "cf7d431991436f19d1c8dad83fe463c729c816d7a21056c5105e75c84a0aa7e9",
+    cogVersion: "0.16.9"
   }
 }, {
   id: 'camenduru/metavoice',
   provider: 'replicate',
   name: 'metavoice',
-  contextWindow: 0,
-  tier: 'flagship',
+  contextWindow: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['audio']),
-  pricing: {},
+  supportedParameters: new Set(['speechInstructions']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    tokensPerSecond: 14.75,
+    averageRequestDuration: 70604
+  },
   metadata: {
     owner: "camenduru",
     description: "MetaVoice-1B: 1.2B parameter base model trained on 100K hours of speech",
@@ -1930,217 +1903,24 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.9.0-beta11"
   }
 }, {
-  id: 'daanelson/minigpt-4',
+  id: 'center-for-curriculum-redesign/bge_1-5_query_embeddings',
   provider: 'replicate',
-  name: 'minigpt-4',
-  contextWindow: 0,
+  name: 'bge_1-5_query_embeddings',
+  contextWindow: 512,
   tier: 'efficient',
-  capabilities: new Set(['chat', 'streaming']),
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {},
   metadata: {
-    owner: "daanelson",
-    description: "A model which generates text in response to an input image and prompt.",
-    runCount: 1842169,
-    githubUrl: "https://github.com/daanelson/MiniGPT-4",
+    owner: "center-for-curriculum-redesign",
+    description: "Query embedding generator for BAAI's bge-large-en v1.5 embedding model",
+    runCount: 7704,
+    githubUrl: "https://github.com/Center-For-Curriculum-Redesign/cog-query-embeddings-template",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "e447a8583cffd86ce3b93f9c2cd24f2eae603d99ace6afa94b33a08e94a3cd06",
-    cogVersion: "v0.7.0-beta17+dev"
-  }
-}, {
-  id: 'genmoai/mochi-1',
-  provider: 'replicate',
-  name: 'mochi-1',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "genmoai",
-    description: "Mochi 1 preview is an open video generation model with high-fidelity motion and strong prompt adherence in preliminary evaluation",
-    runCount: 3053,
-    githubUrl: "https://github.com/lucataco/cog-mochi-1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "1944af04d098ef69bed7f9d335d102e652203f268ec4aaa2d836f6217217e460",
-    cogVersion: "0.13.3"
-  }
-}, {
-  id: 'zsxkib/molmo-7b',
-  provider: 'replicate',
-  name: 'molmo-7b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "allenai/Molmo-7B-D-0924, Answers questions and caption about images",
-    runCount: 835660,
-    githubUrl: "https://github.com/zsxkib/cog-molmo-7b-d",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "76ebd700864218a4ca97ac1ccff068be7222272859f9ea2ae1dd4ac073fa8de8",
-    cogVersion: "0.9.24"
-  }
-}, {
-  id: 'lucataco/moondream2',
-  provider: 'replicate',
-  name: 'moondream2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "moondream2 is a small vision language model designed to run efficiently on edge devices",
-    runCount: 5331407,
-    githubUrl: "https://github.com/lucataco/cog-moondream2",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "72ccb656353c348c1385df54b237eeb7bfa874bf11486cf0b9473e691b662d31",
-    cogVersion: "0.9.13"
-  }
-}, {
-  id: 'leonardoai/motion-2.0',
-  provider: 'replicate',
-  name: 'motion-2.0',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "leonardoai",
-    description: "Create 5s 480p videos from a text prompt",
-    runCount: 9031,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0cd08fd133f6bfffec01dcb8e21488169f8ce9676dd825a45e99b7c5476d7b40",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'joehoover/mplug-owl',
-  provider: 'replicate',
-  name: 'mplug-owl',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "joehoover",
-    description: "An instruction-tuned multimodal large language model that generates text based on user-provided prompts and images",
-    runCount: 55800,
-    githubUrl: "https://github.com/replicate/cog-mplug-owl",
-    visibility: "public",
-    source: "replicate"
-  }
-}, {
-  id: 'google/nano-banana',
-  provider: 'replicate',
-  name: 'nano-banana',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image', 'vision']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Google's latest image editing model in Gemini 2.5",
-    runCount: 41719376,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "7ea0000951d8ec4b579c6f7e12533077a32bc60be3a8a70d171cd57eb2341ed4",
-    cogVersion: "0.16.9"
-  }
-}, {
-  id: 'awerks/neon-tts',
-  provider: 'replicate',
-  name: 'neon-tts',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "awerks",
-    description: "NeonAI Coqui AI TTS Plugin.",
-    runCount: 166390,
-    githubUrl: "https://github.com/NeonGeckoCom/neon-tts-plugin-coqui",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "139606fe1536f85a9f07d87982400b8140c9a9673733d47913af96738894128f",
-    cogVersion: "0.8.3"
-  }
-}, {
-  id: 'fofr/not-real',
-  provider: 'replicate',
-  name: 'not-real',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "Make a very realistic looking real-world AI video",
-    runCount: 2253,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "19b3a157a2bee49509ea771214bdc645dbaae3b8dd0d71d99bbf802c69fbbe2b",
-    cogVersion: "0.14.0"
-  }
-}, {
-  id: 'lucataco/ollama-llama3.2-vision-11b',
-  provider: 'replicate',
-  name: 'ollama-llama3.2-vision-11b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['vision', 'chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "Ollama Llama 3.2 Vision 11B",
-    runCount: 3077,
-    githubUrl: "https://github.com/lucataco/cog-ollama-llama3.2-vision-90b",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d4e81fc1472556464f1ee5cea4de177b2fe95a6eaadb5f63335df1ba654597af",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'lucataco/ollama-llama3.2-vision-90b',
-  provider: 'replicate',
-  name: 'ollama-llama3.2-vision-90b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['vision', 'chat', 'streaming']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "Ollama Llama 3.2 Vision 90B",
-    runCount: 3455,
-    githubUrl: "https://github.com/lucataco/cog-ollama-llama3.2-vision-90b",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "54202b223d5351c5afe5c0c9dba2b3042293b839d022e76f53d66ab30b9dc814",
-    cogVersion: "0.13.6"
-  }
-}, {
-  id: 'lucataco/open-dalle-v1.1',
-  provider: 'replicate',
-  name: 'open-dalle-v1.1',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "A unique fusion that showcases exceptional prompt adherence and semantic understanding, it seems to be a step above base SDXL and a step closer to DALLE-3 in terms of prompt comprehension",
-    runCount: 132450,
-    githubUrl: "https://github.com/lucataco/cog-opendalle-v1.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "1c7d4c8dec39c7306df7794b28419078cb9d18b9213ab1c21fdc46a1deca0144",
+    latestVersionId: "438621acdb4511d2d9c6296860588ee6c60c3df63c93e2012297db8bb965732d",
     cogVersion: "0.8.6"
   }
 }, {
@@ -2148,13 +1928,22 @@ export const replicateModels: ModelInfo[] = [{
   provider: 'replicate',
   name: 'openvoice',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['audio']),
-  pricing: {},
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.000575
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5844
+  },
   metadata: {
     owner: "chenxwh",
     description: "Updated to OpenVoice v2: Versatile Instant Voice Cloning",
-    runCount: 78731,
+    runCount: 78977,
     githubUrl: "https://github.com/chenxwh/OpenVoice",
     visibility: "public",
     source: "replicate",
@@ -2162,53 +1951,259 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "v0.9.6+dev"
   }
 }, {
-  id: 'lucataco/orpheus-3b-0.1-ft',
+  id: 'chigozienri/mediapipe-face',
   provider: 'replicate',
-  name: 'orpheus-3b-0.1-ft',
+  name: 'mediapipe-face',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageBackground']),
+  pricing: {
+    perRequest: 0.0001
+  },
+  metrics: {
+    averageRequestDuration: 438
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Orpheus 3B - high quality, emotive Text to Speech",
-    runCount: 30983,
-    githubUrl: "https://github.com/lucataco/cog-orpheus-3b-0.1-ft",
+    owner: "chigozienri",
+    description: "batch or individual face detection with mediapipe",
+    runCount: 95337,
+    githubUrl: "https://github.com/chigozienri/cog-mediapipe-face",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "79f2a473e6a9720716a473d9b2f2951437dbf91dc02ccb7079fb3d89b881207f",
-    cogVersion: "0.14.2"
+    latestVersionId: "b52b4833a810a8b8d835d6339b72536d63590918b185588be2def78a89e7ca7b",
+    cogVersion: "0.8.6"
   }
 }, {
-  id: 'nvidia/parakeet-rnnt-1.1b',
+  id: 'cjwbw/bigcolor',
   provider: 'replicate',
-  name: 'parakeet-rnnt-1.1b',
+  name: 'bigcolor',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageStyle']),
+  pricing: {
+    image: {
+      output: []
+    },
+    perRequest: 0.0025
+  },
+  metrics: {
+    averageRequestDuration: 4592
+  },
   metadata: {
-    owner: "nvidia",
-    description: "🗣️ Nvidia + Suno.ai's speech-to-text conversion with high accuracy and efficiency 📝",
-    runCount: 19002,
-    githubUrl: "https://github.com/zsxkib/cog-parakeet-rnnt-1.1b",
+    owner: "cjwbw",
+    description: "Colorization using a Generative Color Prior for Natural Images",
+    runCount: 626579,
+    githubUrl: "https://github.com/KIMGEONUNG/BigColor",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "73ddbebaef172a47c8dfdd79381f110bfdc7691bcc7a4edde82f0a39e380ce50",
-    cogVersion: "0.8.6"
+    latestVersionId: "9451bfbf652b21a9bccc741e5c7046540faa5586cfa3aa45abc7dbb46151a4f7",
+    cogVersion: "0.3.13"
+  }
+}, {
+  id: 'cjwbw/canary-1b',
+  provider: 'replicate',
+  name: 'canary-1b',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 12993
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Nvidia Automatic speech-to-text recognition (ASR) in 4 languages (English, German, French, Spanish)",
+    runCount: 277,
+    githubUrl: "https://github.com/chenxwh/cog-canary",
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'cjwbw/cogvlm',
+  provider: 'replicate',
+  name: 'cogvlm',
+  contextWindow: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.0073
+  },
+  metrics: {
+    averageRequestDuration: 12770
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "powerful open-source visual language model",
+    runCount: 1497727,
+    githubUrl: "https://github.com/chenxwh/CogVLM",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a5092d718ea77a073e6d8f6969d5c0fb87d0ac7e4cdb7175427331e1798a34ed",
+    cogVersion: "0.8.3"
+  }
+}, {
+  id: 'cjwbw/docentr',
+  provider: 'replicate',
+  name: 'docentr',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0028
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.0028
+  },
+  metrics: {
+    averageRequestDuration: 5007
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "End-to-End Document Image Enhancement Transformer",
+    runCount: 4671,
+    githubUrl: "https://github.com/dali92002/DocEnTR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0bc456216d675a98405175bf49f2123a6e32a52e0d6a00159edf3f3dc010fa09",
+    cogVersion: "0.4.2"
+  }
+}, {
+  id: 'cjwbw/face-align-cog',
+  provider: 'replicate',
+  name: 'face-align-cog',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5538
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "face alignment using stylegan-encoding",
+    runCount: 6033,
+    githubUrl: "https://github.com/chenxwh/face-alignment-cog",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5eef2d837be6ccf360432ca1a25b6300e644be8a560d0042dfd560cce63cd537",
+    cogVersion: "0.3.4"
+  }
+}, {
+  id: 'cjwbw/internlm-xcomposer',
+  provider: 'replicate',
+  name: 'internlm-xcomposer',
+  contextWindow: 4096,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.012
+  },
+  metrics: {
+    averageRequestDuration: 9930
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Advanced text-image comprehension and composition based on InternLM",
+    runCount: 164425,
+    githubUrl: "https://github.com/chenxwh/InternLM-XComposer",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d16df299dbe3454023fcb47ed48dbff052e9b7cdf2837707adff3581edd11e95",
+    cogVersion: "0.8.3"
+  }
+}, {
+  id: 'cjwbw/night-enhancement',
+  provider: 'replicate',
+  name: 'night-enhancement',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "medium",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 6080
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Unsupervised Night Image Enhancement",
+    runCount: 43772,
+    githubUrl: "https://github.com/jinyeying/night-enhancement",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4328e402cfedafa70ad7cec04412e86ab61832204deccd94108ae5222c9b1ae1",
+    cogVersion: "0.4.1"
   }
 }, {
   id: 'cjwbw/parler-tts',
   provider: 'replicate',
   name: 'parler-tts',
-  contextWindow: 0,
-  tier: 'flagship',
+  contextWindow: 2580,
+  tier: 'efficient',
   capabilities: new Set(['audio']),
+  supportedParameters: new Set(['speechInstructions']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 16375
+  },
   metadata: {
     owner: "cjwbw",
     description: "lightweight text-to-speech (TTS) model, trained on 10.5K hours of audio data",
-    runCount: 2678,
+    runCount: 2684,
     githubUrl: "https://github.com/huggingface/parler-tts",
     visibility: "public",
     source: "replicate",
@@ -2216,179 +2211,636 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.9.4"
   }
 }, {
-  id: 'lucataco/pasd-magnify',
+  id: 'cjwbw/real-esrgan',
   provider: 'replicate',
-  name: 'pasd-magnify',
+  name: 'real-esrgan',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.007
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 12132
+  },
   metadata: {
-    owner: "lucataco",
-    description: "(Academic and Non-commercial use only) Pixel-Aware Stable Diffusion for Realistic Image Super-resolution and Personalized Stylization",
-    runCount: 42476,
-    githubUrl: "https://github.com/lucataco/cog-PASD-Magnify",
+    owner: "cjwbw",
+    description: "Real-ESRGAN: Real-World Blind Super-Resolution",
+    runCount: 2622573,
+    githubUrl: "https://github.com/chenxwh/cog-Real-ESRGAN",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "d59e83ee13c42b137aee558c483e3acc0a8ecdacb1444a7be48152f008dcc195",
-    cogVersion: "0.8.6"
+    latestVersionId: "d0ee3d708c9b911f122a4ad90046c5d26a0293b99476d697f6bb7f2e251ce2d4",
+    cogVersion: "0.6.1"
   }
 }, {
-  id: 'lucataco/pheme',
+  id: 'cjwbw/rudalle-sr',
   provider: 'replicate',
-  name: 'pheme',
+  name: 'rudalle-sr',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 13951
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Pheme generates a variety of conversational voices in 16 kHz for phone-call applications",
-    runCount: 562,
-    githubUrl: "https://github.com/lucataco/pheme",
+    owner: "cjwbw",
+    description: "Real-ESRGAN super-resolution model from ruDALL-E",
+    runCount: 485242,
+    githubUrl: "https://github.com/CJWBW/rudalle-sr",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "f307b9d2b9966608aec791d4a741dc3806f95d9eb92300fdcefeb9aecd4594cd",
-    cogVersion: "0.8.6"
+    latestVersionId: "32fdb2231d00a10d33754cc2ba794a2dfec94216579770785849ce6f149dbc69",
+    cogVersion: "0.4.1"
   }
 }, {
-  id: 'luma/photon',
+  id: 'cjwbw/seamless_communication',
   provider: 'replicate',
-  name: 'photon',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  name: 'seamless_communication',
+  contextWindow: 4096,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['chat', 'hearing', 'audio']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5104
+  },
   metadata: {
-    owner: "luma",
-    description: "High-quality image generation model optimized for creative professional workflows and ultra-high fidelity outputs",
-    runCount: 3005301,
-    githubUrl: null,
+    owner: "cjwbw",
+    description: "SeamlessM4T—Massively Multilingual & Multimodal Machine Translation",
+    runCount: 90702,
+    githubUrl: "https://github.com/chenxwh/seamless_communication",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "fe142c037cf359764f2058c3a42ef0dc750d908311d02868cbc7769fe800b648",
-    cogVersion: "0.10.0-alpha27"
+    latestVersionId: "668a4fec05a887143e5fe8d45df25ec4c794dd43169b9a11562309b2d45873b0",
+    cogVersion: "0.8.3"
   }
 }, {
-  id: 'luma/photon-flash',
+  id: 'cjwbw/supir',
   provider: 'replicate',
-  name: 'photon-flash',
+  name: 'supir',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 18567
+  },
   metadata: {
-    owner: "luma",
-    description: "Accelerated variant of Photon prioritizing speed while maintaining quality",
-    runCount: 186165,
-    githubUrl: null,
+    owner: "cjwbw",
+    description: "Practicing Model Scaling for Photo-Realistic Image Restoration In the Wild. This version uses LLaVA-13b for captioning.",
+    runCount: 189838,
+    githubUrl: "https://github.com/chenxwh/SUPIR",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "8cee7d47f81d8f4f77c1aec44ffb3d1ce09d36388db637ceaa8a6cbcf30b63e1",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'open-mmlab/pia',
-  provider: 'replicate',
-  name: 'pia',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "open-mmlab",
-    description: "Personalized Image Animator",
-    runCount: 103505,
-    githubUrl: "https://github.com/chenxwh/PIA",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "7a673cec329e8f9c51a96791030103467e04aad905cc0319ad6501eb2d54e91b",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'pixverse/pixverse-v4',
-  provider: 'replicate',
-  name: 'pixverse-v4',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "pixverse",
-    description: "Quickly generate smooth 5s or 8s videos at 540p, 720p or 1080p",
-    runCount: 34365,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "312bd23d692994a74914a3bc43b3ad79f6eb4a70873753728e6f388d2f021f1a",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'pixverse/pixverse-v4.5',
-  provider: 'replicate',
-  name: 'pixverse-v4.5',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "pixverse",
-    description: "Quickly make 5s or 8s videos at 540p, 720p or 1080p. It has enhanced motion, prompt coherence and handles complex actions well.",
-    runCount: 206203,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "06f3f252e730acd74bf2609352d14ca4f70d54a7fa10fc464c85e094edf071ff",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'pixverse/pixverse-v5',
-  provider: 'replicate',
-  name: 'pixverse-v5',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "pixverse",
-    description: "Create 5s-8s videos with enhanced character movement, visual effects, and exclusive 1080p-8s support. Optimized for anime characters and complex actions",
-    runCount: 619180,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "cd5f661a89a2cbca3b9ca7e15bea09426ec0ed635b94317e0d935d18da09d7fd",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'playgroundai/playground-v2.5-1024px-aesthetic',
-  provider: 'replicate',
-  name: 'playground-v2.5-1024px-aesthetic',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "playgroundai",
-    description: "Playground v2.5 is the state-of-the-art open-source model in aesthetic quality",
-    runCount: 2748747,
-    githubUrl: "https://github.com/lucataco/cog-playground-v2.5-1024px-aesthetic",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "a45f82a1382bed5c7aeb861dac7c7d191b0fdf74d8d57c4a0e6ed7d4d0bf7d24",
+    latestVersionId: "1302b550b4f7681da87ed0e405016d443fe1fafd64dabce6673401855a5039b5",
     cogVersion: "0.9.4"
+  }
+}, {
+  id: 'cjwbw/supir-v0f',
+  provider: 'replicate',
+  name: 'supir-v0f',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.017
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 23541
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Practicing Model Scaling for Photo-Realistic Image Restoration In the Wild. This is the SUPIR-v0F model and does NOT use LLaVA-13b.",
+    runCount: 19762,
+    githubUrl: "https://github.com/chenxwh/SUPIR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b9c26267b41f3617099b53f09f2d894a621ebf4a59b632bfedb5031eeabd8959",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'cjwbw/supir-v0q',
+  provider: 'replicate',
+  name: 'supir-v0q',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.05
+  },
+  metrics: {
+    averageRequestDuration: 22209
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Practicing Model Scaling for Photo-Realistic Image Restoration In the Wild. This is the SUPIR-v0Q model and does NOT use LLaVA-13b.",
+    runCount: 119247,
+    githubUrl: "https://github.com/chenxwh/SUPIR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ede69f6a5ae7d09f769d683347325b08d2f83a93d136ed89747941205e0a71da",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'cjwbw/voicecraft',
+  provider: 'replicate',
+  name: 'voicecraft',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['temperature', 'topP', 'seed']),
+  pricing: {
+    audio: {
+      perSecond: 0.000575
+    }
+  },
+  metrics: {
+    averageRequestDuration: 7300
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Zero-Shot Speech Editing and Text-to-Speech in the Wild",
+    runCount: 10697,
+    githubUrl: "https://github.com/jasonppy/VoiceCraft",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "db97f6312d4c4d20e500e47fd95d8f14b00d8d28e046834faffb7999d83b6b30",
+    cogVersion: "0.13.7"
+  }
+}, {
+  id: 'cjwbw/vqfr',
+  provider: 'replicate',
+  name: 'vqfr',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    },
+    perRequest: 0.00035
+  },
+  metrics: {
+    averageRequestDuration: 1553
+  },
+  metadata: {
+    owner: "cjwbw",
+    description: "Blind Face Restoration with Vector-Quantized Dictionary and Parallel Decoder",
+    runCount: 140485,
+    githubUrl: "https://github.com/TencentARC/VQFR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ccd53a9a38ebbaa783a1e6318d22fa68c14c3aed66cc3589e53ef07d07f5be1d",
+    cogVersion: "0.3.13"
+  }
+}, {
+  id: 'codeplugtech/object_remover',
+  provider: 'replicate',
+  name: 'object_remover',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0036
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 6240
+  },
+  metadata: {
+    owner: "codeplugtech",
+    description: null,
+    runCount: 17213,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "499559d430d997c34aa80142bfede2ad182b78e9dda9e8e03be5689d99969282",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'codeslake/ifan-defocus-deblur',
+  provider: 'replicate',
+  name: 'ifan-defocus-deblur',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 114797
+  },
+  metadata: {
+    owner: "codeslake",
+    description: "Removes defocus blur in an image",
+    runCount: 212762,
+    githubUrl: "https://github.com/codeslake/IFAN",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ea3b2e163e2ad629fb23e81a1cc9e485c32aa4a53eba4fe08b7dbdd39e6e381e",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'comfyui/any-comfyui-workflow',
+  provider: 'replicate',
+  name: 'any-comfyui-workflow',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['imageFormat', 'seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1800
+  },
+  metadata: {
+    owner: "comfyui",
+    description: "Run any ComfyUI workflow. Guide: https://github.com/replicate/cog-comfyui",
+    runCount: 6953023,
+    githubUrl: "https://github.com/replicate/cog-comfyui",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "16d0a881fbfc066f0471a3519a347db456fe8cbcbd53abb435a50a74efaeb427",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'cswry/seesr',
+  provider: 'replicate',
+  name: 'seesr',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.004
+  },
+  metrics: {
+    averageRequestDuration: 6152
+  },
+  metadata: {
+    owner: "cswry",
+    description: "SeeSR: Towards Semantics-Aware Real-World Image Super-Resolution",
+    runCount: 102180,
+    githubUrl: "https://github.com/lucataco/SeeSR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "989cf3a66fd209363de347c3129d95d9fe639e44533ab47e07a6dfb3f250b6e3",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'cudanexus/ocr-surya',
+  provider: 'replicate',
+  name: 'ocr-surya',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 8000
+  },
+  metadata: {
+    owner: "cudanexus",
+    description: "Surya is a document OCR toolkit that does:",
+    runCount: 6607,
+    githubUrl: "https://github.com/VikParuchuri/surya",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7ab5bedee2cd1f0c82b2df6718d19bf0b473f738f9db062f122e47e1467f96ce",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'curt-park/sentiment-analysis',
+  provider: 'replicate',
+  name: 'sentiment-analysis',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['chat', 'json']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.0001
+  },
+  metrics: {
+    averageRequestDuration: 40
+  },
+  metadata: {
+    owner: "curt-park",
+    description: "Sentiment Analysis with Texts",
+    runCount: 4892,
+    githubUrl: "https://github.com/Curt-Park/playground/tree/main/cog-quickstart",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "49d8f5a887de5668d4333ca1ed520002d2c52a1355d2fdb02a4d41850768a19a",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'cuuupid/glm-4v-9b',
+  provider: 'replicate',
+  name: 'glm-4v-9b',
+  contextWindow: 8192,
+  maxOutputTokens: 8192,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat', 'streaming']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 22,
+    averageRequestDuration: 9510
+  },
+  metadata: {
+    owner: "cuuupid",
+    description: "GLM-4V is a multimodal model released by Tsinghua University that is competitive with GPT-4o and establishes a new SOTA on several benchmarks, including OCR.",
+    runCount: 92496,
+    githubUrl: "https://github.com/THUDM/GLM-4",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "69196a237cdc310988a4b12ad64f4b36d10189428c19a18526af708546e1856f",
+    cogVersion: "v0.10.0-alpha13+dev"
+  }
+}, {
+  id: 'cuuupid/gte-qwen2-7b-instruct',
+  provider: 'replicate',
+  name: 'gte-qwen2-7b-instruct',
+  contextWindow: 32768,
+  tier: 'efficient',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1045
+  },
+  metadata: {
+    owner: "cuuupid",
+    description: "Embed text with Qwen2-7b-Instruct",
+    runCount: 1105023,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "67b1736bae9312a321217b2e10547882943b9e4a285eac4cba4043fab954b954",
+    cogVersion: "v0.10.0-alpha13+dev"
+  }
+}, {
+  id: 'cuuupid/marker',
+  provider: 'replicate',
+  name: 'marker',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 1822
+  },
+  metadata: {
+    owner: "cuuupid",
+    description: "Convert scanned or electronic documents to markdown, very very very fast",
+    runCount: 2892,
+    githubUrl: "https://github.com/cuuupid/cog-marker",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4eb62a42c3e5b8695a796936e69afa2c004839aef15410f01492d59783baf752",
+    cogVersion: "0.8.3"
+  }
+}, {
+  id: 'daanelson/imagebind',
+  provider: 'replicate',
+  name: 'imagebind',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding', 'vision', 'hearing']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.0003
+  },
+  metrics: {
+    averageRequestDuration: 552
+  },
+  metadata: {
+    owner: "daanelson",
+    description: "A model for text, audio, and image embeddings in one space",
+    runCount: 9411040,
+    githubUrl: "https://github.com/daanelson/ImageBind",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0383f62e173dc821ec52663ed22a076d9c970549c209666ac3db181618b7a304",
+    cogVersion: "0.7.0-beta17"
+  }
+}, {
+  id: 'daanelson/minigpt-4',
+  provider: 'replicate',
+  name: 'minigpt-4',
+  contextWindow: 4000,
+  maxOutputTokens: 3000,
+  tier: 'experimental',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['temperature', 'topP', 'maxTokens']),
+  pricing: {
+    perRequest: 0.0123
+  },
+  metrics: {
+    tokensPerSecond: 8,
+    timeToFirstToken: 500,
+    averageRequestDuration: 17000,
+    accuracyScore: 0.8
+  },
+  metadata: {
+    owner: "daanelson",
+    description: "A model which generates text in response to an input image and prompt.",
+    runCount: 1842211,
+    githubUrl: "https://github.com/daanelson/MiniGPT-4",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e447a8583cffd86ce3b93f9c2cd24f2eae603d99ace6afa94b33a08e94a3cd06",
+    cogVersion: "v0.7.0-beta17+dev"
+  }
+}, {
+  id: 'daanelson/whisperx',
+  provider: 'replicate',
+  name: 'whisperx',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing', 'json']),
+  supportedParameters: new Set(['responseFormat']),
+  pricing: {
+    audio: {
+      perSecond: 0.00055
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2700
+  },
+  metadata: {
+    owner: "daanelson",
+    description: "Accelerated transcription of audio using WhisperX",
+    runCount: 91667,
+    githubUrl: "https://github.com/daanelson/cog-whisperx",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9aa6ecadd30610b81119fc1b6807302fd18ca6cbb39b3216f430dcf23618cedd",
+    cogVersion: "0.8.0-beta8"
   }
 }, {
   id: 'datacte/proteus-v0.2',
   provider: 'replicate',
   name: 'proteus-v0.2',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 5446
+  },
   metadata: {
     owner: "datacte",
     description: "Proteus v0.2 shows subtle yet significant improvements over Version 0.1. It demonstrates enhanced prompt understanding that surpasses MJ6, while also approaching its stylistic capabilities.",
-    runCount: 11168730,
+    runCount: 11213409,
     githubUrl: "https://github.com/lucataco/cog-proteus-v0.2",
     visibility: "public",
     source: "replicate",
@@ -2406,7 +2858,7 @@ export const replicateModels: ModelInfo[] = [{
   metadata: {
     owner: "datacte",
     description: "ProteusV0.3: The Anime Update",
-    runCount: 4812602,
+    runCount: 4854536,
     githubUrl: "https://github.com/lucataco/cog-proteus-v0.3",
     visibility: "public",
     source: "replicate",
@@ -2414,53 +2866,2677 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.9.3"
   }
 }, {
-  id: 'zsxkib/pyramid-flow',
+  id: 'datalab-to/marker',
   provider: 'replicate',
-  name: 'pyramid-flow',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  name: 'marker',
+  contextWindow: 128000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'json', 'structured']),
+  supportedParameters: new Set(['structuredOutput']),
+  pricing: {
+    image: {
+      input: 0.005
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 11737,
+    accuracyScore: 0.95
+  },
   metadata: {
-    owner: "zsxkib",
-    description: "Text-to-Video + Image-to-Video:  Pyramid Flow Autoregressive Video Generation method based on Flow Matching",
-    runCount: 9029,
-    githubUrl: "https://github.com/zsxkib/cog-pyramid-flow/tree/replicate",
+    owner: "datalab-to",
+    description: "Convert PDF to markdown + JSON quickly with high accuracy",
+    runCount: 2730,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "8e221e66498a52bb3a928a4b49d85379c99ca60fec41511265deec35d547c1fb",
-    cogVersion: "0.9.25"
+    latestVersionId: "60af7e72bef73c71197269b27a98929910d7496806efecac17d9deab596e5239",
+    cogVersion: "0.16.8"
   }
 }, {
-  id: 'qwen/qwen-image',
+  id: 'datalab-to/ocr',
   provider: 'replicate',
-  name: 'qwen-image',
+  name: 'ocr',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5454
+  },
+  metadata: {
+    owner: "datalab-to",
+    description: "Detect and transcribe text in images with accurate bounding boxes, layout analysis, reding order, and table recognition, in 90 languages",
+    runCount: 2132,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "3e6db0d5311d6fdc232eea333c1e26055ba4e542180043f12acb2967e5c77f4a",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'easel/advanced-face-swap',
+  provider: 'replicate',
+  name: 'advanced-face-swap',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0035
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.0035
+  },
+  metrics: {
+    averageRequestDuration: 5921
+  },
+  metadata: {
+    owner: "easel",
+    description: "Face swap one or two people into a target image",
+    runCount: 107635,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "602d8c526aca9e5081f0515649ff8998e058cf7e6b9ff32717d25327f18c5145",
+    cogVersion: "0.14.0-alpha1"
+  }
+}, {
+  id: 'easel/ai-avatars',
+  provider: 'replicate',
+  name: 'ai-avatars',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 23593
+  },
+  metadata: {
+    owner: "easel",
+    description: "Use one or two face images to create AI avatars",
+    runCount: 32364,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "27ebf241efeded7a50964c7cff8f27c79e1570674be70d8e1df712ae31857d34",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'fermatresearch/high-resolution-controlnet-tile',
+  provider: 'replicate',
+  name: 'high-resolution-controlnet-tile',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 2560,
+              height: 2560,
+              cost: 0.0345
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.0345
+  },
+  metrics: {
+    averageRequestDuration: 60000
+  },
+  metadata: {
+    owner: "fermatresearch",
+    description: "UPDATE: new upscaling algorithm for a much improved image quality. Fermat.app open-source implementation of an efficient ControlNet 1.1 tile for high-quality upscales. Increase the creativity to encourage hallucination.",
+    runCount: 647596,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8e6a54d7b2848c48dc741a109d3fb0ea2a7f554eb4becd39a25cc532536ea975",
+    cogVersion: "0.9.13"
+  }
+}, {
+  id: 'fermatresearch/magic-image-refiner',
+  provider: 'replicate',
+  name: 'magic-image-refiner',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3454
+  },
+  metadata: {
+    owner: "fermatresearch",
+    description: "A better alternative to SDXL refiners, providing a lot of quality and detail. Can also be used for inpainting or upscaling.",
+    runCount: 947817,
+    githubUrl: "https://github.com/BatouResearch/magic-image-refiner",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "507ddf6f977a7e30e46c0daefd30de7d563c72322f9e4cf7cbac52ef0f667b13",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fermatresearch/magic-style-transfer',
+  provider: 'replicate',
+  name: 'magic-style-transfer',
+  contextWindow: 77,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 14568
+  },
+  metadata: {
+    owner: "fermatresearch",
+    description: "Restyle an image with the style of another one. I strongly suggest to upscale the results with Clarity AI",
+    runCount: 50938,
+    githubUrl: "https://github.com/BatouResearch/Cog-Face-to-Anything/tree/magic-style-transfer",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "3b5fa5d360c361090f11164292e45cc5d14cea8d089591d47c580cac9ec1c7ca",
+    cogVersion: "0.9.5"
+  }
+}, {
+  id: 'fermatresearch/sdxl-controlnet-lora',
+  provider: 'replicate',
+  name: 'sdxl-controlnet-lora',
+  contextWindow: 77,
+  tier: 'flagship',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.012
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 20411
+  },
+  metadata: {
+    owner: "fermatresearch",
+    description: "'''Last update: Now supports img2img.''' SDXL Canny controlnet with LoRA support.",
+    runCount: 978356,
+    githubUrl: "https://github.com/BatouResearch/Cog-SDXL-ControlNet-LoRA",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "3bb13fe1c33c35987b33792b01b71ed6529d03f165d1c2416375859f09ca9fef",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fermatresearch/spanish-f5-tts',
+  provider: 'replicate',
+  name: 'spanish-f5-tts',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 12236
+  },
+  metadata: {
+    owner: "fermatresearch",
+    description: "A F5-TTS fine-tuned for Spanish",
+    runCount: 1031,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f26405b801a0b0945679fb3adf9bbca7ab8559c7fd9cf7cd2a68067c3aab83f7",
+    cogVersion: "0.11.6"
+  }
+}, {
+  id: 'fewjative/ultimate-sd-upscale',
+  provider: 'replicate',
+  name: 'ultimate-sd-upscale',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 59000
+  },
+  metadata: {
+    owner: "fewjative",
+    description: "Ultimate SD Upscale with ControlNet Tile",
+    runCount: 165054,
+    githubUrl: "https://github.com/fewjative/cog-ultimate-sd-upscale",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5daf1012d946160622cd1bd45ed8f12d9675d24659276ccfe24804035f3b3ad7",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'flux-kontext-apps/change-haircut',
+  provider: 'replicate',
+  name: 'change-haircut',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 6215
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "Quickly change someone's hair style and hair color, powered by FLUX.1 Kontext [pro]",
+    runCount: 135228,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e30b995ea7834dd440ee987205fffe1841ce28c638f2ec8d599972e904fe69f8",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'flux-kontext-apps/multi-image-kontext-max',
+  provider: 'replicate',
+  name: 'multi-image-kontext-max',
+  contextWindow: 77,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.02
+  },
+  metrics: {
+    averageRequestDuration: 8248
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "An experimental FLUX Kontext model that can combine two input images",
+    runCount: 207328,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "aa37e77197b933892f690e7e30418d971d091966490781b0f6caecff5bd1c7fb",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'flux-kontext-apps/multi-image-kontext-pro',
+  provider: 'replicate',
+  name: 'multi-image-kontext-pro',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 8592
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "An experimental model with FLUX Kontext Pro that can combine two input images",
+    runCount: 1806787,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "93b90058443599a0623db1d176446e246194e68e1e3e0b8febef90543a992e06",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'flux-kontext-apps/multi-image-list',
+  provider: 'replicate',
+  name: 'multi-image-list',
+  contextWindow: 2048,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.05
+  },
+  metrics: {
+    averageRequestDuration: 9521
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "FLUX Kontext max with list input for multiple images",
+    runCount: 156100,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "02f073c63abec2c72f0638164a25a64bd0ca70bce780c0ac75c6851252bb4c70",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'flux-kontext-apps/professional-headshot',
+  provider: 'replicate',
+  name: 'professional-headshot',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageBackground']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 6415
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "Create a professional headshot photo from any single image",
+    runCount: 62352,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "383e326b60ec0bd451af148f204579fc9dcc13c030df51ff2af628b2d2cdb21e",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'flux-kontext-apps/restore-image',
+  provider: 'replicate',
+  name: 'restore-image',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0034
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5864
+  },
+  metadata: {
+    owner: "flux-kontext-apps",
+    description: "Use FLUX Kontext to restore, fix scratches and damage, and colorize old photos",
+    runCount: 644733,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "da7613a13aac59a1a3231023f0f30cf27991695ee0fe7ef52959ec1e02311c25",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'fofr/become-image',
+  provider: 'replicate',
+  name: 'become-image',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image', 'streaming']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1690
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Adapt any picture of a face into another image",
+    runCount: 737883,
+    githubUrl: "https://github.com/fofr/cog-become-image",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8d0b076a2aff3904dfcec3253c778e0310a68f78483c4699c7fd800f3051d2b3",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fofr/color-matcher',
+  provider: 'replicate',
+  name: 'color-matcher',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 1441
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Color match and white balance fixes for images",
+    runCount: 136767,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9870c2ebd9f6f747c39c23815cb58489e8df129e0bace4d61cf8ba3ddd03cb26",
+    cogVersion: "0.16.2"
+  }
+}, {
+  id: 'fofr/deprecated-batch-image-captioning',
+  provider: 'replicate',
+  name: 'deprecated-batch-image-captioning',
+  contextWindow: 128000,
+  maxOutputTokens: 4096,
+  tier: 'legacy',
+  tokenizer: 'GPT',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 23039
+  },
+  metadata: {
+    owner: "fofr",
+    description: "A wrapper model for captioning multiple images using GPT, Claude or Gemini, useful for lora training",
+    runCount: 1560,
+    githubUrl: "https://github.com/fofr/cog-batch-image-captioning",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d0adb15f4826881a68f1d82e0b10fe2ee1af536632dc8313f7f777ed8d264726",
+    cogVersion: "0.9.14"
+  }
+}, {
+  id: 'fofr/face-swap-with-ideogram',
+  provider: 'replicate',
+  name: 'face-swap-with-ideogram',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.022
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 37038
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Use ideogram-character to face-swap someone into a target image",
+    runCount: 19752,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "01775a8abbf145a9720e29b0060f72b99776d7bdb419d5d3367ee89ebfab0fa6",
+    cogVersion: "0.14.0"
+  }
+}, {
+  id: 'fofr/face-to-many',
+  provider: 'replicate',
+  name: 'face-to-many',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.005
+  },
+  metrics: {
+    averageRequestDuration: 6523
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Turn a face into 3D, emoji, pixel art, video game, claymation or toy",
+    runCount: 14750355,
+    githubUrl: "https://github.com/fofr/cog-face-to-many",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a07f252abbbd832009640b27f063ea52d87d7a23a185ca165bec23b5adc8deaf",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fofr/face-to-sticker',
+  provider: 'replicate',
+  name: 'face-to-sticker',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.005
+  },
+  metrics: {
+    averageRequestDuration: 4834
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Turn a face into a sticker",
+    runCount: 1616674,
+    githubUrl: "https://github.com/fofr/cog-face-to-sticker",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "764d4827ea159608a07cdde8ddf1c6000019627515eb02b6b449695fd547e5ef",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fofr/latent-consistency-model',
+  provider: 'replicate',
+  name: 'latent-consistency-model',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 768,
+              height: 768,
+              cost: 0.00035
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.00035
+  },
+  metrics: {
+    averageRequestDuration: 846
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Super-fast, 0.6s per image. LCM with img2img, large batching and canny controlnet",
+    runCount: 1534883,
+    githubUrl: "https://github.com/fofr/cog-lcm",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "683d19dc312f7a9f0428b04429a9ccefd28dbf7785fef083ad5cf991b65f406f",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fofr/prompt-classifier',
+  provider: 'replicate',
+  name: 'prompt-classifier',
+  contextWindow: 2048,
+  maxOutputTokens: 128,
+  tier: 'legacy',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'stop', 'seed']),
+  pricing: {
+    perRequest: 0.000235
+  },
+  metrics: {
+    timeToFirstToken: 408,
+    averageRequestDuration: 408
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Determines the toxicity of text to image prompts, llama-13b fine-tune. [SAFETY_RANKING] between 0 (safe) and 10 (toxic)",
+    runCount: 1894163,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1ffac777bf2c1f5a4a5073faf389fefe59a8b9326b3ca329e9d576cce658a00f",
+    cogVersion: "0.8.1"
+  }
+}, {
+  id: 'fofr/sdxl-emoji',
+  provider: 'replicate',
+  name: 'sdxl-emoji',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 15177
+  },
+  metadata: {
+    owner: "fofr",
+    description: "An SDXL fine-tune based on Apple Emojis",
+    runCount: 11345741,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "dee76b5afde21b0f01ed7925f0665b7e879c50ee718c5f78a9d38e04d523cc5e",
+    cogVersion: "v0.8.1+dev"
+  }
+}, {
+  id: 'fofr/sdxl-multi-controlnet-lora',
+  provider: 'replicate',
+  name: 'sdxl-multi-controlnet-lora',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 16949
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Multi-controlnet, lora loading, img2img, inpainting",
+    runCount: 215070,
+    githubUrl: "https://github.com/fofr/cog-sdxl-multicontrolnet-lora",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "89eb212b3d1366a83e949c12a4b45dfe6b6b313b594cb8268e864931ac9ffb16",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'fofr/sticker-maker',
+  provider: 'replicate',
+  name: 'sticker-maker',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1152,
+              height: 1152,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 4630
+  },
+  metadata: {
+    owner: "fofr",
+    description: "Make stickers with AI. Generates graphics with transparent backgrounds.",
+    runCount: 1763142,
+    githubUrl: "https://github.com/fofr/cog-stickers",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4acb778eb059772225ec213948f0660867b2e03f277448f18cf1800b96a65a1a",
+    cogVersion: "0.9.5"
+  }
+}, {
+  id: 'georgedavila/bart-large-mnli-classifier',
+  provider: 'replicate',
+  name: 'bart-large-mnli-classifier',
+  contextWindow: 1024,
+  tier: 'efficient',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 12642
+  },
+  metadata: {
+    owner: "georgedavila",
+    description: "Zero-shot classifier which classifies text into categories of your choosing. Returns a dictionary of the most likely class and all class likelihoods.",
+    runCount: 4295,
+    githubUrl: "https://github.com/GeorgeDavila/cog-bart-large-mnli",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d929487cf059f96a17752ebe55ae5a85b2e8be6cd627078e49c6caa2fd4213db",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'google-research/maxim',
+  provider: 'replicate',
+  name: 'maxim',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.02
+  },
+  metrics: {
+    averageRequestDuration: 21937
+  },
+  metadata: {
+    owner: "google-research",
+    description: "Multi-Axis MLP for Image Processing",
+    runCount: 555374,
+    githubUrl: "https://github.com/google-research/maxim",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "494ca4d578293b4b93945115601b6a38190519da18467556ca223d219c3af9f9",
+    cogVersion: "0.2.0"
+  }
+}, {
+  id: 'google/gemini-2.5-flash',
+  provider: 'replicate',
+  name: 'gemini-2.5-flash',
+  contextWindow: 1000000,
+  maxOutputTokens: 65535,
+  tier: 'efficient',
+  tokenizer: 'Gemini',
+  capabilities: new Set(['chat', 'vision', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'reason']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 48.7,
+    averageRequestDuration: 10651
+  },
+  metadata: {
+    owner: "google",
+    description: "Google’s hybrid “thinking” AI model optimized for speed and cost-efficiency",
+    runCount: 122795,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ae2e439e03512d7acac57e81a7a08cdd70f2a35ce46e6de628cc1f3bbcdbea6e",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/gemini-3-pro',
+  provider: 'replicate',
+  name: 'gemini-3-pro',
+  contextWindow: 2000000,
+  maxOutputTokens: 65535,
+  tier: 'flagship',
+  tokenizer: 'Gemini',
+  capabilities: new Set(['chat', 'vision', 'hearing', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'reason', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 19.35,
+    averageRequestDuration: 12364
+  },
+  metadata: {
+    owner: "google",
+    description: "Google's most advanced reasoning Gemini model",
+    runCount: 10894,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "6c727b6aa9d5663b515ff4d6d36520213d9991d5078adeafce44e6e49ed6f6ac",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/imagen-3',
+  provider: 'replicate',
+  name: 'imagen-3',
   contextWindow: 0,
   tier: 'flagship',
   capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 4569
+  },
   metadata: {
-    owner: "qwen",
-    description: "An image generation foundation model in the Qwen series that achieves significant advances in complex text rendering.",
-    runCount: 1001085,
-    githubUrl: "https://github.com/QwenLM/Qwen-Image",
+    owner: "google",
+    description: "Google's highest quality text-to-image model, capable of generating images with detail, rich lighting and beauty",
+    runCount: 1839103,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "905e345fe1dfe10d628daac2140dd8dea471c0d99793ef0fdc46a15c688b62fb",
-    cogVersion: "0.16.0"
+    latestVersionId: "3dd55f77cb0d2d81370db18b30cd976bb1fc4fe85048db4a5c28083e5e2bfbc4",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/imagen-3-fast',
+  provider: 'replicate',
+  name: 'imagen-3-fast',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 3184
+  },
+  metadata: {
+    owner: "google",
+    description: "A faster and cheaper Imagen 3 model, for when price or speed are more important than final image quality",
+    runCount: 507947,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a27df18374ee1e1464652b7d3bb142128b45a8f7285d0b5bca418948a52621be",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/imagen-4',
+  provider: 'replicate',
+  name: 'imagen-4',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 4159
+  },
+  metadata: {
+    owner: "google",
+    description: "Google's Imagen 4 flagship model",
+    runCount: 6053351,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "30d29dfc13701e1a738b196da7ff68ac637ecf9953a322d2e7dc8390bc093a33",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/imagen-4-fast',
+  provider: 'replicate',
+  name: 'imagen-4-fast',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.004
+  },
+  metrics: {
+    averageRequestDuration: 2905
+  },
+  metadata: {
+    owner: "google",
+    description: "Use this fast version of Imagen 4 when speed and cost are more important than quality",
+    runCount: 2259381,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "77b81010c767c1b66700bfab5020570eec1fa313da34a0b66dab835db71d42e3",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/imagen-4-ultra',
+  provider: 'replicate',
+  name: 'imagen-4-ultra',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 8921
+  },
+  metadata: {
+    owner: "google",
+    description: "Use this ultra version of Imagen 4 when quality matters more than speed and cost",
+    runCount: 1146060,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0e44dd067a6b6cd5dee3e1d3d3e1a7e92f61d43e5a19acbcb09435a6ab4bfb95",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/lyria-2',
+  provider: 'replicate',
+  name: 'lyria-2',
+  contextWindow: 0,
+  tier: 'flagship',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 26168
+  },
+  metadata: {
+    owner: "google",
+    description: "Lyria 2 is a music generation model that produces 48kHz stereo audio through text-based prompts",
+    runCount: 43537,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "bb621623ee2772c96d300b2a303c9e444b482f6b0fafcc7424923e1429971120",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/nano-banana',
+  provider: 'replicate',
+  name: 'nano-banana',
+  contextWindow: 32768,
+  tier: 'experimental',
+  tokenizer: 'Gemini',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 10476
+  },
+  metadata: {
+    owner: "google",
+    description: "Google's latest image editing model in Gemini 2.5",
+    runCount: 46363587,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d05a591283da31be3eea28d5634ef9e26989b351718b6489bd308426ebd0a3e8",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'google/upscaler',
+  provider: 'replicate',
+  name: 'upscaler',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 6950
+  },
+  metadata: {
+    owner: "google",
+    description: "Upscale images 2x or 4x times",
+    runCount: 62722,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "be09f32e4e91419e9f6adeb614c690802abfc28d84b096b05c603b4381fa29cb",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'grandlineai/instant-id-artistic',
+  provider: 'replicate',
+  name: 'instant-id-artistic',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 640,
+              height: 640,
+              cost: 0.018
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.018
+  },
+  metrics: {
+    averageRequestDuration: 31415
+  },
+  metadata: {
+    owner: "grandlineai",
+    description: "InstantID : Zero-shot Identity-Preserving Generation in Seconds. Using Dreamshaper-XL as the base model to encourage artistic generations",
+    runCount: 12113,
+    githubUrl: "https://github.com/GrandlineAI/InstantID",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9cad10c7870bac9d6b587f406aef28208f964454abff5c4152f7dec9b0212a9a",
+    cogVersion: "0.9.3"
+  }
+}, {
+  id: 'grandlineai/instant-id-photorealistic',
+  provider: 'replicate',
+  name: 'instant-id-photorealistic',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.02
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 35000
+  },
+  metadata: {
+    owner: "grandlineai",
+    description: "InstantID : Zero-shot Identity-Preserving Generation in Seconds. Using Juggernaut-XL v8 as the base model to encourage photorealism",
+    runCount: 44203,
+    githubUrl: "https://github.com/GrandlineAI/InstantID",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "03914a0c3326bf44383d0cd84b06822618af879229ce5d1d53bef38d93b68279",
+    cogVersion: "0.9.3"
+  }
+}, {
+  id: 'ibm-granite/granite-embedding-278m-multilingual',
+  provider: 'replicate',
+  name: 'granite-embedding-278m-multilingual',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 564,
+    averageRequestDuration: 12
+  },
+  metadata: {
+    owner: "ibm-granite",
+    description: "Granite-Embedding-278M-Multilingual is a 278M parameter model from the Granite Embeddings suite that can be used to generate high quality text embeddings",
+    runCount: 1213,
+    githubUrl: "https://github.com/bjhargrave/cog-models/tree/main/ibm-granite/granite-embedding-278m-multilingual",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1f76d42a05f120e12272746d5a2d86b525c13420773f795a4cbef9117d8685f1",
+    cogVersion: "0.14.12"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-character',
+  provider: 'replicate',
+  name: 'ideogram-character',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 14490
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "Generate consistent characters from a single reference image. Outputs can be in many styles. You can also use inpainting to add your character to an existing image.",
+    runCount: 467903,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1f8e198263a0d8171b76c55907c294e933e1e7d55e2d0c54f319c0e4a42c723d",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v2',
+  provider: 'replicate',
+  name: 'ideogram-v2',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageStyle', 'imageBackground']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 19650
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "An excellent image model with state of the art inpainting, prompt comprehension and text rendering",
+    runCount: 2561648,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "3e6071946ab5319b3bcc37a4d00083e743dfdff5be386df6a2ff1f212fc7365b",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v2-turbo',
+  provider: 'replicate',
+  name: 'ideogram-v2-turbo',
+  contextWindow: 2048,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.04
+  },
+  metrics: {
+    averageRequestDuration: 12370
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "A fast image model with state of the art inpainting, prompt comprehension and text rendering.",
+    runCount: 2763831,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7cef9d520d672bb802588ad0d13151bc51aee9a408c270aebf25d6530045dd29",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v2a',
+  provider: 'replicate',
+  name: 'ideogram-v2a',
+  contextWindow: 2000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 10457
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "Like Ideogram v2, but faster and cheaper",
+    runCount: 1996985,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8b85e4363b03c25f1d248d0f7e3e118503f2b33773a51bab414603bd52f6112d",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v2a-turbo',
+  provider: 'replicate',
+  name: 'ideogram-v2a-turbo',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 6117
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "Like Ideogram v2 turbo, but now faster and cheaper",
+    runCount: 367999,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0afb968f42d1f96ab92f9c8d669c0e819fa36ccc74f02a7cd057595c9e42da01",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v3-balanced',
+  provider: 'replicate',
+  name: 'ideogram-v3-balanced',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 8326
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "Balance speed, quality and cost. Ideogram v3 creates images with stunning realism, creative designs, and consistent styles",
+    runCount: 331809,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "41f9f0d4bf6c470dd0f5085dadc6c14ffb8ed4ce1f6bffbbc10b03ecf5b053fb",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v3-quality',
+  provider: 'replicate',
+  name: 'ideogram-v3-quality',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 10283
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "The highest quality Ideogram v3 model. v3 creates images with stunning realism, creative designs, and consistent styles",
+    runCount: 2020222,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "6dafa89a04b1547f0d1c1680b8dcd41ebb2f82c4e2f0c8a92d4bf5ea5250150b",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'ideogram-ai/ideogram-v3-turbo',
+  provider: 'replicate',
+  name: 'ideogram-v3-turbo',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.04
+  },
+  metrics: {
+    averageRequestDuration: 6140
+  },
+  metadata: {
+    owner: "ideogram-ai",
+    description: "Turbo is the fastest and cheapest Ideogram v3. v3 creates images with stunning realism, creative designs, and consistent styles",
+    runCount: 4690327,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d9b3748f95c0fe3e71f010f8cc5d80e8f5252acd0e74b1c294ee889eea52a47b",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'j-min/clip-caption-reward',
+  provider: 'replicate',
+  name: 'clip-caption-reward',
+  contextWindow: 77,
+  maxOutputTokens: 100,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.003
+  },
+  metrics: {
+    tokensPerSecond: 5,
+    timeToFirstToken: 5846,
+    averageRequestDuration: 5998,
+    accuracyScore: 0.75
+  },
+  metadata: {
+    owner: "j-min",
+    description: "Fine-grained Image Captioning with CLIP Reward",
+    runCount: 296124,
+    githubUrl: "https://github.com/j-min/CLIP-Caption-Reward",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "de37751f75135f7ebbe62548e27d6740d5155dfefdf6447db35c9865253d7e06",
+    cogVersion: "0.3.4"
+  }
+}, {
+  id: 'jaaari/kokoro-82m',
+  provider: 'replicate',
+  name: 'kokoro-82m',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 1418
+  },
+  metadata: {
+    owner: "jaaari",
+    description: "Kokoro v1.0 - text-to-speech (82M params, based on StyleTTS2)",
+    runCount: 62407691,
+    githubUrl: "https://github.com/hexgrad/kokoro",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f559560eb822dc509045f3921a1921234918b91739db4bf3daab2169b71c7a13",
+    cogVersion: "0.13.6"
+  }
+}, {
+  id: 'jagilley/controlnet-scribble',
+  provider: 'replicate',
+  name: 'controlnet-scribble',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 512,
+              height: 512,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 20510
+  },
+  metadata: {
+    owner: "jagilley",
+    description: "Generate detailed images from scribbled drawings",
+    runCount: 38306058,
+    githubUrl: "https://github.com/replicate/controlnet",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "435061a1b5a4c1e26740464bf786efdfa9cb3a3ac488595a2de23e143fdb0117",
+    cogVersion: "0.6.1"
+  }
+}, {
+  id: 'jingyunliang/hcflow-sr',
+  provider: 'replicate',
+  name: 'hcflow-sr',
+  contextWindow: 0,
+  tier: 'legacy',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1747
+  },
+  metadata: {
+    owner: "jingyunliang",
+    description: "Image Super-Resolution",
+    runCount: 222872,
+    githubUrl: "https://github.com/JingyunLiang/HCFlow",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "567785261e974455ede3b0644d1d7e5aa8d9e40a22217a8726900acdcd9e19ce",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'jingyunliang/swinir',
+  provider: 'replicate',
+  name: 'swinir',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1000
+  },
+  metadata: {
+    owner: "jingyunliang",
+    description: "Image Restoration Using Swin Transformer",
+    runCount: 6185874,
+    githubUrl: "https://github.com/JingyunLiang/SwinIR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "660d922d33153019e8c263a3bba265de882e7f4f70396546b6c9c8f9d47a021a",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'joehoover/instructblip-vicuna13b',
+  provider: 'replicate',
+  name: 'instructblip-vicuna13b',
+  contextWindow: 2048,
+  maxOutputTokens: 512,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'seed']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 8.7,
+    averageRequestDuration: 11270
+  },
+  metadata: {
+    owner: "joehoover",
+    description: "An instruction-tuned multi-modal model based on BLIP-2 and Vicuna-13B",
+    runCount: 257514,
+    githubUrl: "https://github.com/replicate/cog-lavis",
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'joehoover/mplug-owl',
+  provider: 'replicate',
+  name: 'mplug-owl',
+  contextWindow: 2048,
+  maxOutputTokens: 500,
+  tier: 'experimental',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'seed']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 15,
+    timeToFirstToken: 500,
+    averageRequestDuration: 10886,
+    accuracyScore: 0.75
+  },
+  metadata: {
+    owner: "joehoover",
+    description: "An instruction-tuned multimodal large language model that generates text based on user-provided prompts and images",
+    runCount: 55800,
+    githubUrl: "https://github.com/replicate/cog-mplug-owl",
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'juergengunz/ultimate-portrait-upscale',
+  provider: 'replicate',
+  name: 'ultimate-portrait-upscale',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 9670
+  },
+  metadata: {
+    owner: "juergengunz",
+    description: "Upscale Portrait Images with ControlNet Tile",
+    runCount: 50093,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f7fdace4ec7adab7fa02688a160eee8057f070ead7fbb84e0904864fd2324be5",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'krthr/clip-embeddings',
+  provider: 'replicate',
+  name: 'clip-embeddings',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding', 'vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 3487
+  },
+  metadata: {
+    owner: "krthr",
+    description: "Generate CLIP (clip-vit-large-patch14) text & image embeddings",
+    runCount: 48033364,
+    githubUrl: "https://github.com/dommo-app/ai-model-clip",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1c0371070cb827ec3c7f2f28adcdde54b50dcd239aa6faea0bc98b174ef03fb4",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'kshitijagrwl/pii-extractor-llm',
+  provider: 'replicate',
+  name: 'pii-extractor-llm',
+  contextWindow: 4096,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['chat']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 96
+  },
+  metadata: {
+    owner: "kshitijagrwl",
+    description: "PII Data Extraction from Text",
+    runCount: 168,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "426575f2800cbb25b9442324b9ebc868121100c3fb9637a50de96c4b6248b5bc",
+    cogVersion: "0.8.1"
+  }
+}, {
+  id: 'leonardoai/lucid-origin',
+  provider: 'replicate',
+  name: 'lucid-origin',
+  contextWindow: 0,
+  tier: 'flagship',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageStyle', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5974
+  },
+  metadata: {
+    owner: "leonardoai",
+    description: "Artistic and high-quality visuals with improved prompt adherence, diversity, and definition",
+    runCount: 161421,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "589fc21af967c3912ac0f04986604ee6a695067eb62890f53e0f805db4ff4aef",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'lucataco/ace-step',
+  provider: 'replicate',
+  name: 'ace-step',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 45837
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "A Step Towards Music Generation Foundation Model text2music",
+    runCount: 73229,
+    githubUrl: "https://github.com/ACE-Step/ACE-Step",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "280fc4f9ee507577f880a167f639c02622421d8fecf492454320311217b688f1",
+    cogVersion: "0.14.10"
+  }
+}, {
+  id: 'lucataco/bakllava',
+  provider: 'replicate',
+  name: 'bakllava',
+  contextWindow: 2048,
+  maxOutputTokens: 2048,
+  tier: 'efficient',
+  tokenizer: 'Mistral',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {},
+  metrics: {},
+  metadata: {
+    owner: "lucataco",
+    description: "BakLLaVA-1 is a Mistral 7B base augmented with the LLaVA 1.5 architecture",
+    runCount: 39802,
+    githubUrl: "https://github.com/lucataco/cog-bakllava",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "452b2fa0b66d8acdf40e05a7f0af948f9c6065f6da5af22fce4cead99a26ff3d",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/codeformer',
+  provider: 'replicate',
+  name: 'codeformer',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1884
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Robust face restoration algorithm for old photos/AI-generated faces",
+    runCount: 8084248,
+    githubUrl: "https://github.com/sczhou/CodeFormer",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "78f2bab438ab0ffc85a68cdfd316a2ecd3994b5dd26aa6b3d203357b45e5eb1b",
+    cogVersion: "0.8.5"
+  }
+}, {
+  id: 'lucataco/controlnet-tile',
+  provider: 'replicate',
+  name: 'controlnet-tile',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0085
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 14792
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Controlnet v1.1 - Tile Version",
+    runCount: 4194,
+    githubUrl: "https://github.com/lllyasviel/ControlNet",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f688ff774c27a4843c819c9264c0f949925970bb278669ed9140364c8389869c",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/csm-1b',
+  provider: 'replicate',
+  name: 'csm-1b',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5993
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "CSM (Conversational Speech Model) is a speech generation model from Sesame that generates RVQ audio codes from text and audio inputs",
+    runCount: 995,
+    githubUrl: "https://github.com/lucataco/cog-csm",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "3e59b10a9894c54ae5f2fc0347e3a2f5c82f0574407e53a7d9f76ec7c502ad03",
+    cogVersion: "0.14.2"
+  }
+}, {
+  id: 'lucataco/deepseek-ocr',
+  provider: 'replicate',
+  name: 'deepseek-ocr',
+  contextWindow: 8192,
+  tier: 'efficient',
+  tokenizer: 'DeepSeek',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5817
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Convert documents to markdown, extract raw text, and locate specific content",
+    runCount: 34141,
+    githubUrl: "https://github.com/lucataco/cog-deepseek-OCR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "cb3b474fbfc56b1664c8c7841550bccecbe7b74c30e45ce938ffca1180b4dff5",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'lucataco/demofusion-enhance',
+  provider: 'replicate',
+  name: 'demofusion-enhance',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 91090
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Image to Image enhancer using DemoFusion",
+    runCount: 11114,
+    githubUrl: "https://github.com/lucataco/cog-demofusion-enhance",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5bcfe11066c820e8c08232c6efa3c8a7ab2cd667ad136ca173633f352170691e",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/dreamshaper-xl-turbo',
+  provider: 'replicate',
+  name: 'dreamshaper-xl-turbo',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3800
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "DreamShaper is a general purpose SD model that aims at doing everything well, photos, art, anime, manga. It's designed to match Midjourney and DALL-E.",
+    runCount: 226788,
+    githubUrl: "https://github.com/lucataco/cog-dreamshaper-xl-turbo",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0a1710e0187b01a255302738ca0158ff02a22f4638679533e111082f9dd1b615",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/florence-2-base',
+  provider: 'replicate',
+  name: 'florence-2-base',
+  contextWindow: 1024,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.0002
+  },
+  metrics: {
+    averageRequestDuration: 818
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Florence-2: Advancing a Unified Representation for a Variety of Vision Tasks",
+    runCount: 127757,
+    githubUrl: "https://github.com/lucataco/cog-florence-2-base",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c81609117f666d3a86b262447f80d41ac5158a76adb56893301843a23165eaf8",
+    cogVersion: "0.9.9"
+  }
+}, {
+  id: 'lucataco/fuyu-8b',
+  provider: 'replicate',
+  name: 'fuyu-8b',
+  contextWindow: 8192,
+  maxOutputTokens: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {
+    perRequest: 0.0013
+  },
+  metrics: {
+    tokensPerSecond: 30,
+    timeToFirstToken: 500,
+    averageRequestDuration: 1835,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Fuyu-8B is a multi-modal text and image transformer trained by Adept AI",
+    runCount: 14635,
+    githubUrl: "https://github.com/lucataco/cog-fuyu",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "42f23bc876570a46f5a90737086fbc4c3f79dd11753a28eaa39544dd391815e9",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/gpt-oss-safeguard-20b',
+  provider: 'replicate',
+  name: 'gpt-oss-safeguard-20b',
+  contextWindow: 8192,
+  maxOutputTokens: 8192,
+  tier: 'efficient',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat', 'reasoning']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'reason']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 7500
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "classify text content based on safety policies that you provide and perform a suite of foundational safety tasks",
+    runCount: 10,
+    githubUrl: "https://github.com/lucataco/cog-gpt-oss-safeguard-20b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f10ffd6deb8a2fe73746ade74b5281b33d20c90d7c90b54d6068cfc0c072cbbe",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'lucataco/ip_adapter-face-inpaint',
+  provider: 'replicate',
+  name: 'ip_adapter-face-inpaint',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 512,
+              height: 512,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 13074
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "A combination of ip_adapter SDv1.5 and mediapipe-face to inpaint a face",
+    runCount: 4194,
+    githubUrl: "https://github.com/lucataco/cog-ip_adapter-face-inpaint",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b199f118e2133894551cc59ff0777276e275cf64e9e8e0369ca6c4c599097890",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/ip_adapter-sdxl-face',
+  provider: 'replicate',
+  name: 'ip_adapter-sdxl-face',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 16225
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "The image prompt adapter is designed to enable a pretrained text-to-image diffusion model to generate SDXL images with an image prompt",
+    runCount: 34605,
+    githubUrl: "https://github.com/lucataco/cog-ip_adapter-sdxl-face",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "226c6bf67a75a129b0f978e518fed33e1fb13956e15761c1ac53c9d2f898c9af",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/ip-adapter-faceid',
+  provider: 'replicate',
+  name: 'ip-adapter-faceid',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "medium",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.011
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 19362
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "(Research only) IP-Adapter-FaceID can generate various style images conditioned on a face with only text prompts",
+    runCount: 31742,
+    githubUrl: "https://github.com/lucataco/cog-IP-Adapter-FaceID",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "fb81ef963e74776af72e6f380949013533d46dd5c6228a9e586c57db6303d7cd",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/llama-3-vision-alpha',
+  provider: 'replicate',
+  name: 'llama-3-vision-alpha',
+  contextWindow: 8192,
+  tier: 'efficient',
+  tokenizer: 'Llama3',
+  capabilities: new Set(['vision', 'streaming']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 7222
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Projection module trained to add vision capabilties to Llama 3 using SigLIP",
+    runCount: 5901,
+    githubUrl: "https://github.com/lucataco/cog-llama-3-vision-alpha",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "79f9f3418f65fb5d180978a969d5646e33f8ca67430a2fe903c9a4be82565925",
+    cogVersion: "0.12.0"
+  }
+}, {
+  id: 'lucataco/magnet',
+  provider: 'replicate',
+  name: 'magnet',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 14638
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "MAGNeT: Masked Audio Generation using a Single Non-Autoregressive Transformer",
+    runCount: 2805,
+    githubUrl: "https://github.com/lucataco/audiocraft",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e8e2ecd4a1dabb58924aa8300b668290cafae166dd36baf65dad9875877de50e",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/modelscope-facefusion',
+  provider: 'replicate',
+  name: 'modelscope-facefusion',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3444
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Auto fuse a user's face onto the template image, with a similar appearance to the user",
+    runCount: 13832,
+    githubUrl: "https://github.com/lucataco/cog-modelscope-facefusion",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "52edbb2b42beb4e19242f0c9ad5717211a96c63ff1f0b0320caa518b2745f4f7",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/moondream2',
+  provider: 'replicate',
+  name: 'moondream2',
+  contextWindow: 2048,
+  maxOutputTokens: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'streaming']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.0002
+  },
+  metrics: {
+    tokensPerSecond: 50,
+    timeToFirstToken: 500,
+    averageRequestDuration: 600,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "moondream2 is a small vision language model designed to run efficiently on edge devices",
+    runCount: 5560117,
+    githubUrl: "https://github.com/lucataco/cog-moondream2",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "72ccb656353c348c1385df54b237eeb7bfa874bf11486cf0b9473e691b662d31",
+    cogVersion: "0.9.13"
+  }
+}, {
+  id: 'lucataco/nomic-embed-text-v1',
+  provider: 'replicate',
+  name: 'nomic-embed-text-v1',
+  contextWindow: 8192,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 904
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "nomic-embed-text-v1 is 8192 context length text encoder that surpasses OpenAI text-embedding-ada-002 and text-embedding-3-small performance on short and long context tasks",
+    runCount: 34307,
+    githubUrl: "https://github.com/lucataco/cog-nomic-embed-text-v1",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9f7155ca8f3a5596300cac0801815fa5a930a9b5339725fd085ac6f81598b7ed",
+    cogVersion: "0.9.3"
+  }
+}, {
+  id: 'lucataco/ollama-llama3.2-vision-11b',
+  provider: 'replicate',
+  name: 'ollama-llama3.2-vision-11b',
+  contextWindow: 128000,
+  maxOutputTokens: 2048,
+  tier: 'efficient',
+  tokenizer: 'Llama3',
+  capabilities: new Set(['vision', 'chat', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 41.75,
+    averageRequestDuration: 5940
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Ollama Llama 3.2 Vision 11B",
+    runCount: 3244,
+    githubUrl: "https://github.com/lucataco/cog-ollama-llama3.2-vision-90b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d4e81fc1472556464f1ee5cea4de177b2fe95a6eaadb5f63335df1ba654597af",
+    cogVersion: "0.13.6"
+  }
+}, {
+  id: 'lucataco/ollama-llama3.2-vision-90b',
+  provider: 'replicate',
+  name: 'ollama-llama3.2-vision-90b',
+  contextWindow: 128000,
+  maxOutputTokens: 512,
+  tier: 'flagship',
+  tokenizer: 'Llama3',
+  capabilities: new Set(['vision', 'chat', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 11596
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Ollama Llama 3.2 Vision 90B",
+    runCount: 3455,
+    githubUrl: "https://github.com/lucataco/cog-ollama-llama3.2-vision-90b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "54202b223d5351c5afe5c0c9dba2b3042293b839d022e76f53d66ab30b9dc814",
+    cogVersion: "0.13.6"
+  }
+}, {
+  id: 'lucataco/omnigen2',
+  provider: 'replicate',
+  name: 'omnigen2',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.05
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.05
+  },
+  metrics: {
+    averageRequestDuration: 93168
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "OmniGen2: a powerful and efficient unified multimodal model",
+    runCount: 1803,
+    githubUrl: "https://github.com/lucataco/cog-OmniGen2",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5b9ea1d0821a60be9c861ebfc3513d121ecd8cab1932d3aa8d703e517988502e",
+    cogVersion: "0.15.5"
+  }
+}, {
+  id: 'lucataco/open-dalle-v1.1',
+  provider: 'replicate',
+  name: 'open-dalle-v1.1',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 14356
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "A unique fusion that showcases exceptional prompt adherence and semantic understanding, it seems to be a step above base SDXL and a step closer to DALLE-3 in terms of prompt comprehension",
+    runCount: 132472,
+    githubUrl: "https://github.com/lucataco/cog-opendalle-v1.1",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1c7d4c8dec39c7306df7794b28419078cb9d18b9213ab1c21fdc46a1deca0144",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/orpheus-3b-0.1-ft',
+  provider: 'replicate',
+  name: 'orpheus-3b-0.1-ft',
+  contextWindow: 2000,
+  maxOutputTokens: 2000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty']),
+  pricing: {
+    audio: {
+      perSecond: 0.0006
+    },
+    perRequest: 0.0055
+  },
+  metrics: {
+    averageRequestDuration: 9570
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Orpheus 3B - high quality, emotive Text to Speech",
+    runCount: 31703,
+    githubUrl: "https://github.com/lucataco/cog-orpheus-3b-0.1-ft",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "79f2a473e6a9720716a473d9b2f2951437dbf91dc02ccb7079fb3d89b881207f",
+    cogVersion: "0.14.2"
+  }
+}, {
+  id: 'lucataco/pasd-magnify',
+  provider: 'replicate',
+  name: 'pasd-magnify',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.007
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 13317
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "(Academic and Non-commercial use only) Pixel-Aware Stable Diffusion for Realistic Image Super-resolution and Personalized Stylization",
+    runCount: 42540,
+    githubUrl: "https://github.com/lucataco/cog-PASD-Magnify",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d59e83ee13c42b137aee558c483e3acc0a8ecdacb1444a7be48152f008dcc195",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/pheme',
+  provider: 'replicate',
+  name: 'pheme',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5920
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Pheme generates a variety of conversational voices in 16 kHz for phone-call applications",
+    runCount: 563,
+    githubUrl: "https://github.com/lucataco/pheme",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "f307b9d2b9966608aec791d4a741dc3806f95d9eb92300fdcefeb9aecd4594cd",
+    cogVersion: "0.8.6"
   }
 }, {
   id: 'lucataco/qwen-vl-chat',
   provider: 'replicate',
   name: 'qwen-vl-chat',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat', 'streaming']),
-  pricing: {},
+  contextWindow: 8192,
+  maxOutputTokens: 2048,
+  tier: 'efficient',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 3298
+  },
   metadata: {
     owner: "lucataco",
     description: "A multimodal LLM-based AI assistant, which is trained with alignment techniques. Qwen-VL-Chat supports more flexible interaction, such as multi-round question answering, and creative capabilities.",
-    runCount: 825567,
+    runCount: 825568,
     githubUrl: "https://github.com/lucataco/cog-qwen-vl-chat",
     visibility: "public",
     source: "replicate",
@@ -2471,14 +5547,25 @@ export const replicateModels: ModelInfo[] = [{
   id: 'lucataco/qwen2-vl-7b-instruct',
   provider: 'replicate',
   name: 'qwen2-vl-7b-instruct',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  contextWindow: 32768,
+  maxOutputTokens: 512,
+  tier: 'efficient',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    tokensPerSecond: 16,
+    averageRequestDuration: 6245
+  },
   metadata: {
     owner: "lucataco",
     description: "Latest model in the Qwen family for chatting with video and image models",
-    runCount: 268660,
+    runCount: 271999,
     githubUrl: "https://github.com/lucataco/cog-qwen2-vl-7b-instruct",
     visibility: "public",
     source: "replicate",
@@ -2486,161 +5573,58 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.13.6"
   }
 }, {
-  id: 'luma/ray',
+  id: 'lucataco/qwen2.5-omni-7b',
   provider: 'replicate',
-  name: 'ray',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'qwen2.5-omni-7b',
+  contextWindow: 32768,
+  tier: 'efficient',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['chat', 'vision', 'hearing', 'audio', 'streaming']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {},
   metadata: {
-    owner: "luma",
-    description: "Fast, high quality text-to-video and image-to-video (Also known as Dream Machine)",
-    runCount: 61727,
-    githubUrl: null,
+    owner: "lucataco",
+    description: "Qwen2.5-Omni is an end-to-end multimodal model designed to perceive diverse modalities, including text, images, audio, and video, while simultaneously generating text and natural speech responses in a streaming manner.",
+    runCount: 26099,
+    githubUrl: "https://github.com/lucataco/cog-qwen2.5-omni-7b",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "ace5984f3394f17c2a712644b0eb9983c4baaf94c6c30a0f94692d2c37bd8964",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'luma/ray-2-540p',
-  provider: 'replicate',
-  name: 'ray-2-540p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "luma",
-    description: "Generate 5s and 9s 540p videos",
-    runCount: 10409,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "838565ddabd524ed2b1ab8011d811956b954b8f3716c7a15853fd326e826b6c7",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'luma/ray-2-720p',
-  provider: 'replicate',
-  name: 'ray-2-720p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "luma",
-    description: "Generate 5s and 9s 720p videos",
-    runCount: 30626,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "3ca2bc3597e124149bcae1f9c239790a58ba0f1aa72e1c8747192d2b44284dc4",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'luma/ray-flash-2-540p',
-  provider: 'replicate',
-  name: 'ray-flash-2-540p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "luma",
-    description: "Generate 5s and 9s 540p videos, faster and cheaper than Ray 2",
-    runCount: 54671,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "ab7a8dbfe56fe6712c7a64f684930372677a31a3470d260f4786928395c1c5cc",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'luma/ray-flash-2-720p',
-  provider: 'replicate',
-  name: 'ray-flash-2-720p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "luma",
-    description: "Generate 5s and 9s 720p videos, faster and cheaper than Ray 2",
-    runCount: 38834,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "4de59b4688ad158409be13c0c0c37ddfcf21824b2acf326505b03bcf679acab5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'pollinations/real-basicvsr-video-superresolution',
-  provider: 'replicate',
-  name: 'real-basicvsr-video-superresolution',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "pollinations",
-    description: "RealBasicVSR: Investigating Tradeoffs in Real-World Video Super-Resolution",
-    runCount: 9245,
-    githubUrl: "https://github.com/pollinations/mmediting_video_superresolution",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "005b4db1d719c1672c522b220db3bc899a81889986b5adc7a01b4f4cfb34e4a7",
-    cogVersion: "0.6.1"
-  }
-}, {
-  id: 'cjwbw/real-esrgan',
-  provider: 'replicate',
-  name: 'real-esrgan',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "Real-ESRGAN: Real-World Blind Super-Resolution",
-    runCount: 2611075,
-    githubUrl: "https://github.com/chenxwh/cog-Real-ESRGAN",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d0ee3d708c9b911f122a4ad90046c5d26a0293b99476d697f6bb7f2e251ce2d4",
-    cogVersion: "0.6.1"
-  }
-}, {
-  id: 'nightmareai/real-esrgan',
-  provider: 'replicate',
-  name: 'real-esrgan',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "nightmareai",
-    description: "Real-ESRGAN with optional face correction and adjustable upscale",
-    runCount: 78323121,
-    githubUrl: "https://github.com/NightmareAI/Real-ESRGAN",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8",
-    cogVersion: "0.16.8"
+    latestVersionId: "0ca8160f7aaf85703a6aac282d6c79aa64d3541b239fa4c5c1688b10cb1faef1",
+    cogVersion: "0.14.3"
   }
 }, {
   id: 'lucataco/realistic-vision-v5.1',
   provider: 'replicate',
   name: 'realistic-vision-v5.1',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['vision']),
-  pricing: {},
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 512,
+              height: 728,
+              cost: 0.0025
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3260
+  },
   metadata: {
     owner: "lucataco",
     description: "Implementation of Realistic Vision v5.1 with VAE",
-    runCount: 4285513,
+    runCount: 4285925,
     githubUrl: "https://github.com/lucataco/cog-realistic-vision-v5.1",
     visibility: "public",
     source: "replicate",
@@ -2648,58 +5632,1726 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.8.6"
   }
 }, {
-  id: 'zsxkib/realistic-voice-cloning',
+  id: 'lucataco/sdxl-clip-interrogator',
   provider: 'replicate',
-  name: 'realistic-voice-cloning',
+  name: 'sdxl-clip-interrogator',
+  contextWindow: 77,
+  maxOutputTokens: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1200
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "CLIP Interrogator for SDXL optimizes text prompts to match a given image",
+    runCount: 848657,
+    githubUrl: "https://github.com/lucataco/cog-sdxl-clip-interrogator",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b8dd624ad312d215250b362af0ecff05d7ad4f8270f9beb034c483d70682e7b3",
+    cogVersion: "0.9.6"
+  }
+}, {
+  id: 'lucataco/smolvlm-instruct',
+  provider: 'replicate',
+  name: 'smolvlm-instruct',
+  contextWindow: 8192,
+  maxOutputTokens: 2000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set(['maxTokens']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 80,
+    timeToFirstToken: 500,
+    averageRequestDuration: 505,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "SmolVLM-Instruct by HuggingFaceTB",
+    runCount: 8135,
+    githubUrl: "https://github.com/lucataco/cog-smolvlm-instruct",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e79f1e0eb64fe9a145d0a0afd6127d43b37de66eaaa2e00ff3d165bc14097dfb",
+    cogVersion: "0.13.3"
+  }
+}, {
+  id: 'lucataco/snowflake-arctic-embed-l',
+  provider: 'replicate',
+  name: 'snowflake-arctic-embed-l',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1905
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "snowflake-arctic-embed is a suite of text embedding models that focuses on creating high-quality retrieval models optimized for performance",
+    runCount: 398505,
+    githubUrl: "https://github.com/lucataco/cog-snowflake-arctic-embed-l",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "38f2c666dd6a9f96c50eca69bbb0029ed03cba002a289983dc0b487a93cfb1b4",
+    cogVersion: "v0.9.5+dev"
+  }
+}, {
+  id: 'lucataco/ssd-1b',
+  provider: 'replicate',
+  name: 'ssd-1b',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.001
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1407
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Segmind Stable Diffusion Model (SSD-1B) is a distilled 50% smaller version of SDXL, offering a 60% speedup while maintaining high-quality text-to-image generation capabilities",
+    runCount: 1038980,
+    githubUrl: "https://github.com/lucataco/cog-ssd-1b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b19e3639452c59ce8295b82aba70a231404cb062f2eb580ea894b31e8ce5bbb6",
+    cogVersion: "0.8.5"
+  }
+}, {
+  id: 'lucataco/stable-diffusion-x4-upscaler',
+  provider: 'replicate',
+  name: 'stable-diffusion-x4-upscaler',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 5447
+  },
+  metadata: {
+    owner: "lucataco",
+    description: "Stable Diffusion x4 upscaler model",
+    runCount: 7927,
+    githubUrl: "https://github.com/lucataco/cog-sd-x4-upscaler",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c96e30cc409e6c5f68cd8b071b15fe819b23956669fd6461891000ee64545760",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'lucataco/xtts-v2',
+  provider: 'replicate',
+  name: 'xtts-v2',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['audio']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 2505
+  },
   metadata: {
-    owner: "zsxkib",
-    description: "Create song covers with any RVC v2 trained AI voice from audio files.",
-    runCount: 1233700,
-    githubUrl: "https://github.com/zsxkib/AICoverGen.git",
+    owner: "lucataco",
+    description: "Coqui XTTS-v2: Multilingual Text To Speech Voice Cloning",
+    runCount: 4551816,
+    githubUrl: "https://github.com/lucataco/cog-xtts-v2",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "0a9c7c558af4c0f20667c1bd1260ce32a2879944a0b9e44e1398660c077b1550",
+    latestVersionId: "684bc3855b37866c0c65add2ff39c78f3dea3f4ff103a436465326e0f438d55e",
     cogVersion: "0.8.6"
   }
 }, {
-  id: 'sdxl-based/realvisxl-v3-multi-controlnet-lora',
+  id: 'luma/photon',
   provider: 'replicate',
-  name: 'realvisxl-v3-multi-controlnet-lora',
-  contextWindow: 0,
+  name: 'photon',
+  contextWindow: 1024,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.04
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.04
+  },
+  metrics: {
+    averageRequestDuration: 11298
+  },
   metadata: {
-    owner: "sdxl-based",
-    description: "RealVisXl V3 with multi-controlnet, lora loading, img2img, inpainting",
-    runCount: 1954995,
-    githubUrl: "https://github.com/fofr/cog-realvisxl-3-multi-controlnet-lora",
+    owner: "luma",
+    description: "High-quality image generation model optimized for creative professional workflows and ultra-high fidelity outputs",
+    runCount: 3025659,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "90a4a3604cd637cb9f1a2bdae1cfa9ed869362ca028814cdce310a78e27daade",
+    latestVersionId: "fe142c037cf359764f2058c3a42ef0dc750d908311d02868cbc7769fe800b648",
+    cogVersion: "0.10.0-alpha27"
+  }
+}, {
+  id: 'luma/photon-flash',
+  provider: 'replicate',
+  name: 'photon-flash',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision', 'streaming']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 7000
+  },
+  metadata: {
+    owner: "luma",
+    description: "Accelerated variant of Photon prioritizing speed while maintaining quality",
+    runCount: 189555,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8cee7d47f81d8f4f77c1aec44ffb3d1ce09d36388db637ceaa8a6cbcf30b63e1",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'm1guelpf/whisper-subtitles',
+  provider: 'replicate',
+  name: 'whisper-subtitles',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set(['responseFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 5378
+  },
+  metadata: {
+    owner: "m1guelpf",
+    description: "Generate subtitles from an audio file, using OpenAI's Whisper model.",
+    runCount: 73856,
+    githubUrl: "https://github.com/openai/whisper",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7f686e243a96c7f6f0f481bcef24d688a1369ed3983cea348d1f43b879615766",
+    cogVersion: "0.4.4"
+  }
+}, {
+  id: 'mark3labs/embeddings-gte-base',
+  provider: 'replicate',
+  name: 'embeddings-gte-base',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 353
+  },
+  metadata: {
+    owner: "mark3labs",
+    description: "General Text Embeddings (GTE) model.",
+    runCount: 1148829,
+    githubUrl: "https://github.com/mark3labs/replicate-embeddings-gte-base",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "d619cff29338b9a37c3d06605042e1ff0594a8c3eff0175fd6967f5643fc4d47",
     cogVersion: "0.8.6"
   }
 }, {
-  id: 'adirik/realvisxl-v3.0-turbo',
+  id: 'megvii-research/nafnet',
   provider: 'replicate',
-  name: 'realvisxl-v3.0-turbo',
+  name: 'nafnet',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0015
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1912
+  },
   metadata: {
-    owner: "adirik",
-    description: "Photorealism with RealVisXL V3.0 Turbo based on SDXL",
-    runCount: 537105,
-    githubUrl: "https://github.com/alaradirik/cog-RealVisXL",
+    owner: "megvii-research",
+    description: "Nonlinear Activation Free Network for Image Restoration",
+    runCount: 1432647,
+    githubUrl: "https://github.com/megvii-research/NAFNet",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "3dc73c805b11b4b01a60555e532fd3ab3f0e60d26f6584d9b8ba7e1b95858243",
-    cogVersion: "0.9.0-beta10"
+    latestVersionId: "018241a6c880319404eaa2714b764313e27e11f950a7ff0a7b5b37b27b74dcf7",
+    cogVersion: "0.2.0"
+  }
+}, {
+  id: 'meta/musicgen',
+  provider: 'replicate',
+  name: 'musicgen',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['temperature', 'topP', 'seed', 'responseFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 66463
+  },
+  metadata: {
+    owner: "meta",
+    description: "Generate music from a prompt or melody",
+    runCount: 3153651,
+    githubUrl: "https://github.com/replicate/cog-musicgen",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'methexis-inc/img2prompt',
+  provider: 'replicate',
+  name: 'img2prompt',
+  contextWindow: 4096,
+  maxOutputTokens: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 21175
+  },
+  metadata: {
+    owner: "methexis-inc",
+    description: "Get an approximate text prompt, with style, matching an image.  (Optimized for stable-diffusion (clip ViT-L/14))",
+    runCount: 2658835,
+    githubUrl: "https://github.com/pharmapsychotic/clip-interrogator",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "50adaf2d3ad20a6f911a8a9e3ccf777b263b8596fbd2c8fc26e8888f8a0edbb5",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'mickeybeurskens/latex-ocr',
+  provider: 'replicate',
+  name: 'latex-ocr',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.001
+  },
+  metrics: {
+    averageRequestDuration: 1155
+  },
+  metadata: {
+    owner: "mickeybeurskens",
+    description: "Optical character recognition to turn images of latex equations into latex format.",
+    runCount: 872,
+    githubUrl: "https://github.com/mickeybeurskens/LaTeX-OCR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b3278fae4c46eb2798804fc66e721e6ce61a450d072041a7e402b2c77805dcc3",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'microsoft/bringing-old-photos-back-to-life',
+  provider: 'replicate',
+  name: 'bringing-old-photos-back-to-life',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.013
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 23172
+  },
+  metadata: {
+    owner: "microsoft",
+    description: "Bringing Old Photos Back to Life",
+    runCount: 1166264,
+    githubUrl: "https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c75db81db6cbd809d93cc3b7e7a088a351a3349c9fa02b6d393e35e0d51ba799",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'minimax/image-01',
+  provider: 'replicate',
+  name: 'image-01',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['imageMultiple']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 30527
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Minimax's first image model, with character reference support",
+    runCount: 2108832,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "928f3bd6ac899108d0ab8cf7f91dfa39a03eda0175e94c9b4cd075776dececf0",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'minimax/music-01',
+  provider: 'replicate',
+  name: 'music-01',
+  contextWindow: 400,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 44352
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Quickly generate up to 1 minute of music with lyrics and vocals in the style of a reference track",
+    runCount: 439330,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0254c7e2f54315b667dbae03da7c155822ba29ffe0457be5bc246d564be486bd",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'minimax/music-1.5',
+  provider: 'replicate',
+  name: 'music-1.5',
+  contextWindow: 600,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['speechInstructions', 'responseFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 28254
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Music-1.5: Full-length songs (up to 4 mins) with natural vocals & rich instrumentation",
+    runCount: 18153,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "70c8395540eae909be2c09a0b4897d22ee2455a5e5c9826b71161743b5cc45f1",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'minimax/speech-02-hd',
+  provider: 'replicate',
+  name: 'speech-02-hd',
+  contextWindow: 10000,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['responseFormat']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 0.419429060537981,
+    timeToFirstToken: 9.552239,
+    averageRequestDuration: 2393.746
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Text-to-Audio (T2A) that offers voice synthesis, emotional expression, and multilingual capabilities. Optimized for high-fidelity applications like voiceovers and audiobooks.",
+    runCount: 1102286,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "fdd081f807e655246ef42adbcb3ee9334e7fdc710428684771f90d69992cabb3",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'minimax/speech-02-turbo',
+  provider: 'replicate',
+  name: 'speech-02-turbo',
+  contextWindow: 10000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['responseFormat']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 0.4225,
+    timeToFirstToken: 9.73,
+    averageRequestDuration: 2376
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Text-to-Audio (T2A) that offers voice synthesis, emotional expression, and multilingual capabilities. Designed for real-time applications with low latency",
+    runCount: 6052786,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e2e8812b45eefa93b20990418480fe628ddce470f9b72909a175d65e288ff3d5",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'minimax/voice-cloning',
+  provider: 'replicate',
+  name: 'voice-cloning',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing', 'audio']),
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.00057
+    }
+  },
+  metrics: {
+    averageRequestDuration: 34116
+  },
+  metadata: {
+    owner: "minimax",
+    description: "Clone voices to use with Minimax's speech-02-hd and speech-02-turbo",
+    runCount: 22020,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "fff8a670880f066d3742838515a88f7f0a3ae40a4f2e06dae0f7f70ba63582d7",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'mv-lab/instructir',
+  provider: 'replicate',
+  name: 'instructir',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.004
+  },
+  metrics: {
+    averageRequestDuration: 6985
+  },
+  metadata: {
+    owner: "mv-lab",
+    description: "High-Quality Image Restoration Following Human Instructions",
+    runCount: 14238,
+    githubUrl: "https://github.com/mv-lab/InstructIR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e98baeb90b5cd143a86aa2a9deeffb2852c3bebbd428f3cdf5da1b31fb99d3a3",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'mv-lab/swin2sr',
+  provider: 'replicate',
+  name: 'swin2sr',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2492
+  },
+  metadata: {
+    owner: "mv-lab",
+    description: "3 Million Runs! AI Photorealistic Image Super-Resolution and Restoration",
+    runCount: 3574024,
+    githubUrl: "https://github.com/mv-lab/swin2sr",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a01b0512004918ca55d02e554914a9eca63909fa83a29ff0f115c78a7045574f",
+    cogVersion: "0.4.4"
+  }
+}, {
+  id: 'nateraw/bge-large-en-v1.5',
+  provider: 'replicate',
+  name: 'bge-large-en-v1.5',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 344
+  },
+  metadata: {
+    owner: "nateraw",
+    description: "BAAI's bge-en-large-v1.5 for embedding text sequences",
+    runCount: 297559,
+    githubUrl: "https://github.com/nateraw/replicate-examples/tree/main/embeddings",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9cf9f015a9cb9c61d1a2610659cdac4a4ca222f2d3707a68517b18c198a9add1",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'nateraw/jina-embeddings-v2-base-en',
+  provider: 'replicate',
+  name: 'jina-embeddings-v2-base-en',
+  contextWindow: 8192,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 342
+  },
+  metadata: {
+    owner: "nateraw",
+    description: "An 8k context text embedding model served FAST with ONNX on GPU. Check the examples tab to see different ways to run it.",
+    runCount: 277,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'nicknaskida/whisper-diarization',
+  provider: 'replicate',
+  name: 'whisper-diarization',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing', 'json']),
+  supportedParameters: new Set(['transcribePrompt']),
+  pricing: {
+    audio: {
+      perSecond: 0.000725
+    }
+  },
+  metrics: {},
+  metadata: {
+    owner: "nicknaskida",
+    description: "⚡️ Insanely Fast audio transcription | whisper large-v3 | speaker diarization | word & sentence level timestamps | prompt | hotwords. Fork of thomasmol/whisper-diarization. Added batched whisper, 3x-4x speedup 🚀",
+    runCount: 439,
+    githubUrl: "https://github.com/NickNaskida/cog-whisper-diarization",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c643440e783b6d1dcaef96ba97f2034ac61f02df8a3f2ae0481164ec38e8ac0d",
+    cogVersion: "0.9.20"
+  }
+}, {
+  id: 'nightmareai/latent-sr',
+  provider: 'replicate',
+  name: 'latent-sr',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1007694
+  },
+  metadata: {
+    owner: "nightmareai",
+    description: "Upscale images with the latent diffusion superresolution model",
+    runCount: 116536,
+    githubUrl: "https://github.com/NightmareAI/latent-diffusion",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9117a98dd15e931011b8b960963a2dec20ab493c6c0d3a134525273da1616abc",
+    cogVersion: "v0.3.13+dev"
+  }
+}, {
+  id: 'nightmareai/real-esrgan',
+  provider: 'replicate',
+  name: 'real-esrgan',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 2565
+  },
+  metadata: {
+    owner: "nightmareai",
+    description: "Real-ESRGAN with optional face correction and adjustable upscale",
+    runCount: 78938671,
+    githubUrl: "https://github.com/NightmareAI/Real-ESRGAN",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'nohamoamary/image-captioning-with-visual-attention',
+  provider: 'replicate',
+  name: 'image-captioning-with-visual-attention',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 2636
+  },
+  metadata: {
+    owner: "nohamoamary",
+    description: "datasets: Flickr8k",
+    runCount: 11295,
+    githubUrl: "https://github.com/NohaMoAmary/image-captioning-with-visual-attention.git",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9bb60a6baa58801aa7cd4c4fafc95fcf1531bf59b84962aff5a718f4d1f58986",
+    cogVersion: "0.6.1"
+  }
+}, {
+  id: 'nvidia/parakeet-rnnt-1.1b',
+  provider: 'replicate',
+  name: 'parakeet-rnnt-1.1b',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.000575
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1426
+  },
+  metadata: {
+    owner: "nvidia",
+    description: "🗣️ Nvidia + Suno.ai's speech-to-text conversion with high accuracy and efficiency 📝",
+    runCount: 19041,
+    githubUrl: "https://github.com/zsxkib/cog-parakeet-rnnt-1.1b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "73ddbebaef172a47c8dfdd79381f110bfdc7691bcc7a4edde82f0a39e380ce50",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'nvidia/sana',
+  provider: 'replicate',
+  name: 'sana',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 1206
+  },
+  metadata: {
+    owner: "nvidia",
+    description: "A fast image model with wide artistic range and resolutions up to 4096x4096",
+    runCount: 218159,
+    githubUrl: "https://github.com/chenxwh/Sana",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c6b5d2b7459910fec94432e9e1203c3cdce92d6db20f714f1355747990b52fa6",
+    cogVersion: "0.13.3"
+  }
+}, {
+  id: 'nvidia/sana-sprint-1.6b',
+  provider: 'replicate',
+  name: 'sana-sprint-1.6b',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 147
+  },
+  metadata: {
+    owner: "nvidia",
+    description: "SANA-Sprint: One-Step Diffusion with Continuous-Time Consistency Distillation",
+    runCount: 895083,
+    githubUrl: "https://github.com/lucataco/cog-sana-sprint-1.6b",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "038aee6907b53a5c148780983e39a50ce7cd0747b4e2642e78387f48cf36039a",
+    cogVersion: "0.16.0"
+  }
+}, {
+  id: 'openai/gpt-4.1-mini',
+  provider: 'replicate',
+  name: 'gpt-4.1-mini',
+  contextWindow: 128000,
+  maxOutputTokens: 4096,
+  tier: 'efficient',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat', 'vision', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty', 'presencePenalty']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 42.178245871307865,
+    timeToFirstToken: 15.720017,
+    averageRequestDuration: 10044.587
+  },
+  metadata: {
+    owner: "openai",
+    description: "Fast, affordable version of GPT-4.1",
+    runCount: 1304417,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "2e47757e2b7aa34decf05335dc78ad7968386e8aacd345dd045b6dfeb622cd69",
+    cogVersion: "0.16.6"
+  }
+}, {
+  id: 'openai/gpt-4o',
+  provider: 'replicate',
+  name: 'gpt-4o',
+  contextWindow: 128000,
+  maxOutputTokens: 4096,
+  tier: 'flagship',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat', 'vision', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty', 'presencePenalty']),
+  pricing: {
+    text: {
+      input: 2.5,
+      output: 10,
+      cached: 1.25
+    }
+  },
+  metrics: {
+    tokensPerSecond: 59.7,
+    timeToFirstToken: 560,
+    averageRequestDuration: 1163,
+    accuracyScore: 0.95
+  },
+  metadata: {
+    owner: "openai",
+    description: "OpenAI's high-intelligence chat model",
+    runCount: 281784,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ad45308bffd6defaaa05dff12658b454a3a8dcfd7cc1440420a74d87a48caa9e",
+    cogVersion: "0.16.6"
+  }
+}, {
+  id: 'openai/gpt-4o-mini',
+  provider: 'replicate',
+  name: 'gpt-4o-mini',
+  contextWindow: 128000,
+  maxOutputTokens: 16384,
+  tier: 'efficient',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat', 'vision']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty', 'presencePenalty']),
+  pricing: {
+    text: {
+      input: 0.15,
+      output: 0.6,
+      cached: 0.075
+    }
+  },
+  metrics: {
+    tokensPerSecond: 40,
+    timeToFirstToken: 500,
+    averageRequestDuration: 7233,
+    accuracyScore: 0.82
+  },
+  metadata: {
+    owner: "openai",
+    description: "Low latency, low cost version of OpenAI's GPT-4o model",
+    runCount: 5214247,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "86d7f12d34e3f9b6e149231f42154d0f41081d91484932e3f1ee608fc207f7d9",
+    cogVersion: "0.16.2"
+  }
+}, {
+  id: 'openai/gpt-4o-mini-transcribe',
+  provider: 'replicate',
+  name: 'gpt-4o-mini-transcribe',
+  contextWindow: 128000,
+  maxOutputTokens: 16384,
+  tier: 'efficient',
+  tokenizer: 'GPT',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set(['temperature', 'transcribePrompt']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 45.68,
+    timeToFirstToken: 449,
+    averageRequestDuration: 4104
+  },
+  metadata: {
+    owner: "openai",
+    description: "A speech-to-text model that uses GPT-4o mini to transcribe audio",
+    runCount: 7626,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "684265b6c4d23a4f5b3536a76e0b9e022ce5084f6da95fd7d0b5ebbc573a8261",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'openai/gpt-4o-transcribe',
+  provider: 'replicate',
+  name: 'gpt-4o-transcribe',
+  contextWindow: 128000,
+  maxOutputTokens: 4096,
+  tier: 'flagship',
+  tokenizer: 'GPT',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set(['temperature', 'transcribePrompt']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 66.02,
+    timeToFirstToken: 265.57,
+    averageRequestDuration: 2894
+  },
+  metadata: {
+    owner: "openai",
+    description: "A speech-to-text model that uses GPT-4o to transcribe audio",
+    runCount: 31715,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "cc7638666fc85e9defb010d99e304c0c0e94dcdbd3d31385f28f2730b4cdcc6d",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'openai/gpt-5',
+  provider: 'replicate',
+  name: 'gpt-5',
+  contextWindow: 128000,
+  maxOutputTokens: 16384,
+  tier: 'flagship',
+  tokenizer: 'GPT',
+  capabilities: new Set(['chat', 'vision', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'reason', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 55.29,
+    timeToFirstToken: 41.86,
+    averageRequestDuration: 1271.79
+  },
+  metadata: {
+    owner: "openai",
+    description: "OpenAI's new model excelling at coding, writing, and reasoning.",
+    runCount: 643376,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "857113f52713e87828867975887fb4d369789052c5c63076933548b2720044da",
+    cogVersion: "0.16.6"
+  }
+}, {
+  id: 'openai/gpt-image-1',
+  provider: 'replicate',
+  name: 'gpt-image-1',
+  contextWindow: 1000,
+  tier: 'flagship',
+  tokenizer: 'GPT',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['imageMultiple', 'imageFormat', 'imageBackground']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 45888
+  },
+  metadata: {
+    owner: "openai",
+    description: "A multimodal image generation model that creates high-quality images. You need to bring your own verified OpenAI key to use this model. Your OpenAI account will be charged for usage.",
+    runCount: 979164,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5ac56c15446a60fa63b3823de926ada90f5971c2cf9b1dd07659126cfda434e6",
+    cogVersion: "0.16.7"
+  }
+}, {
+  id: 'openai/whisper',
+  provider: 'replicate',
+  name: 'whisper',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['hearing']),
+  supportedParameters: new Set(['temperature', 'transcribePrompt', 'responseFormat']),
+  pricing: {
+    audio: {
+      perSecond: 0.0002
+    }
+  },
+  metrics: {
+    averageRequestDuration: 16572
+  },
+  metadata: {
+    owner: "openai",
+    description: "Convert speech in audio to text",
+    runCount: 142508311,
+    githubUrl: "https://github.com/replicate/cog-whisper",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e",
+    cogVersion: "0.13.2"
+  }
+}, {
+  id: 'orpatashnik/styleclip',
+  provider: 'replicate',
+  name: 'styleclip',
+  contextWindow: 77,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.006
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.006
+  },
+  metrics: {
+    averageRequestDuration: 2918
+  },
+  metadata: {
+    owner: "orpatashnik",
+    description: "Text-Driven Manipulation of StyleGAN Imagery",
+    runCount: 1284215,
+    githubUrl: "https://github.com/orpatashnik/StyleCLIP",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7af9a66f36f97fee2fece7dcc927551a951f0022cbdd23747b9212f23fc17021",
+    cogVersion: "0.4.4"
+  }
+}, {
+  id: 'pbevan1/llama-3.1-8b-ocr-correction',
+  provider: 'replicate',
+  name: 'llama-3.1-8b-ocr-correction',
+  contextWindow: 128000,
+  maxOutputTokens: 5000,
+  tier: 'efficient',
+  tokenizer: 'Llama3',
+  capabilities: new Set(['chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty', 'seed']),
+  pricing: {
+    text: {
+      input: 0.2,
+      output: 0.2,
+      cached: 0.1
+    },
+    perRequest: 0.005
+  },
+  metrics: {
+    tokensPerSecond: 50,
+    timeToFirstToken: 500,
+    averageRequestDuration: 10291
+  },
+  metadata: {
+    owner: "pbevan1",
+    description: "LLaMA 3.1-8B, finetuned on a synthetic OCR dataset for superior OCR correction.",
+    runCount: 54,
+    githubUrl: "https://github.com/pbevan1/finetune-llm-ocr-correction",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "83ae7a3e0d977f581798ee6b8add1bc4e690bf30f5552589ddd12d6afaf1ec01",
+    cogVersion: "0.9.13"
+  }
+}, {
+  id: 'pharmapsychotic/clip-interrogator',
+  provider: 'replicate',
+  name: 'clip-interrogator',
+  contextWindow: 77,
+  maxOutputTokens: 256,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.022
+  },
+  metrics: {
+    averageRequestDuration: 37674
+  },
+  metadata: {
+    owner: "pharmapsychotic",
+    description: "The CLIP Interrogator is a prompt engineering tool that combines OpenAI's CLIP and Salesforce's BLIP to optimize text prompts to match a given image. Use the resulting prompts with text-to-image models like Stable Diffusion to create cool art!",
+    runCount: 4730643,
+    githubUrl: "https://github.com/pharmapsychotic/clip-interrogator",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8151e1c9f47e696fa316146a2e35812ccf79cfc9eba05b11c7f450155102af70",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'philz1337x/clarity-upscaler',
+  provider: 'replicate',
+  name: 'clarity-upscaler',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 12828
+  },
+  metadata: {
+    owner: "philz1337x",
+    description: "High resolution image Upscaler and Enhancer. Use at ClarityAI.co. A free Magnific alternative. Twitter/X: @philz1337x",
+    runCount: 23720958,
+    githubUrl: "https://github.com/philz1337x/clarity-upscaler",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "dfad41707589d68ecdccd1dfa600d55a208f9310748e44bfe35b4a6291453d5e",
+    cogVersion: "0.8.0-beta11"
+  }
+}, {
+  id: 'philz1337x/crystal-upscaler',
+  provider: 'replicate',
+  name: 'crystal-upscaler',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.007
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 12056
+  },
+  metadata: {
+    owner: "philz1337x",
+    description: "High-precision image upscaler optimized for portraits, faces and products. One of the upscale modes powered by Clarity AI. X:https://x.com/philz1337x",
+    runCount: 206710,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "676970c41ea5c90570e8f723374b9a394c446cc34a353b8dddf1a41083471943",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'piddnad/ddcolor',
+  provider: 'replicate',
+  name: 'ddcolor',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 3035
+  },
+  metadata: {
+    owner: "piddnad",
+    description: "Towards Photo-Realistic Image Colorization via Dual Decoders",
+    runCount: 1259660,
+    githubUrl: "https://github.com/piddnad/DDColor",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "ca494ba129e44e45f661d6ece83c4c98a9a7c774309beca01429b58fce8aa695",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'platform-kit/mars5-tts',
+  provider: 'replicate',
+  name: 'mars5-tts',
+  contextWindow: 2048,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['temperature', 'frequencyPenalty']),
+  pricing: {
+    perRequest: 0.03
+  },
+  metrics: {
+    averageRequestDuration: 38287
+  },
+  metadata: {
+    owner: "platform-kit",
+    description: "A novel speech model for insane prosody.",
+    runCount: 525,
+    githubUrl: "https://github.com/Camb-ai/MARS5-TTS",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "6aed0f11f3ba7b13d59ab3228355e7b1ea943479673cc57e10e99ba766536811",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'playgroundai/playground-v2.5-1024px-aesthetic',
+  provider: 'replicate',
+  name: 'playground-v2.5-1024px-aesthetic',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.007
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 8020
+  },
+  metadata: {
+    owner: "playgroundai",
+    description: "Playground v2.5 is the state-of-the-art open-source model in aesthetic quality",
+    runCount: 2761409,
+    githubUrl: "https://github.com/lucataco/cog-playground-v2.5-1024px-aesthetic",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a45f82a1382bed5c7aeb861dac7c7d191b0fdf74d8d57c4a0e6ed7d4d0bf7d24",
+    cogVersion: "0.9.4"
+  }
+}, {
+  id: 'prunaai/flux-fast',
+  provider: 'replicate',
+  name: 'flux-fast',
+  contextWindow: 512,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1348
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This is the fastest Flux endpoint in the world.",
+    runCount: 35149217,
+    githubUrl: "https://github.com/black-forest-labs/flux",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4f22c6cd75e0f95f12f55d1616a4d163e9166087ed4979f5cecc40418a522703",
+    cogVersion: "0.16.0"
+  }
+}, {
+  id: 'prunaai/flux-kontext-fast',
+  provider: 'replicate',
+  name: 'flux-kontext-fast',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1796
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "Ultra fast flux kontext endpoint",
+    runCount: 11737485,
+    githubUrl: "https://github.com/black-forest-labs/flux",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "6efb57153457f8c51fb813c6d15f45d896f1916dd7d732af49d6a4b09488e2a6",
+    cogVersion: "0.16.0"
+  }
+}, {
+  id: 'prunaai/hidream-l1-dev',
+  provider: 'replicate',
+  name: 'hidream-l1-dev',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2477
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This is an optimised version of the hidream-l1-dev model using the pruna ai optimisation toolkit!",
+    runCount: 47160,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "4dfcd146c0def4812455415f55556f6bc84025dcb15193cf1977f01bd384d191",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'prunaai/hidream-l1-fast',
+  provider: 'replicate',
+  name: 'hidream-l1-fast',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 1734
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This is an optimised version of the hidream-l1 model using the pruna ai optimisation toolkit!",
+    runCount: 5579188,
+    githubUrl: "https://github.com/HiDream-ai/HiDream-I1",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "07299025e97b39a8b2a4dbf99af63bf1eb79c39cfea654014e57d013c2043070",
+    cogVersion: "0.16.0"
+  }
+}, {
+  id: 'prunaai/hidream-l1-full',
+  provider: 'replicate',
+  name: 'hidream-l1-full',
+  contextWindow: 128,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0043
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 7500
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This is an optimised version of the hidream-full model using the pruna ai optimisation toolkit!",
+    runCount: 32566,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "03d58532fd29e39fd2ed80e86c3da1cebec28ef2734081cf1366710d30388f42",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'prunaai/sdxl-lightning',
+  provider: 'replicate',
+  name: 'sdxl-lightning',
+  contextWindow: 77,
+  tier: 'efficient',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 414
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This is the fastest sdxl-lightning endpoint in the world on A100, contact us for more at pruna.ai",
+    runCount: 3214,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "123d4264aec4d1c81d8bf142e0d90d6fd4c346f1a869406019f6d1653882d7c3",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'prunaai/wan-2.2-image',
+  provider: 'replicate',
+  name: 'wan-2.2-image',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 4157
+  },
+  metadata: {
+    owner: "prunaai",
+    description: "This model generates beautiful cinematic 2 megapixel images in 3-4 seconds and is derived from the Wan 2.2 model through optimisation techniques from the pruna package",
+    runCount: 813955,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "16e15e913fcc71c1a5defb335ea84739f99731fa1ee17995117c7d9adc6d176c",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'qwen/qwen-image',
+  provider: 'replicate',
+  name: 'qwen-image',
+  contextWindow: 2048,
+  tier: 'flagship',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3482
+  },
+  metadata: {
+    owner: "qwen",
+    description: "An image generation foundation model in the Qwen series that achieves significant advances in complex text rendering.",
+    runCount: 1060182,
+    githubUrl: "https://github.com/QwenLM/Qwen-Image",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "905e345fe1dfe10d628daac2140dd8dea471c0d99793ef0fdc46a15c688b62fb",
+    cogVersion: "0.16.0"
+  }
+}, {
+  id: 'qwen/qwen-image-edit',
+  provider: 'replicate',
+  name: 'qwen-image-edit',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2850
+  },
+  metadata: {
+    owner: "qwen",
+    description: "Edit images using a prompt. This model extends Qwen-Image’s unique text rendering capabilities to image editing tasks, enabling precise text editing",
+    runCount: 1084749,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a072e0d160ef0501120a390f602404655e467a6f591f6574f5742df0b67cbba7",
+    cogVersion: "0.16.1"
+  }
+}, {
+  id: 'qwen/qwen-image-edit-plus',
+  provider: 'replicate',
+  name: 'qwen-image-edit-plus',
+  contextWindow: 8192,
+  tier: 'flagship',
+  tokenizer: 'Qwen',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 6369
+  },
+  metadata: {
+    owner: "qwen",
+    description: "The latest Qwen-Image’s iteration with improved multi-image editing, single-image consistency, and native support for ControlNet",
+    runCount: 4280368,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7677b9cc9967f7725fcf5e814a5a3446bf1d4b6ab0f9c15534dbbc54c7a088f2",
+    cogVersion: "0.16.7"
   }
 }, {
   id: 'recraft-ai/recraft-creative-upscale',
@@ -2707,12 +7359,33 @@ export const replicateModels: ModelInfo[] = [{
   name: 'recraft-creative-upscale',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.03
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.03
+  },
+  metrics: {
+    averageRequestDuration: 46990
+  },
   metadata: {
     owner: "recraft-ai",
     description: "Creative Upscale focuses on enhancing details and refining complex elements in the image. It doesn’t just increase resolution but adds depth by improving textures, fine details, and facial features.",
-    runCount: 10360,
+    runCount: 10573,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -2725,12 +7398,33 @@ export const replicateModels: ModelInfo[] = [{
   name: 'recraft-crisp-upscale',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.006
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.006
+  },
+  metrics: {
+    averageRequestDuration: 9258
+  },
   metadata: {
     owner: "recraft-ai",
     description: "Designed to make images sharper and cleaner, Crisp Upscale increases overall quality, making visuals suitable for web use or print-ready materials.",
-    runCount: 1029216,
+    runCount: 1092611,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -2744,11 +7438,15 @@ export const replicateModels: ModelInfo[] = [{
   contextWindow: 0,
   tier: 'flagship',
   capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageStyle']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 8832
+  },
   metadata: {
     owner: "recraft-ai",
     description: "Recraft V3 (code-named red_panda) is a text-to-image model with the ability to generate long texts, and images in a wide list of styles. As of today, it is SOTA in image generation, proven by the Text-to-Image Benchmark by Artificial Analysis",
-    runCount: 7009296,
+    runCount: 7088741,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -2762,11 +7460,15 @@ export const replicateModels: ModelInfo[] = [{
   contextWindow: 0,
   tier: 'flagship',
   capabilities: new Set(['image']),
+  supportedParameters: new Set(['imageStyle']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 17865
+  },
   metadata: {
     owner: "recraft-ai",
     description: "Recraft V3 SVG (code-named red_panda) is a text-to-image model with the ability to generate high quality SVG images including logotypes, and icons. The model supports a wide list of styles.",
-    runCount: 317464,
+    runCount: 322288,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -2774,107 +7476,436 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.16.8"
   }
 }, {
-  id: 'arielreplicate/robust_video_matting',
+  id: 'replicate/all-mpnet-base-v2',
   provider: 'replicate',
-  name: 'robust_video_matting',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  name: 'all-mpnet-base-v2',
+  contextWindow: 512,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding', 'zdr']),
+  supportedParameters: new Set([]),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 1081
+  },
   metadata: {
-    owner: "arielreplicate",
-    description: "extract foreground of a video",
-    runCount: 66109,
-    githubUrl: "https://github.com/PeterL1n/RobustVideoMatting",
+    owner: "replicate",
+    description: "This is a language model that can be used to obtain document embeddings suitable for downstream tasks like semantic search and clustering.",
+    runCount: 2368190,
+    githubUrl: "https://github.com/replicate/all-mpnet-base-v2",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "73d2128a371922d5d1abf0712a1d974be0e4e2358cc1218e4e34714767232bac",
-    cogVersion: "0.4.4"
+    latestVersionId: "b6b7585c9640cd7a9572c6e129c9549d79c9c31f0d3fdce7baac7c67ca38f305",
+    cogVersion: "0.7.0-beta17"
   }
 }, {
-  id: 'cjwbw/rudalle-sr',
+  id: 'resemble-ai/chatterbox',
   provider: 'replicate',
-  name: 'rudalle-sr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
+  name: 'chatterbox',
+  contextWindow: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['temperature', 'seed']),
   pricing: {},
+  metrics: {
+    timeToFirstToken: 9,
+    averageRequestDuration: 12774
+  },
   metadata: {
-    owner: "cjwbw",
-    description: "Real-ESRGAN super-resolution model from ruDALL-E",
-    runCount: 485174,
-    githubUrl: "https://github.com/CJWBW/rudalle-sr",
+    owner: "resemble-ai",
+    description: "Generate expressive, natural speech. Features unique emotion control, instant voice cloning from short audio, and built-in watermarking.",
+    runCount: 173264,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "32fdb2231d00a10d33754cc2ba794a2dfec94216579770785849ce6f149dbc69",
+    latestVersionId: "1b8422bc49635c20d0a84e387ed20879c0dd09254ecdb4e75dc4bec10ff94e97",
+    cogVersion: "0.15.5"
+  }
+}, {
+  id: 'resemble-ai/chatterbox-multilingual',
+  provider: 'replicate',
+  name: 'chatterbox-multilingual',
+  contextWindow: 300,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['seed', 'temperature']),
+  pricing: {
+    audio: {
+      perSecond: 0.00055
+    }
+  },
+  metrics: {
+    averageRequestDuration: 4866
+  },
+  metadata: {
+    owner: "resemble-ai",
+    description: "Generate expressive, natural speech in 23 languages. Features instant voice cloning from short audio, emotion control, and seamless cross-language voice transfer.",
+    runCount: 4027,
+    githubUrl: "https://github.com/zsxkib/cog-ResembleAI-Chatterbox-Multilingual-TTS",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9cfba4c265e685f840612be835424f8c33bdee685d7466ece7684b0d9d4c0b1c",
+    cogVersion: "0.16.2"
+  }
+}, {
+  id: 'resemble-ai/chatterbox-pro',
+  provider: 'replicate',
+  name: 'chatterbox-pro',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature', 'seed']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 38.45,
+    timeToFirstToken: 8.78,
+    averageRequestDuration: 4715
+  },
+  metadata: {
+    owner: "resemble-ai",
+    description: "Generate expressive, natural speech with Resemble AI's Chatterbox.",
+    runCount: 15510,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "301e12652e84fbba1524e5f2758a9a92c6bd205792304f53c057b7f9ab091342",
+    cogVersion: "0.15.5"
+  }
+}, {
+  id: 'riffusion/riffusion',
+  provider: 'replicate',
+  name: 'riffusion',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 9067
+  },
+  metadata: {
+    owner: "riffusion",
+    description: "Stable diffusion for real-time music generation",
+    runCount: 1060016,
+    githubUrl: "https://github.com/riffusion/riffusion",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "8cf61ea6c56afd61d8f5b9ffd14d7c216c0a93844ce2d82ac1c9ecc9c7f24e05",
+    cogVersion: "0.6.1"
+  }
+}, {
+  id: 'rmokady/clip_prefix_caption',
+  provider: 'replicate',
+  name: 'clip_prefix_caption',
+  contextWindow: 1024,
+  tier: 'legacy',
+  tokenizer: 'GPT',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      input: 0.001
+    },
+    perRequest: 0.001
+  },
+  metrics: {
+    averageRequestDuration: 1629
+  },
+  metadata: {
+    owner: "rmokady",
+    description: "Simple image captioning model using CLIP and GPT-2",
+    runCount: 1736546,
+    githubUrl: "https://github.com/rmokady/CLIP_prefix_caption",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "9a34a6339872a03f45236f114321fb51fc7aa8269d38ae0ce5334969981e4cd8",
     cogVersion: "0.4.1"
   }
 }, {
-  id: 'meta/sam-2-video',
+  id: 'runwayml/gen4-image',
   provider: 'replicate',
-  name: 'sam-2-video',
+  name: 'gen4-image',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1920,
+              height: 1080,
+              cost: 0.055
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.055
+  },
+  metrics: {
+    averageRequestDuration: 36894,
+    accuracyScore: 0.95
+  },
   metadata: {
-    owner: "meta",
-    description: "SAM 2: Segment Anything v2 (for videos)",
-    runCount: 48737,
-    githubUrl: "https://github.com/zsxkib/segment-anything-2/tree/video",
+    owner: "runwayml",
+    description: "Runway's Gen-4 Image model with references. Use up to 3 reference images to create the exact image you need. Capture every angle.",
+    runCount: 434213,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "33432afdfc06a10da6b4018932893d39b0159f838b6d11dd1236dff85cc5ec1d",
-    cogVersion: "0.9.14"
+    latestVersionId: "653987038aea936ca0991639ad92c07e5cbe5dfc646e89377009252a42375b46",
+    cogVersion: "0.16.8"
   }
 }, {
-  id: 'nvidia/sana',
+  id: 'runwayml/gen4-image-turbo',
   provider: 'replicate',
-  name: 'sana',
+  name: 'gen4-image-turbo',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 15784
+  },
   metadata: {
-    owner: "nvidia",
-    description: "A fast image model with wide artistic range and resolutions up to 4096x4096",
-    runCount: 216434,
-    githubUrl: "https://github.com/chenxwh/Sana",
+    owner: "runwayml",
+    description: "Gen-4 Image Turbo is cheaper and 2.5x faster than Gen-4 Image. An image model with references, use up to 3 reference images to create the exact image you need. Capture every angle.",
+    runCount: 82797,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "c6b5d2b7459910fec94432e9e1203c3cdce92d6db20f714f1355747990b52fa6",
-    cogVersion: "0.13.3"
+    latestVersionId: "d22ea0d0c36ad63c18519dda6fc42dca46f5b84b4864678fb070b2370fea5f59",
+    cogVersion: "0.16.8"
   }
 }, {
-  id: 'nvidia/sana-sprint-1.6b',
+  id: 'sakemin/musicgen-chord',
   provider: 'replicate',
-  name: 'sana-sprint-1.6b',
+  name: 'musicgen-chord',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['temperature', 'topP', 'seed', 'responseFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 81263
+  },
   metadata: {
-    owner: "nvidia",
-    description: "SANA-Sprint: One-Step Diffusion with Continuous-Time Consistency Distillation",
-    runCount: 871942,
-    githubUrl: "https://github.com/lucataco/cog-sana-sprint-1.6b",
+    owner: "sakemin",
+    description: "Generate music restricted to chord sequences and tempo",
+    runCount: 2970,
+    githubUrl: "https://github.com/sakemin/cog-musicgen-chord",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "038aee6907b53a5c148780983e39a50ce7cd0747b4e2642e78387f48cf36039a",
-    cogVersion: "0.16.0"
+    latestVersionId: "c940ab4308578237484f90f010b2b3871bf64008e95f26f4d567529ad019a3d6",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'sakemin/musicgen-remixer',
+  provider: 'replicate',
+  name: 'musicgen-remixer',
+  contextWindow: 0,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['seed', 'temperature', 'topP', 'responseFormat']),
+  pricing: {
+    audio: {
+      perSecond: 0.000725
+    }
+  },
+  metrics: {
+    averageRequestDuration: 376242
+  },
+  metadata: {
+    owner: "sakemin",
+    description: "Remix the music into another styles with MusicGen Chord",
+    runCount: 18089,
+    githubUrl: "https://github.com/sakemin/cog-musicgen-remixer",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0b769f28e399c7c30e4f2360691b9b11c294183e9ab2fd9f3398127b556c86d7",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'sakemin/musicgen-stereo-chord',
+  provider: 'replicate',
+  name: 'musicgen-stereo-chord',
+  contextWindow: 1500,
+  maxOutputTokens: 1500,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature', 'topP', 'seed', 'responseFormat']),
+  pricing: {
+    audio: {
+      perSecond: 0.000725
+    }
+  },
+  metrics: {
+    tokensPerSecond: 29.4,
+    averageRequestDuration: 51060
+  },
+  metadata: {
+    owner: "sakemin",
+    description: "Generate music in stereo, restricted to chord sequences and tempo",
+    runCount: 3313,
+    githubUrl: "https://github.com/sakemin/cog-musicgen-chord",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "fbdc5ef7200220ed300015d9b4fd3f8e620f84547e970b23aa2be7f2ff366a5b",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'salesforce/blip',
+  provider: 'replicate',
+  name: 'blip',
+  contextWindow: 512,
+  maxOutputTokens: 64,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    },
+    perRequest: 0.0015
+  },
+  metrics: {
+    averageRequestDuration: 6644
+  },
+  metadata: {
+    owner: "salesforce",
+    description: "Generate image captions",
+    runCount: 168991227,
+    githubUrl: "https://github.com/salesforce/BLIP",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'sczhou/codeformer',
+  provider: 'replicate',
+  name: 'codeformer',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 55069
+  },
+  metadata: {
+    owner: "sczhou",
+    description: "Robust face restoration algorithm for old photos / AI-generated faces",
+    runCount: 46597615,
+    githubUrl: "https://github.com/sczhou/CodeFormer",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "cc4956dd26fa5a7185d5660cc9100fab1b8070a1d1654a8bb5eb6d443b020bb2",
+    cogVersion: "0.8.5"
+  }
+}, {
+  id: 'sdxl-based/realvisxl-v3-multi-controlnet-lora',
+  provider: 'replicate',
+  name: 'realvisxl-v3-multi-controlnet-lora',
+  contextWindow: 77,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0054
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.0054
+  },
+  metrics: {
+    averageRequestDuration: 9367
+  },
+  metadata: {
+    owner: "sdxl-based",
+    description: "RealVisXl V3 with multi-controlnet, lora loading, img2img, inpainting",
+    runCount: 1962004,
+    githubUrl: "https://github.com/fofr/cog-realvisxl-3-multi-controlnet-lora",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "90a4a3604cd637cb9f1a2bdae1cfa9ed869362ca028814cdce310a78e27daade",
+    cogVersion: "0.8.6"
   }
 }, {
   id: 'stability-ai/sdxl',
   provider: 'replicate',
   name: 'sdxl',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.003
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.003
+  },
+  metrics: {
+    averageRequestDuration: 4981
+  },
   metadata: {
     owner: "stability-ai",
     description: "A text-to-image generative AI model that creates beautiful images",
-    runCount: 82786086,
+    runCount: 82864424,
     githubUrl: "https://github.com/replicate/cog-sdxl",
     visibility: "public",
     source: "replicate",
@@ -2882,413 +7913,60 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.9.5"
   }
 }, {
-  id: 'lucataco/sdxl-clip-interrogator',
+  id: 'stability-ai/stable-audio-2.5',
   provider: 'replicate',
-  name: 'sdxl-clip-interrogator',
+  name: 'stable-audio-2.5',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "CLIP Interrogator for SDXL optimizes text prompts to match a given image",
-    runCount: 848641,
-    githubUrl: "https://github.com/lucataco/cog-sdxl-clip-interrogator",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b8dd624ad312d215250b362af0ecff05d7ad4f8270f9beb034c483d70682e7b3",
-    cogVersion: "0.9.6"
-  }
-}, {
-  id: 'fermatresearch/sdxl-controlnet-lora',
-  provider: 'replicate',
-  name: 'sdxl-controlnet-lora',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "fermatresearch",
-    description: "'''Last update: Now supports img2img.''' SDXL Canny controlnet with LoRA support.",
-    runCount: 976185,
-    githubUrl: "https://github.com/BatouResearch/Cog-SDXL-ControlNet-LoRA",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "3bb13fe1c33c35987b33792b01b71ed6529d03f165d1c2416375859f09ca9fef",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'fofr/sdxl-emoji',
-  provider: 'replicate',
-  name: 'sdxl-emoji',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "An SDXL fine-tune based on Apple Emojis",
-    runCount: 11299465,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "dee76b5afde21b0f01ed7925f0665b7e879c50ee718c5f78a9d38e04d523cc5e",
-    cogVersion: "v0.8.1+dev"
-  }
-}, {
-  id: 'prunaai/sdxl-lightning',
-  provider: 'replicate',
-  name: 'sdxl-lightning',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "prunaai",
-    description: "This is the fastest sdxl-lightning endpoint in the world on A100, contact us for more at pruna.ai",
-    runCount: 2051,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "123d4264aec4d1c81d8bf142e0d90d6fd4c346f1a869406019f6d1653882d7c3",
-    cogVersion: "0.14.7"
-  }
-}, {
-  id: 'bytedance/sdxl-lightning-4step',
-  provider: 'replicate',
-  name: 'sdxl-lightning-4step',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "SDXL-Lightning by ByteDance: a fast text-to-image model that makes high-quality images in 4 steps",
-    runCount: 1029349811,
-    githubUrl: "https://github.com/lucataco/cog-sdxl-lightning-4step",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6f7a773af6fc3e8de9d5a3c00be77c17308914bf67772726aff83496ba1e3bbe",
-    cogVersion: "0.14.1"
-  }
-}, {
-  id: 'fofr/sdxl-multi-controlnet-lora',
-  provider: 'replicate',
-  name: 'sdxl-multi-controlnet-lora',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "Multi-controlnet, lora loading, img2img, inpainting",
-    runCount: 214966,
-    githubUrl: "https://github.com/fofr/cog-sdxl-multicontrolnet-lora",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "89eb212b3d1366a83e949c12a4b45dfe6b6b313b594cb8268e864931ac9ffb16",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'cjwbw/seamless_communication',
-  provider: 'replicate',
-  name: 'seamless_communication',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "SeamlessM4T—Massively Multilingual & Multimodal Machine Translation",
-    runCount: 90323,
-    githubUrl: "https://github.com/chenxwh/seamless_communication",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "668a4fec05a887143e5fe8d45df25ec4c794dd43169b9a11562309b2d45873b0",
-    cogVersion: "0.8.3"
-  }
-}, {
-  id: 'bytedance/seedance-1-lite',
-  provider: 'replicate',
-  name: 'seedance-1-lite',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "A video generation model that offers text-to-video and image-to-video support for 5s or 10s videos, at 480p and 720p resolution",
-    runCount: 1768491,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "78c9c4b0a7056c911b0483f58349b9931aff30d6465e7ab665e6c852949ce6d5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'bytedance/seedance-1-pro',
-  provider: 'replicate',
-  name: 'seedance-1-pro',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "A pro version of Seedance that offers text-to-video and image-to-video support for 5s or 10s videos, at 480p and 1080p resolution",
-    runCount: 1093161,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "a5fd550893da3b6f67997812759065652454ddaca10e96b83b59cbae1814cb36",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'bytedance/seedance-1-pro-fast',
-  provider: 'replicate',
-  name: 'seedance-1-pro-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "A faster and cheaper version of Seedance 1 Pro",
-    runCount: 123887,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "155d6d446da5e7cd4a2ef72725461ba8687bdf63a2a1fb7bb574f25af24dc7b5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'bytedance/seedream-3',
-  provider: 'replicate',
-  name: 'seedream-3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "A text-to-image model with support for native high-resolution (2K) image generation",
-    runCount: 2901116,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "ed344813bc9f4996be6de4febd8b9c14c7849ad7b21ab047572e3620ee374ee7",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'bytedance/seedream-4',
-  provider: 'replicate',
-  name: 'seedream-4',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "bytedance",
-    description: "Unified text-to-image generation and precise single-sentence editing at up to 4K resolution",
-    runCount: 13112435,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "cf7d431991436f19d1c8dad83fe463c729c816d7a21056c5105e75c84a0aa7e9",
-    cogVersion: "0.16.9"
-  }
-}, {
-  id: 'zsxkib/seedvr2',
-  provider: 'replicate',
-  name: 'seedvr2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "🔥 SeedVR2: one-step video & image restoration with 3B/7B hot‑swap and optional color fix 🎬✨",
-    runCount: 4266,
-    githubUrl: "https://github.com/zsxkib/cog-ByteDance-Seed-SeedVR2-3B",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'cswry/seesr',
-  provider: 'replicate',
-  name: 'seesr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cswry",
-    description: "SeeSR: Towards Semantics-Aware Real-World Image Super-Resolution",
-    runCount: 102098,
-    githubUrl: "https://github.com/lucataco/SeeSR",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "989cf3a66fd209363de347c3129d95d9fe639e44533ab47e07a6dfb3f250b6e3",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'lucataco/smolvlm-instruct',
-  provider: 'replicate',
-  name: 'smolvlm-instruct',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "SmolVLM-Instruct by HuggingFaceTB",
-    runCount: 8135,
-    githubUrl: "https://github.com/lucataco/cog-smolvlm-instruct",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e79f1e0eb64fe9a145d0a0afd6127d43b37de66eaaa2e00ff3d165bc14097dfb",
-    cogVersion: "0.13.3"
-  }
-}, {
-  id: 'openai/sora-2',
-  provider: 'replicate',
-  name: 'sora-2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "openai",
-    description: "OpenAI's Flagship video generation with synced audio",
-    runCount: 109305,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6dd6f49244af4fc3cc2de9b65ab589e85870035dba05329d21c434e9172f0143",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'openai/sora-2-pro',
-  provider: 'replicate',
-  name: 'sora-2-pro',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "openai",
-    description: "OpenAI's Most advanced synced-audio video generation",
-    runCount: 40868,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "4b88384943c04009e691011b2e42f9c7a7fe2c67036a68d6e9af153eb8210d1f",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'fermatresearch/spanish-f5-tts',
-  provider: 'replicate',
-  name: 'spanish-f5-tts',
-  contextWindow: 0,
-  tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['audio']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 5800
+  },
   metadata: {
-    owner: "fermatresearch",
-    description: "A F5-TTS fine-tuned for Spanish",
-    runCount: 1010,
+    owner: "stability-ai",
+    description: "Generate high-quality music and sound from text prompts",
+    runCount: 6585,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "f26405b801a0b0945679fb3adf9bbca7ab8559c7fd9cf7cd2a68067c3aab83f7",
-    cogVersion: "0.11.6"
-  }
-}, {
-  id: 'minimax/speech-02-hd',
-  provider: 'replicate',
-  name: 'speech-02-hd',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Text-to-Audio (T2A) that offers voice synthesis, emotional expression, and multilingual capabilities. Optimized for high-fidelity applications like voiceovers and audiobooks.",
-    runCount: 1061380,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "fdd081f807e655246ef42adbcb3ee9334e7fdc710428684771f90d69992cabb3",
+    latestVersionId: "a61ac8edbb27cd2eda1b2eff2bbc03dcff1131f5560836ff77a052df05b77491",
     cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/speech-02-turbo',
-  provider: 'replicate',
-  name: 'speech-02-turbo',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Text-to-Audio (T2A) that offers voice synthesis, emotional expression, and multilingual capabilities. Designed for real-time applications with low latency",
-    runCount: 5782601,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e2e8812b45eefa93b20990418480fe628ddce470f9b72909a175d65e288ff3d5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'lucataco/ssd-1b',
-  provider: 'replicate',
-  name: 'ssd-1b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "lucataco",
-    description: "Segmind Stable Diffusion Model (SSD-1B) is a distilled 50% smaller version of SDXL, offering a 60% speedup while maintaining high-quality text-to-image generation capabilities",
-    runCount: 1038195,
-    githubUrl: "https://github.com/lucataco/cog-ssd-1b",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b19e3639452c59ce8295b82aba70a231404cb062f2eb580ea894b31e8ce5bbb6",
-    cogVersion: "0.8.5"
-  }
-}, {
-  id: 'arielreplicate/stable_diffusion_infinite_zoom',
-  provider: 'replicate',
-  name: 'stable_diffusion_infinite_zoom',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "arielreplicate",
-    description: "Use Runway's Stable-diffusion inpainting model to create an infinite loop video",
-    runCount: 38431,
-    githubUrl: "https://github.com/ArielReplicate/stable-diffusion-infinite-zoom",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "a2527c5074fc0cf9fa6015a40d75d080d1ddf7082fabe142f1ccd882c18fce61",
-    cogVersion: "0.4.4"
   }
 }, {
   id: 'stability-ai/stable-diffusion',
   provider: 'replicate',
   name: 'stable-diffusion',
-  contextWindow: 0,
-  tier: 'flagship',
+  contextWindow: 77,
+  tier: 'legacy',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 768,
+              height: 768,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2040
+  },
   metadata: {
     owner: "stability-ai",
     description: "A latent text-to-image diffusion model capable of generating photo-realistic images given any text input",
-    runCount: 110810139,
+    runCount: 110820340,
     githubUrl: "https://github.com/replicate/cog-stable-diffusion",
     visibility: "public",
     source: "replicate",
@@ -3299,14 +7977,19 @@ export const replicateModels: ModelInfo[] = [{
   id: 'stability-ai/stable-diffusion-3.5-large',
   provider: 'replicate',
   name: 'stable-diffusion-3.5-large',
-  contextWindow: 0,
+  contextWindow: 512,
   tier: 'flagship',
-  capabilities: new Set(['image']),
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 8852
+  },
   metadata: {
     owner: "stability-ai",
     description: "A text-to-image model that generates high-resolution images with fine details. It supports various artistic styles and produces diverse outputs from the same prompt, thanks to Query-Key Normalization.",
-    runCount: 1740127,
+    runCount: 1749674,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -3317,14 +8000,35 @@ export const replicateModels: ModelInfo[] = [{
   id: 'stability-ai/stable-diffusion-3.5-large-turbo',
   provider: 'replicate',
   name: 'stable-diffusion-3.5-large-turbo',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.002
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 930
+  },
   metadata: {
     owner: "stability-ai",
     description: "A text-to-image model that generates high-resolution images with fine details. It supports various artistic styles and produces diverse outputs from the same prompt, with a focus on fewer inference steps",
-    runCount: 828051,
+    runCount: 831829,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -3335,14 +8039,37 @@ export const replicateModels: ModelInfo[] = [{
   id: 'stability-ai/stable-diffusion-3.5-medium',
   provider: 'replicate',
   name: 'stable-diffusion-3.5-medium',
-  contextWindow: 0,
+  contextWindow: 77,
   tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.004
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.004
+  },
+  metrics: {
+    timeToFirstToken: 4400,
+    averageRequestDuration: 4400,
+    accuracyScore: 0.95
+  },
   metadata: {
     owner: "stability-ai",
     description: "2.5 billion parameter image model with improved MMDiT-X architecture",
-    runCount: 86271,
+    runCount: 87519,
     githubUrl: null,
     visibility: "public",
     source: "replicate",
@@ -3350,809 +8077,238 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.16.8"
   }
 }, {
-  id: 'andreasjansson/stable-diffusion-animation',
+  id: 'suno-ai/bark',
   provider: 'replicate',
-  name: 'stable-diffusion-animation',
+  name: 'bark',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio']),
+  supportedParameters: new Set(['temperature', 'speechInstructions']),
+  pricing: {
+    audio: {
+      perSecond: 0.00057
+    }
+  },
+  metrics: {
+    averageRequestDuration: 45000
+  },
   metadata: {
-    owner: "andreasjansson",
-    description: "Animate Stable Diffusion by interpolating between two prompts",
-    runCount: 119477,
-    githubUrl: "https://github.com/andreasjansson/cog-stable-diffusion",
+    owner: "suno-ai",
+    description: "🔊 Text-Prompted Generative Audio Model",
+    runCount: 302696,
+    githubUrl: "https://github.com/chenxwh/bark",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "ca1f5e306e5721e19c473e0d094e6603f0456fe759c10715fcd6c1b79242d4a5",
-    cogVersion: "0.4.4"
+    latestVersionId: "b76242b40d67c76ab6742e987628a2a9ac019e11d56ab96c4e91ce03b79b2787",
+    cogVersion: "0.7.0-beta19"
   }
 }, {
-  id: 'nateraw/stable-diffusion-videos',
+  id: 'tencent/hunyuan-image-3',
   provider: 'replicate',
-  name: 'stable-diffusion-videos',
+  name: 'hunyuan-image-3',
   contextWindow: 0,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.064
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 27606
+  },
   metadata: {
-    owner: "nateraw",
-    description: "Generate videos by interpolating the latent space of Stable Diffusion",
-    runCount: 58497,
-    githubUrl: "https://github.com/nateraw/stable-diffusion-videos",
+    owner: "tencent",
+    description: "A powerful native multimodal model for image generation (PrunaAI squeezed)",
+    runCount: 29358,
+    githubUrl: "https://github.com/Tencent-Hunyuan/HunyuanImage-3.0",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "2d87f0f8bc282042002f8d24458bbf588eee5e8d8fffb6fbb10ed48d1dac409e",
+    latestVersionId: "080dbbefcd1504ca5aeebaa2815fd51467d5bb793d2b1fb4eb4eb32ac22a3377",
+    cogVersion: "0.16.7"
+  }
+}, {
+  id: 'tencentarc/gfpgan',
+  provider: 'replicate',
+  name: 'gfpgan',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.0005
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.0005
+  },
+  metrics: {
+    averageRequestDuration: 1965
+  },
+  metadata: {
+    owner: "tencentarc",
+    description: "Practical face restoration algorithm for *old photos* or *AI-generated faces*",
+    runCount: 101991619,
+    githubUrl: "https://github.com/replicate/GFPGAN",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0fbacf7afc6c144e5be9767cff80f25aff23e52b0708f17e20f9879b2f21516c",
     cogVersion: "0.4.2"
   }
 }, {
-  id: 'lucataco/stable-diffusion-x4-upscaler',
+  id: 'tencentarc/photomaker',
   provider: 'replicate',
-  name: 'stable-diffusion-x4-upscaler',
+  name: 'photomaker',
   contextWindow: 0,
   tier: 'flagship',
   capabilities: new Set(['image']),
-  pricing: {},
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.007
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 11860
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Stable Diffusion x4 upscaler model",
-    runCount: 7918,
-    githubUrl: "https://github.com/lucataco/cog-sd-x4-upscaler",
+    owner: "tencentarc",
+    description: "Create photos, paintings and avatars for anyone in any style within seconds.",
+    runCount: 8497399,
+    githubUrl: "https://github.com/datakami-models/PhotoMaker",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "c96e30cc409e6c5f68cd8b071b15fe819b23956669fd6461891000ee64545760",
-    cogVersion: "0.8.6"
+    latestVersionId: "ddfc2b08d209f9fa8c1eca692712918bd449f695dabb4a958da31802a9570fe4",
+    cogVersion: "0.9.0-beta12"
   }
 }, {
-  id: 'fofr/sticker-maker',
+  id: 'tencentarc/photomaker-style',
   provider: 'replicate',
-  name: 'sticker-maker',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
+  name: 'photomaker-style',
+  contextWindow: 77,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageStyle']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.025
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 22806
+  },
   metadata: {
-    owner: "fofr",
-    description: "Make stickers with AI. Generates graphics with transparent backgrounds.",
-    runCount: 1741374,
-    githubUrl: "https://github.com/fofr/cog-stickers",
+    owner: "tencentarc",
+    description: "Create photos, paintings and avatars for anyone in any style within seconds.  (Stylization version)",
+    runCount: 1539156,
+    githubUrl: "https://github.com/TencentARC/PhotoMaker",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "4acb778eb059772225ec213948f0660867b2e03f277448f18cf1800b96a65a1a",
-    cogVersion: "0.9.5"
+    latestVersionId: "467d062309da518648ba89d226490e02b8ed09b5abc15026e54e31c5a8cd0769",
+    cogVersion: "0.9.2"
   }
 }, {
-  id: 'adirik/styletts2',
+  id: 'tencentarc/vqfr',
   provider: 'replicate',
-  name: 'styletts2',
+  name: 'vqfr',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 7828
+  },
   metadata: {
-    owner: "adirik",
-    description: "Generates speech from text",
-    runCount: 131998,
-    githubUrl: "https://github.com/yl4579/StyleTTS2",
+    owner: "tencentarc",
+    description: "Blind Face Restoration with Vector-Quantized Dictionary and Parallel Decoder",
+    runCount: 481426,
+    githubUrl: "https://github.com/TencentARC/VQFR",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "989cb5ea6d2401314eb30685740cb9f6fd1c9001b8940659b406f952837ab5ac",
-    cogVersion: "0.9.0-beta10"
-  }
-}, {
-  id: 'cjwbw/supir',
-  provider: 'replicate',
-  name: 'supir',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "Practicing Model Scaling for Photo-Realistic Image Restoration In the Wild. This version uses LLaVA-13b for captioning.",
-    runCount: 189767,
-    githubUrl: "https://github.com/chenxwh/SUPIR",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "1302b550b4f7681da87ed0e405016d443fe1fafd64dabce6673401855a5039b5",
-    cogVersion: "0.9.4"
-  }
-}, {
-  id: 'mv-lab/swin2sr',
-  provider: 'replicate',
-  name: 'swin2sr',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "mv-lab",
-    description: "3 Million Runs! AI Photorealistic Image Super-Resolution and Restoration",
-    runCount: 3573765,
-    githubUrl: "https://github.com/mv-lab/swin2sr",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "a01b0512004918ca55d02e554914a9eca63909fa83a29ff0f115c78a7045574f",
-    cogVersion: "0.4.4"
-  }
-}, {
-  id: 'jingyunliang/swinir',
-  provider: 'replicate',
-  name: 'swinir',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "jingyunliang",
-    description: "Image Restoration Using Swin Transformer",
-    runCount: 6179277,
-    githubUrl: "https://github.com/JingyunLiang/SwinIR",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "660d922d33153019e8c263a3bba265de882e7f4f70396546b6c9c8f9d47a021a",
-    cogVersion: "0.4.1"
-  }
-}, {
-  id: 'cjwbw/text2video-zero',
-  provider: 'replicate',
-  name: 'text2video-zero',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['image']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "Text-to-Image Diffusion Models are Zero-Shot Video Generators",
-    runCount: 42015,
-    githubUrl: "https://github.com/chenxwh/Text2Video-Zero",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e671ffe4e976c0ec813f15a9836ebcfd08857ac2669af6917e3c2549307f9fae",
-    cogVersion: "0.6.1"
-  }
-}, {
-  id: 'andreasjansson/tile-morph',
-  provider: 'replicate',
-  name: 'tile-morph',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "andreasjansson",
-    description: "Create tileable animations with seamless transitions",
-    runCount: 529343,
-    githubUrl: "https://github.com/andreasjansson/tile-morph",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "cbf059cce30a22d821a3c86309ae3b037dcd505dd2eba47f8ea6eba20adced85",
-    cogVersion: "0.6.1"
-  }
-}, {
-  id: 'fofr/tooncrafter',
-  provider: 'replicate',
-  name: 'tooncrafter',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "Create videos from illustrated input images",
-    runCount: 62576,
-    githubUrl: "https://github.com/fofr/cog-comfyui-tooncrafter",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0486ff07368e816ec3d5c69b9581e7a09b55817f567a0d74caad9395c9295c77",
-    cogVersion: "0.9.7"
-  }
-}, {
-  id: 'afiaka87/tortoise-tts',
-  provider: 'replicate',
-  name: 'tortoise-tts',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "afiaka87",
-    description: "Generate speech from text, clone voices from mp3 files. From James Betker AKA \"neonbjb\".",
-    runCount: 172790,
-    githubUrl: "https://github.com/afiaka87/tortoise-tts",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e9658de4b325863c4fcdc12d94bb7c9b54cbfe351b7ca1b36860008172b91c71",
-    cogVersion: "0.3.13"
-  }
-}, {
-  id: 'zsxkib/uform-gen',
-  provider: 'replicate',
-  name: 'uform-gen',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "zsxkib",
-    description: "🖼️ Super fast 1.5B Image Captioning/VQA Multimodal LLM (Image-to-Text) 🖋️",
-    runCount: 2345,
-    githubUrl: "https://github.com/zsxkib/cog-uform-gen",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e6fa8e2d076907b45a0b535a14ddb22402548c2e478310cd18daa1c4c01f422b",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'juergengunz/ultimate-portrait-upscale',
-  provider: 'replicate',
-  name: 'ultimate-portrait-upscale',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "juergengunz",
-    description: "Upscale Portrait Images with ControlNet Tile",
-    runCount: 50084,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "f7fdace4ec7adab7fa02688a160eee8057f070ead7fbb84e0904864fd2324be5",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'fewjative/ultimate-sd-upscale',
-  provider: 'replicate',
-  name: 'ultimate-sd-upscale',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fewjative",
-    description: "Ultimate SD Upscale with ControlNet Tile",
-    runCount: 165017,
-    githubUrl: "https://github.com/fewjative/cog-ultimate-sd-upscale",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5daf1012d946160622cd1bd45ed8f12d9675d24659276ccfe24804035f3b3ad7",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'alexgenovese/upscaler',
-  provider: 'replicate',
-  name: 'upscaler',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "alexgenovese",
-    description: "GFPGAN aims at developing Practical Algorithms for Real-world Face and Object Restoration",
-    runCount: 7547848,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "4f7eb3da655b5182e559d50a0437440f242992d47e5e20bd82829a79dee61ff3",
-    cogVersion: "0.8.6"
-  }
-}, {
-  id: 'google/upscaler',
-  provider: 'replicate',
-  name: 'upscaler',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Upscale images 2x or 4x times",
-    runCount: 58297,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "d2a2bb56bfb9b0a333b0b887ad79923a4bf808a9d2a3ae1a902af95d414c4b4a",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/veo-2',
-  provider: 'replicate',
-  name: 'veo-2',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "State of the art video generation model. Veo 2 can faithfully follow simple and complex instructions, and convincingly simulates real-world physics as well as a wide range of visual styles.",
-    runCount: 101938,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6d1366d35a555516e29b09b6da7df10301c8a5ec589238742d31eb732e77fce5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/veo-3',
-  provider: 'replicate',
-  name: 'veo-3',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "Sound on: Google’s flagship Veo 3 text to video model, with audio",
-    runCount: 199400,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "0335bd4f16df445405d0706150701f766edda6652adaf8b9a2a0711af83a6d4f",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/veo-3-fast',
-  provider: 'replicate',
-  name: 'veo-3-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "A faster and cheaper version of Google’s Veo 3 video model, with audio",
-    runCount: 125676,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "55a98860aef3187802db0cf27d85439019a44266442aed9f5ba0baf1d5b3983f",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/veo-3.1',
-  provider: 'replicate',
-  name: 'veo-3.1',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "New and improved version of Veo 3, with higher-fidelity video, context-aware audio, reference image and last frame support",
-    runCount: 80157,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "20ebd92c5919f20e8fa2e983bdb60016a99794c9accfab496ea25a68e0dbbaad",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'google/veo-3.1-fast',
-  provider: 'replicate',
-  name: 'veo-3.1-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "google",
-    description: "New and improved version of Veo 3 Fast, with higher-fidelity video, context-aware audio and last frame support",
-    runCount: 54800,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e246755a6d4f8c916a53cabef103241974202d6dfbced965dbd04a53ca040d02",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/video-01',
-  provider: 'replicate',
-  name: 'video-01',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Generate 6s videos with prompts or images. (Also known as Hailuo). Use a subject reference to make a video with a character and the S2V-01 model.",
-    runCount: 616928,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "5aa835260ff7f40f4069c41185f72036accf99e29957bb4a3b3a911f3b6c1912",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/video-01-director',
-  provider: 'replicate',
-  name: 'video-01-director',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Generate videos with specific camera movements",
-    runCount: 71307,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "377cde553c72d2a8a034a2824a43b63b9472247d670dbb14d8c917abb2d39b64",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'minimax/video-01-live',
-  provider: 'replicate',
-  name: 'video-01-live',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "An image-to-video (I2V) model specifically trained for Live2D and general animation use cases",
-    runCount: 169933,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "7574e16b8f1ad52c6332ecb264c0f132e555f46c222255a738131ec1bb614092",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'fofr/video-morpher',
-  provider: 'replicate',
-  name: 'video-morpher',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "fofr",
-    description: "Generate a video that morphs between subjects, with an optional style",
-    runCount: 15005,
-    githubUrl: "https://github.com/fofr/cog-video-morpher",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "e70e975067d2b5dbe9e2d9022833d27230a1bdeb3f4af6fe6bb49a548a3039a7",
-    cogVersion: "0.9.5"
-  }
-}, {
-  id: 'cjwbw/videocrafter',
-  provider: 'replicate',
-  name: 'videocrafter',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "VideoCrafter2: Text-to-Video and Image-to-Video Generation and Editing",
-    runCount: 131450,
-    githubUrl: "https://github.com/chenxwh/VideoCrafter",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "02edcff3e9d2d11dcc27e530773d988df25462b1ee93ed0257b6f246de4797c8",
-    cogVersion: "0.9.4"
-  }
-}, {
-  id: 'minimax/voice-cloning',
-  provider: 'replicate',
-  name: 'voice-cloning',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "minimax",
-    description: "Clone voices to use with Minimax's speech-02-hd and speech-02-turbo",
-    runCount: 21025,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "fff8a670880f066d3742838515a88f7f0a3ae40a4f2e06dae0f7f70ba63582d7",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'cjwbw/voicecraft',
-  provider: 'replicate',
-  name: 'voicecraft',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['audio']),
-  pricing: {},
-  metadata: {
-    owner: "cjwbw",
-    description: "Zero-Shot Speech Editing and Text-to-Speech in the Wild",
-    runCount: 10650,
-    githubUrl: "https://github.com/jasonppy/VoiceCraft",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "db97f6312d4c4d20e500e47fd95d8f14b00d8d28e046834faffb7999d83b6b30",
-    cogVersion: "0.13.7"
-  }
-}, {
-  id: 'wan-video/wan-2.1-1.3b',
-  provider: 'replicate',
-  name: 'wan-2.1-1.3b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Generate 5s 480p videos. Wan is an advanced and powerful visual generation model developed by Tongyi Lab of Alibaba Group",
-    runCount: 44204,
-    githubUrl: "https://github.com/Wan-Video/Wan2.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "121bbb762bf449889f090d36e3598c72c50c7a8cc2ce250433bc521a562aae61",
-    cogVersion: "0.14.0-alpha1"
-  }
-}, {
-  id: 'wavespeedai/wan-2.1-i2v-480p',
-  provider: 'replicate',
-  name: 'wan-2.1-i2v-480p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wavespeedai",
-    description: "Accelerated inference for Wan 2.1 14B image to video, a comprehensive and open suite of video foundation models that pushes the boundaries of video generation.",
-    runCount: 427234,
-    githubUrl: "https://github.com/Wan-Video/Wan2.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "70cc41f08f08a92133c0446992f846d86959f9eb7d7733d6a7a15b08062ef3cc",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wavespeedai/wan-2.1-i2v-720p',
-  provider: 'replicate',
-  name: 'wan-2.1-i2v-720p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wavespeedai",
-    description: "Accelerated inference for Wan 2.1 14B image to video with high resolution, a comprehensive and open suite of video foundation models that pushes the boundaries of video generation.",
-    runCount: 85363,
-    githubUrl: "https://github.com/Wan-Video/Wan2.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b74618163a6f48671a0463bafc5bef248d0214f123324d2f9970171e91855d3e",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wavespeedai/wan-2.1-t2v-480p',
-  provider: 'replicate',
-  name: 'wan-2.1-t2v-480p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wavespeedai",
-    description: "Accelerated inference for Wan 2.1 14B text to video, a comprehensive and open suite of video foundation models that pushes the boundaries of video generation.",
-    runCount: 180219,
-    githubUrl: "https://github.com/Wan-Video/Wan2.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "7677a619127ea34d1ed873fb5b77448e4b9889fbd83809b44a2c459ace99192a",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wavespeedai/wan-2.1-t2v-720p',
-  provider: 'replicate',
-  name: 'wan-2.1-t2v-720p',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wavespeedai",
-    description: "Accelerated inference for Wan 2.1 14B text to video with high resolution, a comprehensive and open suite of video foundation models that pushes the boundaries of video generation.",
-    runCount: 34925,
-    githubUrl: "https://github.com/Wan-Video/Wan2.1",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "a18e0a4faa7718b440ef647e37f7e5c65d54ad4a9365d9893465c19e43e19730",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wan-video/wan-2.2-i2v-a14b',
-  provider: 'replicate',
-  name: 'wan-2.2-i2v-a14b',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Image-to-video at 720p and 480p with Wan 2.2 A14B",
-    runCount: 41661,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "2c62e0842338726c74ad99a3c469255ce3f4c1f66ee000c265451b87754ac0c9",
-    cogVersion: "0.15.9"
-  }
-}, {
-  id: 'wan-video/wan-2.2-i2v-fast',
-  provider: 'replicate',
-  name: 'wan-2.2-i2v-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "A very fast and cheap PrunaAI optimized version of Wan 2.2 A14B image-to-video",
-    runCount: 3249308,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b609b267d986d762a6d8679ac036d29e6d4454218df558db3aa4d0396ba55c59",
-    cogVersion: "0.15.9"
-  }
-}, {
-  id: 'prunaai/wan-2.2-image',
-  provider: 'replicate',
-  name: 'wan-2.2-image',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "prunaai",
-    description: "This model generates beautiful cinematic 2 megapixel images in 3-4 seconds and is derived from the Wan 2.2 model through optimisation techniques from the pruna package",
-    runCount: 786983,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "16e15e913fcc71c1a5defb335ea84739f99731fa1ee17995117c7d9adc6d176c",
-    cogVersion: "0.14.7"
-  }
-}, {
-  id: 'wan-video/wan-2.2-t2v-fast',
-  provider: 'replicate',
-  name: 'wan-2.2-t2v-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "A very fast and cheap PrunaAI optimized version of Wan 2.2 A14B text-to-video",
-    runCount: 124937,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "1adb67211e01b96e48f9ab2bc5da80cac6f07604f2117ffafa729808850ffc0e",
-    cogVersion: "0.15.9"
-  }
-}, {
-  id: 'wan-video/wan-2.5-i2v',
-  provider: 'replicate',
-  name: 'wan-2.5-i2v',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Alibaba Wan 2.5 Image to video generation with background audio",
-    runCount: 79079,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "b4ebd9b0f1d222dca88ccb225e8e282c3d9311cbd19845f37cff6e4c30117d21",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wan-video/wan-2.5-i2v-fast',
-  provider: 'replicate',
-  name: 'wan-2.5-i2v-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Wan 2.5 image-to-video, optimized for speed",
-    runCount: 23197,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "66226b38d223f8ac7a81aa33b8519759e300c2f9818a215e32900827ad6d2db5",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wan-video/wan-2.5-t2v',
-  provider: 'replicate',
-  name: 'wan-2.5-t2v',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Alibaba Wan 2.5 text to video generation model",
-    runCount: 20055,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "ae5683465c7685f84af13c709d0cceb20df4b9209c35afdd99dec1dec6c98cd0",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'wan-video/wan-2.5-t2v-fast',
-  provider: 'replicate',
-  name: 'wan-2.5-t2v-fast',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
-  pricing: {},
-  metadata: {
-    owner: "wan-video",
-    description: "Wan 2.5 text-to-video, optimized for speed",
-    runCount: 17620,
-    githubUrl: null,
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "6647dd0f2b71ddda4eb34b9b096871edffdb832a669bbbcf0be106e67465eb35",
-    cogVersion: "0.16.8"
-  }
-}, {
-  id: 'openai/whisper',
-  provider: 'replicate',
-  name: 'whisper',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
-  metadata: {
-    owner: "openai",
-    description: "Convert speech in audio to text",
-    runCount: 142412321,
-    githubUrl: "https://github.com/replicate/cog-whisper",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e",
-    cogVersion: "0.13.2"
-  }
-}, {
-  id: 'nicknaskida/whisper-diarization',
-  provider: 'replicate',
-  name: 'whisper-diarization',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
-  metadata: {
-    owner: "nicknaskida",
-    description: "⚡️ Insanely Fast audio transcription | whisper large-v3 | speaker diarization | word & sentence level timestamps | prompt | hotwords. Fork of thomasmol/whisper-diarization. Added batched whisper, 3x-4x speedup 🚀",
-    runCount: 439,
-    githubUrl: "https://github.com/NickNaskida/cog-whisper-diarization",
-    visibility: "public",
-    source: "replicate",
-    latestVersionId: "c643440e783b6d1dcaef96ba97f2034ac61f02df8a3f2ae0481164ec38e8ac0d",
-    cogVersion: "0.9.20"
+    latestVersionId: "f9085ea5bf9c8f2d7e5c64564234ab41b5bcd8cd61a58b59a3dde5cbb487721a",
+    cogVersion: "0.4.0"
   }
 }, {
   id: 'thomasmol/whisper-diarization',
   provider: 'replicate',
   name: 'whisper-diarization',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'efficient',
+  tokenizer: 'Other',
   capabilities: new Set(['hearing']),
+  supportedParameters: new Set(['transcribePrompt']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 54819
+  },
   metadata: {
     owner: "thomasmol",
     description: "⚡️ Blazing fast audio transcription with speaker diarization | Whisper Large V3 Turbo | word & sentence level timestamps | prompt",
-    runCount: 3482898,
+    runCount: 3511400,
     githubUrl: "https://github.com/thomasmol/cog-whisper-diarization",
     visibility: "public",
     source: "replicate",
@@ -4160,40 +8316,111 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.13.7"
   }
 }, {
-  id: 'm1guelpf/whisper-subtitles',
+  id: 'topazlabs/image-upscale',
   provider: 'replicate',
-  name: 'whisper-subtitles',
+  name: 'image-upscale',
   contextWindow: 0,
   tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.01
+            }
+          ]
+        }
+      ]
+    },
+    perRequest: 0.01
+  },
+  metrics: {
+    averageRequestDuration: 12835
+  },
   metadata: {
-    owner: "m1guelpf",
-    description: "Generate subtitles from an audio file, using OpenAI's Whisper model.",
-    runCount: 73853,
-    githubUrl: "https://github.com/openai/whisper",
+    owner: "topazlabs",
+    description: "Professional-grade image upscaling, from Topaz Labs",
+    runCount: 1013686,
+    githubUrl: null,
     visibility: "public",
     source: "replicate",
-    latestVersionId: "7f686e243a96c7f6f0f481bcef24d688a1369ed3983cea348d1f43b879615766",
+    latestVersionId: "2fdc3b86a01d338ae89ad58e5d9241398a8a01de9b0dda41ba8a0434c8a00dc3",
+    cogVersion: "0.14.4"
+  }
+}, {
+  id: 'tstramer/material-diffusion',
+  provider: 'replicate',
+  name: 'material-diffusion',
+  contextWindow: 77,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "standard",
+          sizes: [
+            {
+              width: 512,
+              height: 512,
+              cost: 0.005
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 9266
+  },
+  metadata: {
+    owner: "tstramer",
+    description: "Stable diffusion fork for generating tileable outputs using v1.5 model",
+    runCount: 2350848,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "a42692c54c0f407f803a0a8a9066160976baedb77c91171a01730f9b0d7beeff",
     cogVersion: "0.4.4"
   }
 }, {
-  id: 'daanelson/whisperx',
+  id: 'vaibhavs10/incredibly-fast-whisper',
   provider: 'replicate',
-  name: 'whisperx',
+  name: 'incredibly-fast-whisper',
   contextWindow: 0,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['hearing']),
-  pricing: {},
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.000725
+    },
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 2750
+  },
   metadata: {
-    owner: "daanelson",
-    description: "Accelerated transcription of audio using WhisperX",
-    runCount: 91241,
-    githubUrl: "https://github.com/daanelson/cog-whisperx",
+    owner: "vaibhavs10",
+    description: "whisper-large-v3, incredibly fast, powered by Hugging Face Transformers! 🤗",
+    runCount: 20554500,
+    githubUrl: "https://github.com/chenxwh/insanely-fast-whisper",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "9aa6ecadd30610b81119fc1b6807302fd18ca6cbb39b3216f430dcf23618cedd",
-    cogVersion: "0.8.0-beta8"
+    latestVersionId: "3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
+    cogVersion: "0.9.4"
   }
 }, {
   id: 'victor-upmeet/whisperx',
@@ -4201,12 +8428,21 @@ export const replicateModels: ModelInfo[] = [{
   name: 'whisperx',
   contextWindow: 0,
   tier: 'flagship',
+  tokenizer: 'Other',
   capabilities: new Set(['hearing']),
-  pricing: {},
+  supportedParameters: new Set(['temperature', 'transcribePrompt']),
+  pricing: {
+    audio: {
+      perSecond: 0.00055
+    }
+  },
+  metrics: {
+    averageRequestDuration: 3575
+  },
   metadata: {
     owner: "victor-upmeet",
     description: "Accelerated transcription, word-level timestamps and diarization with whisperX large-v3",
-    runCount: 5009619,
+    runCount: 5110687,
     githubUrl: "https://github.com/victor-upmeet/whisperx-replicate",
     visibility: "public",
     source: "replicate",
@@ -4214,57 +8450,652 @@ export const replicateModels: ModelInfo[] = [{
     cogVersion: "0.9.4"
   }
 }, {
-  id: 'adidoes/whisperx-video-transcribe',
+  id: 'willywongi/donut',
   provider: 'replicate',
-  name: 'whisperx-video-transcribe',
-  contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['hearing']),
-  pricing: {},
+  name: 'donut',
+  contextWindow: 1024,
+  maxOutputTokens: 1024,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    perRequest: 0.002
+  },
+  metrics: {
+    averageRequestDuration: 1347
+  },
   metadata: {
-    owner: "adidoes",
-    description: "ASR from video URL based on whisperx using large-v2 model",
-    runCount: 19596,
-    githubUrl: "https://github.com/adidoes/cog-whisperx-video-transcribe",
+    owner: "willywongi",
+    description: "Extract structured data from receipt images using Donut 🍩 (Document Understanding Transformer)",
+    runCount: 2236,
+    githubUrl: "https://github.com/clovaai/donut",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "481284a2a2ff72a031689481ca92fb1d20b194980a4b435d93f6f4c9520fea61",
+    latestVersionId: "6bdf3a5790f9cdf491e995a659563c3dcbe94d929e89216486e8fe3f909f4716",
+    cogVersion: "0.6.1"
+  }
+}, {
+  id: 'x-lance/f5-tts',
+  provider: 'replicate',
+  name: 'f5-tts',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set([]),
+  pricing: {
+    audio: {
+      perSecond: 0.000575
+    }
+  },
+  metrics: {
+    averageRequestDuration: 5257
+  },
+  metadata: {
+    owner: "x-lance",
+    description: "F5-TTS, the new state-of-the-art in open source voice cloning",
+    runCount: 35274,
+    githubUrl: "https://github.com/cuuupid/cog-f5-tts",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "87faf6dd7a692dd82043f662e76369cab126a2cf1937e25a9d41e0b834fd230e",
+    cogVersion: "0.9.20"
+  }
+}, {
+  id: 'xai/grok-4',
+  provider: 'replicate',
+  name: 'grok-4',
+  contextWindow: 131072,
+  maxOutputTokens: 2048,
+  tier: 'flagship',
+  tokenizer: 'Grok',
+  capabilities: new Set(['chat', 'reasoning', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP', 'frequencyPenalty', 'presencePenalty']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 2,
+    averageRequestDuration: 4081
+  },
+  metadata: {
+    owner: "xai",
+    description: "Grok 4 is xAI’s most advanced reasoning model. Excels at logical thinking and in-depth analysis. Ideal for insightful discussions and complex problem-solving.",
+    runCount: 11021,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "08e47aa14634bfb55b44e90d10a32f8e5a3a73719777e3f11256a34279fc22a7",
+    cogVersion: "0.16.9"
+  }
+}, {
+  id: 'xinntao/esrgan',
+  provider: 'replicate',
+  name: 'esrgan',
+  contextWindow: 0,
+  tier: 'legacy',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 2752
+  },
+  metadata: {
+    owner: "xinntao",
+    description: "Image 4x super-resolution",
+    runCount: 183020,
+    githubUrl: "https://github.com/xinntao/ESRGAN",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "c263265e04b16fda1046d1828997fc27b46610647a3348df1c72fbffbdbac912",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'yangxy/gpen',
+  provider: 'replicate',
+  name: 'gpen',
+  contextWindow: 0,
+  tier: 'legacy',
+  tokenizer: 'Other',
+  capabilities: new Set(['image', 'vision']),
+  supportedParameters: new Set([]),
+  pricing: {
+    image: {
+      output: []
+    }
+  },
+  metrics: {
+    averageRequestDuration: 174546
+  },
+  metadata: {
+    owner: "yangxy",
+    description: "Blind Face Restoration in the Wild",
+    runCount: 164838,
+    githubUrl: "https://github.com/yangxy/GPEN",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "cf4e15a70049c0119884eb2906c8ae8807af8317bea98313fefd941e414d0c91",
+    cogVersion: "0.4.1"
+  }
+}, {
+  id: 'yorickvp/llava-13b',
+  provider: 'replicate',
+  name: 'llava-13b',
+  contextWindow: 2048,
+  maxOutputTokens: 1024,
+  tier: 'efficient',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['vision', 'chat', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {
+    perRequest: 0.0038
+  },
+  metrics: {
+    tokensPerSecond: 11,
+    timeToFirstToken: 500,
+    averageRequestDuration: 5332,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "yorickvp",
+    description: "Visual instruction tuning towards large language and vision models with GPT-4 level capabilities",
+    runCount: 32666946,
+    githubUrl: "https://github.com/haotian-liu/LLaVA",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb",
+    cogVersion: "0.9.5"
+  }
+}, {
+  id: 'yorickvp/llava-v1.6-34b',
+  provider: 'replicate',
+  name: 'llava-v1.6-34b',
+  contextWindow: 32768,
+  maxOutputTokens: 1024,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['chat', 'vision', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {
+    text: {
+      input: 0.3,
+      output: 0.3
+    }
+  },
+  metrics: {
+    tokensPerSecond: 12,
+    timeToFirstToken: 500,
+    averageRequestDuration: 16556,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "yorickvp",
+    description: "LLaVA v1.6: Large Language and Vision Assistant (Nous-Hermes-2-34B)",
+    runCount: 1770103,
+    githubUrl: "https://github.com/haotian-liu/LLaVA",
+    visibility: "public",
+    source: "replicate"
+  }
+}, {
+  id: 'yorickvp/llava-v1.6-mistral-7b',
+  provider: 'replicate',
+  name: 'llava-v1.6-mistral-7b',
+  contextWindow: 32768,
+  maxOutputTokens: 1024,
+  tier: 'efficient',
+  tokenizer: 'Mistral',
+  capabilities: new Set(['chat', 'vision']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {
+    text: {
+      input: 0.2,
+      output: 0.2,
+      cached: 0.1
+    },
+    image: {
+      input: 0.002
+    }
+  },
+  metrics: {
+    tokensPerSecond: 20,
+    timeToFirstToken: 500,
+    averageRequestDuration: 4445,
+    accuracyScore: 0.85
+  },
+  metadata: {
+    owner: "yorickvp",
+    description: "LLaVA v1.6: Large Language and Vision Assistant (Mistral-7B)",
+    runCount: 4924002,
+    githubUrl: "https://github.com/haotian-liu/LLaVA",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "19be067b589d0c46689ffa7cc3ff321447a441986a7694c01225973c2eafc874",
+    cogVersion: "0.9.2"
+  }
+}, {
+  id: 'yorickvp/llava-v1.6-vicuna-13b',
+  provider: 'replicate',
+  name: 'llava-v1.6-vicuna-13b',
+  contextWindow: 4096,
+  maxOutputTokens: 1024,
+  tier: 'efficient',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['chat', 'vision', 'streaming']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 10.7,
+    averageRequestDuration: 29647
+  },
+  metadata: {
+    owner: "yorickvp",
+    description: "LLaVA v1.6: Large Language and Vision Assistant (Vicuna-13B)",
+    runCount: 3744616,
+    githubUrl: "https://github.com/haotian-liu/LLaVA",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0603dec596080fa084e26f0ae6d605fc5788ed2b1a0358cd25010619487eae63",
+    cogVersion: "0.9.2"
+  }
+}, {
+  id: 'zsxkib/aura-sr',
+  provider: 'replicate',
+  name: 'aura-sr',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 2119
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "AuraSR: GAN-based Super-Resolution for real-world",
+    runCount: 3203,
+    githubUrl: "https://github.com/zsxkib/cog-aura-sr",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "7231d40ac06e74c6d1bc287309c396fa4791e4cf4fdcb91fb4b191c6c485fc1c",
+    cogVersion: "0.9.9"
+  }
+}, {
+  id: 'zsxkib/aura-sr-v2',
+  provider: 'replicate',
+  name: 'aura-sr-v2',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['imageFormat']),
+  pricing: {
+    image: {
+      output: [
+        {
+          quality: "high",
+          sizes: [
+            {
+              width: 1024,
+              height: 1024,
+              cost: 0.00035
+            }
+          ]
+        }
+      ]
+    }
+  },
+  metrics: {
+    averageRequestDuration: 600
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "AuraSR v2: Second-gen GAN-based Super-Resolution for real-world applications",
+    runCount: 17730,
+    githubUrl: "https://github.com/zsxkib/cog-aura-sr-v2",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5c137257cce8d5ce16e8a334b70e9e025106b5580affed0bc7d48940b594e74c",
+    cogVersion: "0.9.14"
+  }
+}, {
+  id: 'zsxkib/blip-3',
+  provider: 'replicate',
+  name: 'blip-3',
+  contextWindow: 4096,
+  maxOutputTokens: 2048,
+  tier: 'efficient',
+  tokenizer: 'Llama2',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 8912
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Blip 3 / XGen-MM, Answers questions about images ({blip3,xgen-mm}-phi3-mini-base-r-v1)",
+    runCount: 1331478,
+    githubUrl: "https://github.com/zsxkib/cog-blip-3",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "499bec581d8f64060fd695ec0c34d7595c6824c4118259aa8b0788e0d2d903e1",
+    cogVersion: "v0.9.5+dev"
+  }
+}, {
+  id: 'zsxkib/bsrgan',
+  provider: 'replicate',
+  name: 'bsrgan',
+  contextWindow: 0,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 343661
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Upscale videos + images with BSRGAN",
+    runCount: 5519,
+    githubUrl: "https://github.com/zsxkib/BSRGAN/tree/replicate",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "1ae02b13920bbc43cedec32a680b836412a55d978d0a2f2f6a423acc85e332e4",
+    cogVersion: "0.13.7"
+  }
+}, {
+  id: 'zsxkib/dia',
+  provider: 'replicate',
+  name: 'dia',
+  contextWindow: 4096,
+  maxOutputTokens: 4096,
+  tier: 'experimental',
+  tokenizer: 'Other',
+  capabilities: new Set(['audio', 'hearing']),
+  supportedParameters: new Set(['seed', 'temperature', 'topP', 'maxTokens']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 24025
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Dia 1.6B by Nari Labs, Generates realistic dialogue audio from text, including non-verbal cues and voice cloning",
+    runCount: 9738,
+    githubUrl: "https://github.com/zsxkib/cog-dia",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "2119e338ca5c0dacd3def83158d6c80d431f2ac1024146d8cca9220b74385599",
+    cogVersion: "0.15.10"
+  }
+}, {
+  id: 'zsxkib/diffbir',
+  provider: 'replicate',
+  name: 'diffbir',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 75052
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "✨DiffBIR: Towards Blind Image Restoration with Generative Diffusion Prior",
+    runCount: 137283,
+    githubUrl: "https://github.com/XPixelGroup/DiffBIR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "51ed1464d8bbbaca811153b051d3b09ab42f0bdeb85804ae26ba323d7a66a4ac",
     cogVersion: "0.8.6"
   }
 }, {
-  id: 'lucataco/xtts-v2',
+  id: 'zsxkib/flash-face',
   provider: 'replicate',
-  name: 'xtts-v2',
+  name: 'flash-face',
   contextWindow: 0,
-  tier: 'flagship',
+  tier: 'experimental',
+  capabilities: new Set(['image']),
+  supportedParameters: new Set(['seed', 'imageMultiple', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 22578
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "FlashFace: Human Image Personalization with High-fidelity Identity Preservation",
+    runCount: 4838,
+    githubUrl: "https://github.com/zsxkib/FlashFace",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "edb17f54faec253ee86e58e0b5f18f24a89c4e31fe7fcefa970e13d8ad934117",
+    cogVersion: "v0.9.5+dev"
+  }
+}, {
+  id: 'zsxkib/flux-music',
+  provider: 'replicate',
+  name: 'flux-music',
+  contextWindow: 0,
+  tier: 'experimental',
   capabilities: new Set(['audio']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 5822
+  },
   metadata: {
-    owner: "lucataco",
-    description: "Coqui XTTS-v2: Multilingual Text To Speech Voice Cloning",
-    runCount: 4517622,
-    githubUrl: "https://github.com/lucataco/cog-xtts-v2",
+    owner: "zsxkib",
+    description: "🎼FluxMusic Text-to-Music Generation with Rectified Flow Transformer🎶",
+    runCount: 8712,
+    githubUrl: "https://github.com/zsxkib/FluxMusic/tree/replicate",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "684bc3855b37866c0c65add2ff39c78f3dea3f4ff103a436465326e0f438d55e",
+    latestVersionId: "eebfed4a1749bb1172f005f71fac5a1e0377502ec149c9d02b56ac1de3aa9f07",
+    cogVersion: "0.9.24"
+  }
+}, {
+  id: 'zsxkib/idefics3',
+  provider: 'replicate',
+  name: 'idefics3',
+  contextWindow: 8192,
+  maxOutputTokens: 1024,
+  tier: 'efficient',
+  tokenizer: 'Llama3',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 3447
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Idefics3-8B-Llama3, Answers questions and caption about images",
+    runCount: 2562,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "b06f5f6b6249b27d0b00d1b794240e5641190d1582ad68c40ef53778459bb593",
+    cogVersion: "0.9.14"
+  }
+}, {
+  id: 'zsxkib/instant-id',
+  provider: 'replicate',
+  name: 'instant-id',
+  contextWindow: 0,
+  tier: 'flagship',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat', 'imageMultiple']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 36064
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Make realistic images of real people instantly",
+    runCount: 997734,
+    githubUrl: "https://github.com/zsxkib/InstantID",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "2e4785a4d80dadf580077b2244c8d7c05d8e3faac04a04c02d8e099dd2876789",
+    cogVersion: "0.13.6"
+  }
+}, {
+  id: 'zsxkib/jina-clip-v2',
+  provider: 'replicate',
+  name: 'jina-clip-v2',
+  contextWindow: 8192,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['embedding', 'vision']),
+  supportedParameters: new Set(['embeddingDimensions']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 1128
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Jina-CLIP v2: 0.9B multimodal embedding model with 89-language multilingual support, 512x512 image resolution, and Matryoshka representations",
+    runCount: 764977,
+    githubUrl: null,
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "5050c3108bab23981802011a3c76ee327cc0dbfdd31a2f4ef1ee8ef0d3f0b448",
+    cogVersion: "0.13.2"
+  }
+}, {
+  id: 'zsxkib/molmo-7b',
+  provider: 'replicate',
+  name: 'molmo-7b',
+  contextWindow: 4096,
+  maxOutputTokens: 1000,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision', 'chat']),
+  supportedParameters: new Set(['maxTokens', 'temperature', 'topP']),
+  pricing: {},
+  metrics: {
+    tokensPerSecond: 16,
+    averageRequestDuration: 14536
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "allenai/Molmo-7B-D-0924, Answers questions and caption about images",
+    runCount: 906239,
+    githubUrl: "https://github.com/zsxkib/cog-molmo-7b-d",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "76ebd700864218a4ca97ac1ccff068be7222272859f9ea2ae1dd4ac073fa8de8",
+    cogVersion: "0.9.24"
+  }
+}, {
+  id: 'zsxkib/realistic-voice-cloning',
+  provider: 'replicate',
+  name: 'realistic-voice-cloning',
+  contextWindow: 0,
+  tier: 'efficient',
+  capabilities: new Set(['hearing', 'audio']),
+  supportedParameters: new Set(['responseFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 2832
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "Create song covers with any RVC v2 trained AI voice from audio files.",
+    runCount: 1255670,
+    githubUrl: "https://github.com/zsxkib/AICoverGen.git",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "0a9c7c558af4c0f20667c1bd1260ce32a2879944a0b9e44e1398660c077b1550",
     cogVersion: "0.8.6"
   }
 }, {
-  id: 'anotherjesse/zeroscope-v2-xl',
+  id: 'zsxkib/seedvr2',
   provider: 'replicate',
-  name: 'zeroscope-v2-xl',
+  name: 'seedvr2',
   contextWindow: 0,
-  tier: 'flagship',
-  capabilities: new Set(['chat']),
+  tier: 'efficient',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
   pricing: {},
+  metrics: {
+    averageRequestDuration: 3117
+  },
   metadata: {
-    owner: "anotherjesse",
-    description: "Zeroscope V2 XL & 576w",
-    runCount: 299103,
-    githubUrl: "https://github.com/anotherjesse/cog-text2video",
+    owner: "zsxkib",
+    description: "🔥 SeedVR2: one-step video & image restoration with 3B/7B hot‑swap and optional color fix 🎬✨",
+    runCount: 5290,
+    githubUrl: "https://github.com/zsxkib/cog-ByteDance-Seed-SeedVR2-3B",
     visibility: "public",
     source: "replicate",
-    latestVersionId: "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
-    cogVersion: "v0.8.0-beta7+dev"
+    latestVersionId: "ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78",
+    cogVersion: "0.16.8"
+  }
+}, {
+  id: 'zsxkib/step1x-edit',
+  provider: 'replicate',
+  name: 'step1x-edit',
+  contextWindow: 2048,
+  tier: 'experimental',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed', 'imageFormat']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 13587
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "✍️Step1X-Edit by stepfun-ai, Edit an image using text prompt📸",
+    runCount: 15773,
+    githubUrl: "https://github.com/zsxkib/cog-Step1X-Edit/",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "12b5a5a61e3419f792eb56cfc16eed046252740ebf5d470228f9b4cf2c861610",
+    cogVersion: "0.14.7"
+  }
+}, {
+  id: 'zsxkib/uform-gen',
+  provider: 'replicate',
+  name: 'uform-gen',
+  contextWindow: 2048,
+  tier: 'efficient',
+  tokenizer: 'Other',
+  capabilities: new Set(['vision']),
+  supportedParameters: new Set([]),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 17160
+  },
+  metadata: {
+    owner: "zsxkib",
+    description: "🖼️ Super fast 1.5B Image Captioning/VQA Multimodal LLM (Image-to-Text) 🖋️",
+    runCount: 2346,
+    githubUrl: "https://github.com/zsxkib/cog-uform-gen",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "e6fa8e2d076907b45a0b535a14ddb22402548c2e478310cd18daa1c4c01f422b",
+    cogVersion: "0.8.6"
+  }
+}, {
+  id: 'zsyoaoa/invsr',
+  provider: 'replicate',
+  name: 'invsr',
+  contextWindow: 0,
+  tier: 'experimental',
+  capabilities: new Set(['vision', 'image']),
+  supportedParameters: new Set(['seed']),
+  pricing: {},
+  metrics: {
+    averageRequestDuration: 96037
+  },
+  metadata: {
+    owner: "zsyoaoa",
+    description: "Arbitrary-steps Image Super-resolution via Diffusion Inversion",
+    runCount: 5426,
+    githubUrl: "https://github.com/zsyOAOA/InvSR",
+    visibility: "public",
+    source: "replicate",
+    latestVersionId: "37eebabfb6cdc4be2892b884b96b361d6fedc9f6a934d2fa3c1a2f85f004b0f0",
+    cogVersion: "0.13.6"
   }
 }];

@@ -284,7 +284,7 @@ export class Prompt<
     if (hasTools && !template.includes('{{tools}}')) {
       template = template + "\n\n<tools>\n{{tools}}\n</tools>";
     }
-    return Handlebars.compile(template);
+    return Handlebars.compile(template, { noEscape: true });
   }
 
   constructor(

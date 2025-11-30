@@ -4,41 +4,42 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { ModelInfo } from '@aeye/ai';
+import type { ModelInfo, ModelParameter } from '@aeye/ai';
 
+export const stringify = (x: any, space?: number | string | undefined) => 
+  (JSON.stringify(x, null, space) || '')
+    .replace(/"([^"]+)":/g, '$1:')
+    .replace(/\n/g, '\n  ')
+    .trim() || undefined;
+
+export const stringifyModel = (m: ModelInfo) => {
+  const fields: [any, string][] = [
+    [m.id, `id: '${m.id}'`],
+    [m.provider, `provider: '${m.provider}'`],
+    [m.name, `name: '${m.name}'`],
+    [m.contextWindow, `contextWindow: ${m.contextWindow}`],
+    [m.maxOutputTokens, `maxOutputTokens: ${m.maxOutputTokens}`],
+    [m.tier, `tier: '${m.tier}'`],
+    [m.tokenizer, `tokenizer: '${m.tokenizer}'`],
+    [m.capabilities, `capabilities: new Set([${Array.from(m.capabilities).map(c => `'${c}'`).join(', ')}])`],
+    [m.supportedParameters?.size || (m.supportedParameters as any)?.length, `supportedParameters: new Set([${Array.from(m.supportedParameters || []).map(p => `'${p}'`).join(', ')}])`],
+    [m.pricing || {}, `pricing: ${stringify(m.pricing, 2)}`],
+    [m.metrics, `metrics: ${stringify(m.metrics, 2)}`],
+    [m.metadata, `metadata: ${stringify(m.metadata, 2)}`],
+  ];
+
+  const fieldStrings = fields
+    .filter(([value]) => value !== undefined)
+    .map(([, str]) => `  ${str}`);
+
+  return `{\n${fieldStrings.join(',\n')}\n}`;
+};
 
 /**
  * Convert ModelInfo array to TypeScript source code
  */
 export function generateModelTS(models: ModelInfo[], exportName: string): string {
-  const stringify = (x: any, space?: number | string | undefined) => 
-    (JSON.stringify(x, null, space) || '')
-      .replace(/"([^"]+)":/g, '$1:')
-      .replace(/\n/g, '\n  ')
-      .trim() || undefined;
-
-  const serialized = models.map(m => {
-    const fields: [any, string][] = [
-      [m.id, `id: '${m.id}'`],
-      [m.provider, `provider: '${m.provider}'`],
-      [m.name, `name: '${m.name}'`],
-      [m.contextWindow, `contextWindow: ${m.contextWindow}`],
-      [m.maxOutputTokens, `maxOutputTokens: ${m.maxOutputTokens}`],
-      [m.tier, `tier: '${m.tier}'`],
-      [m.tokenizer, `tokenizer: '${m.tokenizer}'`],
-      [m.capabilities, `capabilities: new Set([${Array.from(m.capabilities).map(c => `'${c}'`).join(', ')}])`],
-      [m.supportedParameters?.size, `supportedParameters: new Set([${Array.from(m.supportedParameters || []).map(p => `'${p}'`).join(', ')}])`],
-      [m.pricing, `pricing: ${stringify(m.pricing, 2)}`],
-      [m.metrics, `metrics: ${stringify(m.metrics, 2)}`],
-      [m.metadata, `metadata: ${stringify(m.metadata, 2)}`],
-    ];
-
-    const fieldStrings = fields
-      .filter(([value]) => value !== undefined)
-      .map(([, str]) => `  ${str}`);
-
-    return `{\n${fieldStrings.join(',\n')}\n}`;
-  }).join(', ');
+  const serialized = models.map(stringifyModel).join(', ');
 
   return `/**
  * Generated model data

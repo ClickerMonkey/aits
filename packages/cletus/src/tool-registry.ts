@@ -1,4 +1,4 @@
-import { AnyTool, Message } from '@aeye/core';
+import { AnyTool, Message, resolveFn } from '@aeye/core';
 import { cosineSimilarity } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
@@ -45,9 +45,9 @@ export class ToolRegistry {
   /**
    * Register multiple tools from a toolset
    */
-  registerToolset(toolset: string, tools: AnyTool[], getInstructions: (tool: AnyTool) => string): void {
+  async registerToolset(toolset: string, tools: AnyTool[], getInstructions: (tool: AnyTool) => Promise<string>): Promise<void> {
     for (const tool of tools) {
-      this.register(toolset, tool, getInstructions(tool));
+      this.register(toolset, tool, await getInstructions(tool));
     }
   }
 
@@ -211,13 +211,14 @@ export function getDBAToolsetName(typeName: string): string {
 /**
  * Extract instructions from a tool (uses instructions first, falls back to description)
  */
-export function getToolInstructions(tool: AnyTool): string {
+export async function getToolInstructions(tool: AnyTool, ctx?: CletusAIContext): Promise<string> {
   const input = tool.input;
   // Use instructions first if available, then fall back to description
-  if (input.instructions) {
-    return `${input.description}\n\n${input.instructions}`;
-  }
-  return input.description;
+  const instructions = input.instructionsFn && ctx
+    ? await resolveFn(input.instructionsFn)(ctx)
+    : input.instructions;
+  
+  return instructions || input.description;
 }
 
 /**

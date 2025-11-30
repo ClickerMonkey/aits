@@ -461,6 +461,17 @@ export async function toStream(input: Resource, fallback?: Readable): Promise<Re
 }
 
 /**
+ * Converts the input resource to a ReadableStream.
+ * 
+ * @param input - The resource to convert.
+ * @param fallback - Optional fallback ReadableStream to use if conversion fails.
+ * @returns A promise that resolves to a ReadableStream.
+ */
+export async function toReadableStream(input: Resource, fallback?: ReadableStream): Promise<ReadableStream> {
+  return ReadableStream.from(await toStream(input, fallback ? Readable.fromWeb(fallback) : undefined));
+}
+
+/**
  * Converts the input resource to a File.
  * 
  * @param input - The resource to convert.

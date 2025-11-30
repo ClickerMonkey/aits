@@ -5,33 +5,32 @@
  * Reuses core types from @server/ai/core for consistency.
  */
 
-import { ReadStream } from 'fs';
 import type {
-  Context as CoreContext,
-  Request,
-  Response,
-  Chunk,
-  Usage,
-  Executor,
-  Streamer,
-  Message,
-  Component,
+  AgentInput,
   AnyComponent,
-  ComponentInput,
-  ComponentOutput,
-  OptionalParams,
-  ComponentCompatible,
-  BaseResponse,
   BaseChunk,
   BaseRequest,
-  ModelInput,
+  BaseResponse,
+  Chunk,
+  Component,
+  ComponentCompatible,
+  ComponentInput,
+  ComponentOutput,
+  Context as CoreContext,
+  Executor,
+  Message,
   Model,
-  Simplify,
+  ModelInput,
+  OptionalParams,
+  PromptInput,
+  Request,
   Resource,
+  Response,
+  Simplify,
+  Streamer,
+  ToolInput,
+  Usage,
 } from '@aeye/core';
-import type { PromptInput } from '@aeye/core';
-import type { ToolInput } from '@aeye/core';
-import type { AgentInput } from '@aeye/core';
 import { AI } from './ai';
 
 // ============================================================================
@@ -39,22 +38,9 @@ import { AI } from './ai';
 // ============================================================================
 
 export type {
-  CoreContext,
-  Request,
-  Response,
-  Chunk,
-  Usage,
-  Executor,
-  Streamer,
-  Message,
-  Component,
-  AnyComponent,
-  ComponentInput,
-  ComponentOutput,
-  PromptInput,
-  ToolInput,
-  AgentInput,
-  OptionalParams,
+  AgentInput, AnyComponent, Chunk, Component, ComponentInput,
+  ComponentOutput, CoreContext, Executor, Message, OptionalParams, PromptInput, Request,
+  Response, Streamer, ToolInput, Usage
 };
 
 // ============================================================================
@@ -817,51 +803,62 @@ export interface ModelHandler<TContext extends AIContextAny = AIContextAny> {
 export type ModelHandlerFor<T extends AIBaseTypes> = ModelHandler<AIContext<T>>;
 
 /**
+ * Model transformer response type - omits model and usage fields.
+ */
+export type ModelTransformerResponse<T> = Omit<T, 'model' | 'usage'>;
+
+/**
  * Model transformer for providers with inconsistent request/response shapes.
  * Transforms standard requests/responses to/from provider-specific formats.
  * Useful for adapting providers like Replicate that have model-specific APIs.
  *
- * @template TContext - Context type passed to transformer methods
+ * @template TRequest - A specific type for transformed requests if any
+ * @template TResponse - A specific type for transformed responses if any
+ * @template TChunk - A specific type for transformed streaming chunks if any
  */
-export interface ModelTransformer {
+export interface ModelTransformer<
+  TRequest = object,
+  TResponse = object,
+  TChunk = object,
+> {
   chat?: {
-    convertRequest?: (request: Request, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
+    convertRequest?: (request: Request, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<Response>>;
+    parseChunk?: (chunk: TChunk, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   imageGenerate?: {
-    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
+    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<ImageGenerationResponse>>;
+    parseChunk?: (chunk: TChunk, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageEdit?: {
-    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
+    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<ImageGenerationResponse>>;
+    parseChunk?: (chunk: TChunk, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageAnalyze?: {
-    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
+    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<Response>>;
+    parseChunk?: (chunk: TChunk, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   transcribe?: {
-    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<TranscriptionResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<TranscriptionChunk>;
+    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<TranscriptionResponse>>;
+    parseChunk?: (chunk: TChunk, ctx: AIContextAny) => Promise<TranscriptionChunk>;
   };
 
   speech?: {
-    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<SpeechResponse>;
+    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<SpeechResponse>>;
   };
 
   embed?: {
-    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<EmbeddingResponse>;
+    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => Promise<TRequest>;
+    parseResponse?: (response: TResponse, ctx: AIContextAny) => Promise<ModelTransformerResponse<EmbeddingResponse>>;
   };
 }
 

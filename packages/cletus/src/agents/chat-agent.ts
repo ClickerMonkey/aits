@@ -1,16 +1,13 @@
 import { AnyTool } from '@aeye/core';
-import { z } from 'zod';
 import type { CletusAI, CletusAIContext } from '../ai';
-import { abbreviate } from '../common';
-import { ADAPTIVE_TOOLING, CONSTS } from '../constants';
-import { OperationManager } from '../operations/manager';
-import { OperationMode, Operations } from '../operations/types';
-import { 
-  toolRegistry, 
-  getToolInstructions, 
+import { ADAPTIVE_TOOLING } from '../constants';
+import { Operations } from '../operations/types';
+import {
   buildToolSelectionQuery,
   getDBAToolsetName,
-  RegisteredTool
+  getToolInstructions,
+  RegisteredTool,
+  toolRegistry
 } from '../tool-registry';
 import { createUtilityTools } from '../tools/utility';
 import { createToolsets } from './toolsets';
@@ -18,7 +15,7 @@ import { createToolsets } from './toolsets';
 /**
  * Initialize the tool registry with all static tools
  */
-function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof createToolsets>) {
+async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof createToolsets>) {
   const {
     plannerTools,
     librarianTools,
@@ -30,18 +27,21 @@ function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof create
     createDBATools,
   } = toolsets;
 
-  // Register static toolsets
-  toolRegistry.registerToolset('planner', plannerTools, getToolInstructions);
-  toolRegistry.registerToolset('librarian', librarianTools, getToolInstructions);
-  toolRegistry.registerToolset('clerk', clerkTools, getToolInstructions);
-  toolRegistry.registerToolset('secretary', secretaryTools, getToolInstructions);
-  toolRegistry.registerToolset('architect', architectTools, getToolInstructions);
-  toolRegistry.registerToolset('artist', artistTools, getToolInstructions);
-  toolRegistry.registerToolset('internet', internetTools, getToolInstructions);
+  const ctx = await ai.buildContext({});
+  const instruct = (tool: AnyTool) => getToolInstructions(tool, ctx);
+
+    // Register static toolsets
+  await toolRegistry.registerToolset('planner', plannerTools, instruct);
+  await toolRegistry.registerToolset('librarian', librarianTools, instruct);
+  await toolRegistry.registerToolset('clerk', clerkTools, instruct);
+  await toolRegistry.registerToolset('secretary', secretaryTools, instruct);
+  await toolRegistry.registerToolset('architect', architectTools, instruct);
+  await toolRegistry.registerToolset('artist', artistTools, instruct);
+  await toolRegistry.registerToolset('internet', internetTools, instruct);
 
   // Register utility tools
   const utilityTools = createUtilityTools(ai);
-  toolRegistry.registerToolset('utility', utilityTools, getToolInstructions);
+  await toolRegistry.registerToolset('utility', utilityTools, instruct);
 
   // Register DBA tools for existing types
   const config = ai.config.defaultContext?.config;
@@ -51,7 +51,7 @@ function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof create
   for (const type of types) {
     const dbaTools = createDBATools(type);
     const toolsetName = getDBAToolsetName(type.name);
-    toolRegistry.registerToolset(toolsetName, dbaTools, getToolInstructions);
+    await toolRegistry.registerToolset(toolsetName, dbaTools, instruct);
   }
 }
 
@@ -102,7 +102,10 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
 
   if (toolset) {
     // Use specific toolset
-    return toolRegistry.getToolset(toolset);
+    return [
+      ...toolRegistry.getToolset(toolset),
+      ...toolRegistry.getToolset('utility'),
+    ];
   }
 
   // Adaptive selection: use embeddings of recent user messages
@@ -110,9 +113,9 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
   if (!query) {
     // No user messages yet, return a default set of tools
     return [
-      ...toolRegistry.getToolset('utility'),
       ...toolRegistry.getToolset('planner').slice(0, 2),
       ...toolRegistry.getToolset('clerk').slice(0, 3),
+      ...toolRegistry.getToolset('utility'),
     ];
   }
 

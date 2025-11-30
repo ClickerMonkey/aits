@@ -10,6 +10,7 @@
     { "path": "../ai" },
     { "path": "../core" },
     { "path": "../openrouter" },
-    { "path": "../aws" }
+    { "path": "../aws" },
+    { "path": "../replicate" }
   ]
 }

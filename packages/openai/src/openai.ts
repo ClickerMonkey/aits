@@ -73,6 +73,25 @@ export type PostRequestHook<TRequest = any, TParams = any, TResponse = any> = (
 ) => void | Promise<void>;
 
 /**
+ * Hook called when an error occurs during a request to the provider.
+ * 
+ * @template TRequest - The request type
+ * @template TParams - The provider-specific parameters type
+ * @param error - The error that occurred
+ * @param request - The request object
+ * @param params - The provider-specific parameters that were sent to the API
+ * @param ctx - The context object
+ * @param metadata - Optional metadata
+ */
+export type ErrorHook<TRequest = any, TParams = any> = (
+  request: TRequest,
+  params: TParams,
+  error: Error,
+  ctx: AIContextAny,
+  metadata?: AIMetadataAny
+) => void | Promise<void>;
+
+/**
  * Hooks for different operation types.
  */
 export interface OpenAIHooks {
@@ -80,36 +99,43 @@ export interface OpenAIHooks {
   chat?: {
     beforeRequest?: PreRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams>;
     afterRequest?: PostRequestHook<Request, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+    onError?: ErrorHook<Request, OpenAI.Chat.ChatCompletionCreateParams>;
   };
   // Image generation hooks
   imageGenerate?: {
     beforeRequest?: PreRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams>;
     afterRequest?: PostRequestHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams, ImageGenerationResponse>;
+    onError?: ErrorHook<ImageGenerationRequest, OpenAI.Images.ImageGenerateParams>;
   };
   // Image edit hooks
   imageEdit?: {
     beforeRequest?: PreRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams>;
     afterRequest?: PostRequestHook<ImageEditRequest, OpenAI.Images.ImageEditParams, ImageGenerationResponse>;
+    onError?: ErrorHook<ImageEditRequest, OpenAI.Images.ImageEditParams>;
   };
   // Image analysis hooks
   imageAnalyze?: {
     beforeRequest?: PreRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams>;
     afterRequest?: PostRequestHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams, Response>;
+    onError?: ErrorHook<ImageAnalyzeRequest, OpenAI.Chat.ChatCompletionCreateParams>;
   };
   // Transcription hooks
   transcribe?: {
     beforeRequest?: PreRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams>;
     afterRequest?: PostRequestHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams, TranscriptionResponse>;
+    onError?: ErrorHook<TranscriptionRequest, OpenAI.Audio.TranscriptionCreateParams>;
   };
   // Speech synthesis hooks
   speech?: {
     beforeRequest?: PreRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams>;
     afterRequest?: PostRequestHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams, SpeechResponse>;
+    onError?: ErrorHook<SpeechRequest, OpenAI.Audio.Speech.SpeechCreateParams>;
   };
   // Embedding hooks
   embed?: {
     beforeRequest?: PreRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams>;
     afterRequest?: PostRequestHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams, EmbeddingResponse>;
+    onError?: ErrorHook<EmbeddingRequest, OpenAI.EmbeddingCreateParams>;
   };
 }
 
@@ -979,6 +1005,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           await effectiveConfig.hooks?.chat?.afterRequest?.(request, params, errorResponse, ctx, metadata);
           
           return errorResponse;
+        } else {
+          await effectiveConfig.hooks?.chat?.onError?.(request, params, e, ctx, metadata);
         }
 
         throw e;
@@ -1106,6 +1134,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           await effectiveConfig.hooks?.chat?.afterRequest?.(request, params, errorResponse, ctx, metadata);
           
           return errorResponse;
+        } else {
+          await effectiveConfig.hooks?.chat?.onError?.(request, params, e, ctx, metadata);
         }
 
         throw e;
@@ -1425,6 +1455,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during image generation', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.imageGenerate?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1493,6 +1525,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during image generation', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.imageGenerate?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1661,6 +1695,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.imageEdit?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1733,6 +1769,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.imageEdit?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1810,6 +1848,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during image editing', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.transcribe?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1879,6 +1919,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during transcription', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.transcribe?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -1971,6 +2013,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during speech generation', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.speech?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -2035,6 +2079,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       if (isContextWindowError(e)) {
         const details = parseContextWindowError(e);
         throw new ContextWindowError(this.name, 'Context window exceeded during embedding generation', details?.contextWindow, e);
+      } else {
+        await effectiveConfig.hooks?.embed?.onError?.(request, params, e, ctx);
       }
       throw e;
     }
@@ -2113,18 +2159,25 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     await effectiveConfig.hooks?.imageAnalyze?.beforeRequest?.(request, params, ctx);
 
     const executor = this.createExecutor(effectiveConfig);
+    let response: Response;
 
-    // Use the chat executor to analyze the images (this will also call chat hooks)
-    const response = await executor(
-      chatRequest,
-      ctx,
-      {},
-      undefined
-    );
+    try {
+      // Use the chat executor to analyze the images (this will also call chat hooks)
+      response = await executor(
+        chatRequest,
+        ctx,
+        {},
+        undefined
+      );
 
-    // Call post-request hook with params
-    await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, response, ctx);
+      // Call post-request hook with params
+      await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, response, ctx);
+    } catch (e: any) {
+      await effectiveConfig.hooks?.imageAnalyze?.onError?.(request, params, e, ctx);
 
+      throw e;
+    }
+    
     return response;
   }
 
@@ -2183,42 +2236,52 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     const streamer = this.createStreamer(effectiveConfig);
 
-    // Track accumulated response for post-hook
-    let accumulatedContent = '';
-    let finalUsage: any = undefined;
-    let finishReason: any = undefined;
-    const toolCalls: any[] = [];
+    try {
+      // Use the chat streamer to analyze the images (this will also call chat hooks)
+      const stream = streamer(
+        chatRequest,
+        ctx,
+        { model: request.model } as any,
+        undefined
+      );
+      // Track accumulated response for post-hook
+      let accumulatedContent = '';
+      let finalUsage: any = undefined;
+      let finishReason: any = undefined;
+      const toolCalls: any[] = [];
 
-    // Use the chat streamer to analyze the images (this will also call chat hooks)
-    for await (const chunk of streamer(
-      chatRequest,
-      ctx,
-      { model: request.model } as any,
-      undefined
-    )) {
-      if (chunk.content) {
-        accumulatedContent += chunk.content;
+      try {
+        for await (const chunk of stream) {
+          if (chunk.content) {
+            accumulatedContent += chunk.content;
+          }
+          if (chunk.usage) {
+            finalUsage = chunk.usage;
+          }
+          if (chunk.finishReason) {
+            finishReason = chunk.finishReason;
+          }
+          if (chunk.toolCall) {
+            toolCalls.push(chunk.toolCall);
+          }
+          yield chunk;
+        }
+      } finally {
+        // Call post-request hook with params
+        const finalResponse: Response = {
+          content: accumulatedContent,
+          toolCalls,
+          finishReason: finishReason || 'stop' as FinishReason,
+          model,
+          usage: finalUsage,
+        };
+
+        await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, finalResponse, ctx);
       }
-      if (chunk.usage) {
-        finalUsage = chunk.usage;
-      }
-      if (chunk.finishReason) {
-        finishReason = chunk.finishReason;
-      }
-      if (chunk.toolCall) {
-        toolCalls.push(chunk.toolCall);
-      }
-      yield chunk;
+    } catch (e: any) {
+      await effectiveConfig.hooks?.imageAnalyze?.onError?.(request, params, e, ctx);
+
+      throw e;
     }
-
-    // Call post-request hook with params
-    const finalResponse: Response = {
-      content: accumulatedContent,
-      toolCalls,
-      finishReason: finishReason || 'stop' as FinishReason,
-      model,
-      usage: finalUsage,
-    };
-    await effectiveConfig.hooks?.imageAnalyze?.afterRequest?.(request, params, finalResponse, ctx);
   }
 }

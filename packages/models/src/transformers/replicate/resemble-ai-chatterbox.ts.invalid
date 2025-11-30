@@ -1,0 +1,39 @@
+import { toURL, toStream } from '@aeye/core';
+import { ReplicateTransformer } from '@aeye/replicate';
+
+type Schemas = {
+  Input: {
+    seed?: number;
+    prompt: string;
+    cfg_weight?: number;
+    temperature?: number;
+    audio_prompt?: string;
+    exaggeration?: number;
+  };
+  Output: string;
+  Status: "starting" | "processing" | "succeeded" | "canceled" | "failed";
+};
+
+export default   "resemble-ai/chatterbox": (() => {
+    const transformer: ReplicateTransformer = {
+      speech: {
+        convertRequest: async (request, ctx): Promise<Schemas["Input"]> => {
+          const input: Schemas["Input"] = {
+            prompt: request.text,
+            temperature: request.temperature,
+            ...request.extra,
+          };
+          if (request.voice) {
+            input.audio_prompt = await toURL(request.voice);
+          }
+          return input;
+        },
+        parseResponse: async (response: Schemas["Output"], ctx) => {
+          return {
+            audio: await toStream(response),
+          };
+        },
+      },
+    };
+    return transformer;
+  })(),

@@ -12,7 +12,7 @@ import { getAssetPath } from '../file-manager';
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
   try {
-    const compiled = Handlebars.compile(template);
+    const compiled = Handlebars.compile(template, { noEscape: true });
     // Test with sample data based on fields
     const testData: Record<string, any> = {};
 

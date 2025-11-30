@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { formatName } from '../common';
-import { toolRegistry, buildToolSelectionQuery, getDBAToolsetName, STATIC_TOOLSETS } from '../tool-registry';
-import { ADAPTIVE_TOOLING } from '../constants';
+import { buildToolSelectionQuery, getDBAToolsetName, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
 
 /**
@@ -103,7 +102,7 @@ Example 2: Focus on file operations:
 { "toolset": "clerk" }
 
 Example 3: Focus on data operations for a specific type:
-{ "toolset": "dba:task" }`;
+{ "toolset": "${dbaToolsets[0] || 'dba:task'}" }`;
     },
     schema: ({ config }) => {
       const types = config.getData().types;
