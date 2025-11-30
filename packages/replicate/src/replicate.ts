@@ -20,6 +20,7 @@ import type {
   ModelInfo,
   ModelTier,
   ModelTransformer,
+  ModelTransformerResponse,
   Provider,
   SpeechRequest,
   SpeechResponse,
@@ -67,30 +68,61 @@ export type PostRequestHook<TRequest = any, TInput = any, TResponse = any> = (
 ) => void | Promise<void>;
 
 /**
+ * Hook called when an error occurs during a request to the provider.
+ * 
+ * @param TRequest - The request type
+ * @param TInput - The Replicate input payload type
+ * @param request - The request object
+ * @param input - The Replicate input payload that was sent to the API
+ * @param error - The error that occurred
+ * @param ctx - The context object
+ */
+export type ErrorHook<TRequest = any, TInput = any> = (
+  request: TRequest,
+  input: TInput,
+  error: Error,
+  ctx: AIContextAny
+) => void | Promise<void>;
+
+/**
+ * Hooks for a specific operation type.
+ */
+export interface ReplicateHookObject<TRequest = any, TResponse = any> {
+  beforeRequest?: PreRequestHook<TRequest, object>;
+  afterRequest?: PostRequestHook<TRequest, object, TResponse>;
+  onError?: ErrorHook<TRequest, object>;
+}
+
+/**
  * Hooks for different operation types.
  */
 export interface ReplicateHooks {
   // Chat completion hooks
-  chat?: {
-    beforeRequest?: PreRequestHook<Request, object>;
-    afterRequest?: PostRequestHook<Request, object, Response>;
-  };
+  chat?: ReplicateHookObject<Request, Response>;
   // Image generation hooks
-  imageGenerate?: {
-    beforeRequest?: PreRequestHook<ImageGenerationRequest, object>;
-    afterRequest?: PostRequestHook<ImageGenerationRequest, object, ImageGenerationResponse>;
-  };
+  imageGenerate?: ReplicateHookObject<ImageGenerationRequest, ImageGenerationResponse>;
+  // Image generation hooks
+  imageEdit?: ReplicateHookObject<ImageEditRequest, ImageGenerationResponse>;
+  // Image analysis hooks
+  imageAnalyze?: ReplicateHookObject<ImageAnalyzeRequest, Response>;
   // Transcription hooks
-  transcribe?: {
-    beforeRequest?: PreRequestHook<TranscriptionRequest, object>;
-    afterRequest?: PostRequestHook<TranscriptionRequest, object, TranscriptionResponse>;
-  };
+  transcribe?: ReplicateHookObject<TranscriptionRequest, TranscriptionResponse>;
+  // Speech synthesis hooks
+  speech?: ReplicateHookObject<SpeechRequest, SpeechResponse>;
   // Embedding hooks
-  embed?: {
-    beforeRequest?: PreRequestHook<EmbeddingRequest, object>;
-    afterRequest?: PostRequestHook<EmbeddingRequest, object, EmbeddingResponse>;
-  };
+  embed?: ReplicateHookObject<EmbeddingRequest, EmbeddingResponse>;
 }
+
+/**
+ * Keys of ReplicateHooks
+ */
+export type ReplicateHookType = keyof ReplicateHooks;
+
+/**
+ * A ModelTransformer specialized for Replicate models.
+ */
+export type ReplicateTransformer = ModelTransformer<any, any, any>;
+
 
 export interface ReplicateConfig {
   apiKey: string;
@@ -99,7 +131,7 @@ export interface ReplicateConfig {
    * Model-specific transformers for request/response conversion
    * Map of model ID (owner/name) to transformer
    */
-  transformers?: Record<string, ModelTransformer>;
+  transformers?: Record<string, ReplicateTransformer>;
   /**
    * Hooks for intercepting requests and responses
    */
@@ -322,9 +354,9 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
   /**
    * Get transformer for a specific model
    */
-  private getTransformer(modelId: string, config?: ReplicateConfig): ModelTransformer | undefined {
+  private getTransformer(modelId: string, config?: ReplicateConfig): ReplicateTransformer | undefined {
     const repConfig = config || this.config;
-    return repConfig.transformers?.[modelId] as ModelTransformer | undefined;
+    return repConfig.transformers?.[modelId] as ReplicateTransformer | undefined;
   }
 
   /**
@@ -344,11 +376,11 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny, 
     metadata: AIMetadataAny | undefined,
     requestSignal: AbortSignal | undefined,
-    getConverters: (transformer: ModelTransformer) => {
+    getConverters: (transformer: ReplicateTransformer) => {
       convertRequest?: (request: TRequest, ctx: AIContextAny) => Promise<object>;
-      parseResponse?: (response: object, ctx: AIContextAny) => Promise<TResponse>;
+      parseResponse?: (response: object, ctx: AIContextAny) => Promise<ModelTransformerResponse<TResponse>>;
     },
-    hookType?: 'chat' | 'imageGenerate' | 'transcribe' | 'embed'
+    hookType: ReplicateHookType
   ) {
     const repConfig = config || this.config;
 
@@ -381,28 +413,32 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const signal = requestSignal || ctx.signal;
     const modelId = model.id as `${string}/${string}`;
     const client = createClient(repConfig);
+    const hooks = repConfig.hooks?.[hookType] as ReplicateHookObject<TRequest, TResponse> | undefined;
 
     // Convert request using transformer
     const input = await convertRequest(request, ctx);
 
     // Call pre-request hook with input payload
-    if (hookType && repConfig.hooks?.[hookType]?.beforeRequest) {
-      await repConfig.hooks[hookType].beforeRequest(request as any, input, ctx);
+    await hooks?.beforeRequest?.(request, input, ctx);
+
+    try {      
+      // Run prediction
+      const output = await client.run(modelId, { input, signal });
+
+      // Parse response using transformer
+      const response = await parseResponse(output, ctx) as TResponse;
+      response.model = modelInput;
+
+      // Call post-request hook with input payload
+      await hooks?.afterRequest?.(request, input, response, ctx);
+
+      return response;
+    } catch (error) {
+      // Call error hook
+      await hooks?.onError?.(request, input, error as Error, ctx);
+
+      throw error;
     }
-
-    // Run prediction
-    const output = await client.run(modelId, { input, signal });
-
-    // Parse response using transformer
-    const response = await parseResponse(output, ctx);
-    response.model = modelInput;
-
-    // Call post-request hook with input payload
-    if (hookType && repConfig.hooks?.[hookType]?.afterRequest) {
-      await repConfig.hooks[hookType].afterRequest(request as any, input, response as any, ctx);
-    }
-
-    return response;
   }
 
   /**
@@ -422,10 +458,11 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny, 
     metadata: AIMetadataAny | undefined,
     requestSignal: AbortSignal | undefined,
-    getConverters: (transformer: ModelTransformer) => {
+    getConverters: (transformer: ReplicateTransformer) => {
       convertRequest?: (request: TRequest, ctx: AIContextAny) => Promise<object>;
       parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<TChunk>;
-    }
+    },
+    hookType: ReplicateHookType
   ) {
     const repConfig = config || this.config;
 
@@ -457,29 +494,40 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const signal = requestSignal || ctx.signal;
     const modelId = model.id as `${string}/${string}`;
     const client = createClient(repConfig);
+    const hooks = repConfig.hooks?.[hookType] as ReplicateHookObject<TRequest, any> | undefined;
 
     // Convert request using transformer
     const input = await convertRequest(request, ctx);
     let yieldedModel = false;
 
-    // Stream prediction
-    for await (const event of client.stream(modelId, { input, signal })) {
-      if (signal?.aborted) {
-        throw new Error('Request aborted');
+    // Call pre-request hook with input payload
+    await hooks?.beforeRequest?.(request, input, ctx);
+
+    try {
+      // Stream prediction
+      for await (const event of client.stream(modelId, { input, signal })) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+        
+        // Parse chunk using transformer
+        const chunk = await parseChunk(event, ctx);
+        if (chunk.usage && !yieldedModel) {
+          chunk.model = modelInput;
+          yieldedModel = true;
+        }
+        yield chunk;
       }
-      
-      // Parse chunk using transformer
-      const chunk = await parseChunk(event, ctx);
-      if (chunk.usage && !yieldedModel) {
-        chunk.model = modelInput;
-        yieldedModel = true;
+      if (!yieldedModel) {
+        yield {
+          model: modelInput,
+        };    
       }
-      yield chunk;
-    }
-    if (!yieldedModel) {
-      yield {
-        model: modelInput,
-      };    
+    } catch (error) {
+      // Call error hook
+      await hooks?.onError?.(request, input, error as Error, ctx);
+
+      throw error;
     }
   }
 
@@ -503,7 +551,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     const provider = this;
 
     return async function* (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, signal?: AbortSignal) {
-      const stream = provider.doStream(config, request, ctx, metadata, signal, (transformer) => transformer.chat || {});
+      const stream = provider.doStream(config, request, ctx, metadata, signal, (transformer) => transformer.chat || {}, 'chat');
       const chunks: Chunk[] = [];
       for await (const chunk of stream) {
         chunks.push(chunk);
@@ -545,7 +593,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ) {
-    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {});
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageGenerate || {}, 'imageGenerate');
   }
 
   /**
@@ -558,7 +606,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<ImageGenerationResponse> {
-    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {});
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {}, 'imageEdit');
   }
 
   /**
@@ -571,7 +619,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ) {
-    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {});
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageEdit || {}, 'imageEdit');
   }
 
   /**
@@ -584,7 +632,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<Response> {
-    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {});
+    return this.doRequest(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {}, 'imageAnalyze');
   }
 
   /**
@@ -597,7 +645,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ) {
-    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {});
+    return this.doStream(config, request, ctx, undefined, ctx.signal, (transformer) => transformer.imageAnalyze || {}, 'imageAnalyze');
   }
 
   /**
@@ -623,7 +671,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ) {
-    return this.doStream(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {});
+    return this.doStream(config, request, ctx, undefined, undefined, (transformer) => transformer.transcribe || {}, 'transcribe');
   }
 
   /**
@@ -636,7 +684,7 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
     ctx: AIContextAny,
     config?: ReplicateConfig
   ): Promise<SpeechResponse> {
-    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.speech || {});
+    return this.doRequest(config, request, ctx, undefined, undefined, (transformer) => transformer.speech || {}, 'speech');
   }
 
   /**

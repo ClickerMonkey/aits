@@ -1,5 +1,5 @@
 import { AI, ContextInfer } from '@aeye/ai';
-import { models } from '@aeye/models';
+import { models, replicateTransformers } from '@aeye/models';
 import { OpenAIProvider } from '@aeye/openai';
 import { OpenRouterProvider } from '@aeye/openrouter';
 import { ReplicateProvider } from '@aeye/replicate';
@@ -77,6 +77,9 @@ export function createCletusAI(configFile: ConfigFile) {
           afterRequest: (request, response, responseComplete, ctx, metadata) => {
             logger.log(`OpenAI Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
+          onError: (request, params, error, ctx, metadata) => {
+            logger.log(`OpenAI Chat onError:\n${String(error)}`);
+          },
         }
       }
     })} : {}),
@@ -90,11 +93,38 @@ export function createCletusAI(configFile: ConfigFile) {
         appName: 'cletus',
         siteUrl: 'https://github.com/ClickerMonkey/aeye',
       },
+      hooks: {
+        chat: {
+          beforeRequest: (request, params, ctx, metadata) => {
+            logger.log(`OpenRouter Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
+          },
+          afterRequest: (request, response, responseComplete, ctx, metadata) => {
+            logger.log(`OpenRouter Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
+          },
+          onError: (request, params, error, ctx, metadata) => {
+            logger.log(`OpenRouter Chat onError:\n${String(error)}`);
+          },
+        }
+      }
     })} : {}),
 
     // Replicate
     ...(config.providers.replicate ? { replicate: new ReplicateProvider({
       ...config.providers.replicate,
+      transformers: replicateTransformers,
+      hooks: {
+        chat: {
+          beforeRequest: (request, params, ctx) => {
+            logger.log(`Replicate Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
+          },
+          afterRequest: (request, response, responseComplete, ctx) => {
+            logger.log(`Replicate Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
+          },
+          onError: (request, params, error, ctx) => {
+            logger.log(`Replicate Chat onError:\n${String(error)}`);
+          },
+        }
+      }
     })} : {}),
 
     // AWS Bedrock
@@ -328,8 +358,8 @@ Chat Mode: {{mode}}
 - delete: All operations are automatic
 
 Agent Mode: {{agentMode}}
-- default: All sub-agents are available for delegation
-- plan: Only the planner sub-agent is available. Use this mode when you need to focus on planning and task management
+- default: All toolsets are available
+- plan: Only the planner toolset is available. Use this mode when you need to focus on planning and task management
 
 {{#if chatPrompt}}
 Prompt: {{chatPrompt}}
@@ -338,7 +368,7 @@ Prompt: {{chatPrompt}}
 
 <types>
 Data types are user defined schemas representing structured information.
-The schemas are managed by the 'architect' sub-agent and the data is managed by the 'dba'.
+The schemas are managed by the 'architect' toolset and the data is managed by the 'dba' toolset.
 {{#if types.length}}
 Available Data Types:
 {{#each types}}
@@ -354,9 +384,9 @@ No custom data types defined.
 - Base your responses in what you know based on the context or what tool results you have.
 - If your response is not based on tool results or context, clearly state that you are not basing it on any known information.
 - Do not assume anything about a data type based on it's name - always use the architect to understand the schema first.
-- Todos are mainly managed by the planner agent; only reference them if specifically asked about them. Do not misinterpret anything else as todos - they are explicitly referred to as "todos". They simply have a name and a done status. Todos are meant for cletus, not the user.
+- Todos are mainly managed by the planner toolsets; only reference them if specifically asked about them. Do not misinterpret anything else as todos - they are explicitly referred to as "todos". They simply have a name and a done status. Todos are meant for cletus, not the user.
 </IMPORTANT>
-`);
+`, { noEscape: true });
 
 const DESCRIBE_PROMPT = `Analyze this image in detail and describe its key elements, context, and any notable aspects.`;
 

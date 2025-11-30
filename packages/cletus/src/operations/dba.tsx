@@ -1499,7 +1499,7 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
   const dataFile = new DataManager(type.name);
   await dataFile.load();
   
-  const typeTemplate = type.knowledgeTemplate ? Handlebars.compile(type.knowledgeTemplate) : () => '';
+  const typeTemplate = type.knowledgeTemplate ? Handlebars.compile(type.knowledgeTemplate, { noEscape: true }) : () => '';
   const updateTemplates = update
     .map(id => {
       const record = dataFile.getById(id);

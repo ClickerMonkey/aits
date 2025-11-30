@@ -110,7 +110,7 @@ export class Tool<
    * @returns A compiled Handlebars template function or a simple string returner.
    */
   static compileInstructions(instructions: string, hasInput: boolean) {
-    return hasInput ? Handlebars.compile(instructions) : () => instructions;
+    return hasInput ? Handlebars.compile(instructions, { noEscape: true }) : () => instructions;
   }
 
   /**

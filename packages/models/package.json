@@ -13,10 +13,21 @@
     "scrape:openrouter": "tsx scripts/scrapers/openrouter.ts",
     "scrape:openai": "tsx scripts/scrapers/openai.ts",
     "scrape:replicate": "tsx scripts/scrapers/replicate.ts",
-    "scrape:replicate:next": "tsx scripts/scrapers/replicate.ts --transformers --n=1",
+    "scrape:replicate:test": "tsx scripts/scrapers/replicate.ts --transformers --transformers-only --models=\"adirik/kosmos-g\"",
+    "scrape:replicate:chunk": "tsx scripts/scrapers/replicate.ts --transformers --transformers-only --transformer-model=\"google/gemini-3-pro-preview\" --n=50 --transform-concurrency=0",
+    "scrape:replicate:models": "tsx scripts/scrapers/replicate.ts --transformers-only",
+    "scrape:replicate:patch": "tsx scripts/patch-modelinfo.ts",
     "scrape:aws": "tsx scripts/scrapers/aws.ts"
   },
-  "keywords": ["ai", "models", "openai", "openrouter", "replicate", "aws", "bedrock"],
+  "keywords": [
+    "ai",
+    "models",
+    "openai",
+    "openrouter",
+    "replicate",
+    "aws",
+    "bedrock"
+  ],
   "author": "ClickerMonkey",
   "license": "GPL-3.0",
   "repository": {
@@ -25,19 +36,21 @@
     "directory": "packages/models"
   },
   "dependencies": {
-    "@aeye/ai": "^0.1.0",
-    "@aeye/openrouter": "^0.1.0",
-    "@aeye/aws": "^0.1.0"
+    "@aeye/ai": "*",
+    "@aeye/aws": "*",
+    "@aeye/openrouter": "*",
+    "@aeye/replicate": "*"
   },
   "devDependencies": {
     "@aws-sdk/client-bedrock": "^3.709.0",
     "@types/node": "^20.12.7",
+    "axios": "^1.7.2",
+    "openapi-typescript": "^7.10.1",
     "puppeteer": "^24.31.0",
+    "replicate": "^0.34.1",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.9.3",
-    "axios": "^1.7.2",
-    "replicate": "^0.34.1"
+    "typescript": "^5.9.3"
   },
   "publishConfig": {
     "access": "public"

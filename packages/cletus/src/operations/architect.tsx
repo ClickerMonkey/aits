@@ -12,7 +12,7 @@ import { getAssetPath } from '../file-manager';
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
   try {
-    const compiled = Handlebars.compile(template);
+    const compiled = Handlebars.compile(template, { noEscape: true });
     // Test with sample data based on fields
     const testData: Record<string, any> = {};
 
@@ -256,7 +256,7 @@ export const type_update = operationOf<
       throw new Error(`Type update failed - ${validation}`);
     }
 
-    await config.save((data) => {
+    await config.saveWithTypeCheck((data) => {
       const dataType = data.types.find((t) => t.name === input.name);
       if (dataType) {
         if (input.update.friendlyName) {
@@ -435,7 +435,7 @@ export const type_delete = operationOf<
       throw new Error(`Cannot delete type "${type.friendlyName}" - it is referenced by: ${typeList}`);
     }
 
-    await config.save((data) => {
+    await config.saveWithTypeCheck((data) => {
       const index = data.types.findIndex((t) => t.name === input.name);
       if (index !== -1) {
         data.types.splice(index, 1);

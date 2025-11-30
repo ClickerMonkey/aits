@@ -17,8 +17,9 @@
   "include": ["scripts/**/*"],
   "exclude": ["node_modules"],
   "references": [
+    { "path": "../../core" },
     { "path": "../../ai" },
     { "path": "../../openrouter" },
-    { "path": "../../core" }
+    { "path": "../../replicate" }
   ]
 }

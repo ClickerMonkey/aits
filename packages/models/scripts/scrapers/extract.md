@@ -1,59 +1,57 @@
-Run `npm run scrape:replicate`
+import z from 'zod'; // zod 4
 
-I want you to consume one model chunk file at a time. They are in cache/replicate-schemas-chunk-#.json. Each model has latest_version and in the components of the schema has Input & Output. You need to do one at a time because each file is ~ 20k tokens.
-
-What you need to do is replace/create a src/replicate.ts file with all model handlers that make sense for each model. A model handler allows you to link a particular model ID with a set of supported functions. Like chat prediction, image generation, etc.
-
-Here's the shape of the ModelHandler from the `@aeye/ai` package:
-
-```ts
-export interface ModelTransformer {
+interface ReplicateTransformer {
   chat?: {
-    convertRequest?: (request: Request, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
+    convertRequest?: (request: Request, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ModelTransformerResponse<Response>>;
+    parseChunk?: (chunk: any, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   imageGenerate?: {
-    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
+    convertRequest?: (request: ImageGenerationRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<ImageGenerationResponse>>;
+    parseChunk?: (chunk: any, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageEdit?: {
-    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<ImageGenerationResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
+    convertRequest?: (request: ImageEditRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<ImageGenerationResponse>>;
+    parseChunk?: (chunk: any, ctx: AIContextAny) => Promise<ImageGenerationChunk>;
   };
 
   imageAnalyze?: {
-    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<Response>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<Chunk>;
+    convertRequest?: (request: ImageAnalyzeRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<Response>>;
+    parseChunk?: (chunk: any, ctx: AIContextAny) => Promise<Chunk>;
   };
 
   transcribe?: {
-    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<TranscriptionResponse>;
-    parseChunk?: (chunk: object, ctx: AIContextAny) => Promise<TranscriptionChunk>;
+    convertRequest?: (request: TranscriptionRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<TranscriptionResponse>>;
+    parseChunk?: (chunk: any, ctx: AIContextAny) => Promise<TranscriptionChunk>;
   };
 
   speech?: {
-    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<SpeechResponse>;
+    convertRequest?: (request: SpeechRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<SpeechResponse>>;
   };
 
   embed?: {
-    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => Promise<object>;
-    parseResponse?: (response: object, ctx: AIContextAny) => Promise<EmbeddingResponse>;
+    convertRequest?: (request: EmbeddingRequest, ctx: AIContextAny) => Promise<any>;
+    parseResponse?: (response: any, ctx: AIContextAny) => Promise<ModelTransformerResponse<EmbeddingResponse>>;
   };
 }
-```
-
-And here are the referenced types:
-```ts
-export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
-export interface Message { 
+type AIContextAny = {
+  ai: {} // special type, not important for implementation
+  metadata?: {
+    model?: ModelInput;
+    // others
+  };
+  signal?: AbortSignal;
+}
+type ModelTransformerResponse<T> = Omit<T, 'model' | 'usage'>;
+type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
+interface Message { 
   role: MessageRole;
   content: string | MessageContent[];
   tokens?: number;
@@ -63,33 +61,33 @@ export interface Message {
   refusal?: string;
   cache?: Record<string, any>;
 }
-export type MessageContentType = 'text' | 'image' | 'file' | 'audio';
-export interface MessageContent {
+type MessageContentType = 'text' | 'image' | 'file' | 'audio';
+interface MessageContent {
   type: MessageContentType;
   content: Resource;
   format?: string;
 }
-export interface ToolDefinition {
+interface ToolDefinition {
   name: string;
   description?: string;
   parameters: z.ZodType<object>;
   strict?: boolean;
 }
-export interface ToolCall {
+interface ToolCall {
   id: string;
   name: string;
   arguments: string;
 }
-export type ToolChoice =
+type ToolChoice =
   | 'auto'
   | 'none'
   | 'required'
   | { tool: string };
-export type ResponseFormat =
+type ResponseFormat =
   | 'text'
   | 'json'
   | { type: z.ZodType<object, object>, strict: boolean };
-export interface Usage {
+interface Usage {
   text?: {
     input?: number;
     output?: number;
@@ -119,8 +117,8 @@ export interface Usage {
   };
   cost?: number;
 }
-export type ReasoningEffort = 'low' | 'medium' | 'high';
-export interface Request extends BaseRequest {
+type ReasoningEffort = 'low' | 'medium' | 'high';
+interface Request extends BaseRequest {
   name?: string;
   messages: Message[];
   temperature?: number;
@@ -139,33 +137,33 @@ export interface Request extends BaseRequest {
   cacheKey?: string;
   userKey?: string;
 }
-export type FinishReason = 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'refusal';
-export interface Model {
+type FinishReason = 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'refusal';
+interface Model {
   id: string;
   contextWindow?: number;
   maxOutputTokens?: number;
 }
-export type ModelInput = string | Model;
-export interface BaseRequest {
+type ModelInput = string | Model;
+interface BaseRequest {
   model?: ModelInput;
   extra?: Record<string, any>;
 }
-export interface BaseResponse {
+interface BaseResponse {
   usage?: Usage;
   model: ModelInput;
 }
-export interface BaseChunk {
+interface BaseChunk {
   usage?: Usage;
   model?: ModelInput;
 }
-export interface Response extends BaseResponse {
+interface Response extends BaseResponse {
   content: string;
   toolCalls?: ToolCall[];
   finishReason: FinishReason;
   refusal?: string;
   reasoning?: string;
 }
-export interface Chunk extends BaseChunk {
+interface Chunk extends BaseChunk {
   content?: string;
   toolCallNamed?: ToolCall;
   toolCallArguments?: ToolCall;
@@ -174,7 +172,7 @@ export interface Chunk extends BaseChunk {
   refusal?: string;
   reasoning?: string;
 }
-export interface ImageGenerationRequest extends BaseRequest {
+interface ImageGenerationRequest extends BaseRequest {
   prompt: string;
   n?: number;
   size?: string;
@@ -186,7 +184,7 @@ export interface ImageGenerationRequest extends BaseRequest {
   seed?: number;
   userIdentifier?: string;
 }
-export interface ImageEditRequest extends BaseRequest {
+interface ImageEditRequest extends BaseRequest {
   prompt: string;
   image: Resource;
   mask?: Resource;
@@ -197,14 +195,14 @@ export interface ImageEditRequest extends BaseRequest {
   streamCount?: number;
   userIdentifier?: string;
 }
-export interface ImageGenerationResponse extends BaseResponse {
+interface ImageGenerationResponse extends BaseResponse {
   images: Array<{
     url?: string;
     b64_json?: string;
     revisedPrompt?: string;
   }>;
 }
-export interface ImageGenerationChunk extends BaseChunk {
+interface ImageGenerationChunk extends BaseChunk {
   imageData?: string;
   progress?: number;
   done?: boolean;
@@ -213,7 +211,7 @@ export interface ImageGenerationChunk extends BaseChunk {
     b64_json?: string;
   };
 }
-export interface TranscriptionRequest extends BaseRequest {
+interface TranscriptionRequest extends BaseRequest {
   audio: Resource;
   language?: string;
   prompt?: string;
@@ -221,45 +219,45 @@ export interface TranscriptionRequest extends BaseRequest {
   responseFormat?: 'json' | 'text' | 'srt' | 'vtt' | 'verbose_json';
   timestampGranularities?: Array<'word' | 'segment'>;
 }
-export interface TranscriptionResponse extends BaseResponse {
+interface TranscriptionResponse extends BaseResponse {
   text: string;
 }
-export interface TranscriptionChunk extends BaseChunk {
+interface TranscriptionChunk extends BaseChunk {
   delta?: string;
   text?: string;
   segment?: { start: number; end: number; speaker: string, text: string, id: string };
   status?: string;
 }
-export interface SpeechRequest extends BaseRequest{
+interface SpeechRequest extends BaseRequest{
   text: string;
   instructions?: string;
   voice?: string;
   speed?: number;
   responseFormat?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
 }
-export interface SpeechResponse extends BaseResponse {
+interface SpeechResponse extends BaseResponse {
   audio: ReadableStream<any>;
   responseFormat?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm';
 }
-export interface EmbeddingRequest extends BaseRequest {
+interface EmbeddingRequest extends BaseRequest {
   texts: string[];
   dimensions?: number;
   encodingFormat?: 'float' | 'base64';
   userIdentifier?: string;
 }
-export interface EmbeddingResponse extends BaseResponse {
+interface EmbeddingResponse extends BaseResponse {
   embeddings: Array<{
     embedding: number[];
     index: number;
   }>;
 }
-export interface ImageAnalyzeRequest extends BaseRequest{
+interface ImageAnalyzeRequest extends BaseRequest{
   prompt: string;
   images: string[];
   maxTokens?: number;
   temperature?: number;
 }
-export type Resource = 
+type Resource = 
  | string // plain text, or data URL, or http(s) URL, or file:// URL
  | AsyncIterable<Uint8Array> // fs.ReadStream, ReadableStream
  | Blob // File
@@ -271,4 +269,3 @@ export type Resource =
  | { blob(): Promise<Blob> | Blob }
  | { url(): string }
  | { read(): Promise<ReadableStream> | ReadableStream }
-```
