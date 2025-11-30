@@ -963,7 +963,9 @@ export const data_count = operationOf<
     };
   },
   do: async ({ input: { name, where }, cache }) => {
-    // Use cached count if available (for local mode operations)
+    // For local mode operations (read-only), use cached count if available.
+    // This ensures consistency between analysis and execution, which is especially
+    // important when the user has approved an operation based on the analysis.
     if (cache?.count !== undefined) {
       return { count: cache.count };
     }
