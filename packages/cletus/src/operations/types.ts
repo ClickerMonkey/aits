@@ -2,7 +2,6 @@ import React from "react";
 import { CletusAI, CletusAIContext } from "../ai";
 import { ChatMode, Operation, OperationKind } from "../schemas";
 
-import { Plus } from "@aeye/core";
 import * as architect from './architect';
 import * as artist from './artist';
 import * as clerk from './clerk';
@@ -11,7 +10,6 @@ import * as internet from './internet';
 import * as librarian from './librarian';
 import * as planner from './planner';
 import * as secretary from './secretary';
-import { ConfigFile } from "../config";
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -151,3 +149,41 @@ export type OperationInput<K extends OperationKind> = {
   // The operation input.
   input: OperationInputFor<K>;
 };
+
+export const OperationModeOrder = {
+  local: 0,
+  none: 1,
+  read: 2,
+  create: 3,
+  update: 4,
+  delete: 5,
+} as const;
+
+/**
+ * Get operation instructions based on mode and context.
+ * 
+ * @param ctx - Cletus AI context
+ * @param def - Operation definition
+ * @returns 
+ */
+export function getOperationInstructions(ctx: CletusAIContext, def: OperationDefinition<any, any>): string {
+  const mode = typeof def.mode === 'function' ? def.mode({}, ctx) : def.mode;
+  const chatMode = ctx.chat?.mode || 'none';
+  const modeOrder = OperationModeOrder[mode];
+  const chatModeOrder = OperationModeOrder[chatMode];
+  const canExecute = chatModeOrder >= modeOrder;
+
+  return !canExecute ? 'Calling this tool will only provide an analysis of what would happen - the user will be prompted to execute it or not. You should not make any tool calls after this one if they are dependent on the results of this one.' : 'This tool call will return the actual results of the operation.';
+}
+
+/**
+ * Get operation input generator function.
+ * 
+ * @param def - Operation definition
+ * @returns 
+ */
+export function getOperationInput(def: OperationKind) {
+  return (ctx: CletusAIContext) => ({
+    modeInstructions: getOperationInstructions(ctx, Operations[def]),
+  });
+}

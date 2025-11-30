@@ -69,7 +69,13 @@ export function getSummary<TOperation extends Operation>(
 
   // Fallback to analysis or default
   if (op.analysis) {
-    return abbreviate(op.analysis!.replaceAll(/\n/g, ' '), 60);
+    // return abbreviate(op.analysis!.replaceAll(/\n/g, ' '), 60);
+    return (
+      <Box marginLeft={2} flexGrow={1}>
+        <Text>{' → '}</Text>
+        <Markdown overflow="hidden" height={1} flexGrow={1}>{op.analysis}</Markdown>
+      </Box>
+    );
   }
 
   return 'Processing...';

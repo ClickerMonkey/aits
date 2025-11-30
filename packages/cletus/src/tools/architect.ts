@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create architect tools for type definition management
@@ -16,11 +17,14 @@ export function createArchitectTools(ai: CletusAI) {
     instructions: `Use this to see the full schema of a custom data type including all fields and their properties.
 
 Example: Get information about a type:
-{ "name": "task" }`,
+{ "name": "task" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Type name'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_info'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_info', input }, ctx),
   });
 
@@ -29,10 +33,13 @@ Example: Get information about a type:
     description: 'List all existing type definitions (names & descriptions',
     instructions: `Use this to get a list of all custom data types defined in the system, including their names and friendly names.
 Example: List all types:
-{ }`,
+{ }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_list'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_list', input }, ctx),
   });
 
@@ -58,7 +65,9 @@ Example 3: Make a field optional:
 { "name": "task", "update": { "fields": { "deadline": { "required": false } } } }
 
 If fields are being changed knowledgeTemplate MUST be updated to reflect those changes.
-If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.`,
+If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.
+ 
+{{modeInstructions}}`,
     schema: ({ config }) => z.object({
       name: z.enum(config.getData().types.map(t => t.name)).describe('Type name to update'),
       update: z.object({
@@ -82,6 +91,7 @@ If the knowledgeTemplate is updated and there are records for this type the data
       }).describe('Updates to apply'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_update'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_update', input }, ctx),
   });
@@ -92,7 +102,9 @@ If the knowledgeTemplate is updated and there are records for this type the data
     instructions: `Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value. Field names must be all lowercase with no spaces.
 
 Example: Create a project tracking type:
-{ "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }`,
+{ "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Type name (lowercase, no spaces)'),
       friendlyName: z.string().describe('Display name'),
@@ -111,6 +123,7 @@ Example: Create a project tracking type:
       ).describe('Field definitions'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_create'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_create', input }, ctx),
   });
 
@@ -122,11 +135,14 @@ Example: Create a project tracking type:
 - There are existing data records of this type (data must be deleted first)
 
 Example: Delete a type:
-{ "name": "task" }`,
+{ "name": "task" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Type name to delete'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_delete'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_delete', input }, ctx),
   });
 
@@ -154,13 +170,16 @@ Example 2: Focus on specific types:
 { "glob": "documents/**/*.txt", "hints": ["user", "transaction", "product"] }
 
 Example 3: Limit discovery to top types:
-{ "glob": "**/*.json", "max": 5 }`,
+{ "glob": "**/*.json", "max": 5 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to analyze (e.g., "data/*.csv", "**/*.txt")'),
       hints: z.array(z.string()).optional().describe('Optional type name hints to focus discovery (e.g., ["user", "order", "product"])'),
       max: z.number().optional().describe('Maximum number of types to discover (default: unlimited)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('type_import'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
   });
 

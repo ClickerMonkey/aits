@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create planner tools for todo management
@@ -11,10 +12,13 @@ export function createPlannerTools(ai: CletusAI) {
     instructions: `Use this to clear all todos when starting fresh or when all tasks are complete.
 
 Example: Simply call with no parameters:
-{}`,
+{}
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_clear'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_clear', input }, ctx),
   });
 
@@ -24,10 +28,13 @@ Example: Simply call with no parameters:
     instructions: `Use this to see what tasks are pending or completed.
 
 Example: Simply call with no parameters:
-{}`,
+{}
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_list'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_list', input }, ctx),
   });
 
@@ -37,11 +44,14 @@ Example: Simply call with no parameters:
     instructions: `Use this when breaking down a complex task into smaller steps. Provide a clear, concise name for the todo.
 
 Example: Add a task to implement a feature:
-{ "name": "Implement user authentication with OAuth" }`,
+{ "name": "Implement user authentication with OAuth" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('The todo name/description'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_add'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_add', input }, ctx),
   });
 
@@ -51,11 +61,14 @@ Example: Add a task to implement a feature:
     instructions: `Use this when a task has been successfully completed. Provide the todo ID.
 
 Example: Mark a todo as done:
-{ "id": "abc-123-def" }`,
+{ "id": "abc-123-def" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       id: z.string().describe('The todo ID to mark as done'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_done'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_done', input }, ctx),
   });
 
@@ -65,11 +78,14 @@ Example: Mark a todo as done:
     instructions: `Use this to check the status and details of a particular todo.
 
 Example: Get details for a specific todo:
-{ "id": "abc-123-def" }`,
+{ "id": "abc-123-def" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       id: z.string().describe('The todo ID'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_get'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_get', input }, ctx),
   });
 
@@ -79,11 +95,14 @@ Example: Get details for a specific todo:
     instructions: `Use this to delete a todo that is no longer relevant or was added by mistake.
 
 Example: Remove a todo:
-{ "id": "abc-123-def" }`,
+{ "id": "abc-123-def" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       id: z.string().describe('The todo ID to remove'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_remove'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_remove', input }, ctx),
   });
 
@@ -93,7 +112,9 @@ Example: Remove a todo:
     instructions: `Use this to completely reorganize the todo list with a new plan. All existing todos will be replaced.
 
 Example: Replace with a new project plan:
-{ "todos": [{ "name": "Set up project structure", "done": false }, { "name": "Implement core features", "done": false }, { "name": "Write tests", "done": false }] }`,
+{ "todos": [{ "name": "Set up project structure", "done": false }, { "name": "Implement core features", "done": false }, { "name": "Write tests", "done": false }] }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       todos: z.array(
         z.object({
@@ -103,6 +124,7 @@ Example: Replace with a new project plan:
       ).describe('Array of new todos'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('todos_replace'),
     call: async (input, _, ctx) => ctx.ops.handle({
       type: 'todos_replace',
       input: {

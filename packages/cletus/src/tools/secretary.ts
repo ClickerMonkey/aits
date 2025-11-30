@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create secretary tools for assistant and memory management
@@ -11,11 +12,14 @@ export function createSecretaryTools(ai: CletusAI) {
     instructions: `Use this to change the current chat assistant. The assistant persona affects how the AI responds.
 
 Example: To switch to a coding-focused assistant:
-{ "name": "coder" }`,
+{ "name": "coder" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Assistant name'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('assistant_switch'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_switch', input }, ctx),
   });
 
@@ -25,12 +29,15 @@ Example: To switch to a coding-focused assistant:
     instructions: `Use this to modify an existing assistant's system prompt.
 
 Example: To make an assistant more concise:
-{ "name": "helper", "prompt": "You are a helpful assistant. Always give concise, direct answers without unnecessary explanation." }`,
+{ "name": "helper", "prompt": "You are a helpful assistant. Always give concise, direct answers without unnecessary explanation." }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('New system prompt'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('assistant_update'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_update', input }, ctx),
   });
 
@@ -40,12 +47,15 @@ Example: To make an assistant more concise:
     instructions: `Use this to create a new assistant with a custom system prompt. The assistant will be available for future chats.
 
 Example: Create a specialized writing coach:
-{ "name": "writer", "prompt": "You are a creative writing coach who helps users improve their prose, providing constructive feedback on style, structure, and narrative flow." }`,
+{ "name": "writer", "prompt": "You are a creative writing coach who helps users improve their prose, providing constructive feedback on style, structure, and narrative flow." }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Assistant name'),
       prompt: z.string().describe('System prompt for the assistant'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('assistant_add'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'assistant_add', input }, ctx),
   });
 
@@ -55,10 +65,13 @@ Example: Create a specialized writing coach:
     instructions: `Use this to see what the user has asked to remember.
 
 Example: Simply call with no parameters:
-{}`,
+{}
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('memory_list'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_list', input }, ctx),
   });
 
@@ -68,11 +81,14 @@ Example: Simply call with no parameters:
     instructions: `Use this to store important information about the user. This will integrate with existing memories or add a new one.
 
 Example: Store a user preference:
-{ "content": "User prefers TypeScript over JavaScript for all new projects" }`,
+{ "content": "User prefers TypeScript over JavaScript for all new projects" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       content: z.string().describe('Memory content to add or update'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('memory_update'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'memory_update', input }, ctx),
   });
 

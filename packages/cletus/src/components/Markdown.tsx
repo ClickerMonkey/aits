@@ -1,4 +1,4 @@
-import { Box, Text, TextProps } from "ink";
+import { Box, BoxProps, Text, TextProps } from "ink";
 import { highlight, supportsLanguage } from "cli-highlight";
 import React from 'react';
 import { COLORS } from "../constants";
@@ -523,9 +523,9 @@ const renderInline = (line: string, props?: TextProps) => {
  * @param param0 
  * @returns 
  */
-export const Markdown: React.FC<{ children: string }> = ({ children }) => {
+export const Markdown: React.FC<{ children: string } & BoxProps> = ({ children, ...boxProps }) => {
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" {...boxProps}>
       {renderMarkdownContent(children)}
     </Box>
   );

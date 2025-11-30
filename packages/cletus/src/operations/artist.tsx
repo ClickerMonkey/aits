@@ -1,18 +1,19 @@
-import { ImageGenerationResponse, ScoredModel } from "@aeye/ai";
+import { ImageGenerationResponse } from "@aeye/ai";
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from "sharp";
-import { abbreviate, chunkArray, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
-import { CONSTS } from "../constants";
+import url from 'url';
+import { abbreviate, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
+import { canEmbed, embed } from "../embed";
 import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
-import { canEmbed, embed } from "../embed";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
-  const cleanPath = filepath || imagePath;
+  const actualPath = filepath || imagePath;
+  const cleanPath = actualPath.startsWith('file://') ? url.fileURLToPath(actualPath) : actualPath;
   return path.isAbsolute(cleanPath) ? cleanPath : path.resolve(cwd, cleanPath);
 }
 
@@ -113,7 +114,7 @@ export const image_generate = operationOf<
     (op) => {
       if (op.output) {
         const count = op.output.count;
-        return `Generated **${count}** image${count !== 1 ? 's' : ''}: *"${abbreviate(op.input.prompt, 40)}"*\n${op.output.images.map(linkImage).join(' | ')}`;
+        return `Generated **${count}** image${count !== 1 ? 's' : ''}: *"${op.input.prompt}"*\n${op.output.images.map(linkImage).join(' | ')}`;
       }
       return null;
     },
@@ -165,7 +166,7 @@ export const image_edit = operationOf<
     `ImageEdit("${paginateText(op.input.path, 100, -100)}", "${abbreviate(op.input.prompt, 20)}")`,
     (op) => {
       if (op.output) {
-        return `Edited **${op.input.path}** → saved to ${op.output.editedLink}`;
+        return `Edited ${linkImage(op.input.path)} → saved to ${op.output.editedLink}`;
       }
       return null;
     },

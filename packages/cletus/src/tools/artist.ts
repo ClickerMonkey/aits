@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create artist tools for image operations
@@ -12,12 +13,15 @@ export function createArtistTools(ai: CletusAI) {
     instructions: `Use this to create new images. Generated images are saved to .cletus/images/ and returned as file paths.
 
 Example: Generate a landscape image:
-{ "prompt": "A serene mountain landscape at sunset with a lake in the foreground", "n": 1 }`,
+{ "prompt": "A serene mountain landscape at sunset with a lake in the foreground", "n": 1 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       prompt: z.string().describe('Text description of the image to generate'),
       n: z.number().optional().default(1).describe('Number of images to generate (default: 1)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_generate'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_generate', input }, ctx),
   });
 
@@ -27,12 +31,15 @@ Example: Generate a landscape image:
     instructions: `Use this to modify an existing image. Provide a file path (relative or absolute path or[filename](filepath)) and a description of the edit. The edited image will be saved as a new file.
 
 Example: Add a sunset effect to an image:
-{ "prompt": "Add warm sunset colors and lighting", "path": "images/photo.jpg" }`,
+{ "prompt": "Add warm sunset colors and lighting", "path": "images/photo.jpg" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       prompt: z.string().describe('Description of how to edit the image'),
       path: z.string().describe('Path to the image to edit (relative path or absolute path or [filename](filepath) URL)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_edit'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_edit', input }, ctx),
   });
 
@@ -42,13 +49,16 @@ Example: Add a sunset effect to an image:
     instructions: `Use this to understand what's in images or answer specific questions about them. Can analyze multiple images together for comparison.
 
 Example: Compare two designs:
-{ "prompt": "What are the main differences between these two UI designs?", "paths": ["designs/v1.png", "designs/v2.png"] }`,
+{ "prompt": "What are the main differences between these two UI designs?", "paths": ["designs/v1.png", "designs/v2.png"] }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       prompt: z.string().describe('Question or analysis request about the images'),
       paths: z.array(z.string()).describe('Paths to images to analyze (relative paths or absolute file or [filename](filepath))'),
       maxCharacters: z.number().optional().default(2084).describe('Maximum response length (maxCharacters/4 = maxTokens, default: 2084)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_analyze'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_analyze', input }, ctx),
   });
 
@@ -58,11 +68,14 @@ Example: Compare two designs:
     instructions: `Use this to generate a comprehensive description of an image's contents without a specific question.
 
 Example: Describe a screenshot:
-{ "path": "screenshots/dashboard.png" }`,
+{ "path": "screenshots/dashboard.png" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Path to the image to describe (relative path or absolute path or [filename](filepath))'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_describe'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_describe', input }, ctx),
   });
 
@@ -72,7 +85,9 @@ Example: Describe a screenshot:
     instructions: `Use this to search for images in a directory that match a text description. Each image is analyzed and embedded, then compared to the prompt embedding for similarity scoring. This operation can be slow for large numbers of images.
 
 Example: Find images of people in photos:
-{ "query": "photos containing people smiling", "glob": "photos/**/*.jpg", "n": 5 }`,
+{ "query": "photos containing people smiling", "glob": "photos/**/*.jpg", "n": 5 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       query: z.string().describe('Description of what to find in images'),
       glob: z.string().describe('Glob pattern for image files to search (e.g., "**/*.png", "photos/*.jpg")'),
@@ -80,6 +95,7 @@ Example: Find images of people in photos:
       n: z.number().optional().default(5).describe('Number of top results to return (default: 5)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_find'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_find', input }, ctx),
   });
 
@@ -89,11 +105,14 @@ Example: Find images of people in photos:
     instructions: `Use this to attach an image file to the chat conversation. The image will be added as a user message and displayed in the chat. Accepts both absolute and relative paths.
 
 Example: Attach an image file:
-{ "path": "images/diagram.png" }`,
+{ "path": "images/diagram.png" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Path to the image file to attach (absolute or relative)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('image_attach'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_attach', input }, ctx),
   });
 

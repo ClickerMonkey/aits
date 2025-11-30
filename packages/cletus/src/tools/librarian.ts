@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create librarian tools for knowledge management
@@ -11,13 +12,16 @@ export function createLibrarianTools(ai: CletusAI) {
     instructions: `Use this to find relevant information from the knowledge base using semantic search. Provide a query and optionally filter by source prefix (e.g., "user", "file@path:", "task:id").
 
 Example: Search for user preferences:
-{ "query": "user's preferred programming languages", "limit": 5, "sourcePrefix": "user" }`,
+{ "query": "user's preferred programming languages", "limit": 5, "sourcePrefix": "user" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       query: z.string().describe('Search query text'),
       limit: z.number().optional().describe('Maximum results (default: 10)'),
       sourcePrefix: z.string().optional().describe('Filter by source prefix (e.g., "user", "task:", "file@{path}:")'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('knowledge_search'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_search', input }, ctx),
   });
 
@@ -27,10 +31,13 @@ Example: Search for user preferences:
     instructions: `Use this to see what types of knowledge are available. Sources are prefixed like "user", "task:", "file@{path}:".
 
 Example: Simply call with no parameters:
-{}`,
+{}
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('knowledge_sources'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_sources', input }, ctx),
   });
 
@@ -40,11 +47,14 @@ Example: Simply call with no parameters:
     instructions: `Use this to store important information the user wants to remember. This will be embedded and made searchable via semantic search.
 
 Example: Store a project detail:
-{ "text": "The authentication service uses JWT tokens with a 24-hour expiration" }`,
+{ "text": "The authentication service uses JWT tokens with a 24-hour expiration" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       text: z.string().describe('The memory text to add'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('knowledge_add'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_add', input }, ctx),
   });
 
@@ -60,12 +70,15 @@ Example: Delete all knowledge from task 123 (case insensitive):
 { "sourcePattern": "task:123", "caseSensitive": false }
 
 Example: Delete all user knowledge:
-{ "sourcePattern": "^user:", "caseSensitive": true }`,
+{ "sourcePattern": "^user:", "caseSensitive": true }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       sourcePattern: z.string().describe('Regex pattern to match source strings (e.g., "^task:123", "file@.*\\.md:", "^user:")'),
       caseSensitive: z.boolean().optional().default(true).describe('Whether pattern matching is case-sensitive (default: true)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('knowledge_delete'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'knowledge_delete', input }, ctx),
   });
 

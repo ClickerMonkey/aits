@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
 import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
 import type { TypeDefinition } from '../schemas';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create DBA tools for a specific type definition.
@@ -20,34 +21,43 @@ export function createDBATools(ai: CletusAI, type: TypeDefinition): AnyTool[] {
   const dataCreate = ai.tool({
     name: 'data_create',
     description: `Create a new ${type.friendlyName} record`,
-    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }`,
+    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_create'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: type.name, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
 
   const dataUpdate = ai.tool({
     name: 'data_update',
     description: `Update a ${type.friendlyName} record by ID`,
-    instructions: `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }`,
+    instructions: `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       id: z.string().describe('Record ID'),
       fields: getSchemas(type, cache).set.describe('Fields to update'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_update'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: type.name, id: input.id, fields: input.fields } }, ctx as unknown as CletusAIContext),
   });
 
   const dataDelete = ai.tool({
     name: 'data_delete',
     description: `Delete a ${type.friendlyName} record by ID`,
-    instructions: `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }`,
+    instructions: `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       id: z.string().describe('Record ID'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_delete'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: type.name, id: input.id } }, ctx as unknown as CletusAIContext),
   });
 
@@ -65,7 +75,9 @@ Example 1: Find records with filter:
 { "where": ${generateExampleWhere(firstField)}, "limit": 10 }
 
 Example 2: Query with sorting:
-{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }`,
+{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Filter conditions with and/or logic'),
       offset: z.number().optional().default(0).describe('Starting position'),
@@ -78,42 +90,52 @@ Example 2: Query with sorting:
       ).optional().describe('Sort order'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_select'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataUpdateMany = ai.tool({
     name: 'data_update_many',
     description: `Update multiple ${type.friendlyName} records`,
-    instructions: `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }`,
+    instructions: `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       set: getSchemas(type, cache).set.describe('Fields to set on matching records'),
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to update'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_update_many'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataDeleteMany = ai.tool({
     name: 'data_delete_many',
     description: `Delete multiple ${type.friendlyName} records`,
-    instructions: `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
+    instructions: `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       where: getSchemas(type, cache).where.describe('Filter conditions'),
       limit: z.number().optional().describe('Maximum records to delete'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_delete_many'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
   const dataCount = ai.tool({
     name: 'data_count',
     description: `Count ${type.friendlyName} records`,
-    instructions: `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }`,
+    instructions: `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_count'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_count', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
@@ -133,7 +155,9 @@ Example 1: Count records by field:
 { "groupBy": ["${groupField.name}"], "select": [{ "function": "count", "alias": "total" }] }
 
 Example 2: Aggregate with filter:
-{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }`,
+{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }
+ 
+{{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       where: getSchemas(type, cache).where.optional().describe('Pre-aggregation filter'),
       having: getSchemas(type, cache).where.optional().describe('Post-aggregation filter'),
@@ -153,6 +177,7 @@ Example 2: Aggregate with filter:
       ).describe('Aggregation functions'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_aggregate'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
 
@@ -160,10 +185,13 @@ Example 2: Aggregate with filter:
     name: 'data_index',
     description: `Index ${type.friendlyName} records for knowledge base`,
     instructions: `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
-This should be done if an embedding model has changed or a knowledge template has changed.`,
+This should be done if an embedding model has changed or a knowledge template has changed.
+ 
+{{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_index'),
     call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: type.name } }, ctx as unknown as CletusAIContext),
   });
 
@@ -181,12 +209,15 @@ Example: Import from CSV or text files:
 { "glob": "data/*.csv" }
 
 Example: Import with image text extraction:
-{ "glob": "documents/**/*.pdf", "transcribeImages": true }`,
+{ "glob": "documents/**/*.pdf", "transcribeImages": true }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
       transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_import'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
   });
     
@@ -196,12 +227,15 @@ Example: Import with image text extraction:
     instructions: `Use this to find relevant ${type.friendlyName} records from the knowledge base using semantic search. Provide a query and optionally specify the number of results.
 
 Example: Search for relevant records:
-{ "query": "user preferences for notifications", "n": 5 }`,
+{ "query": "user preferences for notifications", "n": 5 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       query: z.string().describe('Search query text'),
       n: z.number().optional().describe('Maximum results (default: 10)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('data_search'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: type.name, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
   });
 

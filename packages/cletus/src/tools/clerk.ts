@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
+import { getOperationInput } from '../operations/types';
 
 /**
  * Create clerk tools for file operations
@@ -13,13 +14,16 @@ export function createClerkTools(ai: CletusAI) {
 This ONLY lists files, it does NOT read their content.
 
 Example: Find all TypeScript files in src directory:
-{ "glob": "src/**/*.ts", "limit": 10 }`,
+{ "glob": "src/**/*.ts", "limit": 10 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern (e.g., "**/*.ts", "src/**/*.json")'),
       limit: z.number().optional().describe('Maximum results (default: 50)'),
       offset: z.number().optional().describe('Starting position for results (default: 0)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_search'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_search', input }, ctx),
   });
 
@@ -29,7 +33,9 @@ Example: Find all TypeScript files in src directory:
     instructions: `Use this to get a high-level summary of a file without reading the full content. Supports text files, PDFs, Office docs, and images (with description/transcription).
 
 Example: Summarize a PDF document:
-{ "path": "docs/report.pdf", "characterLimit": 32000 }`,
+{ "path": "docs/report.pdf", "characterLimit": 32000 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       limit: z.number().optional().describe('Maximum summary length in characters/lines (default: 64,000 chars or 1000 lines - whatever is smaller)'),
@@ -40,6 +46,7 @@ Example: Summarize a PDF document:
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_summary'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_summary', input }, ctx),
   });
 
@@ -52,7 +59,9 @@ Example 1: Index all markdown files by content:
 { "glob": "**/*.md", "index": "content" }
 
 Example 2: Index images with descriptions:
-{ "glob": "images/**/*.jpg", "index": "summary", "describeImages": true }`,
+{ "glob": "images/**/*.jpg", "index": "summary", "describeImages": true }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to index'),
       index: z.enum(['content', 'summary']).describe('Index mode: "content" embeds full text in chunks, "summary" embeds AI summary'),
@@ -61,6 +70,7 @@ Example 2: Index images with descriptions:
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_index'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_index', input }, ctx),
   });
 
@@ -70,12 +80,15 @@ Example 2: Index images with descriptions:
     instructions: `Use this to create a new file. Fails if file already exists. Parent directories will be created automatically if needed.
 
 Example: Create a new configuration file:
-{ "path": "config/settings.json", "content": "{\\"theme\\": \\"dark\\", \\"fontSize\\": 14}" }`,
+{ "path": "config/settings.json", "content": "{\\"theme\\": \\"dark\\", \\"fontSize\\": 14}" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       content: z.string().describe('File content'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_create'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_create', input }, ctx),
   });
 
@@ -85,12 +98,15 @@ Example: Create a new configuration file:
     instructions: `Use this to duplicate one or more files. If copying multiple files, target must be a directory. Target directories will be created if needed.
 
 Example: Copy all config files to backup directory:
-{ "glob": "config/*.json", "target": "backup/config/" }`,
+{ "glob": "config/*.json", "target": "backup/config/" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to copy'),
       target: z.string().describe('Destination file path or directory'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_copy'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_copy', input }, ctx),
   });
 
@@ -103,12 +119,15 @@ Example 1: Rename a single file:
 { "glob": "old-name.ts", "target": "new-name.ts" }
 
 Example 2: Move multiple files into a directory:
-{ "glob": "temp/*.log", "target": "archive/" }`,
+{ "glob": "temp/*.log", "target": "archive/" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to move'),
       target: z.string().describe('Destination directory or file'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_move'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_move', input }, ctx),
   });
 
@@ -118,11 +137,14 @@ Example 2: Move multiple files into a directory:
     instructions: `Use this to get metadata about a file (size, timestamps, type, line/character counts for text files).
 
 Example: Get stats for a source file:
-{ "path": "src/index.ts" }`,
+{ "path": "src/index.ts" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_stats'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_stats', input }, ctx),
   });
 
@@ -132,11 +154,14 @@ Example: Get stats for a source file:
     instructions: `Use this to permanently delete a file. This cannot be undone.
 
 Example: Delete a temporary file:
-{ "path": "temp/cache.tmp" }`,
+{ "path": "temp/cache.tmp" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_delete'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_delete', input }, ctx),
   });
 
@@ -146,7 +171,9 @@ Example: Delete a temporary file:
     instructions: `Use this to read a file into context. Supports text files, PDFs, Office docs, and images (with description/transcription). Large files can be truncated using characterLimit.
 
 Example: Read a source file:
-{ "path": "src/main.ts" }`,
+{ "path": "src/main.ts" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
       limit: z.number().optional().describe('Maximum summary length in characters/lines (default: 64,000 chars or 1000 lines - whatever is smaller)'),
@@ -158,6 +185,8 @@ Example: Read a source file:
       transcribeImages: z.boolean().optional().describe('OCR text from images (default: false)'),
       ...globalToolProperties,
     }),
+    
+    input: getOperationInput('file_read'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_read', input }, ctx),
   });
 
@@ -172,7 +201,9 @@ Example 1: Modify a configuration file:
 { "path": "config/settings.json", "request": "Add a new field 'maxRetries' with value 3, and change 'timeout' from 5000 to 10000" }
 
 Example 2: Edit a specific section of a large file (by line numbers):
-{ "path": "src/utils.ts", "request": "Refactor the parseDate function to handle ISO 8601 format", "offset": 100, "limit": 50 }`,
+{ "path": "src/utils.ts", "request": "Refactor the parseDate function to handle ISO 8601 format", "offset": 100, "limit": 50 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path to edit'),
       request: z.string().describe('Detailed request describing the changes to make. Be precise with rules and requirements.'),
@@ -180,6 +211,7 @@ Example 2: Edit a specific section of a large file (by line numbers):
       limit: z.number().optional().describe('Maximum lines to edit (default: 1000 lines)'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_edit'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_edit', input }, ctx),
   });
 
@@ -200,7 +232,9 @@ It may also be useful if the user doesn't want a comprehensive list of matches, 
 The offset & limit are at the file level assuming the files are sorted by name.
 
 Example: Find all function declarations in TypeScript files:
-{ "glob": "src/**/*.ts", "regex": "function \\w+\\(", "caseInsensitive": true, "output": "matches", "surrounding": 2 }`,
+{ "glob": "src/**/*.ts", "regex": "function \\w+\\(", "caseInsensitive": true, "output": "matches", "surrounding": 2 }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to search'),
       regex: z.string().describe('Regular expression pattern, EMCA syntax'),
@@ -219,6 +253,7 @@ Example: Find all function declarations in TypeScript files:
         throw new Error(`Invalid regular expression: ${input.regex}`, { cause: error });
       }
     },
+    input: getOperationInput('text_search'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'text_search', input }, ctx),
   });
 
@@ -228,11 +263,14 @@ Example: Find all function declarations in TypeScript files:
     instructions: `Use this to create a directory. Fails if directory already exists. Parent directories will be created automatically.
 
 Example: Create a new feature directory:
-{ "path": "src/features/auth" }`,
+{ "path": "src/features/auth" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative directory path'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('dir_create'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_create', input }, ctx),
   });
 
@@ -242,11 +280,14 @@ Example: Create a new feature directory:
     instructions: `Use this to attach a file to the chat conversation. The file will be added as a user message. Only text, audio, and PDF files are allowed. Path is relative to current working directory.
 
 Example: Attach a document:
-{ "path": "documents/report.pdf" }`,
+{ "path": "documents/report.pdf" }
+ 
+{{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative path to the text, audio, or PDF file to attach'),
       ...globalToolProperties,
     }),
+    input: getOperationInput('file_attach'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_attach', input }, ctx),
   });
 

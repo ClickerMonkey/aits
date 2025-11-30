@@ -89,9 +89,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
               }
             } else {
               return (
-                <Box key={i} marginBottom={1} flexGrow={1}>
-                  <Markdown>{c.content}</Markdown>
-                </Box>
+                <Markdown key={i} marginBottom={1} flexGrow={1}>{c.content}</Markdown>
               );
             }
           })}
