@@ -398,7 +398,9 @@ async function handleCascadeDeletes(
 
 export const data_create = operationOf<
   { name: string; fields: Record<string, any> },
-  { id: string; libraryKnowledgeUpdated: boolean }
+  { id: string; libraryKnowledgeUpdated: boolean },
+  {},
+  { typeName: string }
 >({
   mode: 'create',
   signature: 'data_create(fields)',
@@ -409,6 +411,7 @@ export const data_create = operationOf<
     return {
       analysis: `This will create a new ${type.friendlyName} record with fields: ${fieldNames.join(', ')}.`,
       doable: true,
+      cache: { typeName: type.friendlyName },
     };
   },
   do: async ({ input: { name, fields } }, ctx) => {
@@ -433,7 +436,8 @@ export const data_create = operationOf<
     return { id, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const firstField = Object.keys(op.input.fields)[0];
     const additionalCount = Object.keys(op.input.fields).length - 1;
     const more = additionalCount > 0 ? `, +${additionalCount} more` : '';
@@ -454,7 +458,9 @@ export const data_create = operationOf<
 
 export const data_update = operationOf<
   { name: string; id: string; fields: { field: string, value: any }[] },
-  { updated: boolean, libraryKnowledgeUpdated: boolean }
+  { updated: boolean, libraryKnowledgeUpdated: boolean },
+  {},
+  { typeName: string; fieldNames: string[] }
 >({
   mode: 'update',
   signature: 'data_update(id: string, fields)',
@@ -472,21 +478,32 @@ export const data_update = operationOf<
       };
     }
 
-    const fieldNames = fields.map(f => f.field);
+    const fieldNames = fields.map(f => {
+      const field = type.fields.find(tf => tf.name === f.field);
+      return field?.friendlyName || f.field;
+    });
     return {
       analysis: `This will update ${type.friendlyName} record "${id}" with fields: ${fieldNames.join(', ')}.`,
       doable: true,
+      cache: { typeName: type.friendlyName, fieldNames },
     };
   },
-  do: async ({ input: { name, id, fields } }, ctx) => {
+  do: async ({ input: { name, id, fields }, cache }, ctx) => {
     const type = getType(ctx.config, name);
+
+    // Verify record still exists
+    const dataManager = new DataManager(name);
+    await dataManager.load();
+    const record = dataManager.getById(id);
+    if (!record) {
+      throw new Error(`Record "${id}" no longer exists. State has changed since analysis.`);
+    }
+
     const updates = Object.fromEntries(fields.map(f => [f.field, f.value]));
     
     // Validate related field values
     await validateRelatedFields(updates, type, ctx.config);
 
-    const dataManager = new DataManager(name);
-    await dataManager.load();
     await dataManager.update(id, updates);
 
     // Update knowledge base
@@ -501,13 +518,13 @@ export const data_update = operationOf<
     return { updated: true, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const type = getType(ai.config.defaultContext!.config!, op.input.name, true);
-    const typeName = type?.friendlyName || op.input.name;
-    const fields = type?.fields.filter(f => op.input.fields.some(x => x.field === f.name)).map(f => f.friendlyName);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    const fieldNames = op.cache?.fieldNames ?? op.input.fields.map(f => f.field);
     
     return renderOperation(
       op,
-      `${formatName(typeName)}Update(${fields?.map(f => `"${f}"`).join(', ') || '?'})`,
+      `${formatName(typeName)}Update(${fieldNames.map(f => `"${f}"`).join(', ')})`,
       (op) => {
         if (op.output?.updated) {
           return `Updated record ID: ${op.input.id}`;
@@ -521,7 +538,9 @@ export const data_update = operationOf<
 
 export const data_delete = operationOf<
   { name: string; id: string },
-  { deleted: boolean, libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number }
+  { deleted: boolean, libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number },
+  {},
+  { typeName: string }
 >({
   mode: 'delete',
   signature: 'data_delete(id: string)',
@@ -565,6 +584,7 @@ export const data_delete = operationOf<
         return {
           analysis: `This would fail - ${type.friendlyName} record "${id}" is referenced by: ${restrictions.join(', ')}. These fields have onDelete=restrict.`,
           doable: false,
+          cache: { typeName: type.friendlyName },
         };
       }
       
@@ -576,18 +596,25 @@ export const data_delete = operationOf<
         analysis += ` Will set null in: ${setNulls.join(', ')}.`;
       }
       
-      return { analysis, doable: true };
+      return { analysis, doable: true, cache: { typeName: type.friendlyName } };
     }
 
     return {
       analysis: `This will delete ${type.friendlyName} record "${id}".`,
       doable: true,
+      cache: { typeName: type.friendlyName },
     };
   },
-  do: async ({ input: { name, id } }, ctx) => {
+  do: async ({ input: { name, id }, cache }, ctx) => {
     const { config } = ctx;
     const dataManager = new DataManager(name);
     await dataManager.load();
+
+    // Verify record still exists
+    const record = dataManager.getById(id);
+    if (!record) {
+      throw new Error(`Record "${id}" no longer exists. State has changed since analysis.`);
+    }
     
     // Handle cascade deletes using reusable function
     const { cascadedDeletes, setNullUpdates } = await handleCascadeDeletes(name, [id], config, ctx);
@@ -612,7 +639,8 @@ export const data_delete = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
 
     return renderOperation(
       op,
@@ -637,7 +665,9 @@ export const data_delete = operationOf<
 
 export const data_select = operationOf<
   { name: string; where?: WhereClause; offset?: number; limit?: number; orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }> },
-  { count: number; results: any[] }
+  { count: number; results: any[] },
+  {},
+  { typeName: string; matchingCount: number }
 >({
   mode: 'local',
   signature: 'data_select(where?, offset?, limit?, orderBy?)',
@@ -658,6 +688,7 @@ export const data_select = operationOf<
     return {
       analysis: `This will query ${type.friendlyName} records: ${records.length} matching records, returning ${Math.min(recordLimit, Math.max(0, records.length - recordOffset))} (limit: ${recordLimit}, offset: ${recordOffset}).`,
       doable: true,
+      cache: { typeName: type.friendlyName, matchingCount: records.length },
     };
   },
   do: async ({ input: { name, where, offset, limit, orderBy } }, ctx) => {
@@ -701,7 +732,8 @@ export const data_select = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const offset = op.input.offset ? `offset=${op.input.offset}` : '';
@@ -712,8 +744,11 @@ export const data_select = operationOf<
       op,
       `${formatName(typeName)}Select(${params})`,
       (op) => {
+        const count = op.output?.count ?? op.cache?.matchingCount;
         if (op.output) {
-          return `Returned ${op.output.results.length} of ${op.output.count} record(s)`;
+          return `Returned ${op.output.results.length} of ${count} record(s)`;
+        } else if (count !== undefined) {
+          return `Will return from ${count} matching record(s)`;
         }
         return null;
       },
@@ -724,7 +759,9 @@ export const data_select = operationOf<
 
 export const data_update_many = operationOf<
   { name: string; set: { field: string, value: any }[]; where?: WhereClause; limit?: number },
-  { updated: number, libraryKnowledgeUpdated: boolean }
+  { updated: number, libraryKnowledgeUpdated: boolean },
+  {},
+  { typeName: string; matchingCount: number }
 >({
   mode: 'update',
   signature: 'data_update_many(set, where, limit?)',
@@ -742,6 +779,7 @@ export const data_update_many = operationOf<
     return {
       analysis: `This will bulk update ${actualCount} ${type.friendlyName} record(s) matching criteria${limitText}, setting: ${setFields.join(', ')}.`,
       doable: true,
+      cache: { typeName: type.friendlyName, matchingCount: actualCount },
     };
   },
   do: async ({ input: { name, limit, set, where } }, ctx) => {
@@ -779,7 +817,8 @@ export const data_update_many = operationOf<
     return { updated: matchingRecords.length, libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const set = 'set=' + op.input.set.map(f => f.field).join(',');
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
@@ -789,8 +828,11 @@ export const data_update_many = operationOf<
       op,
       `${formatName(typeName)}UpdateMany(${params})`,
       (op) => {
+        const count = op.output?.updated ?? op.cache?.matchingCount;
         if (op.output) {
           return `Updated ${op.output.updated} record(s)`;
+        } else if (count !== undefined) {
+          return `Will update ${count} record(s)`;
         }
         return null;
       },
@@ -801,7 +843,9 @@ export const data_update_many = operationOf<
 
 export const data_delete_many = operationOf<
   { name: string; where: WhereClause; limit?: number },
-  { deleted: number; libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number }
+  { deleted: number; libraryKnowledgeUpdated: boolean; cascadedDeletes?: number; setNullUpdates?: number },
+  {},
+  { typeName: string; matchingCount: number }
 >({
   mode: 'delete',
   signature: 'data_delete_many(where, limit?)',
@@ -819,6 +863,7 @@ export const data_delete_many = operationOf<
     return {
       analysis: `This will bulk delete ${actualCount} ${type.friendlyName} record(s) matching the specified criteria${limitText}.`,
       doable: true,
+      cache: { typeName: type.friendlyName, matchingCount: actualCount },
     };
   },
   do: async ({ input: { name, where, limit } }, ctx) => {
@@ -864,7 +909,8 @@ export const data_delete_many = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const limit = op.input.limit ? `limit=${op.input.limit}` : '';
     const params = [where, limit].filter(p => p).join(', ');
@@ -873,6 +919,7 @@ export const data_delete_many = operationOf<
       op,
       `${formatName(typeName)}DeleteMany(${params})`,
       (op) => {
+        const count = op.output?.deleted ?? op.cache?.matchingCount;
         if (op.output) {
           let msg = `Deleted ${op.output.deleted} record(s)`;
           if (op.output.cascadedDeletes) {
@@ -882,6 +929,8 @@ export const data_delete_many = operationOf<
             msg += `, set null in ${op.output.setNullUpdates} record(s)`;
           }
           return msg;
+        } else if (count !== undefined) {
+          return `Will delete ${count} record(s)`;
         }
         return null;
       },
@@ -892,7 +941,9 @@ export const data_delete_many = operationOf<
 
 export const data_count = operationOf<
   { name: string; where?: WhereClause },
-  { count: number }
+  { count: number },
+  {},
+  { typeName: string; count: number }
 >({
   mode: 'local',
   signature: 'data_count(where?)',
@@ -908,9 +959,15 @@ export const data_count = operationOf<
     return {
       analysis: `This will count ${records.length} ${type.friendlyName} record(s) matching the specified criteria.`,
       doable: true,
+      cache: { typeName: type.friendlyName, count: records.length },
     };
   },
-  do: async ({ input: { name, where } }) => {
+  do: async ({ input: { name, where }, cache }) => {
+    // Use cached count if available (for local mode operations)
+    if (cache?.count !== undefined) {
+      return { count: cache.count };
+    }
+
     const dataManager = new DataManager(name);
     await dataManager.load();
 
@@ -921,15 +978,17 @@ export const data_count = operationOf<
     return { count: records.length };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
 
     return renderOperation(
       op,
       `${formatName(typeName)}Count(${where})`,
       (op) => {
-        if (op.output) {
-          return `Count: ${op.output.count}`;
+        const count = op.output?.count ?? op.cache?.count;
+        if (count !== undefined) {
+          return `Count: ${count}`;
         }
         return null;
       }
@@ -947,7 +1006,9 @@ export const data_aggregate = operationOf<
     groupBy?: string[];
     orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
   },
-  { results: any[] }
+  { results: any[] },
+  {},
+  { typeName: string; recordCount: number }
 >({
   mode: 'local',
   signature: 'data_aggregate(select, where?, having?, groupBy?, orderBy?)',
@@ -967,6 +1028,7 @@ export const data_aggregate = operationOf<
     return {
       analysis: `This will perform an aggregation query on ${records.length} ${type.friendlyName} record(s).`,
       doable: true,
+      cache: { typeName: type.friendlyName, recordCount: records.length },
     };
   },
   do: async ({ input: { name, where, having, groupBy, select, orderBy } }) => {
@@ -1078,7 +1140,8 @@ export const data_aggregate = operationOf<
     return { results };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     const where = op.input.where ? `where=${whereString(op.input.where)}` : ''
     const having = op.input.having ? `having=${whereString(op.input.having)}` : ''
     const groupBy = op.input.groupBy ? `groupBy=${op.input.groupBy.join(',')}` : ''
@@ -1105,7 +1168,9 @@ export const data_aggregate = operationOf<
 
 export const data_index = operationOf<
   { name: string },
-  { libraryKnowledgeUpdated: boolean }
+  { libraryKnowledgeUpdated: boolean },
+  {},
+  { typeName: string }
 >({
   mode: 'update',
   signature: 'data_index()',
@@ -1116,6 +1181,7 @@ export const data_index = operationOf<
     return {
       analysis: `This will update the knowledge for type "${type.friendlyName}".`,
       doable: true,
+      cache: { typeName: type.friendlyName },
     };
   },
   do: async ({ input: { name } }, ctx) => {
@@ -1130,7 +1196,8 @@ export const data_index = operationOf<
     return { libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
 
     return renderOperation(
       op,
@@ -1148,7 +1215,9 @@ export const data_index = operationOf<
 
 export const data_import = operationOf<
   { name: string; glob: string; transcribeImages?: boolean },
-  { imported: number; failed: number; updated: number; updateSkippedNoChanges: number; libraryKnowledgeUpdated: boolean }
+  { imported: number; failed: number; updated: number; updateSkippedNoChanges: number; libraryKnowledgeUpdated: boolean },
+  {},
+  { typeName: string; importableCount: number }
 >({
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
@@ -1177,6 +1246,7 @@ export const data_import = operationOf<
     return {
       analysis,
       doable: importable.length > 0,
+      cache: { typeName: type.friendlyName, importableCount: importable.length },
     };
   },
   do: async ({ input: { name, glob, transcribeImages = false } }, ctx) => {
@@ -1390,13 +1460,16 @@ Fields:
     return { imported, updated, updateSkippedNoChanges, libraryKnowledgeUpdated, failed: filesFailed };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
       `${formatName(typeName)}Import("${op.input.glob}")`,
       (op) => {
         if (op.output) {
           return `Imported ${op.output.imported} new, updated ${op.output.updated}, skipped ${op.output.updateSkippedNoChanges} duplicate(s)`;
+        } else if (op.cache?.importableCount !== undefined) {
+          return `Will import from ${op.cache.importableCount} file(s)`;
         }
         return null;
       },
@@ -1407,7 +1480,9 @@ Fields:
 
 export const data_search = operationOf<
   { name: string; query: string; n?: number },
-  { query: string; results: Array<{ source: string; text: string; similarity: number }> }
+  { query: string; results: Array<{ source: string; text: string; similarity: number }> },
+  {},
+  { typeName: string; limit: number }
 >({
   mode: 'local',
   signature: 'data_search(query: string, n?)',
@@ -1426,6 +1501,7 @@ export const data_search = operationOf<
     return {
       analysis: `This will search ${type.friendlyName} knowledge for "${query}", returning up to ${limit} results.`,
       doable: true,
+      cache: { typeName: type.friendlyName, limit },
     };
   },
   do: async ({ input: { name, query, n } }, { ai }) => {
@@ -1458,7 +1534,8 @@ export const data_search = operationOf<
     };
   },
   render: (op, ai, showInput, showOutput) => {
-    const typeName = getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
     return renderOperation(
       op,
       `${formatName(typeName)}Search("${abbreviate(op.input.query, 20)}")`,
