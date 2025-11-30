@@ -793,9 +793,13 @@ function evaluateValue(
   if (typeof value === "object" && "kind" in value) {
     switch (value.kind) {
       case "select": {
-        // Subquery - should return single value
-        // This is synchronous evaluation, so we need to handle this carefully
-        // For now, return null as subqueries in values are complex
+        // Subquery in value position - this would require async handling
+        // but evaluateValue is synchronous. This limitation affects scalar
+        // subqueries in SELECT expressions. For proper subquery support,
+        // consider restructuring to use CTEs instead.
+        console.warn(
+          "Subquery in value position is not fully supported. Consider using CTEs for complex queries."
+        );
         return null;
       }
 
@@ -1193,7 +1197,13 @@ function evaluateBooleanValue(
     }
 
     case "exists": {
-      // Subquery - would need async handling
+      // EXISTS subquery - would require async handling in synchronous context.
+      // The executeStatement function is async, but evaluateBooleanValue is sync.
+      // For proper EXISTS support, consider restructuring to use CTEs or
+      // implement an async version of boolean evaluation.
+      console.warn(
+        "EXISTS subquery is not fully supported. Consider using CTEs for complex queries."
+      );
       return false;
     }
 

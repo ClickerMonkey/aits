@@ -330,8 +330,11 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
     limit: z.number().nullable().optional().describe('Maximum number of rows to return'),
   })).meta({ aid: 'Select' }).describe('SELECT statement');
 
-  // Create typed insert schemas for each table type
-  const typedInsertSchemas = types.map(t => {
+  // Filter types that have at least one field for typed schemas
+  const typesWithFields = types.filter(t => t.fields.length > 0);
+
+  // Create typed insert schemas for each table type with fields
+  const typedInsertSchemas = typesWithFields.map(t => {
     const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
     const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
@@ -354,27 +357,32 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
       }).nullable().optional().describe('ON CONFLICT clause'),
     }).meta({ aid: `Insert_${t.name}` }).describe(`INSERT statement for ${t.name}`);
   });
-  
-  // Union of typed insert schemas, or generic fallback if no types defined
-  const InsertSchema: z.ZodType<Insert> = types.length > 0
-    ? z.union(typedInsertSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
-    : z.object({
-        kind: z.literal('insert'),
-        table: TableSchema.describe('Target table'),
-        as: z.string().nullable().optional().describe('Table alias'),
-        columns: z.array(ColumnSchema).describe('Columns to insert into'),
-        values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
-        select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
-        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-        onConflict: z.object({
-          columns: z.array(ColumnSchema).describe('Conflict target columns'),
-          doNothing: z.boolean().nullable().optional().describe('Whether to do nothing on conflict'),
-          update: z.array(ColumnValueSchema).nullable().optional().describe('Column updates on conflict'),
-        }).nullable().optional().describe('ON CONFLICT clause'),
-      }).meta({ aid: 'Insert' }).describe('INSERT statement');
 
-  // Create typed update schemas for each table type
-  const typedUpdateSchemas = types.map(t => {
+  // Generic insert schema for fallback
+  const genericInsertSchema = z.object({
+    kind: z.literal('insert'),
+    table: TableSchema.describe('Target table'),
+    as: z.string().nullable().optional().describe('Table alias'),
+    columns: z.array(ColumnSchema).describe('Columns to insert into'),
+    values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
+    select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
+    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+    onConflict: z.object({
+      columns: z.array(ColumnSchema).describe('Conflict target columns'),
+      doNothing: z.boolean().nullable().optional().describe('Whether to do nothing on conflict'),
+      update: z.array(ColumnValueSchema).nullable().optional().describe('Column updates on conflict'),
+    }).nullable().optional().describe('ON CONFLICT clause'),
+  }).meta({ aid: 'Insert' }).describe('INSERT statement');
+  
+  // Union of typed insert schemas with generic fallback, handling 0, 1, or multiple schemas
+  const InsertSchema: z.ZodType<Insert> = typedInsertSchemas.length >= 2
+    ? z.union([...typedInsertSchemas, genericInsertSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
+    : typedInsertSchemas.length === 1
+      ? z.union([typedInsertSchemas[0], genericInsertSchema]).meta({ aid: 'Insert' }).describe('INSERT statement')
+      : genericInsertSchema;
+
+  // Create typed update schemas for each table type with fields
+  const typedUpdateSchemas = typesWithFields.map(t => {
     const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
     const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
@@ -393,22 +401,27 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
       returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
     }).meta({ aid: `Update_${t.name}` }).describe(`UPDATE statement for ${t.name}`);
   });
-  
-  // Union of typed update schemas, or generic fallback if no types defined
-  const UpdateSchema: z.ZodType<Update> = types.length > 0
-    ? z.union(typedUpdateSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
-    : z.object({
-        kind: z.literal('update'),
-        set: z.array(ColumnValueSchema).describe('Column assignments'),
-        table: TableSchema.describe('Target table'),
-        as: z.string().nullable().optional().describe('Table alias'),
-        from: DataSourceSchema.nullable().optional().describe('FROM data source'),
-        joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
-        where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
-        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-      }).meta({ aid: 'Update' }).describe('UPDATE statement');
 
-  // Create typed delete schemas for each table type
+  // Generic update schema for fallback
+  const genericUpdateSchema = z.object({
+    kind: z.literal('update'),
+    set: z.array(ColumnValueSchema).describe('Column assignments'),
+    table: TableSchema.describe('Target table'),
+    as: z.string().nullable().optional().describe('Table alias'),
+    from: DataSourceSchema.nullable().optional().describe('FROM data source'),
+    joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+    where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+  }).meta({ aid: 'Update' }).describe('UPDATE statement');
+  
+  // Union of typed update schemas with generic fallback, handling 0, 1, or multiple schemas
+  const UpdateSchema: z.ZodType<Update> = typedUpdateSchemas.length >= 2
+    ? z.union([...typedUpdateSchemas, genericUpdateSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
+    : typedUpdateSchemas.length === 1
+      ? z.union([typedUpdateSchemas[0], genericUpdateSchema]).meta({ aid: 'Update' }).describe('UPDATE statement')
+      : genericUpdateSchema;
+
+  // Create typed delete schemas for each table type (doesn't require fields)
   const typedDeleteSchemas = types.map(t => {
     return z.object({
       kind: z.literal('delete'),
@@ -419,18 +432,23 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
       returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
     }).meta({ aid: `Delete_${t.name}` }).describe(`DELETE statement for ${t.name}`);
   });
+
+  // Generic delete schema for fallback
+  const genericDeleteSchema = z.object({
+    kind: z.literal('delete'),
+    table: TableSchema.describe('Target table'),
+    as: z.string().nullable().optional().describe('Table alias'),
+    joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
+    where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
+    returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
+  }).meta({ aid: 'Delete' }).describe('DELETE statement');
   
-  // Union of typed delete schemas, or generic fallback if no types defined
-  const DeleteSchema: z.ZodType<Delete> = types.length > 0
-    ? z.union(typedDeleteSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
-    : z.object({
-        kind: z.literal('delete'),
-        table: TableSchema.describe('Target table'),
-        as: z.string().nullable().optional().describe('Table alias'),
-        joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
-        where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
-        returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
-      }).meta({ aid: 'Delete' }).describe('DELETE statement');
+  // Union of typed delete schemas with generic fallback, handling 0, 1, or multiple schemas
+  const DeleteSchema: z.ZodType<Delete> = typedDeleteSchemas.length >= 2
+    ? z.union([...typedDeleteSchemas, genericDeleteSchema] as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
+    : typedDeleteSchemas.length === 1
+      ? z.union([typedDeleteSchemas[0], genericDeleteSchema]).meta({ aid: 'Delete' }).describe('DELETE statement')
+      : genericDeleteSchema;
 
   const SetOperationSchema: z.ZodType<SetOperation> = z.lazy(() => z.object({
     kind: z.enum(['union', 'intersect', 'except']).describe('Set operation type'),
