@@ -691,31 +691,45 @@ export const file_read = operationOf<
   ),
 });
 
+type FileEditInput = {
+  path: string;
+  request: string;
+  offset?: number;
+  limit?: number;
+}
+
+type FileEditResult = {
+  insertStart: number;
+  insertEnd: number;
+  insert: string;
+  lastModified: number;
+  changed: boolean;
+  diff: string;
+}
+
 export const file_edit = operationOf<
-  { path: string; request: string; offset?: number; limit?: number },
+  FileEditInput,
   string,
   { 
     diff: (
-      input: { path: string; request: string; offset?: number; limit?: number },
+      input: FileEditInput,
       fileContent: string,
+      lastModified: number,
       ai: CletusAI
-    ) => Promise<{ newFileContent: string; diff: string; changed: boolean }> 
+    ) => Promise<FileEditResult>; 
   },
-  {
-    newFileContent: string;
-    changed: boolean;
-    diff: string;
-  }
+  FileEditResult
 >({
   mode: 'update',
   signature: 'file_edit(path: string, request: string, offset?: number, limit?: number)',
   status: (input) => `Editing: ${paginateText(input.path, 100, -100)}`,
   instructions: 'Do NOT show the diff to the user, it will be rendered separately.',
   async diff(
-    input: { path: string; request: string; offset?: number; limit?: number },
+    input: FileEditInput,
     fileContent: string,
+    lastModified: number,
     ai: CletusAI
-  ): Promise<{ newFileContent: string; diff: string; changed: boolean }> {
+  ): Promise<FileEditResult> {
     // Paginate the text if offset/limit are provided (lines only)
     const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'lines');
 
@@ -759,9 +773,12 @@ export const file_edit = operationOf<
     );
 
     return {
-      newFileContent,
       diff,
+      lastModified,
       changed: fileContent !== newFileContent,
+      insert: newPaginatedContent,
+      insertStart: paginatedIndex,
+      insertEnd: paginatedIndex + paginatedContent.length,
     };
   },
   async analyze({ input }, { cwd, ai }) {
@@ -793,34 +810,40 @@ export const file_edit = operationOf<
 
     // Read the file content and generate diff in analyze phase
     const fileContent = await fs.readFile(fullPath, 'utf-8');
-    const { diff, newFileContent, changed } = await this.diff(input, fileContent, ai);
+    const fileStats = await fs.stat(fullPath);
+    const result = await this.diff(input, fileContent, fileStats.mtimeMs, ai);
 
     return {
-      analysis: diff,
+      analysis: result.diff,
       doable: true,
-      cache: {
-        newFileContent,
-        changed,
-        diff,
-      }
+      cache: result,
     };
   },
   async do({ input, cache }, { cwd, ai }) {
     const fullPath = path.resolve(cwd, input.path);
 
+    const fileContent = await fs.readFile(fullPath, 'utf-8');
+    const lastModified = await fs.stat(fullPath).then(s => s.mtimeMs);
+
     // Retrieve diff from analyze phase if available
-    const { newFileContent, changed, diff } = cache || await this.diff(input, await fs.readFile(fullPath, 'utf-8'), ai);
+    const result = cache || await this.diff(input, fileContent, lastModified, ai);
+
+    // Prevent overwriting changes if file was modified since analysis
+    if (result.lastModified !== lastModified) {
+      throw new Error(`File "${input.path}" was modified since analysis. Aborting edit to prevent overwriting changes.`);
+    }
+
+    const newFileContent = ''
+      + fileContent.slice(0, result.insertStart)
+      + result.insert
+      + fileContent.slice(result.insertEnd);
     
     // Write the new content back to the file
     await fs.writeFile(fullPath, newFileContent, 'utf-8');
 
     return {
-      output: diff,
-      cache: {
-        newFileContent,
-        changed,
-        diff,
-      }
+      output: result.diff,
+      cache: result,
     };
   },
   render: (op, ai, showInput) => renderOperation(
@@ -914,9 +937,11 @@ export const file_edit = operationOf<
         <Box {...boxStyle} flexDirection="column" flexGrow={1}>
           <Box marginLeft={2} flexGrow={1}>
             <Text>{'→ '}</Text>
-            <Text>{op.output ? 'Updated ' : 'Edit '}</Text>
+            <Text>{op.output ? 'Updated ' : op.analysis ? 'Edit ' : 'Analyzing '}</Text>
             <Link url={url}>{op.input.path}</Link>
-            <Text> with {pluralize(additions, 'addition')} and {pluralize(subtractions, 'removal')}</Text>
+            {diff && (
+              <Text> with {pluralize(additions, 'addition')} and {pluralize(subtractions, 'removal')}</Text>
+            )}
           </Box>
           {changeSetsGrouped}
         </Box>

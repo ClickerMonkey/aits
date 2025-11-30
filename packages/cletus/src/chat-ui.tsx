@@ -450,7 +450,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   });
 
   const handleCommand = async (command: string) => {
-    const [cmd, args] = command.split(' ', 2);
+    const [cmd, ...rest] = command.split(' ');
+    const args = rest.join(' ');
 
     switch (cmd) {
       case '/quit':

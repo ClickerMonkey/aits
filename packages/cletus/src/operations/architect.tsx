@@ -8,6 +8,7 @@ import { operationOf } from "./types";
 import { renderOperation } from '../helpers/render';
 import { searchFiles, processFile } from '../helpers/files';
 import { getAssetPath } from '../file-manager';
+import { get } from 'http';
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
@@ -35,18 +36,43 @@ function validateTemplate(template: string, fields: TypeField[]): string | true 
   }
 }
 
+function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
+function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
+function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
+  const type = config.getData().types.find((t) => t.name === typeName);
+  if (!type && !optional) {
+    throw new Error(`Data type not found: ${typeName}`);
+  }
+  return type;
+}
+
+function getTypeName(config: ConfigFile, typeName: string): string {
+  return getType(config, typeName, true)?.friendlyName || typeName;
+}
 
 export const type_info = operationOf<
   { name: string },
-  { type: TypeDefinition | null }
+  { type: TypeDefinition | null },
+  {},
+  { typeName: string }
 >({
   mode: 'local',
   signature: 'type_info(name: string)',
   status: (input) => `Getting type info: ${input.name}`,
   analyze: async ({ input }, { config }) => {
+    const type = getType(config, input.name, true);
+
+    if (!type) {
+      return {
+        analysis: `This would fail - type not found: ${input.name}`,
+        doable: false,
+      };
+    }
+
     return {
       analysis: `This will get information about data type "${input.name}".`,
       doable: true,
+      cache: { typeName: type.friendlyName }
     };
   },
   do: async ({ input }, { config }) => {
@@ -57,7 +83,7 @@ export const type_info = operationOf<
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,
-    `${formatName(op.input.name)}Info()`,
+    `${formatName(op.cache?.typeName || op.input.name)}Info()`,
     (op) => {
       if (op.output?.type) {
         return `Found type: ${op.output.type.friendlyName}`;
