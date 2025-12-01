@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { formatName } from '../common';
 import { isDBAEnabled } from '../file-manager';
+import { AgentMode, ChatMode } from '../schemas';
 import { buildToolSelectionQuery, getDBAToolsetName, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
 
@@ -161,13 +162,137 @@ Example 2: Focus on file operations:
     },
   });
 
+  const hypothetical = ai.tool({
+    name: 'hypothetical',
+    description: 'Switch to a more restrictive mode to explore what would happen hypothetically without actually performing operations',
+    instructions: `Use this tool ONLY when the user explicitly wants to understand what WOULD happen for a request without actually doing it.
+
+This tool allows switching to more restrictive modes temporarily to see what operations would be proposed:
+- From 'default' (run) mode → 'plan' mode (only plans, doesn't execute)
+- From 'delete' mode → 'update', 'create', 'read', or 'none' mode
+- From 'update' mode → 'create', 'read', or 'none' mode
+- From 'create' mode → 'read' or 'none' mode
+- From 'read' mode → 'none' mode
+
+<critical>
+Only use this when it's VERY CLEAR the user wants hypothetical exploration, such as:
+- "What would happen if I..."
+- "Can you show me what you would do..."
+- "I want to see what operations would be needed..."
+- "Don't actually do it, just tell me what would happen..."
+
+Do NOT use this for normal requests where the user wants actual operations performed.
+</critical>
+
+After using this tool, inform the user they will need to manually change back to the previous mode using the /mode command when they're ready to actually perform operations.`,
+    schema: ({ chat }) => {
+      const currentMode = chat?.mode || 'none';
+      const currentAgentMode = chat?.agentMode || 'default';
+
+      // Define mode hierarchy (index = restrictiveness, lower index = more restrictive)
+      const chatModes: ChatMode[] = ['none', 'read', 'create', 'update', 'delete'];
+      const currentModeIndex = chatModes.indexOf(currentMode);
+
+      // Get available chat modes (all modes more restrictive than current)
+      const availableChatModes = chatModes.slice(0, currentModeIndex);
+
+      // For agent mode, can only go from 'default' to 'plan'
+      const canSwitchToPlanning = currentAgentMode === 'default';
+
+      // If no options available, return undefined to indicate tool shouldn't be available
+      if (availableChatModes.length === 0 && !canSwitchToPlanning) {
+        return undefined;
+      }
+
+      // Build schema with only available options
+      const schemaObj: any = {
+        ...globalToolProperties,
+      };
+
+      // Only include mode property if there are available chat modes
+      if (availableChatModes.length > 0) {
+        schemaObj.mode = z.enum(availableChatModes as [ChatMode, ...ChatMode[]]).optional()
+          .describe('Switch to a more restrictive operation mode');
+      }
+
+      // Only include agentMode property if can switch to planning
+      if (canSwitchToPlanning) {
+        schemaObj.agentMode = z.literal('plan' as const).optional()
+          .describe('Switch to plan mode to see what would be done without executing');
+      }
+
+      return z.object(schemaObj);
+    },
+    call: async (input: any, _, ctx) => {
+      const { mode, agentMode } = input as { mode?: ChatMode; agentMode?: AgentMode };
+      const previousMode = ctx.chat?.mode || 'none';
+      const previousAgentMode = ctx.chat?.agentMode || 'default';
+
+      let changed = false;
+      let message = 'Switched to hypothetical exploration mode:\n';
+
+      // Update chat mode if specified
+      if (mode && mode !== previousMode) {
+        if (ctx.chatData && ctx.chat) {
+          ctx.chat.mode = mode;
+          await ctx.config.save((cfg) => {
+            const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
+            if (chatMeta) {
+              chatMeta.mode = mode;
+            }
+          });
+          changed = true;
+          message += `- Operation mode: ${previousMode} → ${mode}\n`;
+        }
+      }
+
+      // Update agent mode if specified
+      if (agentMode && agentMode !== previousAgentMode) {
+        if (ctx.chatData && ctx.chat) {
+          ctx.chat.agentMode = agentMode;
+          await ctx.config.save((cfg) => {
+            const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
+            if (chatMeta) {
+              chatMeta.agentMode = agentMode;
+            }
+          });
+          changed = true;
+          message += `- Agent mode: ${previousAgentMode} → ${agentMode}\n`;
+        }
+      }
+
+      if (!changed) {
+        return 'Already at the most restrictive mode. No changes made.';
+      }
+
+      // Build the restoration instructions
+      const restoreInstructions: string[] = [];
+      if (mode && mode !== previousMode) {
+        restoreInstructions.push(`/mode ${previousMode}`);
+      }
+      if (agentMode && agentMode !== previousAgentMode) {
+        // For agent mode, there's no direct command shown in the codebase, so we'll note it differently
+        restoreInstructions.push(`manually switch back to ${previousAgentMode} mode`);
+      }
+
+      message += `\n⚠️ You are now in a more restrictive mode for hypothetical exploration.\n`;
+      message += `When ready to perform actual operations, you will need to run: ${restoreInstructions.join(' and ')}`;
+
+      ctx.chatStatus('Switched to hypothetical mode');
+
+      return message;
+    },
+  });
+
   return [
     getOperationOutput,
     about,
     retool,
+    hypothetical,
   ] as [
     typeof getOperationOutput,
     typeof about,
     typeof retool,
+    typeof hypothetical,
   ];
 }

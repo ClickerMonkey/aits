@@ -1209,6 +1209,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
           )}
           {isWaitingForResponse && (
             <Box>
+              <Text>( </Text>
               <Text color="cyan">
                 {(elapsedTime / 1000).toFixed(1)}s
               </Text>
@@ -1225,7 +1226,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 </>
               )}
               <Text dimColor> │ </Text>
-              <Text dimColor>ESC to interrupt</Text>
+              <Text dimColor>esc to interrupt</Text>
+              <Text> )</Text>
             </Box>
           )}
         </Box>
