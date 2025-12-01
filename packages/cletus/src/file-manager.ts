@@ -113,10 +113,29 @@ export abstract class JsonFile<T> {
 let globalProfile: string | undefined;
 
 /**
+ * Global flag to enable DBA toolsets
+ */
+let enableDBA: boolean = false;
+
+/**
  * Set the global profile for the session
  */
 export function setProfile(profile: string | undefined): void {
   globalProfile = profile;
+}
+
+/**
+ * Set whether DBA toolsets should be enabled
+ */
+export function setEnableDBA(enabled: boolean): void {
+  enableDBA = enabled;
+}
+
+/**
+ * Check if DBA toolsets are enabled
+ */
+export function isDBAEnabled(): boolean {
+  return enableDBA;
 }
 
 /**

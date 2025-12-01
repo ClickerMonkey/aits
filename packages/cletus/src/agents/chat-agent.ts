@@ -1,6 +1,7 @@
 import { AnyTool } from '@aeye/core';
 import type { CletusAI, CletusAIContext } from '../ai';
 import { ADAPTIVE_TOOLING } from '../constants';
+import { isDBAEnabled } from '../file-manager';
 import { Operations } from '../operations/types';
 import {
   buildToolSelectionQuery,
@@ -43,10 +44,14 @@ async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof 
   const utilityTools = createUtilityTools(ai);
   await toolRegistry.registerToolset('utility', utilityTools, instruct);
 
-  // Register DBA tools for existing types
+  // Register DBA tools for existing types only if enabled
+  if (!isDBAEnabled()) {
+    return;
+  }
+
   const config = ai.config.defaultContext?.config;
   if (!config) return;
-  
+
   const types = config.getData().types;
   for (const type of types) {
     const dbaTools = createDBATools(type);
@@ -59,13 +64,18 @@ async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof 
  * Update DBA tools when types change
  */
 export function updateDBATools(ai: CletusAI, toolsets: ReturnType<typeof createToolsets>) {
+  // Skip DBA tools if not enabled
+  if (!isDBAEnabled()) {
+    return;
+  }
+
   const { createDBATools } = toolsets;
   const config = ai.config.defaultContext?.config;
 
   if (!config) {
     return;
   }
-  
+
   const types = config.getData().types;
 
   // Get current DBA toolsets

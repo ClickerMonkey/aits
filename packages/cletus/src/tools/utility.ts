@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { formatName } from '../common';
+import { isDBAEnabled } from '../file-manager';
 import { buildToolSelectionQuery, getDBAToolsetName, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
 
@@ -74,9 +75,14 @@ export function createUtilityTools(ai: CletusAI) {
     description: 'Switch between toolsets or enable adaptive tool selection',
     instructionsFn: ({ config }) => {
       const types = config.getData().types;
-      const dbaToolsets = types.map(t => getDBAToolsetName(t.name));
+      const dbaToolsets = isDBAEnabled() ? types.map(t => getDBAToolsetName(t.name)) : [];
       const allToolsets = [...STATIC_TOOLSETS, ...dbaToolsets];
-      
+
+      const dbaExample = isDBAEnabled() && dbaToolsets.length > 0
+        ? `\n\nExample 3: Focus on data operations for a specific type:
+{ "toolset": "${dbaToolsets[0]}" }`
+        : '';
+
       return `Use this to switch between different toolsets or enable adaptive tool selection.
 
 <toolsets>
@@ -99,16 +105,13 @@ Example 1: Switch to adaptive mode:
 { "toolset": null }
 
 Example 2: Focus on file operations:
-{ "toolset": "clerk" }
-
-Example 3: Focus on data operations for a specific type:
-{ "toolset": "${dbaToolsets[0] || 'dba:task'}" }`;
+{ "toolset": "clerk" }${dbaExample}`;
     },
     schema: ({ config }) => {
       const types = config.getData().types;
-      const dbaToolsets = types.map(t => getDBAToolsetName(t.name)) as string[];
+      const dbaToolsets = isDBAEnabled() ? types.map(t => getDBAToolsetName(t.name)) as string[] : [];
       const allToolsets = [...STATIC_TOOLSETS, ...dbaToolsets] as [string, ...string[]];
-      
+
       return z.object({
         toolset: z.enum(allToolsets).nullable().describe('The toolset to switch to, or null to enable adaptive tool selection'),
         ...globalToolProperties,
