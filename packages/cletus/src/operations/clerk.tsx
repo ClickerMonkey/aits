@@ -1323,8 +1323,8 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       maxDepth: depth,
     });
 
-    // Separate files and directories with their metadata
-    const files: { name: string; size: number }[] = [];
+    // Separate files and directories
+    const files: string[] = [];
     const dirs: string[] = [];
     const extCounts = new Map<string, number>();
     // Track direct children counts for each directory
@@ -1339,9 +1339,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
         // Initialize directory contents counter
         dirContents.set(entry, { files: 0, dirs: 0 });
       } else {
-        // Get file size
-        const stats = await fs.stat(entryFullPath);
-        files.push({ name: entry, size: stats.size });
+        files.push(entry);
         const ext = path.extname(entry).toLowerCase() || '(no extension)';
         extCounts.set(ext, (extCounts.get(ext) || 0) + 1);
       }
@@ -1349,7 +1347,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
 
     // Count direct children for each directory
     for (const file of files) {
-      const parent = path.dirname(file.name);
+      const parent = path.dirname(file);
       if (dirContents.has(parent)) {
         const counts = dirContents.get(parent)!;
         counts.files++;
@@ -1364,20 +1362,23 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
     }
 
     // Sort entries
-    files.sort((a, b) => a.name.localeCompare(b.name));
+    files.sort();
     dirs.sort();
 
     const MAX_LINES = 50;
     const lines: string[] = [];
 
-    const buildFilesSection = (maxLines: number): string[] => {
+    const buildFilesSection = async (maxLines: number): Promise<string[]> => {
       const result: string[] = [];
       if (files.length === 0) return result;
       
       const toShow = files.slice(0, maxLines);
       result.push('Files:');
+      // Only get stats for files we're actually displaying
       for (const file of toShow) {
-        result.push(`  ${file.name} (${formatSize(file.size)})`);
+        const filePath = path.resolve(cwd, file);
+        const stats = await fs.stat(filePath);
+        result.push(`  ${file} (${formatSize(stats.size)})`);
       }
       if (files.length > toShow.length) {
         result.push(`  ... and ${files.length - toShow.length} more files`);
@@ -1425,7 +1426,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
     const availableLines = MAX_LINES - SUMMARY_LINES;
 
     if (kind === 'files') {
-      lines.push(...buildFilesSection(availableLines - 1));
+      lines.push(...await buildFilesSection(availableLines - 1));
     } else if (kind === 'dirs') {
       lines.push(...buildDirsSection(availableLines - 1));
     } else if (kind === 'ext') {
@@ -1442,28 +1443,46 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       } else {
         // Build sections with adaptive line allocation
         // Each section gets an equal share of remaining lines, unused lines go to the next section
-        const sections: { hasContent: boolean; builder: (lines: number) => string[] }[] = [
-          { hasContent: hasFiles, builder: buildFilesSection },
-          { hasContent: hasDirs, builder: buildDirsSection },
-          { hasContent: hasExts, builder: buildExtSection },
-        ];
-        
         let remainingLines = availableLines;
         let remainingActive = activeSections;
         
-        for (const section of sections) {
-          if (!section.hasContent) continue;
-          
+        // Handle files section (async)
+        if (hasFiles) {
           const linesForSection = Math.floor(remainingLines / remainingActive);
-          const sectionContent = section.builder(linesForSection);
+          const sectionContent = await buildFilesSection(linesForSection);
           
           if (sectionContent.length > 0) {
             if (lines.length > 0) lines.push('');
             lines.push(...sectionContent);
           }
           
-          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0); // Account for spacing
+          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0);
           remainingActive--;
+        }
+        
+        // Handle dirs section (sync)
+        if (hasDirs) {
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = buildDirsSection(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
+          
+          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0);
+          remainingActive--;
+        }
+        
+        // Handle ext section (sync)
+        if (hasExts) {
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = buildExtSection(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
         }
       }
     }
