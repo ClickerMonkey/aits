@@ -1207,16 +1207,16 @@ export const dba_query = operationOf<
         if (op.output) {
           const parts: string[] = [];
           if (op.output.rows.length > 0) {
-            parts.push(`${op.output.rows.length} row(s)`);
+            parts.push(`${pluralize(op.output.rows.length, 'row')}`);
           }
-          if (op.output.insertedIds?.length) {
-            parts.push(`${op.output.insertedIds.length} inserted`);
+          if (op.output.inserted?.length) {
+            parts.push(`${op.output.inserted.reduce((a, b) => a + b.ids.length, 0)} inserted`);
           }
-          if (op.output.updatedIds?.length) {
-            parts.push(`${op.output.updatedIds.length} updated`);
+          if (op.output.updated?.length) {
+            parts.push(`${op.output.updated.reduce((a, b) => a + b.ids.length, 0)} updated`);
           }
-          if (op.output.deletedIds?.length) {
-            parts.push(`${op.output.deletedIds.length} deleted`);
+          if (op.output.deleted?.length) {
+            parts.push(`${op.output.deleted.reduce((a, b) => a + b.ids.length, 0)} deleted`);
           }
           return parts.length > 0 ? parts.join(', ') : 'Query executed';
         }

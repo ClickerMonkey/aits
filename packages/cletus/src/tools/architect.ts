@@ -10,7 +10,7 @@ export function createArchitectTools(ai: CletusAI) {
   const configData = ai.config.defaultContext!.config!.getData();
   const types = configData.types.map((t) => t.name);
 
-  const fieldType = z.enum(['string', 'number', 'boolean', 'date', 'enum', ...types]).describe('Field type (custom types are allowed)');
+  const fieldType = z.enum(['string', 'number', 'boolean', 'date', 'enum', ...types]).describe('Field type - can be a primitive type (string, number, boolean, date, enum) or the name of another type to create a relationship');
 
   const typeInfo = ai.tool({
     name: 'type_info',
@@ -56,18 +56,25 @@ Provide an update object with the changes to make.
 - Field names must be lowercase with no spaces.
 - Knowledge templates are Handlebars templates used to generate knowledge base entries for records of this type. They should include all fields and use #if statements for optional fields. Use field name and not friendly name.
 
+IMPORTANT:
+- All types automatically have an 'id' primary key field - DO NOT add an 'id' field unless explicitly requested by the user
+- Field types can be the name of another type to create relationships (e.g., "userId" field with type "user")
+
 Example 1: Add a new optional field:
 { "name": "task", "update": { "fields": { "priority": { "friendlyName": "Priority", "type": "number", "required": false } } } }
 
-Example 2: Update description:
+Example 2: Add a relationship field to another type:
+{ "name": "task", "update": { "fields": { "assigneeid": { "friendlyName": "Assignee", "type": "user", "required": false } } } }
+
+Example 3: Update description:
 { "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }
- 
-Example 3: Make a field optional:
+
+Example 4: Make a field optional:
 { "name": "task", "update": { "fields": { "deadline": { "required": false } } } }
 
 If fields are being changed knowledgeTemplate MUST be updated to reflect those changes.
 If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.
- 
+
 {{modeInstructions}}`,
     schema: ({ config }) => z.object({
       name: z.enum(config.getData().types.map(t => t.name)).describe('Type name to update'),
@@ -102,9 +109,17 @@ If the knowledgeTemplate is updated and there are records for this type the data
     description: 'Create a new type definition',
     instructions: `Use this to define a new custom data type with fields. Each field should have a name, friendlyName, and type. Required fields must have a default value. Field names must be all lowercase with no spaces.
 
-Example: Create a project tracking type:
+IMPORTANT:
+- All types automatically have an 'id' primary key field - DO NOT add an 'id' field to the fields array unless explicitly requested by the user
+- Field types can be the name of another type to create relationships (e.g., "userId" field with type "user")
+- When creating multiple related types, create them one at a time in dependency order (create referenced types before types that reference them)
+
+Example 1: Create a project tracking type:
 { "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }
- 
+
+Example 2: Create a task type with a relationship to project (create project type first, then task):
+{ "name": "task", "friendlyName": "Task", "description": "Task assigned to a project", "knowledgeTemplate": "Task: {{name}}\\nProject: {{projectid}}\\nStatus: {{status}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "projectid", "friendlyName": "Project", "type": "project", "required": true }, { "name": "status", "friendlyName": "Status", "type": "string", "required": true, "default": "todo" }] }
+
 {{modeInstructions}}`,
     schema: z.object({
       name: z.string().describe('Type name (lowercase, no spaces)'),

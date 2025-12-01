@@ -287,6 +287,7 @@ export async function runChatOrchestrator(
 
             case 'textReset':
               {
+                /*
                 // Clear all non-operation text 
                 const last = pending.content[pending.content.length - 1];
                 if (last.operationIndex === undefined && last.type === 'text') {
@@ -298,6 +299,7 @@ export async function runChatOrchestrator(
                 }
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
+                */
               }
               break;
 
@@ -436,11 +438,13 @@ export async function runChatOrchestrator(
 
   } catch (error: any) {
     if (error.message !== 'Aborted') {
-      logger.log(`orchestrator: error - ${error.message}: ${error.stack}`);
+      logger.log(`orchestrator: error - ${JSON.stringify(error)}`);
+
       onEvent({ type: 'error', error: error.message });
     }
   } finally {
     logger.log('orchestrator: finished');
+    
     clearInterval(elapsedInterval);
   }
 }

@@ -5,11 +5,11 @@ export type Table = string; // table that can be read from
 export type Column = string; // column name, used for insert/update (lvalues)
 export type Alias = string; // alias for a value, used for select or returning
 export type SourceColumn = { source: Source, column: Column }; // used for rvalues
-export type Constant = number|string|boolean|null; // dates are represented as strings in yyyy-mm-dd format and dateTimes include millisecond precision. duration fields are stored as pg intervals
-export type Aggregate = 'count'|'min'|'max'|'avg'|'sum';
-export type Binary = '+'|'-'|'*'|'/';
+export type Constant = number | string | boolean | null; // dates are represented as strings in yyyy-mm-dd format and dateTimes include millisecond precision. duration fields are stored as pg intervals
+export type Aggregate = 'count' | 'min' | 'max' | 'avg' | 'sum';
+export type Binary = '+' | '-' | '*' | '/';
 export type Unary = '-';
-export type Comparison = '='|'<'|'>'|'<='|'>='|'<>'|'like'|'notLike'; // etc
+export type Comparison = '=' | '<' | '>' | '<=' | '>=' | '<>' | 'like' | 'notLike'; // etc
 export type SelectOrSet = Select | SetOperation;
 
 export type BooleanValue =
@@ -23,16 +23,17 @@ export type BooleanValue =
   { kind: 'not', not: BooleanValue };
 
 export type Function = 
-  'concat'|'substring'|'length'|'lower'|'upper'|'trim'|'replace'| // string
-  'abs'|'ceil'|'floor'|'round'|'power'|'sqrt'| // number
-  'now'|'current_date'|'date_add'|'date_sub'|'extract'|'date_trunc'| // date
-  'coalesce'|'nullif'|'greatest'|'least'; // logic
+  'concat' | 'substring' | 'length' | 'lower' | 'upper' | 'trim' | 'replace' | // string
+  'abs' | 'ceil'|'floor' | 'round' | 'power' | 'sqrt'| // number
+  'now' | 'current_date' | 'date_add' | 'date_sub' | 'extract' | 'date_trunc' | // date
+  'coalesce' | 'nullif' | 'greatest' | 'least'; // logic
 
 export type FunctionCall = {
   kind: 'function';
   function: Function;
   args: Value[];
 };
+
 export type WindowValue = {
   kind: 'window';
   function: Aggregate | string;
@@ -334,9 +335,9 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   const typesWithFields = types.filter(t => t.fields.length > 0);
 
   // Create typed insert schemas for each table type with fields
-  const typedInsertSchemas = typesWithFields.map(t => {
+  const typedInsertSchemas: z.ZodType<Insert>[] = typesWithFields.map(t => {
     const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
-    const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
+    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),
       value: ValueSchema.describe('Value to assign'),
@@ -376,15 +377,15 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   
   // Union of typed insert schemas only (no generic fallback when types exist)
   const InsertSchema: z.ZodType<Insert> = typedInsertSchemas.length >= 2
-    ? z.union(typedInsertSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
+    ? z.union(typedInsertSchemas as [z.ZodType<Insert>, ...z.ZodType<Insert>[]]).meta({ aid: 'Insert' }).describe('INSERT statement')
     : typedInsertSchemas.length === 1
       ? typedInsertSchemas[0].meta({ aid: 'Insert' }).describe('INSERT statement')
       : genericInsertSchema;
 
   // Create typed update schemas for each table type with fields
-  const typedUpdateSchemas = typesWithFields.map(t => {
+  const typedUpdateSchemas: z.ZodType<Update>[] = typesWithFields.map(t => {
     const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
-    const TypedColumnSchema = z.enum(columnNames).describe(`Column from ${t.name}`);
+    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),
       value: ValueSchema.describe('Value to assign'),
@@ -416,13 +417,13 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   
   // Union of typed update schemas only (no generic fallback when types exist)
   const UpdateSchema: z.ZodType<Update> = typedUpdateSchemas.length >= 2
-    ? z.union(typedUpdateSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
+    ? z.union(typedUpdateSchemas as [z.ZodType<Update>, ...z.ZodType<Update>[]]).meta({ aid: 'Update' }).describe('UPDATE statement')
     : typedUpdateSchemas.length === 1
       ? typedUpdateSchemas[0].meta({ aid: 'Update' }).describe('UPDATE statement')
       : genericUpdateSchema;
 
   // Create typed delete schemas for each table type (doesn't require fields)
-  const typedDeleteSchemas = types.map(t => {
+  const typedDeleteSchemas: z.ZodType<Delete>[] = types.map(t => {
     return z.object({
       kind: z.literal('delete'),
       table: z.literal(t.name).describe(`Delete from ${t.name} table`),
@@ -445,7 +446,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   
   // Union of typed delete schemas only (no generic fallback when types exist)
   const DeleteSchema: z.ZodType<Delete> = typedDeleteSchemas.length >= 2
-    ? z.union(typedDeleteSchemas as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
+    ? z.union(typedDeleteSchemas as [z.ZodType<Delete>, ...z.ZodType<Delete>[]]).meta({ aid: 'Delete' }).describe('DELETE statement')
     : typedDeleteSchemas.length === 1
       ? typedDeleteSchemas[0].meta({ aid: 'Delete' }).describe('DELETE statement')
       : genericDeleteSchema;

@@ -181,6 +181,8 @@ export interface OpenAIConfig {
   organization?: string;
   // Optional project ID
   project?: string;
+  // If you want to allow OpenAI to store contents of calls. By default this is false.
+  store?: boolean;
   // Global retry configuration for all operations
   retry?: RetryConfig;
   // Global event handlers for retry lifecycle events
@@ -963,7 +965,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         logprobs: request.logProbabilities,
         prompt_cache_key: request.cacheKey,
         safety_identifier: request.userKey,
-        store: false,
+        store: effectiveConfig.store ?? false,
         stop: request.stop,
         tools,
         tool_choice,
@@ -1082,7 +1084,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         logprobs: request.logProbabilities,
         prompt_cache_key: request.cacheKey,
         safety_identifier: request.userKey,
-        store: false,
+        store: effectiveConfig.store ?? false,
         stop: request.stop,
         tools,
         tool_choice,

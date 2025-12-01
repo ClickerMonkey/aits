@@ -32,12 +32,23 @@ export interface QueryResult {
   /** Number of rows affected (for INSERT/UPDATE/DELETE) */
   affectedCount?: number;
   /** Inserted record IDs (for INSERT) */
-  insertedIds?: string[];
+  inserted?: QueryResultType[];
   /** Updated record IDs (for UPDATE) */
-  updatedIds?: string[];
+  updated?: QueryResultType[];
   /** Deleted record IDs (for DELETE) */
-  deletedIds?: string[];
+  deleted?: QueryResultType[];
 }
+
+/**
+ * Type for inserted/updated/deleted IDs result
+ */
+export interface QueryResultType {
+  /** The type */
+  type: string;
+  /** The ids of the type affected  */
+  ids: string[];
+}
+
 
 /**
  * Transactional state for a table - tracks original data and pending changes
@@ -270,41 +281,74 @@ function addDelete(state: TableState, id: string): void {
  * Commit all pending changes to disk
  */
 async function commitChanges(ctx: QueryContext): Promise<{
-  insertedIds: string[];
-  updatedIds: string[];
-  deletedIds: string[];
+  inserted: QueryResultType[];
+  updated: QueryResultType[];
+  deleted: QueryResultType[];
 }> {
   const result = {
-    insertedIds: [] as string[],
-    updatedIds: [] as string[],
-    deletedIds: [] as string[],
+    inserted: [] as QueryResultType[],
+    updated: [] as QueryResultType[],
+    deleted: [] as QueryResultType[],
   };
+
+  const now = Date.now();
   
   for (const [tableName, state] of ctx.tableStates) {
     const manager = ctx.dataManagers.get(tableName);
-    if (!manager) continue;
-    
-    // Process inserts - DataManager.create returns the actual ID
-    for (const [tempId, fields] of state.insertedIds) {
-      const actualId = await manager.create(fields);
-      result.insertedIds.push(actualId);
+    if (!manager) {
+      continue;
     }
-    
-    // Process updates (only for records that weren't inserted)
-    for (const [id, fields] of state.updatedIds) {
-      if (!state.insertedIds.has(id)) {
-        await manager.update(id, fields);
-        result.updatedIds.push(id);
+
+    await manager.save(async (dataFile) => {
+      // Inserts
+      const inserts: QueryResultType = { type: tableName, ids: [] };
+      for (const [tempId, fields] of state.insertedIds) {
+        const newRecord: DataRecord = {
+          id: uuidv4(),
+          updated: now,
+          created: now,
+          fields,
+        };
+        dataFile.data.push(newRecord);
+        inserts.ids.push(newRecord.id);
       }
-    }
-    
-    // Process deletes (only for records that weren't inserted)
-    for (const id of state.deletedIds) {
-      if (!state.insertedIds.has(id)) {
-        await manager.delete(id);
-        result.deletedIds.push(id);
+      if (inserts.ids.length > 0) {
+        result.inserted.push(inserts);
       }
-    }
+
+      // Update
+      const updates: QueryResultType = { type: tableName, ids: [] };
+      for (const [id, fields] of state.updatedIds) {
+        if (!state.insertedIds.has(id)) {
+          const item = dataFile.data.find((item) => item.id === id);
+          if (!item) {
+            throw new Error(`Item with ID ${id} not found in ${tableName}`);
+          }
+          Object.assign(item.fields, fields);
+          item.updated = now;
+          updates.ids.push(id);
+        }
+      }
+      if (updates.ids.length > 0) {
+        result.updated.push(updates);
+      }
+
+      // Deletes
+      const deletes: QueryResultType = { type: tableName, ids: [] };
+      for (const id of state.deletedIds) {
+        if (!state.insertedIds.has(id)) {
+          const index = dataFile.data.findIndex((item) => item.id === id);
+          if (index === -1) {
+            throw new Error(`Item with ID ${id} not found in ${tableName}`);
+          }
+          dataFile.data.splice(index, 1);
+          deletes.ids.push(id);
+        }
+      }
+      if (deletes.ids.length > 0) {
+        result.deleted.push(deletes);
+      }
+    });
   }
   
   return result;
@@ -352,32 +396,42 @@ export async function executeQuery(
   }
   
   // Commit all changes at the end
-  const { insertedIds, updatedIds, deletedIds } = await commitChanges(ctx);
+  const { inserted, updated, deleted } = await commitChanges(ctx);
   
   // Merge commit results into result using Sets for deduplication
-  const existingInserted = new Set(result.insertedIds || []);
-  const existingUpdated = new Set(result.updatedIds || []);
-  const existingDeleted = new Set(result.deletedIds || []);
-  
-  for (const id of insertedIds) {
-    existingInserted.add(id);
+  const insertedMap = new Map(result.inserted?.map(i => [i.type, i]));
+  const updatedMap = new Map(result.updated?.map(u => [u.type, u]));
+  const deletedMap = new Map(result.deleted?.map(d => [d.type, d]));
+
+  for (const ins of inserted) {
+    const existing = insertedMap.get(ins.type);
+    if (existing) {
+      existing.ids = Array.from(new Set([...existing.ids, ...ins.ids]));
+    } else {
+      insertedMap.set(ins.type, ins);
+    }
   }
-  for (const id of updatedIds) {
-    existingUpdated.add(id);
+  for (const upd of updated) {
+    const existing = updatedMap.get(upd.type);
+    if (existing) {
+      existing.ids = Array.from(new Set([...existing.ids, ...upd.ids]));
+    } else {
+      updatedMap.set(upd.type, upd);
+    }
   }
-  for (const id of deletedIds) {
-    existingDeleted.add(id);
+
+  for (const del of deleted) {
+    const existing = deletedMap.get(del.type);
+    if (existing) {
+      existing.ids = Array.from(new Set([...existing.ids, ...del.ids]));
+    } else {
+      deletedMap.set(del.type, del);
+    }
   }
-  
-  if (existingInserted.size > 0) {
-    result.insertedIds = Array.from(existingInserted);
-  }
-  if (existingUpdated.size > 0) {
-    result.updatedIds = Array.from(existingUpdated);
-  }
-  if (existingDeleted.size > 0) {
-    result.deletedIds = Array.from(existingDeleted);
-  }
+
+  result.inserted = Array.from(insertedMap.values());
+  result.updated = Array.from(updatedMap.values());
+  result.deleted = Array.from(deletedMap.values());
   
   return result;
 }
@@ -442,7 +496,7 @@ async function executeWithStatement(
         id: `cte_${withStmt.name}_recursive_${iteration}_${index}`,
         created: Date.now(),
         updated: Date.now(),
-        fields: row as Record<string, unknown>,
+        fields: row,
       }));
 
       if (newRecords.length > 0) {
@@ -538,7 +592,7 @@ async function executeSelect(
           id: "",
           created: 0,
           updated: 0,
-          fields: row as Record<string, unknown>,
+          fields: row,
         };
         if (await evaluateBooleanValueAsync(stmt.having, tempRecord, ctx)) {
           filteredRows.push(row);
@@ -625,7 +679,7 @@ async function executeInsert(
   ctx: QueryContext
 ): Promise<QueryResult> {
   const state = await getTableState(stmt.table, ctx);
-  const insertedIds: string[] = [];
+  const insertResult: QueryResultType = { type: stmt.table, ids: [] };
   const insertedRecords: DataRecord[] = [];
 
   // Get values to insert
@@ -677,7 +731,7 @@ async function executeInsert(
             updates[cv.column] = await evaluateValueAsync(cv.value, existing, ctx);
           }
           addUpdate(state, existing.id, updates);
-          insertedIds.push(existing.id);
+          insertResult.ids.push(existing.id);
           insertedRecords.push({ ...existing, fields: { ...existing.fields, ...updates } });
           continue;
         }
@@ -686,7 +740,7 @@ async function executeInsert(
 
     const id = uuidv4();
     const record = addInsert(state, id, fields);
-    insertedIds.push(id);
+    insertResult.ids.push(id);
     insertedRecords.push(record);
   }
 
@@ -704,8 +758,8 @@ async function executeInsert(
 
   return {
     rows,
-    affectedCount: insertedIds.length,
-    insertedIds,
+    affectedCount: insertResult.ids.length,
+    inserted: insertResult.ids.length ? [insertResult] : undefined,
   };
 }
 
@@ -746,7 +800,7 @@ async function executeUpdate(
     records = await filterRecordsAsync(records, stmt.where, ctx);
   }
 
-  const updatedIds: string[] = [];
+  const updateResult: QueryResultType = { type: stmt.table, ids: [] };
   const updatedRecords: DataRecord[] = [];
 
   // Update matching records
@@ -756,7 +810,7 @@ async function executeUpdate(
       updates[cv.column] = await evaluateValueAsync(cv.value, record, ctx);
     }
     addUpdate(state, record.id, updates);
-    updatedIds.push(record.id);
+    updateResult.ids.push(record.id);
 
     // Get updated record from current state
     const updated = getRecords(state).find(r => r.id === record.id);
@@ -779,8 +833,8 @@ async function executeUpdate(
 
   return {
     rows,
-    affectedCount: updatedIds.length,
-    updatedIds,
+    affectedCount: updateResult.ids.length,
+    updated: updateResult.ids.length ? [updateResult] : undefined,
   };
 }
 
@@ -813,7 +867,7 @@ async function executeDelete(
 
   // Collect records for RETURNING before deletion
   const recordsToDelete = [...records];
-  const deletedIds: string[] = [];
+  const deleteResult: QueryResultType = { type: stmt.table, ids: [] };
 
   // Handle RETURNING before deletion
   let rows: Record<string, unknown>[] = [];
@@ -830,13 +884,13 @@ async function executeDelete(
   // Delete matching records
   for (const record of recordsToDelete) {
     addDelete(state, record.id);
-    deletedIds.push(record.id);
+    deleteResult.ids.push(record.id);
   }
 
   return {
     rows,
-    affectedCount: deletedIds.length,
-    deletedIds,
+    affectedCount: deleteResult.ids.length,
+    deleted: deleteResult.ids.length ? [deleteResult] : undefined,
   };
 }
 
@@ -1074,7 +1128,7 @@ async function evaluateSingleBooleanAsync(
       const val = await evaluateValueAsync(value.value, record, ctx);
       if (Array.isArray(value.in)) {
         for (const v of value.in) {
-          if ((await evaluateValueAsync(v, record, ctx)) === val) {
+          if (compare((await evaluateValueAsync(v, record, ctx)), val) === 0) {
             return true;
           }
         }
@@ -1090,7 +1144,7 @@ async function evaluateSingleBooleanAsync(
       const val = await evaluateValueAsync(value.value, record, ctx);
       const low = await evaluateValueAsync(value.between[0], record, ctx);
       const high = await evaluateValueAsync(value.between[1], record, ctx);
-      return val >= low && val <= high;
+      return compare(val, low) >= 0 && compare(val, high) <= 0;
     }
 
     case "isNull": {
@@ -1332,11 +1386,11 @@ async function evaluateAggregateAsync(
     }
     case "min": {
       if (values.length === 0) return null;
-      return values.reduce((min, v) => (v < min ? v : min));
+      return values.reduce((min, v) => (compare(v, min) < 0 ? v : min));
     }
     case "max": {
       if (values.length === 0) return null;
-      return values.reduce((max, v) => (v > max ? v : max));
+      return values.reduce((max, v) => (compare(v, max) > 0 ? v : max));
     }
     default:
       return null;
@@ -1534,7 +1588,7 @@ async function evaluateWindowAsync(
         // Evaluate synchronously for sorting (simplified)
         const aVal = evaluateValueSync(sort.value, a, ctx);
         const bVal = evaluateValueSync(sort.value, b, ctx);
-        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        const cmp = compare(aVal, bVal)
         if (cmp !== 0) {
           return sort.dir === "desc" ? -cmp : cmp;
         }
@@ -1588,17 +1642,17 @@ function evaluateComparison(
 ): boolean {
   switch (cmp) {
     case "=":
-      return left === right;
+      return compare(left, right) === 0;
     case "<>":
-      return left !== right;
+      return compare(left, right) !== 0;
     case "<":
-      return left < right;
+      return compare(left, right) < 0;
     case ">":
-      return left > right;
+      return compare(left, right) > 0;
     case "<=":
-      return left <= right;
+      return compare(left, right) <= 0;
     case ">=":
-      return left >= right;
+      return compare(left, right) >= 0;
     case "like": {
       const pattern = String(right ?? "")
         .replace(/%/g, ".*")
@@ -1674,7 +1728,7 @@ async function sortRowsAsync(
     for (let i = 0; i < orderBy.length; i++) {
       const aVal = a.sortValues[i];
       const bVal = b.sortValues[i];
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      const cmp = compare(aVal, bVal);
       if (cmp !== 0) {
         return orderBy[i].dir === "desc" ? -cmp : cmp;
       }
@@ -1714,4 +1768,19 @@ function containsAggregate(value: Value): boolean {
   }
 
   return false;
+}
+
+function compare(a: unknown, b: unknown): number {
+  if (a === b) return 0;
+  const anull = a === null || a === undefined;
+  const bnull = b === null || b === undefined;
+  if (anull === bnull) return 0;
+  if (anull && !bnull) return -1;
+  if (!anull && bnull) return 1;
+  if (typeof a === "number" && typeof b === "number") {
+    return a < b ? -1 : 1;
+  }
+  const astr = String(a);
+  const bstr = String(b);
+  return astr < bstr ? -1 : 1;
 }

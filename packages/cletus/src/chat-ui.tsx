@@ -237,8 +237,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         // Cancel the exit prompt if they press Ctrl+C again
         setShowExitPrompt(false);
         setExitOptionIndex(0);
+      } else if (inputValue.trim()) {
+        // Clear input if there is text
+        setInputValue('');
+        setHistoryIndex(-1);
+        setSavedInput('');
       } else {
-        // Show exit prompt
+        // Show exit prompt only if input is empty
         setShowExitPrompt(true);
         setExitOptionIndex(0);
       }
@@ -919,7 +924,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
         addSystemMessage(`❌ Error: ${error.message}`);
       }
 
-      logger.log(`error: ${error.message} ${error.stack}`);
+      logger.log(`error: ${JSON.stringify(error)}`);
     } finally {
       setIsWaitingForResponse(false);
       setPendingMessage(null);
@@ -1195,9 +1200,34 @@ After installation and the SoX executable is in the path, restart Cletus and try
       )}
 
       {/* Status Display */}
-      {currentStatus && (
+      {(currentStatus || isWaitingForResponse) && (
         <Box>
-          <InkAnimatedText text={currentStatus} />
+          {currentStatus && (
+            <Box marginRight={2}>
+              <InkAnimatedText text={currentStatus} />
+            </Box>
+          )}
+          {isWaitingForResponse && (
+            <Box>
+              <Text color="cyan">
+                {(elapsedTime / 1000).toFixed(1)}s
+              </Text>
+              <Text dimColor> │ </Text>
+              <Text color="green">
+                ~{tokenCount >= 1000 ? (tokenCount/1000).toFixed(1) + 'k' : tokenCount.toFixed(0)} tokens
+              </Text>
+              {accumulatedCost > 0 && (
+                <>
+                  <Text dimColor> │ </Text>
+                  <Text color="yellow">
+                    ${accumulatedCost.toFixed(4)}
+                  </Text>
+                </>
+              )}
+              <Text dimColor> │ </Text>
+              <Text dimColor>ESC to interrupt</Text>
+            </Box>
+          )}
         </Box>
       )}
 
@@ -1256,35 +1286,18 @@ After installation and the SoX executable is in the path, restart Cletus and try
       </Box>
 
       {/* Footer */}
-      <Box marginTop={1}>
+      <Box>
         <Text dimColor>
           {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
           {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
-          {(pendingMessage ? accumulatedCost : totalMessageCost) > 0 && (
+          {totalMessageCost > 0 && (
             <>
               {' │ '}
               <Text color="yellow">
-                ${(pendingMessage ? accumulatedCost : totalMessageCost).toFixed(4)}
+                ${totalMessageCost.toFixed(4)}
               </Text>
-            </>
-          )}
-          {isWaitingForResponse ? (
-            <>
-              {' │ '}
-              <Text color="cyan">
-                {(elapsedTime / 1000).toFixed(1)}s
-              </Text>
-              {' │ '}
-              <Text color="green">
-                ~{tokenCount >= 1000 ? (tokenCount/1000).toFixed(1) + 'k' : tokenCount.toFixed(0)} tokens
-              </Text>
-              {' | ESC: interrupt '}
-            </>
-          ): (
-            <>
-              {' | Ctrl+C: exit │ ESC: interrupt'}
             </>
           )}
         </Text>

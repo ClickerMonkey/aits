@@ -78,7 +78,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`OpenAI Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx, metadata) => {
-            logger.log(`OpenAI Chat onError:\n${String(error)}`);
+            logger.log(`OpenAI Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
@@ -102,7 +102,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`OpenRouter Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx, metadata) => {
-            logger.log(`OpenRouter Chat onError:\n${String(error)}`);
+            logger.log(`OpenRouter Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
@@ -121,7 +121,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`Replicate Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx) => {
-            logger.log(`Replicate Chat onError:\n${String(error)}`);
+            logger.log(`Replicate Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
