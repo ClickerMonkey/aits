@@ -590,7 +590,7 @@ async function executeSelect(
 
   if (stmt.groupBy?.length) {
     const groups = groupRecords(records, stmt.groupBy, ctx);
-    rows = [];
+    const rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: DataRecord[] }> = [];
 
     for (const [, groupRecs] of groups) {
       const row: Record<string, unknown> = {};
@@ -602,24 +602,28 @@ async function executeSelect(
           groupRecs
         );
       }
-      rows.push(row);
+      rowsWithGroups.push({ row, groupRecs });
     }
 
-    // Apply HAVING clause
+    // Apply HAVING clause - needs access to group records for aggregate evaluation
     if (stmt.having?.length) {
-      const filteredRows: Record<string, unknown>[] = [];
-      for (const row of rows) {
-        const tempRecord: DataRecord = {
-          id: "",
-          created: 0,
-          updated: 0,
-          fields: row,
-        };
-        if (await evaluateBooleanValueAsync(stmt.having, tempRecord, ctx)) {
-          filteredRows.push(row);
+      const filteredRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: DataRecord[] }> = [];
+      for (const { row, groupRecs } of rowsWithGroups) {
+        // Evaluate HAVING with access to the group records for aggregates
+        let matches = true;
+        for (const cond of stmt.having) {
+          if (!(await evaluateSingleBooleanWithGroupAsync(cond, groupRecs[0], ctx, groupRecs))) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          filteredRowsWithGroups.push({ row, groupRecs });
         }
       }
-      rows = filteredRows;
+      rows = filteredRowsWithGroups.map(({ row }) => row);
+    } else {
+      rows = rowsWithGroups.map(({ row }) => row);
     }
   } else {
     // No grouping - evaluate values for each record
@@ -658,7 +662,8 @@ async function executeSelect(
       for (const record of records) {
         const row: Record<string, unknown> = {};
         for (const aliasValue of stmt.values) {
-          row[aliasValue.alias] = await evaluateValueAsync(aliasValue.value, record, ctx);
+          // Pass all records for window function support
+          row[aliasValue.alias] = await evaluateValueAsync(aliasValue.value, record, ctx, records);
         }
         rows.push(row);
       }
@@ -1178,9 +1183,31 @@ async function evaluateSingleBooleanAsync(
     }
 
     case "exists": {
-      // Execute the EXISTS subquery
-      const subResult = await executeStatement(value.exists, ctx);
-      return subResult.rows.length > 0;
+      // For correlated subqueries, we need to temporarily update the aliases
+      // so the subquery can reference the current outer record's values.
+      // Store all current aliases that might be overwritten
+      const savedAliases = new Map<string, DataRecord[]>();
+      
+      // Get all source references in the current record and set them as single-record aliases
+      for (const [alias, records] of ctx.aliases) {
+        savedAliases.set(alias, records);
+        // Find if the current record matches this alias
+        const matchingRecord = records.find(r => r.id === record.id);
+        if (matchingRecord) {
+          ctx.aliases.set(alias, [matchingRecord]);
+        }
+      }
+      
+      try {
+        // Execute the EXISTS subquery
+        const subResult = await executeStatement(value.exists, ctx);
+        return subResult.rows.length > 0;
+      } finally {
+        // Restore original aliases
+        for (const [alias, records] of savedAliases) {
+          ctx.aliases.set(alias, records);
+        }
+      }
     }
 
     case "and": {
@@ -1203,6 +1230,81 @@ async function evaluateSingleBooleanAsync(
 
     case "not":
       return !(await evaluateSingleBooleanAsync(value.not, record, ctx));
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluate a single boolean value with group records (for HAVING clause)
+ */
+async function evaluateSingleBooleanWithGroupAsync(
+  value: BooleanValue,
+  record: DataRecord,
+  ctx: QueryContext,
+  groupRecords: DataRecord[]
+): Promise<boolean> {
+  switch (value.kind) {
+    case "comparison": {
+      const left = await evaluateValueAsync(value.left, record, ctx, groupRecords);
+      const right = await evaluateValueAsync(value.right, record, ctx, groupRecords);
+      return evaluateComparison(left, value.cmp, right);
+    }
+
+    case "in": {
+      const val = await evaluateValueAsync(value.value, record, ctx, groupRecords);
+      if (Array.isArray(value.in)) {
+        for (const v of value.in) {
+          if ((await evaluateValueAsync(v, record, ctx, groupRecords)) === val) {
+            return true;
+          }
+        }
+        return false;
+      }
+      // Subquery IN
+      const subResult = await executeStatement(value.in, ctx);
+      const subValues = subResult.rows.map(r => Object.values(r)[0]);
+      return subValues.includes(val);
+    }
+
+    case "between": {
+      const val = await evaluateValueAsync(value.value, record, ctx, groupRecords);
+      const low = await evaluateValueAsync(value.between[0], record, ctx, groupRecords);
+      const high = await evaluateValueAsync(value.between[1], record, ctx, groupRecords);
+      return val >= low && val <= high;
+    }
+
+    case "isNull": {
+      const val = await evaluateValueAsync(value.isNull, record, ctx, groupRecords);
+      return val === null || val === undefined;
+    }
+
+    case "exists": {
+      const subResult = await executeStatement(value.exists, ctx);
+      return subResult.rows.length > 0;
+    }
+
+    case "and": {
+      for (const v of value.and) {
+        if (!(await evaluateSingleBooleanWithGroupAsync(v, record, ctx, groupRecords))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    case "or": {
+      for (const v of value.or) {
+        if (await evaluateSingleBooleanWithGroupAsync(v, record, ctx, groupRecords)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    case "not":
+      return !(await evaluateSingleBooleanWithGroupAsync(value.not, record, ctx, groupRecords));
 
     default:
       return false;
@@ -1240,11 +1342,11 @@ async function evaluateValueAsync(
     const aliasRecords = ctx.aliases.get(value.source);
     if (aliasRecords?.length) {
       // For combined records from joins, check stored original records
-      const recordAny = record as any;
+      const recordAny = record as { __left__?: DataRecord; __right__?: DataRecord };
       if (recordAny.__left__ || recordAny.__right__) {
         // This is a combined record - check which alias it came from
-        const leftRecord = recordAny.__left__ as DataRecord | undefined;
-        const rightRecord = recordAny.__right__ as DataRecord | undefined;
+        const leftRecord = recordAny.__left__;
+        const rightRecord = recordAny.__right__;
 
         // Try to find which original record matches this alias
         let sourceRecord: DataRecord | undefined;
@@ -1262,7 +1364,7 @@ async function evaluateValueAsync(
           return sourceRecord.fields[value.column];
         }
       } else {
-        // Regular record - find it in the alias
+        // Regular record - first try to find it in the alias by ID match
         const aliasRecord = aliasRecords.find((r) => r.id === record.id);
         if (aliasRecord) {
           // Special handling for 'id' column - it's a record property, not a field
@@ -1270,6 +1372,16 @@ async function evaluateValueAsync(
             return aliasRecord.id;
           }
           return aliasRecord.fields[value.column];
+        }
+        
+        // If we have exactly one record in the alias (e.g., for correlated subqueries),
+        // use that record directly - this handles cross-context lookups
+        if (aliasRecords.length === 1) {
+          const singleRecord = aliasRecords[0];
+          if (value.column === 'id') {
+            return singleRecord.id;
+          }
+          return singleRecord.fields[value.column];
         }
       }
     }
