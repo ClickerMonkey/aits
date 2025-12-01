@@ -5,7 +5,7 @@ import { Box, Text } from "ink";
 import path from 'path';
 import React from 'react';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunk, convertNewlines, detectNewlineType, fileProtocol, linkFile, NewlineType, normalizeNewlines, paginateText, pluralize } from "../common";
+import { abbreviate, chunk, convertNewlines, detectNewlineType, fileProtocol, linkFile, NewlineType, normalizeNewlines, paginateText, pluralize, formatSize } from "../common";
 import { Link } from "../components/Link";
 import { CONSTS } from "../constants";
 import { canEmbed, embed } from "../embed";
@@ -1258,6 +1258,254 @@ export const dir_create = operationOf<
     (op) => {
       if (op.output) {
         return `Created directory ${linkFile(op.output.fullPath)}`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
+type DirSummaryKind = 'files' | 'dirs' | 'ext' | 'all';
+
+type DirSummaryInput = {
+  path?: string;
+  kind?: DirSummaryKind;
+  depth?: number;
+};
+
+type DirSummaryOutput = {
+  fullPath: string;
+  summary: string;
+  fileCount: number;
+  dirCount: number;
+  extCount: number;
+};
+
+export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
+  mode: 'local',
+  signature: 'dir_summary(path?: string, kind?: "files" | "dirs" | "ext" | "all", depth?: number)',
+  status: (input) => `Summarizing directory: ${paginateText(input.path || '.', 100, -100)}`,
+  analyze: async ({ input }, { cwd }) => {
+    const targetPath = input.path || '.';
+    const fullPath = path.resolve(cwd, targetPath);
+    const { exists, isDirectory } = await fileIsDirectory(fullPath);
+
+    if (!exists) {
+      return {
+        analysis: `This would fail - path ${linkFile(fullPath)} does not exist.`,
+        doable: false,
+      };
+    }
+    if (!isDirectory) {
+      return {
+        analysis: `This would fail - ${linkFile(fullPath)} is not a directory.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `N/A`,
+      doable: true,
+    };
+  },
+  do: async ({ input }, { cwd }) => {
+    const targetPath = input.path || '.';
+    const fullPath = path.resolve(cwd, targetPath);
+    const kind = input.kind || 'all';
+    const depth = input.depth ?? 10;
+
+    // Use glob to get all files/dirs up to specified depth
+    // Normalize path to avoid patterns like './**/*' which may not work correctly
+    const globPattern = targetPath === '.' ? '**/*' : `${targetPath}/**/*`;
+    const entries = await glob(globPattern, { 
+      cwd,
+      dot: false,
+      maxDepth: depth,
+    });
+
+    // Separate files and directories
+    const files: string[] = [];
+    const dirs: string[] = [];
+    const extCounts = new Map<string, number>();
+    // Track direct children counts for each directory
+    const dirContents = new Map<string, { files: number; dirs: number }>();
+
+    for (const entry of entries) {
+      const entryFullPath = path.resolve(cwd, entry);
+      const { isDirectory: isDir } = await fileIsDirectory(entryFullPath);
+      
+      if (isDir) {
+        dirs.push(entry);
+        // Initialize directory contents counter
+        dirContents.set(entry, { files: 0, dirs: 0 });
+      } else {
+        files.push(entry);
+        const ext = path.extname(entry).toLowerCase() || '(no extension)';
+        extCounts.set(ext, (extCounts.get(ext) || 0) + 1);
+      }
+    }
+
+    // Count direct children for each directory
+    for (const file of files) {
+      const parent = path.dirname(file);
+      if (dirContents.has(parent)) {
+        const counts = dirContents.get(parent)!;
+        counts.files++;
+      }
+    }
+    for (const dir of dirs) {
+      const parent = path.dirname(dir);
+      if (dirContents.has(parent)) {
+        const counts = dirContents.get(parent)!;
+        counts.dirs++;
+      }
+    }
+
+    // Sort entries
+    files.sort();
+    dirs.sort();
+
+    const MAX_LINES = 50;
+    const lines: string[] = [];
+
+    const buildFilesSection = async (maxLines: number): Promise<string[]> => {
+      const result: string[] = [];
+      if (files.length === 0) return result;
+      
+      const toShow = files.slice(0, maxLines);
+      result.push('Files:');
+      // Only get stats for files we're actually displaying
+      for (const file of toShow) {
+        const filePath = path.resolve(cwd, file);
+        const stats = await fs.stat(filePath);
+        result.push(`  ${file} (${formatSize(stats.size)})`);
+      }
+      if (files.length > toShow.length) {
+        result.push(`  ... and ${files.length - toShow.length} more files`);
+      }
+      return result;
+    };
+
+    const buildDirsSection = (maxLines: number): string[] => {
+      const result: string[] = [];
+      if (dirs.length === 0) return result;
+      
+      const toShow = dirs.slice(0, maxLines);
+      result.push('Directories:');
+      for (const dir of toShow) {
+        const contents = dirContents.get(dir);
+        const contentsInfo = contents 
+          ? ` (${pluralize(contents.files, 'file')}, ${pluralize(contents.dirs, 'subdir')})`
+          : '';
+        result.push(`  ${dir}/${contentsInfo}`);
+      }
+      if (dirs.length > toShow.length) {
+        result.push(`  ... and ${dirs.length - toShow.length} more directories`);
+      }
+      return result;
+    };
+
+    const buildExtSection = (maxLines: number): string[] => {
+      const result: string[] = [];
+      if (extCounts.size === 0) return result;
+      
+      const sortedExts = Array.from(extCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const toShow = sortedExts.slice(0, maxLines);
+      result.push('Extensions:');
+      for (const [ext, count] of toShow) {
+        result.push(`  ${ext}: ${pluralize(count, 'file')}`);
+      }
+      if (sortedExts.length > toShow.length) {
+        result.push(`  ... and ${sortedExts.length - toShow.length} more extensions`);
+      }
+      return result;
+    };
+
+    // Reserve 4 lines for summary at the end: empty line, separator (---), summary text, and buffer
+    const SUMMARY_LINES = 4;
+    const availableLines = MAX_LINES - SUMMARY_LINES;
+
+    if (kind === 'files') {
+      lines.push(...await buildFilesSection(availableLines - 1));
+    } else if (kind === 'dirs') {
+      lines.push(...buildDirsSection(availableLines - 1));
+    } else if (kind === 'ext') {
+      lines.push(...buildExtSection(availableLines - 1));
+    } else {
+      // kind === 'all' - try to fit all sections evenly, filling unused space
+      const hasFiles = files.length > 0;
+      const hasDirs = dirs.length > 0;
+      const hasExts = extCounts.size > 0;
+      const activeSections = [hasFiles, hasDirs, hasExts].filter(Boolean).length;
+      
+      if (activeSections === 0) {
+        lines.push('(empty directory)');
+      } else {
+        // Build sections with adaptive line allocation
+        // Each section gets an equal share of remaining lines, unused lines go to the next section
+        let remainingLines = availableLines;
+        let remainingActive = activeSections;
+        
+        // Handle files section (async)
+        if (hasFiles) {
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = await buildFilesSection(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
+          
+          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0);
+          remainingActive--;
+        }
+        
+        // Handle dirs section (sync)
+        if (hasDirs) {
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = buildDirsSection(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
+          
+          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0);
+          remainingActive--;
+        }
+        
+        // Handle ext section (sync)
+        if (hasExts) {
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = buildExtSection(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
+        }
+      }
+    }
+
+    // Add summary at the end
+    lines.push('');
+    lines.push('---');
+    lines.push(`Summary: ${pluralize(files.length, 'file')}, ${pluralize(dirs.length, 'subdirectory', 'subdirectories')}, ${pluralize(extCounts.size, 'unique extension')}`);
+
+    return {
+      fullPath,
+      summary: lines.join('\n'),
+      fileCount: files.length,
+      dirCount: dirs.length,
+      extCount: extCounts.size,
+    };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `DirSummary("${paginateText(op.input.path || '.', 100, -100)}")`,
+    (op) => {
+      if (op.output) {
+        return `${linkFile(op.output.fullPath)}: ${pluralize(op.output.fileCount, 'file')}, ${pluralize(op.output.dirCount, 'dir')}, ${pluralize(op.output.extCount, 'extension')}`;
       }
       return null;
     },
