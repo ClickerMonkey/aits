@@ -1,4 +1,35 @@
 import z from "zod";
+import type { TypeDefinition, TypeField } from '../schemas';
+
+/**
+ * Generate a concise description for a field including all relevant metadata.
+ */
+function generateFieldDescription(field: TypeField): string {
+  const parts: string[] = [field.type];
+
+  if (field.required) parts.push('required');
+  if (field.enumOptions?.length) parts.push(`options:[${field.enumOptions.join(',')}]`);
+  if (field.onDelete) parts.push(`onDelete:${field.onDelete}`);
+
+  return `${field.friendlyName}: ${parts.join(' ')}`;
+}
+
+/**
+ * Generate field descriptions for a type, including system fields based on context.
+ */
+function generateAllFieldDescriptions(type: TypeDefinition, context: 'select' | 'insert' | 'update'): string {
+  const systemFields: string[] = [];
+
+  if (context === 'select') {
+    systemFields.push('id: string required', 'created: number required', 'updated: number required');
+  } else if (context === 'insert') {
+    systemFields.push('id: string automatic', 'created: number automatic', 'updated: number automatic');
+  } else if (context === 'update') {
+    systemFields.push('id: string read-only', 'created: number read-only', 'updated: number read-only');
+  }
+
+  return [...systemFields, ...type.fields.map(generateFieldDescription)].join('; ');
+}
 
 export type Source = string; // table or alias or with statement name
 export type Table = string; // table that can be read from
@@ -144,11 +175,15 @@ export type CTEStatement = {
 export type Query = Statement | CTEStatement;
 
 // Schema factory function that generates schemas based on type definitions
-export function createDBASchemas(types: Array<{ name: string; fields: Array<{ name: string }> }>) {
+export function createDBASchemas(types: TypeDefinition[]) {
   // Generate table enum from type definitions
   const tableNames = types.map(t => t.name);
+  const tableDescriptions = types.map(t =>
+    `${t.friendlyName} (${t.name})` + (t.description ? `: ${t.description}` : '')
+  ).join('; ');
+
   const TableSchema: z.ZodType<Table> = tableNames.length > 0
-    ? z.enum(tableNames as [string, ...string[]]).meta({ aid: 'Table' }).describe('Database table name')
+    ? z.enum(tableNames as [string, ...string[]]).meta({ aid: 'Table' }).describe(`Database table. Tables: ${tableDescriptions}`)
     : z.string().meta({ aid: 'Table' }).describe('Database table name');
 
   // Basic type schemas
@@ -157,10 +192,14 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   const AliasSchema: z.ZodType<Alias> = z.string().meta({ aid: 'Alias' }).describe('Alias for a value in SELECT or RETURNING clause');
 
   const SourceColumnSchema: z.ZodType<SourceColumn> = z.union([
-    ...types.map(t => z.object({
-      source: z.literal(t.name),
-      column: z.enum(['id', 'created', 'updated', ...t.fields.map(f => f.name)] as [string, ...string[]]).describe(`Column name from table ${t.name}`),
-    }).describe(`Reference to a column from table ${t.name}`)),
+    ...types.map(t => {
+      const fieldDescriptions = generateAllFieldDescriptions(t, 'select');
+
+      return z.object({
+        source: z.literal(t.name),
+        column: z.enum(['id', 'created', 'updated', ...t.fields.map(f => f.name)] as [string, ...string[]]).describe(`Column from ${t.name} (${t.friendlyName}). Fields: ${fieldDescriptions}`),
+      }).describe(`Reference to a column from ${t.friendlyName} table (${t.name})`);
+    }),
     z.object({
       source: SourceSchema.describe('Alias or CTE name'),
       column: ColumnSchema.describe('Column name from the source'),
@@ -336,12 +375,14 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
 
   // Create typed insert schemas for each table type with fields
   const typedInsertSchemas: z.ZodType<Insert>[] = typesWithFields.map(t => {
+    const fieldDescriptions = generateAllFieldDescriptions(t, 'insert');
+
     const columnNames = ['id', 'created', 'updated', ...t.fields.map(f => f.name)] as [string, ...string[]];
-    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
+    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name} (${t.friendlyName}). Fields: ${fieldDescriptions}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),
       value: ValueSchema.describe('Value to assign'),
-    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name}`);
+    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name} (${t.friendlyName})`);
     
     return z.object({
       kind: z.literal('insert'),
@@ -384,12 +425,14 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
 
   // Create typed update schemas for each table type with fields
   const typedUpdateSchemas: z.ZodType<Update>[] = typesWithFields.map(t => {
+    const fieldDescriptions = generateAllFieldDescriptions(t, 'update');
+
     const columnNames = ['id', 'created', 'updated', ...t.fields.map(f => f.name)] as [string, ...string[]];
-    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
+    const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name} (${t.friendlyName}). Fields: ${fieldDescriptions}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),
       value: ValueSchema.describe('Value to assign'),
-    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name}`);
+    }).meta({ aid: `${t.name}_ColumnValue` }).describe(`Column assignment for ${t.name} (${t.friendlyName})`);
     
     return z.object({
       kind: z.literal('update'),

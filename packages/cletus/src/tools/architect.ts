@@ -253,10 +253,7 @@ Example 3: Aggregation with GROUP BY:
     schema: ({ config }) => {
       // Build schema dynamically from current config types
       const currentTypes = config.getData().types;
-      const dbaSchemas = createDBASchemas(currentTypes.map(t => ({
-        name: t.name,
-        fields: t.fields.map(f => ({ name: f.name }))
-      })));
+      const dbaSchemas = createDBASchemas(currentTypes);
       return z.object({
         query: dbaSchemas.QuerySchema.describe('The query to execute'),
         ...globalToolProperties,

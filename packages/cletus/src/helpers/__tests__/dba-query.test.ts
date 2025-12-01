@@ -2381,4 +2381,362 @@ describe('executeQuery', () => {
       expect(result.rows[0].max_price).toBe(30);
     });
   });
+
+  describe('Relationship fields (field type as another type name)', () => {
+    it('should handle SELECT with JOIN on relationship fields', async () => {
+      // Setup - Define two related types: Company and Employee
+      ctx.addType({
+        name: 'companies',
+        friendlyName: 'Companies',
+        description: 'Company records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'industry', friendlyName: 'Industry', type: 'string', required: false },
+        ],
+      });
+
+      ctx.addType({
+        name: 'employees',
+        friendlyName: 'Employees',
+        description: 'Employee records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'company', friendlyName: 'Company', type: 'companies', required: true }, // Relationship field
+          { name: 'salary', friendlyName: 'Salary', type: 'number', required: false },
+        ],
+      });
+
+      // Add company records
+      ctx.addRecord('companies', {
+        id: 'c1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'TechCorp', industry: 'Technology' },
+      });
+
+      ctx.addRecord('companies', {
+        id: 'c2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'FinanceInc', industry: 'Finance' },
+      });
+
+      // Add employee records with company relationships (storing company IDs)
+      ctx.addRecord('employees', {
+        id: 'e1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', company: 'c1', salary: 100000 },
+      });
+
+      ctx.addRecord('employees', {
+        id: 'e2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Bob', company: 'c1', salary: 95000 },
+      });
+
+      ctx.addRecord('employees', {
+        id: 'e3',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Charlie', company: 'c2', salary: 110000 },
+      });
+
+      // Query: SELECT e.name, c.name as company_name, c.industry
+      //        FROM employees e
+      //        INNER JOIN companies c ON e.company = c.id
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'employee_name', value: { source: 'e', column: 'name' } },
+          { alias: 'company_name', value: { source: 'c', column: 'name' } },
+          { alias: 'industry', value: { source: 'c', column: 'industry' } },
+          { alias: 'salary', value: { source: 'e', column: 'salary' } },
+        ],
+        from: { kind: 'table', table: 'employees', as: 'e' },
+        joins: [
+          {
+            type: 'inner',
+            source: { kind: 'table', table: 'companies', as: 'c' },
+            on: [
+              {
+                kind: 'comparison',
+                left: { source: 'e', column: 'company' },
+                cmp: '=',
+                right: { source: 'c', column: 'id' },
+              },
+            ],
+          },
+        ],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.rows).toHaveLength(3);
+
+      const alice = result.rows.find((r) => r.employee_name === 'Alice');
+      expect(alice).toEqual({
+        employee_name: 'Alice',
+        company_name: 'TechCorp',
+        industry: 'Technology',
+        salary: 100000,
+      });
+
+      const bob = result.rows.find((r) => r.employee_name === 'Bob');
+      expect(bob).toEqual({
+        employee_name: 'Bob',
+        company_name: 'TechCorp',
+        industry: 'Technology',
+        salary: 95000,
+      });
+
+      const charlie = result.rows.find((r) => r.employee_name === 'Charlie');
+      expect(charlie).toEqual({
+        employee_name: 'Charlie',
+        company_name: 'FinanceInc',
+        industry: 'Finance',
+        salary: 110000,
+      });
+    });
+
+    it('should handle INSERT with relationship field values', async () => {
+      // Setup
+      ctx.addType({
+        name: 'departments',
+        friendlyName: 'Departments',
+        description: 'Department records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addType({
+        name: 'projects',
+        friendlyName: 'Projects',
+        description: 'Project records',
+        knowledgeTemplate: '{{title}}',
+        fields: [
+          { name: 'title', friendlyName: 'Title', type: 'string', required: true },
+          { name: 'department', friendlyName: 'Department', type: 'departments', required: true }, // Relationship
+        ],
+      });
+
+      // Add a department
+      ctx.addRecord('departments', {
+        id: 'd1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Engineering' },
+      });
+
+      // Query: INSERT INTO projects (title, department) VALUES ('New App', 'd1')
+      const query: Query = {
+        kind: 'insert',
+        table: 'projects',
+        columns: ['title', 'department'],
+        values: ['New App', 'd1'],
+        returning: [
+          { alias: 'title', value: { source: 'projects', column: 'title' } },
+          { alias: 'department', value: { source: 'projects', column: 'department' } },
+        ],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.affectedCount).toBe(1);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toEqual({ title: 'New App', department: 'd1' });
+
+      // Verify the record was inserted
+      const manager = ctx.getMockManager('projects');
+      const records = manager.getAll();
+      expect(records).toHaveLength(1);
+      expect(records[0].fields.title).toBe('New App');
+      expect(records[0].fields.department).toBe('d1');
+    });
+
+    it('should handle UPDATE with relationship field changes', async () => {
+      // Setup
+      ctx.addType({
+        name: 'teams',
+        friendlyName: 'Teams',
+        description: 'Team records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addType({
+        name: 'members',
+        friendlyName: 'Members',
+        description: 'Member records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'team', friendlyName: 'Team', type: 'teams', required: false }, // Relationship
+        ],
+      });
+
+      // Add teams
+      ctx.addRecord('teams', {
+        id: 't1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Team Alpha' },
+      });
+
+      ctx.addRecord('teams', {
+        id: 't2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Team Beta' },
+      });
+
+      // Add member
+      ctx.addRecord('members', {
+        id: 'm1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'John', team: 't1' },
+      });
+
+      // Query: UPDATE members SET team = 't2' WHERE name = 'John'
+      const query: Query = {
+        kind: 'update',
+        table: 'members',
+        set: [{ column: 'team', value: 't2' }],
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'members', column: 'name' },
+            cmp: '=',
+            right: 'John',
+          },
+        ],
+        returning: [
+          { alias: 'name', value: { source: 'members', column: 'name' } },
+          { alias: 'team', value: { source: 'members', column: 'team' } },
+        ],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.affectedCount).toBe(1);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toEqual({ name: 'John', team: 't2' });
+
+      // Verify the update
+      const manager = ctx.getMockManager('members');
+      const records = manager.getAll();
+      expect(records[0].fields.team).toBe('t2');
+    });
+
+    it('should handle aggregation grouped by relationship field', async () => {
+      // Setup
+      ctx.addType({
+        name: 'categories',
+        friendlyName: 'Categories',
+        description: 'Category records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addType({
+        name: 'items',
+        friendlyName: 'Items',
+        description: 'Item records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'category', friendlyName: 'Category', type: 'categories', required: true }, // Relationship
+          { name: 'price', friendlyName: 'Price', type: 'number', required: true },
+        ],
+      });
+
+      // Add categories
+      ctx.addRecord('categories', {
+        id: 'cat1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Electronics' },
+      });
+
+      ctx.addRecord('categories', {
+        id: 'cat2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Books' },
+      });
+
+      // Add items
+      ctx.addRecord('items', {
+        id: 'i1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Laptop', category: 'cat1', price: 1000 },
+      });
+
+      ctx.addRecord('items', {
+        id: 'i2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Mouse', category: 'cat1', price: 25 },
+      });
+
+      ctx.addRecord('items', {
+        id: 'i3',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Novel', category: 'cat2', price: 15 },
+      });
+
+      // Query: SELECT category, COUNT(*) as count, SUM(price) as total
+      //        FROM items GROUP BY category
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'category', value: { source: 'items', column: 'category' } },
+          {
+            alias: 'count',
+            value: { kind: 'aggregate', aggregate: 'count', value: '*' },
+          },
+          {
+            alias: 'total',
+            value: {
+              kind: 'aggregate',
+              aggregate: 'sum',
+              value: { source: 'items', column: 'price' },
+            },
+          },
+        ],
+        from: { kind: 'table', table: 'items' },
+        groupBy: [{ source: 'items', column: 'category' }],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.rows).toHaveLength(2);
+
+      const electronicsGroup = result.rows.find((r) => r.category === 'cat1');
+      expect(electronicsGroup).toEqual({ category: 'cat1', count: 2, total: 1025 });
+
+      const booksGroup = result.rows.find((r) => r.category === 'cat2');
+      expect(booksGroup).toEqual({ category: 'cat2', count: 1, total: 15 });
+    });
+  });
 });
