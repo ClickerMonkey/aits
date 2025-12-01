@@ -1301,7 +1301,8 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
     const depth = input.depth ?? 10;
 
     // Use glob to get all files/dirs up to specified depth
-    const globPattern = `${targetPath}/**/*`;
+    // Normalize path to avoid patterns like './**/*' which may not work correctly
+    const globPattern = targetPath === '.' ? '**/*' : `${targetPath}/**/*`;
     const entries = await glob(globPattern, { 
       cwd,
       dot: false,
@@ -1379,7 +1380,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       return result;
     };
 
-    // Reserve lines for summary at the end (3 lines)
+    // Reserve 4 lines for summary at the end: empty line, separator (---), summary text, and buffer
     const SUMMARY_LINES = 4;
     const availableLines = MAX_LINES - SUMMARY_LINES;
 
@@ -1390,41 +1391,39 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
     } else if (kind === 'ext') {
       lines.push(...buildExtSection(availableLines - 1));
     } else {
-      // kind === 'all' - try to fit all sections evenly
-      // Calculate how many sections have content
+      // kind === 'all' - try to fit all sections evenly, filling unused space
       const hasFiles = files.length > 0;
       const hasDirs = dirs.length > 0;
       const hasExts = extCounts.size > 0;
-      
       const activeSections = [hasFiles, hasDirs, hasExts].filter(Boolean).length;
       
       if (activeSections === 0) {
         lines.push('(empty directory)');
       } else {
-        // Allocate lines proportionally based on content
+        // Build sections with adaptive line allocation
+        // Each section gets an equal share of remaining lines, unused lines go to the next section
+        const sections: { hasContent: boolean; builder: (lines: number) => string[] }[] = [
+          { hasContent: hasFiles, builder: buildFilesSection },
+          { hasContent: hasDirs, builder: buildDirsSection },
+          { hasContent: hasExts, builder: buildExtSection },
+        ];
+        
         let remainingLines = availableLines;
+        let remainingActive = activeSections;
         
-        // Build sections with adaptive allocation
-        const filesSection = hasFiles ? buildFilesSection(Math.floor(remainingLines / activeSections)) : [];
-        remainingLines -= filesSection.length;
-        const remainingSections = activeSections - (hasFiles ? 1 : 0);
-        
-        const dirsSection = hasDirs ? buildDirsSection(remainingSections > 1 ? Math.floor(remainingLines / remainingSections) : remainingLines) : [];
-        remainingLines -= dirsSection.length;
-        
-        const extSection = hasExts ? buildExtSection(remainingLines) : [];
-        
-        // Combine sections with spacing
-        if (filesSection.length > 0) {
-          lines.push(...filesSection);
-        }
-        if (dirsSection.length > 0) {
-          if (lines.length > 0) lines.push('');
-          lines.push(...dirsSection);
-        }
-        if (extSection.length > 0) {
-          if (lines.length > 0) lines.push('');
-          lines.push(...extSection);
+        for (const section of sections) {
+          if (!section.hasContent) continue;
+          
+          const linesForSection = Math.floor(remainingLines / remainingActive);
+          const sectionContent = section.builder(linesForSection);
+          
+          if (sectionContent.length > 0) {
+            if (lines.length > 0) lines.push('');
+            lines.push(...sectionContent);
+          }
+          
+          remainingLines -= sectionContent.length + (lines.length > 0 ? 1 : 0); // Account for spacing
+          remainingActive--;
         }
       }
     }
