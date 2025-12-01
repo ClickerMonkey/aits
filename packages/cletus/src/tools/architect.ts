@@ -47,11 +47,10 @@ Example: List all types:
   const typeUpdate = ai.tool({
     name: 'type_update',
     description: 'Update a type definition in a backwards compatible way',
-    instructions: `Use this to modify an existing type definition. You MUST ensure backwards compatibility:
+    instructions: `Use this to modify an existing type definition.
 - Never change field types (breaking change)
-- Never remove required fields (breaking change)
 - Never make optional fields required without a default value (breaking change)
-- You CAN add new fields (if required, must have default), update descriptions, update knowledgeTemplate, or delete optional fields
+- You CAN add new fields (if required, must have default), update descriptions, update knowledgeTemplate, or delete any field
 Provide an update object with the changes to make.
 - Field names must be lowercase with no spaces.
 - Knowledge templates are Handlebars templates used to generate knowledge base entries for records of this type. They should include all fields and use #if statements for optional fields. Use field name and not friendly name.
@@ -62,16 +61,19 @@ IMPORTANT:
 - RESERVED NAMES: The following field names are reserved and cannot be used: id, created, updated
 
 Example 1: Add a new optional field:
-{ "name": "task", "update": { "fields": { "priority": { "friendlyName": "Priority", "type": "number", "required": false } } } }
+{ "name": "task", "update": { "fields": [{ "field": "priority", "change": { "friendlyName": "Priority", "type": "number", "required": false } }] } }
 
 Example 2: Add a relationship field to another type:
-{ "name": "task", "update": { "fields": { "assigneeid": { "friendlyName": "Assignee", "type": "user", "required": false } } } }
+{ "name": "task", "update": { "fields": [{ "field": "assigneeid", "change": { "friendlyName": "Assignee", "type": "user", "required": false } }] } }
 
 Example 3: Update description:
 { "name": "task", "update": { "description": "A task tracking item with assignee and deadline" } }
 
 Example 4: Make a field optional:
-{ "name": "task", "update": { "fields": { "deadline": { "required": false } } } }
+{ "name": "task", "update": { "fields": [{ "field": "deadline", "change": { "required": false } }] } }
+
+Example 5: Delete a field:
+{ "name": "task", "update": { "fields": [{ "field": "priority", "change": null }] } }
 
 If fields are being changed knowledgeTemplate MUST be updated to reflect those changes.
 If the knowledgeTemplate is updated and there are records for this type the data_index tool should be called to reindex the knowledge base.

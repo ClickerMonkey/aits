@@ -179,11 +179,8 @@ export const type_update = operationOf<
         }
 
         if (!fieldUpdate) {
-          // Deleting a field - check if it's required (breaking change)
-          const existingField = existing.fields.find((f) => f.name === fieldName);
-          if (existingField?.required) {
-            return `Cannot delete required field "${fieldName}" - this is a breaking change`;
-          }
+          // Deleting a field - allowed for any field
+          // No additional validation needed
         } else {
           // Adding or updating a field
           const existingField = existing.fields.find((f) => f.name === fieldName);
