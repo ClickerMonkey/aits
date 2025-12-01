@@ -1167,7 +1167,7 @@ async function evaluateSingleBooleanAsync(
       // Subquery IN - execute the subquery
       const subResult = await executeStatement(value.in, ctx);
       const subValues = subResult.rows.map(r => Object.values(r)[0]);
-      return subValues.includes(val);
+      return subValues.some(x => compare(val, x) === 0);
     }
 
     case "between": {
@@ -1256,7 +1256,7 @@ async function evaluateSingleBooleanWithGroupAsync(
       const val = await evaluateValueAsync(value.value, record, ctx, groupRecords);
       if (Array.isArray(value.in)) {
         for (const v of value.in) {
-          if ((await evaluateValueAsync(v, record, ctx, groupRecords)) === val) {
+          if (compare(await evaluateValueAsync(v, record, ctx, groupRecords), val) === 0) {
             return true;
           }
         }
@@ -1265,14 +1265,14 @@ async function evaluateSingleBooleanWithGroupAsync(
       // Subquery IN
       const subResult = await executeStatement(value.in, ctx);
       const subValues = subResult.rows.map(r => Object.values(r)[0]);
-      return subValues.includes(val);
+      return subValues.some(x => compare(x, val) === 0);
     }
 
     case "between": {
       const val = await evaluateValueAsync(value.value, record, ctx, groupRecords);
       const low = await evaluateValueAsync(value.between[0], record, ctx, groupRecords);
       const high = await evaluateValueAsync(value.between[1], record, ctx, groupRecords);
-      return val >= low && val <= high;
+      return compare(val, low) >= 0 && compare(val, high) <= 0;
     }
 
     case "isNull": {
@@ -1309,6 +1309,22 @@ async function evaluateSingleBooleanWithGroupAsync(
     default:
       return false;
   }
+}
+
+/**
+ * Get a column value from a DataRecord, handling internal columns (id, created, updated)
+ */
+function getColumnValue(record: DataRecord, column: string): unknown {
+  if (column === 'id') {
+    return record.id;
+  }
+  if (column === 'created') {
+    return record.created;
+  }
+  if (column === 'updated') {
+    return record.updated;
+  }
+  return record.fields[column];
 }
 
 /**
@@ -1357,40 +1373,25 @@ async function evaluateValueAsync(
         }
 
         if (sourceRecord) {
-          // Special handling for 'id' column - it's a record property, not a field
-          if (value.column === 'id') {
-            return sourceRecord.id;
-          }
-          return sourceRecord.fields[value.column];
+          return getColumnValue(sourceRecord, value.column);
         }
       } else {
         // Regular record - first try to find it in the alias by ID match
         const aliasRecord = aliasRecords.find((r) => r.id === record.id);
         if (aliasRecord) {
-          // Special handling for 'id' column - it's a record property, not a field
-          if (value.column === 'id') {
-            return aliasRecord.id;
-          }
-          return aliasRecord.fields[value.column];
+          return getColumnValue(aliasRecord, value.column);
         }
         
         // If we have exactly one record in the alias (e.g., for correlated subqueries),
         // use that record directly - this handles cross-context lookups
         if (aliasRecords.length === 1) {
           const singleRecord = aliasRecords[0];
-          if (value.column === 'id') {
-            return singleRecord.id;
-          }
-          return singleRecord.fields[value.column];
+          return getColumnValue(singleRecord, value.column);
         }
       }
     }
 
-    // Special handling for 'id' column - it's a record property, not a field
-    if (value.column === 'id') {
-      return record.id;
-    }
-    return record.fields[value.column];
+    return getColumnValue(record, value.column);
   }
 
   // Handle complex value types
@@ -1795,18 +1796,10 @@ function evaluateValueSync(
     if (aliasRecords?.length) {
       const aliasRecord = aliasRecords.find((r) => r.id === record.id);
       if (aliasRecord) {
-        // Special handling for 'id' column - it's a record property, not a field
-        if (value.column === 'id') {
-          return aliasRecord.id;
-        }
-        return aliasRecord.fields[value.column];
+        return getColumnValue(aliasRecord, value.column);
       }
     }
-    // Special handling for 'id' column - it's a record property, not a field
-    if (value.column === 'id') {
-      return record.id;
-    }
-    return record.fields[value.column];
+    return getColumnValue(record, value.column);
   }
   return null;
 }
