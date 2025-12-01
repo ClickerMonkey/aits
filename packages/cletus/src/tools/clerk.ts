@@ -274,6 +274,34 @@ Example: Create a new feature directory:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_create', input }, ctx),
   });
 
+  const dirSummary = ai.tool({
+    name: 'dir_summary',
+    description: 'Get a summary of files in a directory to understand its structure',
+    instructions: `Use this to understand the files in the current working directory or a subdirectory. Returns at most ~50 lines describing the directory structure including files, subdirectories, and file extensions.
+
+Example 1: Get summary of current directory:
+{ }
+
+Example 2: Get summary of src directory showing all info:
+{ "path": "src", "kind": "all", "depth": 5 }
+
+Example 3: List only files in a directory:
+{ "path": "lib", "kind": "files" }
+
+Example 4: Get extension counts:
+{ "path": ".", "kind": "ext" }
+ 
+{{modeInstructions}}`,
+    schema: z.object({
+      path: z.string().optional().describe('Relative directory path (defaults to CWD)'),
+      kind: z.enum(['files', 'dirs', 'ext', 'all']).optional().describe('Type of summary: files, dirs, ext (extensions), or all (default: all)'),
+      depth: z.number().optional().describe('Maximum depth to traverse (default: 10)'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('dir_summary'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'dir_summary', input }, ctx),
+  });
+
   const fileAttach = ai.tool({
     name: 'file_attach',
     description: 'Attach a text, audio, or PDF file to the chat for the user & AI assistant to see',
@@ -304,6 +332,7 @@ Example: Attach a document:
     fileEdit,
     textSearch,
     dirCreate,
+    dirSummary,
     fileAttach,
   ] as [
     typeof fileSearch,
@@ -318,6 +347,7 @@ Example: Attach a document:
     typeof fileEdit,
     typeof textSearch,
     typeof dirCreate,
+    typeof dirSummary,
     typeof fileAttach,
   ];
 }

@@ -1251,6 +1251,210 @@ export const dir_create = operationOf<
   ),
 });
 
+type DirSummaryKind = 'files' | 'dirs' | 'ext' | 'all';
+
+type DirSummaryInput = {
+  path?: string;
+  kind?: DirSummaryKind;
+  depth?: number;
+};
+
+type DirSummaryOutput = {
+  fullPath: string;
+  summary: string;
+  fileCount: number;
+  dirCount: number;
+  extCount: number;
+};
+
+export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
+  mode: 'local',
+  signature: 'dir_summary(path?: string, kind?: "files" | "dirs" | "ext" | "all", depth?: number)',
+  status: (input) => `Summarizing directory: ${paginateText(input.path || '.', 100, -100)}`,
+  analyze: async ({ input }, { cwd }) => {
+    const targetPath = input.path || '.';
+    const fullPath = path.resolve(cwd, targetPath);
+    const { exists, isDirectory } = await fileIsDirectory(fullPath);
+
+    if (!exists) {
+      return {
+        analysis: `This would fail - path ${linkFile(fullPath)} does not exist.`,
+        doable: false,
+      };
+    }
+    if (!isDirectory) {
+      return {
+        analysis: `This would fail - ${linkFile(fullPath)} is not a directory.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `N/A`,
+      doable: true,
+    };
+  },
+  do: async ({ input }, { cwd }) => {
+    const targetPath = input.path || '.';
+    const fullPath = path.resolve(cwd, targetPath);
+    const kind = input.kind || 'all';
+    const depth = input.depth ?? 10;
+
+    // Use glob to get all files/dirs up to specified depth
+    const globPattern = `${targetPath}/**/*`;
+    const entries = await glob(globPattern, { 
+      cwd,
+      dot: false,
+      maxDepth: depth,
+    });
+
+    // Separate files and directories
+    const files: string[] = [];
+    const dirs: string[] = [];
+    const extCounts = new Map<string, number>();
+
+    for (const entry of entries) {
+      const entryFullPath = path.resolve(cwd, entry);
+      const { isDirectory: isDir } = await fileIsDirectory(entryFullPath);
+      
+      if (isDir) {
+        dirs.push(entry);
+      } else {
+        files.push(entry);
+        const ext = path.extname(entry).toLowerCase() || '(no extension)';
+        extCounts.set(ext, (extCounts.get(ext) || 0) + 1);
+      }
+    }
+
+    // Sort entries
+    files.sort();
+    dirs.sort();
+
+    const MAX_LINES = 50;
+    const lines: string[] = [];
+
+    const buildFilesSection = (maxLines: number): string[] => {
+      const result: string[] = [];
+      if (files.length === 0) return result;
+      
+      const toShow = files.slice(0, maxLines);
+      result.push('Files:');
+      for (const file of toShow) {
+        result.push(`  ${file}`);
+      }
+      if (files.length > toShow.length) {
+        result.push(`  ... and ${files.length - toShow.length} more files`);
+      }
+      return result;
+    };
+
+    const buildDirsSection = (maxLines: number): string[] => {
+      const result: string[] = [];
+      if (dirs.length === 0) return result;
+      
+      const toShow = dirs.slice(0, maxLines);
+      result.push('Directories:');
+      for (const dir of toShow) {
+        result.push(`  ${dir}/`);
+      }
+      if (dirs.length > toShow.length) {
+        result.push(`  ... and ${dirs.length - toShow.length} more directories`);
+      }
+      return result;
+    };
+
+    const buildExtSection = (maxLines: number): string[] => {
+      const result: string[] = [];
+      if (extCounts.size === 0) return result;
+      
+      const sortedExts = Array.from(extCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const toShow = sortedExts.slice(0, maxLines);
+      result.push('Extensions:');
+      for (const [ext, count] of toShow) {
+        result.push(`  ${ext}: ${count} file${count !== 1 ? 's' : ''}`);
+      }
+      if (sortedExts.length > toShow.length) {
+        result.push(`  ... and ${sortedExts.length - toShow.length} more extensions`);
+      }
+      return result;
+    };
+
+    // Reserve lines for summary at the end (3 lines)
+    const SUMMARY_LINES = 4;
+    const availableLines = MAX_LINES - SUMMARY_LINES;
+
+    if (kind === 'files') {
+      lines.push(...buildFilesSection(availableLines - 1));
+    } else if (kind === 'dirs') {
+      lines.push(...buildDirsSection(availableLines - 1));
+    } else if (kind === 'ext') {
+      lines.push(...buildExtSection(availableLines - 1));
+    } else {
+      // kind === 'all' - try to fit all sections evenly
+      // Calculate how many sections have content
+      const hasFiles = files.length > 0;
+      const hasDirs = dirs.length > 0;
+      const hasExts = extCounts.size > 0;
+      
+      const activeSections = [hasFiles, hasDirs, hasExts].filter(Boolean).length;
+      
+      if (activeSections === 0) {
+        lines.push('(empty directory)');
+      } else {
+        // Allocate lines proportionally based on content
+        let remainingLines = availableLines;
+        
+        // Build sections with adaptive allocation
+        const filesSection = hasFiles ? buildFilesSection(Math.floor(remainingLines / activeSections)) : [];
+        remainingLines -= filesSection.length;
+        const remainingSections = activeSections - (hasFiles ? 1 : 0);
+        
+        const dirsSection = hasDirs ? buildDirsSection(remainingSections > 1 ? Math.floor(remainingLines / remainingSections) : remainingLines) : [];
+        remainingLines -= dirsSection.length;
+        
+        const extSection = hasExts ? buildExtSection(remainingLines) : [];
+        
+        // Combine sections with spacing
+        if (filesSection.length > 0) {
+          lines.push(...filesSection);
+        }
+        if (dirsSection.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push(...dirsSection);
+        }
+        if (extSection.length > 0) {
+          if (lines.length > 0) lines.push('');
+          lines.push(...extSection);
+        }
+      }
+    }
+
+    // Add summary at the end
+    lines.push('');
+    lines.push('---');
+    lines.push(`Summary: ${pluralize(files.length, 'file')}, ${pluralize(dirs.length, 'subdirectory', 'subdirectories')}, ${pluralize(extCounts.size, 'unique extension')}`);
+
+    return {
+      fullPath,
+      summary: lines.join('\n'),
+      fileCount: files.length,
+      dirCount: dirs.length,
+      extCount: extCounts.size,
+    };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `DirSummary("${paginateText(op.input.path || '.', 100, -100)}")`,
+    (op) => {
+      if (op.output) {
+        return `${linkFile(op.output.fullPath)}: ${pluralize(op.output.fileCount, 'file')}, ${pluralize(op.output.dirCount, 'dir')}, ${pluralize(op.output.extCount, 'extension')}`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
 export const file_attach = operationOf<
   { path: string },
   { fullPath: string, attached: boolean }
