@@ -506,3 +506,61 @@ export function fileProtocol(path: string): string {
   }
   return path;
 }
+
+/**
+ * Newline types that can be detected in text content.
+ */
+export type NewlineType = '\n' | '\r\n' | '\r';
+
+/**
+ * Detects the predominant newline type in the given text content.
+ * Returns '\n' (LF) as the default if no newlines are found.
+ * 
+ * @param content - The text content to analyze
+ * @returns The detected newline type
+ */
+export function detectNewlineType(content: string): NewlineType {
+  const crlfCount = (content.match(/\r\n/g) || []).length;
+  // Remove CRLF first, then count standalone LF and CR
+  const contentWithoutCrlf = content.replace(/\r\n/g, '');
+  const lfCount = (contentWithoutCrlf.match(/\n/g) || []).length;
+  const crCount = (contentWithoutCrlf.match(/\r/g) || []).length;
+
+  // Default to LF if no newlines found
+  if (crlfCount === 0 && lfCount === 0 && crCount === 0) {
+    return '\n';
+  }
+
+  // Return the most common newline type
+  if (crlfCount >= lfCount && crlfCount >= crCount) {
+    return '\r\n';
+  } else if (lfCount >= crCount) {
+    return '\n';
+  } else {
+    return '\r';
+  }
+}
+
+/**
+ * Normalizes all newlines in text to LF (\n).
+ * 
+ * @param content - The text content to normalize
+ * @returns Content with all newlines converted to LF
+ */
+export function normalizeNewlines(content: string): string {
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * Converts LF newlines to the specified newline type.
+ * 
+ * @param content - The text content with LF newlines
+ * @param newlineType - The target newline type
+ * @returns Content with newlines converted to the specified type
+ */
+export function convertNewlines(content: string, newlineType: NewlineType): string {
+  if (newlineType === '\n') {
+    return content;
+  }
+  return content.replace(/\n/g, newlineType);
+}

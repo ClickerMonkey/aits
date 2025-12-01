@@ -5,7 +5,7 @@ import { Box, Text } from "ink";
 import path from 'path';
 import React from 'react';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunk, fileProtocol, linkFile, paginateText, pluralize } from "../common";
+import { abbreviate, chunk, convertNewlines, detectNewlineType, fileProtocol, linkFile, NewlineType, normalizeNewlines, paginateText, pluralize } from "../common";
 import { Link } from "../components/Link";
 import { CONSTS } from "../constants";
 import { canEmbed, embed } from "../embed";
@@ -757,6 +757,7 @@ type FileEditResult = {
   lastModified: number;
   changed: boolean;
   diff: string;
+  originalNewlineType: NewlineType;
 }
 
 export const file_edit = operationOf<
@@ -782,8 +783,12 @@ export const file_edit = operationOf<
     lastModified: number,
     ai: CletusAI
   ): Promise<FileEditResult> {
+    // Detect and normalize newlines for consistent processing
+    const originalNewlineType = detectNewlineType(fileContent);
+    const normalizedContent = normalizeNewlines(fileContent);
+
     // Paginate the text if offset/limit are provided (lines only)
-    const paginatedContent = paginateText(fileContent, input.limit, input.offset, 'lines');
+    const paginatedContent = paginateText(normalizedContent, input.limit, input.offset, 'lines');
 
     // Use AI to generate new content based on the request
     const models = ai.config.defaultContext!.config!.getData().user.models;
@@ -808,17 +813,18 @@ export const file_edit = operationOf<
       }
     });
 
-    const newPaginatedContent = response.content;
+    // Normalize AI response to ensure consistent LF newlines
+    const newPaginatedContent = normalizeNewlines(response.content);
 
     // Apply the changes to the full file content by replacing the paginated section
-    const paginatedIndex = fileContent.indexOf(paginatedContent);
-    const newFileContent = fileContent.slice(0, paginatedIndex) + newPaginatedContent + fileContent.slice(paginatedIndex + paginatedContent.length);
+    const paginatedIndex = normalizedContent.indexOf(paginatedContent);
+    const newNormalizedContent = normalizedContent.slice(0, paginatedIndex) + newPaginatedContent + normalizedContent.slice(paginatedIndex + paginatedContent.length);
 
-    // Generate unified diff to show what will be changed
+    // Generate unified diff to show what will be changed (using normalized content)
     const diff = Diff.createPatch(
       input.path,
-      fileContent,
-      newFileContent,
+      normalizedContent,
+      newNormalizedContent,
       'before',
       'after',
       { ignoreWhitespace: true, stripTrailingCr: true, context: 3 },
@@ -827,10 +833,11 @@ export const file_edit = operationOf<
     return {
       diff,
       lastModified,
-      changed: fileContent !== newFileContent,
+      changed: normalizedContent !== newNormalizedContent,
       insert: newPaginatedContent,
       insertStart: paginatedIndex,
       insertEnd: paginatedIndex + paginatedContent.length,
+      originalNewlineType,
     };
   },
   async analyze({ input }, { cwd, ai }) {
@@ -885,10 +892,17 @@ export const file_edit = operationOf<
       throw new Error(`File "${input.path}" was modified since analysis. Aborting edit to prevent overwriting changes.`);
     }
 
-    const newFileContent = ''
-      + fileContent.slice(0, result.insertStart)
+    // Normalize file content for consistent processing with cached result
+    const normalizedContent = normalizeNewlines(fileContent);
+
+    // Build new content using normalized data and cached insert positions
+    const newNormalizedContent = ''
+      + normalizedContent.slice(0, result.insertStart)
       + result.insert
-      + fileContent.slice(result.insertEnd);
+      + normalizedContent.slice(result.insertEnd);
+    
+    // Convert back to original newline type
+    const newFileContent = convertNewlines(newNormalizedContent, result.originalNewlineType);
     
     // Write the new content back to the file
     await fs.writeFile(fullPath, newFileContent, 'utf-8');
