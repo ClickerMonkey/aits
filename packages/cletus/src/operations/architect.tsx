@@ -12,6 +12,10 @@ import { executeQuery, QueryResult } from '../helpers/dba-query';
 import type { Query } from '../helpers/dba';
 import { DataManager } from '../data';
 
+// Reserved names that cannot be used
+const RESERVED_FIELD_NAMES = ['id', 'created', 'updated'];
+const RESERVED_TYPE_NAMES = ['string', 'number', 'boolean', 'date', 'enum'];
+
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
   try {
@@ -167,6 +171,11 @@ export const type_update = operationOf<
       for (const { field: fieldName, change: fieldUpdate } of input.update.fields) {
         if (fieldName !== fieldName.toLowerCase()) {
           return `Field name "${fieldName}" must be lowercase`;
+        }
+
+        // Validate field name is not reserved
+        if (RESERVED_FIELD_NAMES.includes(fieldName)) {
+          return `Field name "${fieldName}" is reserved and cannot be used`;
         }
 
         if (!fieldUpdate) {
@@ -328,6 +337,11 @@ export const type_create = operationOf<
       return `Type already exists: ${input.name}`;
     }
 
+    // Validate type name is not reserved
+    if (RESERVED_TYPE_NAMES.includes(input.name)) {
+      return `Type name "${input.name}" is reserved and cannot be used`;
+    }
+
     // Validate fields for duplicates and required properties
     const fieldNames = new Set<string>();
     for (const field of input.fields) {
@@ -339,6 +353,12 @@ export const type_create = operationOf<
       if (!field.name) {
         return `Field must have a name`;
       }
+
+      // Validate field name is not reserved
+      if (RESERVED_FIELD_NAMES.includes(field.name)) {
+        return `Field name "${field.name}" is reserved and cannot be used`;
+      }
+
       if (!field.friendlyName) {
         return `Field "${field.name}" must have a friendlyName`;
       }
@@ -640,22 +660,34 @@ When managing types:
           call: async (input) => {
             // Check if max limit would be exceeded
             if (max && discoveredTypes.size >= max) {
-              return { 
-                success: false, 
-                message: `Cannot add type "${input.name}": maximum of ${max} types reached. Remove a less frequent type first or increase the max limit.` 
+              return {
+                success: false,
+                message: `Cannot add type "${input.name}": maximum of ${max} types reached. Remove a less frequent type first or increase the max limit.`
               };
             }
-            
+
             const existing = discoveredTypes.get(input.name);
             if (existing) {
               return { success: false, message: `Type "${input.name}" already discovered. Use update_discovered or update_fields instead.` };
             }
-            
+
             // Check if name conflicts with existing types
             if (existingTypeNames.includes(input.name)) {
               return { success: false, message: `Type "${input.name}" already exists as an existing type. Choose a different name.` };
             }
-            
+
+            // Validate type name is not reserved
+            if (RESERVED_TYPE_NAMES.includes(input.name)) {
+              return { success: false, message: `Type name "${input.name}" is reserved and cannot be used.` };
+            }
+
+            // Validate field names are not reserved
+            for (const field of input.fields) {
+              if (RESERVED_FIELD_NAMES.includes(field.name)) {
+                return { success: false, message: `Field name "${field.name}" is reserved and cannot be used.` };
+              }
+            }
+
             discoveredTypes.set(input.name, {
               name: input.name,
               friendlyName: input.friendlyName,
@@ -663,7 +695,7 @@ When managing types:
               fields: input.fields as TypeField[],
               instanceCount: input.instanceCount || 1,
             });
-            
+
             return { success: true, message: `Added discovered type: ${input.friendlyName}` };
           },
         }),
@@ -681,16 +713,21 @@ When managing types:
             if (!type) {
               return { success: false, message: `Type "${input.oldName}" not found in discovered types.` };
             }
-            
+
             // Check if newName already exists
             if (existingTypeNames.includes(input.newName) || discoveredTypes.has(input.newName)) {
               return { success: false, message: `Type name "${input.newName}" already exists. Choose a different name.` };
             }
-            
+
+            // Validate new type name is not reserved
+            if (RESERVED_TYPE_NAMES.includes(input.newName)) {
+              return { success: false, message: `Type name "${input.newName}" is reserved and cannot be used.` };
+            }
+
             discoveredTypes.delete(input.oldName);
             type.name = input.newName;
             discoveredTypes.set(input.newName, type);
-            
+
             return { success: true, message: `Renamed type from ${input.oldName} to ${input.newName}` };
           },
         }),
@@ -749,7 +786,12 @@ When managing types:
                 // Validate add/update
                 const typedField = field as TypeField;
                 const existingFieldIndex = targetFields.findIndex(f => f.name === typedField.name);
-                
+
+                // Validate field name is not reserved
+                if (RESERVED_FIELD_NAMES.includes(typedField.name)) {
+                  errors.push(`Field name "${typedField.name}" is reserved and cannot be used`);
+                }
+
                 if (existingFieldIndex !== -1) {
                   // Validate update (only for discovered types)
                   if (!discoveredType) {

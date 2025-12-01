@@ -59,6 +59,7 @@ Provide an update object with the changes to make.
 IMPORTANT:
 - All types automatically have an 'id' primary key field - DO NOT add an 'id' field unless explicitly requested by the user
 - Field types can be the name of another type to create relationships (e.g., "userId" field with type "user")
+- RESERVED NAMES: The following field names are reserved and cannot be used: id, created, updated
 
 Example 1: Add a new optional field:
 { "name": "task", "update": { "fields": { "priority": { "friendlyName": "Priority", "type": "number", "required": false } } } }
@@ -113,6 +114,8 @@ IMPORTANT:
 - All types automatically have an 'id' primary key field - DO NOT add an 'id' field to the fields array unless explicitly requested by the user
 - Field types can be the name of another type to create relationships (e.g., "userId" field with type "user")
 - When creating multiple related types, create them one at a time in dependency order (create referenced types before types that reference them)
+- RESERVED NAMES: The following field names are reserved and cannot be used: id, created, updated
+- RESERVED TYPE NAMES: The following type names are reserved and cannot be used: string, number, boolean, date, enum
 
 Example 1: Create a project tracking type:
 { "name": "project", "friendlyName": "Project", "description": "Software project tracking", "knowledgeTemplate": "Project: {{name}}\\nStatus: {{status}}\\n{{#if description}}Description: {{description}}{{/if}}", "fields": [{ "name": "name", "friendlyName": "Name", "type": "string", "required": true }, { "name": "status", "friendlyName": "Status", "type": "enum", "enumOptions": ["planning", "active", "completed"], "required": true, "default": "planning" }, { "name": "description", "friendlyName": "Description", "type": "string", "required": false }] }
@@ -178,6 +181,10 @@ This is useful when the user wants to:
 - "analyze my JSON files and create type definitions"
 
 The discovered types are presented with field definitions and instance counts. The user can then review and selectively add types using type_create.
+
+IMPORTANT:
+- RESERVED FIELD NAMES: The following field names are reserved and cannot be used: id, created, updated
+- RESERVED TYPE NAMES: The following type names are reserved and cannot be used: string, number, boolean, date, enum
 
 Example 1: Discover all types from data files:
 { "glob": "data/**/*.csv" }
