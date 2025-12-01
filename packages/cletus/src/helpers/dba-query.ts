@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DataManager } from "../data";
 import { ConfigFile } from "../config";
-import { DataRecord, TypeDefinition } from "../schemas";
+import { DataRecord, DataFile, TypeDefinition } from "../schemas";
 import type {
   Query,
   Statement,
@@ -22,6 +22,18 @@ import type {
   WindowValue,
   SelectOrSet,
 } from "./dba";
+
+/**
+ * Interface for data management operations
+ */
+export interface IDataManager {
+  /** Load data from storage */
+  load(): Promise<void>;
+  /** Save data with optional transformation */
+  save(fn: (dataFile: DataFile) => void | Promise<void>): Promise<void>;
+  /** Get all records */
+  getAll(): DataRecord[];
+}
 
 /**
  * Result of executing a DBA query
@@ -74,14 +86,16 @@ interface QueryContext {
   ctes: Map<string, DataRecord[]>;
   /** Map of aliases to their result sets */
   aliases: Map<string, DataRecord[]>;
-  /** Configuration file for type definitions */
-  config: ConfigFile;
+  /** Function to get type definitions */
+  getTypes: () => TypeDefinition[];
+  /** Function to get data manager for a type */
+  getManager: (typeName: string) => IDataManager;
   /** Type definitions cache */
   types: Map<string, TypeDefinition>;
   /** Transactional table state */
   tableStates: Map<string, TableState>;
   /** Data managers for committing */
-  dataManagers: Map<string, DataManager>;
+  dataManagers: Map<string, IDataManager>;
 }
 
 /**
@@ -181,11 +195,11 @@ async function getTableState(tableName: string, ctx: QueryContext): Promise<Tabl
   if (!state) {
     let manager = ctx.dataManagers.get(tableName);
     if (!manager) {
-      manager = new DataManager(tableName);
+      manager = ctx.getManager(tableName);
       await manager.load();
       ctx.dataManagers.set(tableName, manager);
     }
-    
+
     const original = manager.getAll();
     state = {
       original,
@@ -359,27 +373,29 @@ async function commitChanges(ctx: QueryContext): Promise<{
  */
 export async function executeQuery(
   query: Query,
-  config: ConfigFile
+  getTypes: () => TypeDefinition[],
+  getManager: (typeName: string) => IDataManager
 ): Promise<QueryResult> {
   // Collect all referenced tables upfront
   const referencedTables = new Set<string>();
   collectReferencedTables(query, referencedTables);
-  
+
   // Build type definitions cache
   const types = new Map<string, TypeDefinition>();
-  for (const type of config.getData().types) {
+  for (const type of getTypes()) {
     types.set(type.name, type);
   }
-  
+
   const ctx: QueryContext = {
     ctes: new Map(),
     aliases: new Map(),
-    config,
+    getTypes,
+    getManager,
     types,
     tableStates: new Map(),
     dataManagers: new Map(),
   };
-  
+
   // Pre-load all referenced tables
   for (const tableName of referencedTables) {
     // Only load tables that exist as types (skip CTE names)
@@ -398,19 +414,19 @@ export async function executeQuery(
   // Commit all changes at the end
   const { inserted, updated, deleted } = await commitChanges(ctx);
   
-  // Merge commit results into result using Sets for deduplication
-  const insertedMap = new Map(result.inserted?.map(i => [i.type, i]));
+  // Replace query-time IDs with commit-time IDs (commit has the real UUIDs)
+  // For inserts, the temp IDs from execution are replaced with real UUIDs from commit
+  // For updates/deletes, the IDs are the same so we deduplicate
+  const insertedMap = new Map<string, QueryResultType>();
   const updatedMap = new Map(result.updated?.map(u => [u.type, u]));
   const deletedMap = new Map(result.deleted?.map(d => [d.type, d]));
 
+  // For inserts, use ONLY the committed IDs (not the temporary query-time IDs)
   for (const ins of inserted) {
-    const existing = insertedMap.get(ins.type);
-    if (existing) {
-      existing.ids = Array.from(new Set([...existing.ids, ...ins.ids]));
-    } else {
-      insertedMap.set(ins.type, ins);
-    }
+    insertedMap.set(ins.type, ins);
   }
+
+  // For updates, deduplicate by merging
   for (const upd of updated) {
     const existing = updatedMap.get(upd.type);
     if (existing) {
@@ -420,6 +436,7 @@ export async function executeQuery(
     }
   }
 
+  // For deletes, deduplicate by merging
   for (const del of deleted) {
     const existing = deletedMap.get(del.type);
     if (existing) {
@@ -429,10 +446,14 @@ export async function executeQuery(
     }
   }
 
-  result.inserted = Array.from(insertedMap.values());
-  result.updated = Array.from(updatedMap.values());
-  result.deleted = Array.from(deletedMap.values());
-  
+  const insertedArray = Array.from(insertedMap.values());
+  const updatedArray = Array.from(updatedMap.values());
+  const deletedArray = Array.from(deletedMap.values());
+
+  result.inserted = insertedArray.length > 0 ? insertedArray : undefined;
+  result.updated = updatedArray.length > 0 ? updatedArray : undefined;
+  result.deleted = deletedArray.length > 0 ? deletedArray : undefined;
+
   return result;
 }
 
@@ -1066,6 +1087,7 @@ async function applyJoin(
 
 /**
  * Combine two records for join operations
+ * Stores references to original records so aliased columns can be resolved
  */
 function combineRecords(left: DataRecord, right: DataRecord): DataRecord {
   return {
@@ -1073,7 +1095,10 @@ function combineRecords(left: DataRecord, right: DataRecord): DataRecord {
     created: Math.min(left.created, right.created),
     updated: Math.max(left.updated, right.updated),
     fields: { ...left.fields, ...right.fields },
-  };
+    // Store original records as metadata (using special keys that won't conflict with user fields)
+    __left__: left,
+    __right__: right,
+  } as DataRecord;
 }
 
 /**
@@ -1210,14 +1235,48 @@ async function evaluateValueAsync(
   // Handle source column reference
   if (isSourceColumn(value)) {
     if (!record) return null;
+
     // Check aliases first, then direct field access
     const aliasRecords = ctx.aliases.get(value.source);
     if (aliasRecords?.length) {
-      // Find matching record by checking if record is in the alias set
-      const aliasRecord = aliasRecords.find((r) => r.id === record.id);
-      if (aliasRecord) {
-        return aliasRecord.fields[value.column];
+      // For combined records from joins, check stored original records
+      const recordAny = record as any;
+      if (recordAny.__left__ || recordAny.__right__) {
+        // This is a combined record - check which alias it came from
+        const leftRecord = recordAny.__left__ as DataRecord | undefined;
+        const rightRecord = recordAny.__right__ as DataRecord | undefined;
+
+        // Try to find which original record matches this alias
+        let sourceRecord: DataRecord | undefined;
+        if (leftRecord && aliasRecords.some(r => r.id === leftRecord.id)) {
+          sourceRecord = leftRecord;
+        } else if (rightRecord && aliasRecords.some(r => r.id === rightRecord.id)) {
+          sourceRecord = rightRecord;
+        }
+
+        if (sourceRecord) {
+          // Special handling for 'id' column - it's a record property, not a field
+          if (value.column === 'id') {
+            return sourceRecord.id;
+          }
+          return sourceRecord.fields[value.column];
+        }
+      } else {
+        // Regular record - find it in the alias
+        const aliasRecord = aliasRecords.find((r) => r.id === record.id);
+        if (aliasRecord) {
+          // Special handling for 'id' column - it's a record property, not a field
+          if (value.column === 'id') {
+            return aliasRecord.id;
+          }
+          return aliasRecord.fields[value.column];
+        }
       }
+    }
+
+    // Special handling for 'id' column - it's a record property, not a field
+    if (value.column === 'id') {
+      return record.id;
     }
     return record.fields[value.column];
   }
@@ -1624,8 +1683,16 @@ function evaluateValueSync(
     if (aliasRecords?.length) {
       const aliasRecord = aliasRecords.find((r) => r.id === record.id);
       if (aliasRecord) {
+        // Special handling for 'id' column - it's a record property, not a field
+        if (value.column === 'id') {
+          return aliasRecord.id;
+        }
         return aliasRecord.fields[value.column];
       }
+    }
+    // Special handling for 'id' column - it's a record property, not a field
+    if (value.column === 'id') {
+      return record.id;
     }
     return record.fields[value.column];
   }
@@ -1774,7 +1841,7 @@ function compare(a: unknown, b: unknown): number {
   if (a === b) return 0;
   const anull = a === null || a === undefined;
   const bnull = b === null || b === undefined;
-  if (anull === bnull) return 0;
+  if (anull && bnull) return 0;  // Both null/undefined are equal
   if (anull && !bnull) return -1;
   if (!anull && bnull) return 1;
   if (typeof a === "number" && typeof b === "number") {

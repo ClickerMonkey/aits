@@ -159,7 +159,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
   const SourceColumnSchema: z.ZodType<SourceColumn> = z.union([
     ...types.map(t => z.object({
       source: z.literal(t.name),
-      column: z.enum(t.fields.map(f => f.name) as [string, ...string[]]).describe(`Column name from table ${t.name}`),
+      column: z.enum(['id', ...t.fields.map(f => f.name)] as [string, ...string[]]).describe(`Column name from table ${t.name}`),
     }).describe(`Reference to a column from table ${t.name}`)),
     z.object({
       source: SourceSchema.describe('Alias or CTE name'),
@@ -336,7 +336,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
 
   // Create typed insert schemas for each table type with fields
   const typedInsertSchemas: z.ZodType<Insert>[] = typesWithFields.map(t => {
-    const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
+    const columnNames = ['id', ...t.fields.map(f => f.name)] as [string, ...string[]];
     const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),
@@ -384,7 +384,7 @@ export function createDBASchemas(types: Array<{ name: string; fields: Array<{ na
 
   // Create typed update schemas for each table type with fields
   const typedUpdateSchemas: z.ZodType<Update>[] = typesWithFields.map(t => {
-    const columnNames = t.fields.map(f => f.name) as [string, ...string[]];
+    const columnNames = ['id', ...t.fields.map(f => f.name)] as [string, ...string[]];
     const TypedColumnSchema = z.enum(columnNames).meta({ aid: `${t.name}_Column` }).describe(`Column from ${t.name}`);
     const TypedColumnValueSchema = z.object({
       column: TypedColumnSchema.describe('Column name'),

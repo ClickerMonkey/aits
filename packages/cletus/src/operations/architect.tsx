@@ -10,6 +10,7 @@ import { searchFiles, processFile } from '../helpers/files';
 import { getAssetPath } from '../file-manager';
 import { executeQuery, QueryResult } from '../helpers/dba-query';
 import type { Query } from '../helpers/dba';
+import { DataManager } from '../data';
 
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
@@ -1194,7 +1195,11 @@ export const dba_query = operationOf<
     };
   },
   do: async ({ input: { query } }, { config }) => {
-    return executeQuery(query, config);
+    return executeQuery(
+      query,
+      () => config.getData().types,
+      (typeName: string) => new DataManager(typeName)
+    );
   },
   render: (op, ai, showInput, showOutput) => {
     const kind = getQueryKind(op.input.query);
