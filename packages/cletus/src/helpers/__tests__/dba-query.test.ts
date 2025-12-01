@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { executeQuery, IDataManager } from '../dba-query';
+import {
+  executeQuery,
+  executeQueryWithoutCommit,
+  canCommitQueryResult,
+  commitQueryChanges,
+  IDataManager,
+} from '../dba-query';
 import type { Query } from '../dba';
 import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
 
@@ -8,17 +14,30 @@ import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
  */
 class MockDataManager implements IDataManager {
   private data: DataFile;
+  private diskData: DataFile; // Simulates data on disk
   private loaded: boolean = false;
 
   constructor(private typeName: string, initialRecords: DataRecord[] = []) {
-    this.data = {
+    this.diskData = {
       updated: Date.now(),
       data: initialRecords,
+    };
+    this.data = {
+      updated: this.diskData.updated,
+      data: [...this.diskData.data], // Copy for in-memory state
     };
   }
 
   async load(): Promise<void> {
     this.loaded = true;
+    // Reload from "disk" - create a deep copy to simulate fresh load
+    this.data = {
+      updated: this.diskData.updated,
+      data: this.diskData.data.map(r => ({
+        ...r,
+        fields: { ...r.fields },
+      })),
+    };
   }
 
   async save(fn: (dataFile: DataFile) => void | Promise<void>): Promise<void> {
@@ -27,6 +46,14 @@ class MockDataManager implements IDataManager {
     }
     await fn(this.data);
     this.data.updated = Date.now();
+    // Save to "disk" - persist the changes
+    this.diskData = {
+      updated: this.data.updated,
+      data: this.data.data.map(r => ({
+        ...r,
+        fields: { ...r.fields },
+      })),
+    };
   }
 
   getAll(): DataRecord[] {
@@ -35,7 +62,8 @@ class MockDataManager implements IDataManager {
 
   // Test helper methods
   addRecord(record: DataRecord): void {
-    this.data.data.push(record);
+    this.diskData.data.push(record);
+    this.data.data.push({ ...record, fields: { ...record.fields } });
   }
 
   getTypeName(): string {
@@ -2737,6 +2765,371 @@ describe('executeQuery', () => {
 
       const booksGroup = result.rows.find((r) => r.category === 'cat2');
       expect(booksGroup).toEqual({ category: 'cat2', count: 1, total: 15 });
+    });
+  });
+
+  describe('Query execution with commit control', () => {
+    it('should execute query without committing changes', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query: INSERT INTO users (name, age) VALUES ('Bob', 25)
+      const query: Query = {
+        kind: 'insert',
+        table: 'users',
+        columns: ['name', 'age'],
+        values: ['Bob', 25],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - payload should contain the result and deltas
+      expect(payload.result.affectedCount).toBe(1);
+      expect(payload.deltas).toHaveLength(1);
+      expect(payload.deltas[0].tableName).toBe('users');
+      expect(payload.deltas[0].inserts).toHaveLength(1);
+      expect(payload.deltas[0].inserts[0].fields).toEqual({ name: 'Bob', age: 25 });
+
+      // Verify data was NOT committed to disk
+      const manager = ctx.getMockManager('users');
+      await manager.load(); // Reload from disk
+      const records = manager.getAll();
+      expect(records).toHaveLength(1); // Only Alice, Bob not committed
+      expect(records[0].fields.name).toBe('Alice');
+    });
+
+    it('should validate payload can be committed when data unchanged', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query: UPDATE users SET name = 'Alice Updated' WHERE name = 'Alice'
+      const query: Query = {
+        kind: 'update',
+        table: 'users',
+        set: [{ column: 'name', value: 'Alice Updated' }],
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'name' },
+            cmp: '=',
+            right: 'Alice',
+          },
+        ],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Check if can commit (no changes to underlying data)
+      const canCommit = await canCommitQueryResult(payload, ctx.getManager);
+
+      // Assert
+      expect(canCommit.canCommit).toBe(true);
+      expect(canCommit.reason).toBeUndefined();
+    });
+
+    it('should detect when payload cannot be committed due to data changes', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query: UPDATE users SET age = 31 WHERE name = 'Alice'
+      const query: Query = {
+        kind: 'update',
+        table: 'users',
+        set: [{ column: 'age', value: 31 }],
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'name' },
+            cmp: '=',
+            right: 'Alice',
+          },
+        ],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Small delay to ensure timestamp is different
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Simulate external change to the data (someone else updated it)
+      const manager = ctx.getMockManager('users');
+      await manager.save(async (dataFile) => {
+        const alice = dataFile.data.find((r) => r.id === '1');
+        if (alice) {
+          alice.fields.age = 35; // External change
+          alice.updated = Date.now(); // Update timestamp to change version
+        }
+      });
+
+      // Check if can commit (should fail because data changed)
+      const canCommit = await canCommitQueryResult(payload, ctx.getManager);
+
+      // Assert
+      expect(canCommit.canCommit).toBe(false);
+      expect(canCommit.reason).toContain('users');
+      expect(canCommit.modifiedTables).toContain('users');
+    });
+
+    it('should commit a valid payload successfully', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query: INSERT INTO users (name, age) VALUES ('Bob', 25)
+      const query: Query = {
+        kind: 'insert',
+        table: 'users',
+        columns: ['name', 'age'],
+        values: ['Bob', 25],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Commit the payload
+      const result = await commitQueryChanges(payload, ctx.getManager);
+
+      // Assert
+      expect(result.affectedCount).toBe(1);
+      expect(result.inserted).toHaveLength(1);
+      expect(result.inserted![0].type).toBe('users');
+      expect(result.inserted![0].ids).toHaveLength(1);
+
+      // Verify data was committed to disk
+      const manager = ctx.getMockManager('users');
+      await manager.load(); // Reload from disk
+      const records = manager.getAll();
+      expect(records).toHaveLength(2); // Alice and Bob
+      const bob = records.find((r) => r.fields.name === 'Bob');
+      expect(bob).toBeDefined();
+      expect(bob!.fields.age).toBe(25);
+    });
+
+    it('should throw error when trying to commit stale payload', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query: UPDATE users SET name = 'Alice Updated' WHERE name = 'Alice'
+      const query: Query = {
+        kind: 'update',
+        table: 'users',
+        set: [{ column: 'name', value: 'Alice Updated' }],
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'name' },
+            cmp: '=',
+            right: 'Alice',
+          },
+        ],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Small delay to ensure timestamp is different
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Simulate external change
+      const manager = ctx.getMockManager('users');
+      await manager.save(async (dataFile) => {
+        dataFile.data[0].fields.name = 'Alice External Update';
+        dataFile.data[0].updated = Date.now(); // Update timestamp to change version
+      });
+
+      // Try to commit the stale payload (should throw)
+      await expect(commitQueryChanges(payload, ctx.getManager)).rejects.toThrow(
+        'Cannot commit query'
+      );
+    });
+
+    it('should handle multiple table modifications in one query', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addType({
+        name: 'logs',
+        friendlyName: 'Logs',
+        description: 'Log records',
+        knowledgeTemplate: '{{message}}',
+        fields: [
+          { name: 'message', friendlyName: 'Message', type: 'string', required: true },
+        ],
+      });
+
+      // Create a CTE query that modifies multiple tables
+      const query: Query = {
+        kind: 'withs',
+        withs: [
+          {
+            kind: 'cte',
+            name: 'new_user',
+            statement: {
+              kind: 'insert',
+              table: 'users',
+              columns: ['name'],
+              values: ['Charlie'],
+              returning: [{ alias: 'name', value: { source: 'users', column: 'name' } }],
+            },
+          },
+        ],
+        final: {
+          kind: 'insert',
+          table: 'logs',
+          columns: ['message'],
+          values: ['User added'],
+        },
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should have deltas for both tables
+      expect(payload.deltas.length).toBeGreaterThan(0);
+      const usersDelta = payload.deltas.find((d) => d.tableName === 'users');
+      const logsDelta = payload.deltas.find((d) => d.tableName === 'logs');
+
+      expect(usersDelta).toBeDefined();
+      expect(usersDelta!.inserts).toHaveLength(1);
+
+      expect(logsDelta).toBeDefined();
+      expect(logsDelta!.inserts).toHaveLength(1);
+
+      // Commit and verify
+      const result = await commitQueryChanges(payload, ctx.getManager);
+
+      expect(result.inserted).toBeDefined();
+      expect(result.inserted!.length).toBeGreaterThan(0);
+    });
+
+    it('should preserve query results in payload', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query: INSERT with RETURNING
+      const query: Query = {
+        kind: 'insert',
+        table: 'users',
+        columns: ['name'],
+        values: ['Bob'],
+        returning: [{ alias: 'name', value: { source: 'users', column: 'name' } }],
+      };
+
+      // Execute without committing
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - result should contain the returned rows
+      expect(payload.result.rows).toHaveLength(1);
+      expect(payload.result.rows[0].name).toBe('Bob');
+
+      // Commit and verify result is preserved
+      const result = await commitQueryChanges(payload, ctx.getManager);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].name).toBe('Bob');
     });
   });
 });

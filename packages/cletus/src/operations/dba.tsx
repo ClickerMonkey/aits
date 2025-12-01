@@ -12,25 +12,10 @@ import { getAssetPath } from "../file-manager";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
 import { processFile, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
-import { buildFieldsSchema } from "../helpers/type";
+import { buildFieldsSchema, getType, getTypeName } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
-
-
-function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
-function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
-function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
-  const type = config.getData().types.find((t) => t.name === typeName);
-  if (!type && !optional) {
-    throw new Error(`Data type not found: ${typeName}`);
-  }
-  return type;
-}
-
-function getTypeName(config: ConfigFile, typeName: string): string {
-  return getType(config, typeName, true)?.friendlyName || typeName;
-}
 
 /**
  * Check if a field type is a reference to another type

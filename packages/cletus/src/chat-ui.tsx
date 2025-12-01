@@ -1,6 +1,7 @@
 import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import path from 'path';
+import fs from 'fs';
 import events from 'events'
 import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai';
@@ -10,6 +11,7 @@ import { MessageDisplay } from './components/MessageDisplay';
 import { ModelSelector } from './components/ModelSelector';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
 import { ConfigFile } from './config';
+import { getChatPath } from './file-manager';
 import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
 import { getTotalTokens } from '@aeye/core';
 // @ts-ignore
@@ -104,6 +106,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showExitPrompt, setShowExitPrompt] = useState(false);
   const [exitOptionIndex, setExitOptionIndex] = useState(0);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteConfirmationIndex, setDeleteConfirmationIndex] = useState(0);
+  const [deleteAndThen, setDeleteAndThen] = useState<'exit' | 'quit'>('exit');
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -397,23 +402,82 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
     }
 
+    // Handle delete confirmation navigation
+    if (showDeleteConfirmation) {
+      if (key.upArrow) {
+        setDeleteConfirmationIndex((prev) => (prev > 0 ? prev - 1 : 1));
+      } else if (key.downArrow) {
+        setDeleteConfirmationIndex((prev) => (prev < 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        if (deleteConfirmationIndex === 0) {
+          // Yes - delete the chat
+          const chatFilePath = getChatPath(chat.id);
+          try {
+            if (fs.existsSync(chatFilePath)) {
+              fs.unlinkSync(chatFilePath);
+            }
+            // Perform the action after deletion
+            if (deleteAndThen === 'exit') {
+              onExit();
+            } else {
+              process.exit(0);
+            }
+          } catch (error: any) {
+            addSystemMessage(`❌ Failed to delete chat: ${error.message}`);
+            setShowDeleteConfirmation(false);
+            setDeleteConfirmationIndex(0);
+            setShowExitPrompt(false);
+            setExitOptionIndex(0);
+          }
+        } else {
+          // No - cancel deletion
+          setShowDeleteConfirmation(false);
+          setDeleteConfirmationIndex(0);
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
+        }
+      } else if (key.escape) {
+        // ESC cancels
+        setShowDeleteConfirmation(false);
+        setDeleteConfirmationIndex(0);
+        setShowExitPrompt(false);
+        setExitOptionIndex(0);
+      }
+      return;
+    }
+
     // Handle exit prompt navigation
     if (showExitPrompt) {
       if (key.upArrow) {
-        setExitOptionIndex((prev) => (prev > 0 ? prev - 1 : 2));
+        setExitOptionIndex((prev) => (prev > 0 ? prev - 1 : 4));
       } else if (key.downArrow) {
-        setExitOptionIndex((prev) => (prev < 2 ? prev + 1 : 0));
+        setExitOptionIndex((prev) => (prev < 4 ? prev + 1 : 0));
       } else if (key.return) {
-        setShowExitPrompt(false);
-        setExitOptionIndex(0);
         if (exitOptionIndex === 0) {
           // Exit to main menu
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
           onExit();
         } else if (exitOptionIndex === 1) {
           // Quit application
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
           process.exit(0);
+        } else if (exitOptionIndex === 2) {
+          // Exit to main menu and delete chat
+          setDeleteAndThen('exit');
+          setShowDeleteConfirmation(true);
+          setDeleteConfirmationIndex(0);
+        } else if (exitOptionIndex === 3) {
+          // Quit application and delete chat
+          setDeleteAndThen('quit');
+          setShowDeleteConfirmation(true);
+          setDeleteConfirmationIndex(0);
+        } else if (exitOptionIndex === 4) {
+          // Cancel
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
         }
-        // else: Cancel (index 2) - just close the prompt
       } else if (key.escape) {
         // ESC also cancels
         setShowExitPrompt(false);
@@ -1081,8 +1145,33 @@ After installation and the SoX executable is in the path, restart Cletus and try
         )}
       </Box>
 
+      {/* Delete Confirmation Prompt */}
+      {showDeleteConfirmation && (
+        <Box
+          borderStyle="round"
+          borderColor="red"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="red">
+            Are you sure you want to delete this chat? (↑↓ to navigate, Enter to select):
+          </Text>
+          <Box>
+            <Text color={deleteConfirmationIndex === 0 ? 'cyan' : 'white'}>
+              {deleteConfirmationIndex === 0 ? '▶ ' : '  '}Yes, delete the chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={deleteConfirmationIndex === 1 ? 'cyan' : 'white'}>
+              {deleteConfirmationIndex === 1 ? '▶ ' : '  '}No, cancel
+            </Text>
+          </Box>
+        </Box>
+      )}
+
       {/* Exit Prompt */}
-      {showExitPrompt && (
+      {showExitPrompt && !showDeleteConfirmation && (
         <Box
           borderStyle="round"
           borderColor="yellow"
@@ -1105,7 +1194,17 @@ After installation and the SoX executable is in the path, restart Cletus and try
           </Box>
           <Box>
             <Text color={exitOptionIndex === 2 ? 'cyan' : 'white'}>
-              {exitOptionIndex === 2 ? '▶ ' : '  '}Cancel
+              {exitOptionIndex === 2 ? '▶ ' : '  '}Exit to main menu and delete chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 3 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 3 ? '▶ ' : '  '}Quit application and delete chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 4 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 4 ? '▶ ' : '  '}Cancel
             </Text>
           </Box>
         </Box>
@@ -1209,7 +1308,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
           )}
           {isWaitingForResponse && (
             <Box>
-              <Text>( </Text>
+              <Text dimColor>( </Text>
               <Text color="cyan">
                 {(elapsedTime / 1000).toFixed(1)}s
               </Text>
@@ -1227,7 +1326,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
               )}
               <Text dimColor> │ </Text>
               <Text dimColor>esc to interrupt</Text>
-              <Text> )</Text>
+              <Text dimColor> )</Text>
             </Box>
           )}
         </Box>

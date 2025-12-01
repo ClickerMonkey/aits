@@ -74,6 +74,8 @@ interface TableState {
   updatedIds: Map<string, Record<string, unknown>>;
   /** Map of IDs to their insert fields (for new records) */
   insertedIds: Map<string, Record<string, unknown>>;
+  /** Version hash of the table when loaded (for detecting external changes) */
+  version: string;
 }
 
 /**
@@ -94,6 +96,45 @@ interface QueryContext {
   tableStates: Map<string, TableState>;
   /** Data managers for committing */
   dataManagers: Map<string, IDataManager>;
+}
+
+/**
+ * Serializable table delta containing only the changes to be applied
+ */
+export interface TableDelta {
+  /** Table name */
+  tableName: string;
+  /** Version hash when the query was executed */
+  version: string;
+  /** Records to insert (temp ID -> field values) */
+  inserts: Array<{ tempId: string; fields: Record<string, unknown> }>;
+  /** Records to update (real ID -> field values to update) */
+  updates: Array<{ id: string; fields: Record<string, unknown> }>;
+  /** Record IDs to delete */
+  deletes: string[];
+}
+
+/**
+ * Execution payload that can be passed to commitQueryChanges
+ * Contains only serializable deltas and versions
+ */
+export interface QueryExecutionPayload {
+  /** The query result with temporary IDs for inserts */
+  result: QueryResult;
+  /** Deltas for each affected table */
+  deltas: TableDelta[];
+}
+
+/**
+ * Result of checking if a query execution payload can be committed
+ */
+export interface CanCommitResult {
+  /** Whether the payload can be committed */
+  canCommit: boolean;
+  /** Reason why it cannot be committed (if canCommit is false) */
+  reason?: string;
+  /** Tables that have been modified since the query was executed */
+  modifiedTables?: string[];
 }
 
 /**
@@ -205,10 +246,29 @@ async function getTableState(tableName: string, ctx: QueryContext): Promise<Tabl
       deletedIds: new Set(),
       updatedIds: new Map(),
       insertedIds: new Map(),
+      version: computeTableVersion(original),
     };
     ctx.tableStates.set(tableName, state);
   }
   return state;
+}
+
+/**
+ * Compute a version hash for a table's data
+ * Used to detect if data has changed since query execution
+ */
+function computeTableVersion(records: DataRecord[]): string {
+  // Create a simple hash from the record IDs and updated timestamps
+  // This is sufficient to detect if records were added/removed/modified
+  const data = records.map(r => `${r.id}:${r.updated}`).sort().join('|');
+  // Use a simple hash function (could use crypto.createHash in Node.js, but this is simpler)
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
 }
 
 /**
@@ -367,13 +427,14 @@ async function commitChanges(ctx: QueryContext): Promise<{
 }
 
 /**
- * Execute a complete DBA query
+ * Execute a DBA query without committing changes
+ * Returns a payload that can be committed later via commitQueryChanges
  */
-export async function executeQuery(
+export async function executeQueryWithoutCommit(
   query: Query,
   getTypes: () => TypeDefinition[],
   getManager: (typeName: string) => IDataManager
-): Promise<QueryResult> {
+): Promise<QueryExecutionPayload> {
   // Collect all referenced tables upfront
   const referencedTables = new Set<string>();
   collectReferencedTables(query, referencedTables);
@@ -408,51 +469,171 @@ export async function executeQuery(
   } else {
     result = await executeStatement(query, ctx);
   }
-  
-  // Commit all changes at the end
-  const { inserted, updated, deleted } = await commitChanges(ctx);
-  
-  // Replace query-time IDs with commit-time IDs (commit has the real UUIDs)
-  // For inserts, the temp IDs from execution are replaced with real UUIDs from commit
-  // For updates/deletes, the IDs are the same so we deduplicate
-  const insertedMap = new Map<string, QueryResultType>();
-  const updatedMap = new Map(result.updated?.map(u => [u.type, u]));
-  const deletedMap = new Map(result.deleted?.map(d => [d.type, d]));
 
-  // For inserts, use ONLY the committed IDs (not the temporary query-time IDs)
-  for (const ins of inserted) {
-    insertedMap.set(ins.type, ins);
+  // Extract serializable deltas from table states
+  const deltas: TableDelta[] = [];
+  for (const [tableName, state] of ctx.tableStates) {
+    // Skip tables with no pending changes
+    if (state.insertedIds.size === 0 && state.updatedIds.size === 0 && state.deletedIds.size === 0) {
+      continue;
+    }
+
+    const delta: TableDelta = {
+      tableName,
+      version: state.version,
+      inserts: Array.from(state.insertedIds.entries()).map(([tempId, fields]) => ({
+        tempId,
+        fields,
+      })),
+      updates: Array.from(state.updatedIds.entries()).map(([id, fields]) => ({
+        id,
+        fields,
+      })),
+      deletes: Array.from(state.deletedIds),
+    };
+
+    deltas.push(delta);
   }
 
-  // For updates, deduplicate by merging
-  for (const upd of updated) {
-    const existing = updatedMap.get(upd.type);
-    if (existing) {
-      existing.ids = Array.from(new Set([...existing.ids, ...upd.ids]));
-    } else {
-      updatedMap.set(upd.type, upd);
+  // Return the execution payload without committing
+  return {
+    result,
+    deltas,
+  };
+}
+
+/**
+ * Check if a query execution payload can still be committed
+ * Returns information about whether the data has changed since execution
+ */
+export async function canCommitQueryResult(
+  payload: QueryExecutionPayload,
+  getManager: (typeName: string) => IDataManager
+): Promise<CanCommitResult> {
+  const modifiedTables: string[] = [];
+
+  for (const delta of payload.deltas) {
+    // Reload the table data to check if it has changed
+    const manager = getManager(delta.tableName);
+    await manager.load();
+    const currentRecords = manager.getAll();
+    const currentVersion = computeTableVersion(currentRecords);
+
+    if (currentVersion !== delta.version) {
+      modifiedTables.push(delta.tableName);
     }
   }
 
-  // For deletes, deduplicate by merging
-  for (const del of deleted) {
-    const existing = deletedMap.get(del.type);
-    if (existing) {
-      existing.ids = Array.from(new Set([...existing.ids, ...del.ids]));
-    } else {
-      deletedMap.set(del.type, del);
+  if (modifiedTables.length > 0) {
+    return {
+      canCommit: false,
+      reason: `Table(s) have been modified since query execution: ${modifiedTables.join(', ')}`,
+      modifiedTables,
+    };
+  }
+
+  return {
+    canCommit: true,
+  };
+}
+
+/**
+ * Commit a query execution payload
+ * This applies all pending changes to disk
+ */
+export async function commitQueryChanges(
+  payload: QueryExecutionPayload,
+  getManager: (typeName: string) => IDataManager
+): Promise<QueryResult> {
+  // First check if the payload can be committed
+  const canCommit = await canCommitQueryResult(payload, getManager);
+  if (!canCommit.canCommit) {
+    throw new Error(`Cannot commit query: ${canCommit.reason}`);
+  }
+
+  const result = payload.result;
+  const committedInserted: QueryResultType[] = [];
+  const committedUpdated: QueryResultType[] = [];
+  const committedDeleted: QueryResultType[] = [];
+
+  const now = Date.now();
+
+  // Apply deltas to each table
+  for (const delta of payload.deltas) {
+    const manager = getManager(delta.tableName);
+    await manager.load();
+
+    const inserts: QueryResultType = { type: delta.tableName, ids: [] };
+    const updates: QueryResultType = { type: delta.tableName, ids: [] };
+    const deletes: QueryResultType = { type: delta.tableName, ids: [] };
+
+    await manager.save(async (dataFile) => {
+      // Apply inserts
+      for (const insert of delta.inserts) {
+        const newRecord: DataRecord = {
+          id: uuidv4(),
+          updated: now,
+          created: now,
+          fields: insert.fields,
+        };
+        dataFile.data.push(newRecord);
+        inserts.ids.push(newRecord.id);
+      }
+
+      // Apply updates
+      for (const update of delta.updates) {
+        const item = dataFile.data.find((item) => item.id === update.id);
+        if (!item) {
+          throw new Error(`Item with ID ${update.id} not found in ${delta.tableName}`);
+        }
+        Object.assign(item.fields, update.fields);
+        item.updated = now;
+        updates.ids.push(update.id);
+      }
+
+      // Apply deletes
+      for (const id of delta.deletes) {
+        const index = dataFile.data.findIndex((item) => item.id === id);
+        if (index === -1) {
+          throw new Error(`Item with ID ${id} not found in ${delta.tableName}`);
+        }
+        dataFile.data.splice(index, 1);
+        deletes.ids.push(id);
+      }
+    });
+
+    if (inserts.ids.length > 0) {
+      committedInserted.push(inserts);
+    }
+    if (updates.ids.length > 0) {
+      committedUpdated.push(updates);
+    }
+    if (deletes.ids.length > 0) {
+      committedDeleted.push(deletes);
     }
   }
 
-  const insertedArray = Array.from(insertedMap.values());
-  const updatedArray = Array.from(updatedMap.values());
-  const deletedArray = Array.from(deletedMap.values());
+  // Return the result with committed IDs
+  return {
+    rows: result.rows,
+    affectedCount: result.affectedCount,
+    inserted: committedInserted.length > 0 ? committedInserted : undefined,
+    updated: committedUpdated.length > 0 ? committedUpdated : undefined,
+    deleted: committedDeleted.length > 0 ? committedDeleted : undefined,
+  };
+}
 
-  result.inserted = insertedArray.length > 0 ? insertedArray : undefined;
-  result.updated = updatedArray.length > 0 ? updatedArray : undefined;
-  result.deleted = deletedArray.length > 0 ? deletedArray : undefined;
-
-  return result;
+/**
+ * Execute a complete DBA query
+ */
+export async function executeQuery(
+  query: Query,
+  getTypes: () => TypeDefinition[],
+  getManager: (typeName: string) => IDataManager
+): Promise<QueryResult> {
+  // Execute the query without committing and then commit the changes
+  const payload = await executeQueryWithoutCommit(query, getTypes, getManager);
+  return await commitQueryChanges(payload, getManager);
 }
 
 /**
