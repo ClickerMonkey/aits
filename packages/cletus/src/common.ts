@@ -31,6 +31,24 @@ export function formatTime(ms: number): string {
 }
 
 /**
+ * Formats a file size in bytes to a human-readable string.
+ * 
+ * @param bytes - file size in bytes
+ * @returns formatted string like "1.5 KB", "2.3 MB", etc.
+ */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  } else if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  } else if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  } else {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+}
+
+/**
  * Formats name by converting camelCase, underscores, and hyphens to TitleCase.
  * 
  * @param x - input string

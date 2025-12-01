@@ -5,7 +5,7 @@ import { Box, Text } from "ink";
 import path from 'path';
 import React from 'react';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunk, fileProtocol, linkFile, paginateText, pluralize } from "../common";
+import { abbreviate, chunk, fileProtocol, formatSize, linkFile, paginateText, pluralize } from "../common";
 import { Link } from "../components/Link";
 import { CONSTS } from "../constants";
 import { canEmbed, embed } from "../embed";
@@ -1309,10 +1309,12 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       maxDepth: depth,
     });
 
-    // Separate files and directories
-    const files: string[] = [];
+    // Separate files and directories with their metadata
+    const files: { name: string; size: number }[] = [];
     const dirs: string[] = [];
     const extCounts = new Map<string, number>();
+    // Track direct children counts for each directory
+    const dirContents = new Map<string, { files: number; dirs: number }>();
 
     for (const entry of entries) {
       const entryFullPath = path.resolve(cwd, entry);
@@ -1320,15 +1322,35 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       
       if (isDir) {
         dirs.push(entry);
+        // Initialize directory contents counter
+        dirContents.set(entry, { files: 0, dirs: 0 });
       } else {
-        files.push(entry);
+        // Get file size
+        const stats = await fs.stat(entryFullPath);
+        files.push({ name: entry, size: stats.size });
         const ext = path.extname(entry).toLowerCase() || '(no extension)';
         extCounts.set(ext, (extCounts.get(ext) || 0) + 1);
       }
     }
 
+    // Count direct children for each directory
+    for (const file of files) {
+      const parent = path.dirname(file.name);
+      if (dirContents.has(parent)) {
+        const counts = dirContents.get(parent)!;
+        counts.files++;
+      }
+    }
+    for (const dir of dirs) {
+      const parent = path.dirname(dir);
+      if (dirContents.has(parent)) {
+        const counts = dirContents.get(parent)!;
+        counts.dirs++;
+      }
+    }
+
     // Sort entries
-    files.sort();
+    files.sort((a, b) => a.name.localeCompare(b.name));
     dirs.sort();
 
     const MAX_LINES = 50;
@@ -1341,7 +1363,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       const toShow = files.slice(0, maxLines);
       result.push('Files:');
       for (const file of toShow) {
-        result.push(`  ${file}`);
+        result.push(`  ${file.name} (${formatSize(file.size)})`);
       }
       if (files.length > toShow.length) {
         result.push(`  ... and ${files.length - toShow.length} more files`);
@@ -1356,7 +1378,11 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       const toShow = dirs.slice(0, maxLines);
       result.push('Directories:');
       for (const dir of toShow) {
-        result.push(`  ${dir}/`);
+        const contents = dirContents.get(dir);
+        const contentsInfo = contents 
+          ? ` (${pluralize(contents.files, 'file')}, ${pluralize(contents.dirs, 'subdir')})`
+          : '';
+        result.push(`  ${dir}/${contentsInfo}`);
       }
       if (dirs.length > toShow.length) {
         result.push(`  ... and ${dirs.length - toShow.length} more directories`);
@@ -1372,7 +1398,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       const toShow = sortedExts.slice(0, maxLines);
       result.push('Extensions:');
       for (const [ext, count] of toShow) {
-        result.push(`  ${ext}: ${count} file${count !== 1 ? 's' : ''}`);
+        result.push(`  ${ext}: ${pluralize(count, 'file')}`);
       }
       if (sortedExts.length > toShow.length) {
         result.push(`  ... and ${sortedExts.length - toShow.length} more extensions`);
