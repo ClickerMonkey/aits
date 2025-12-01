@@ -207,7 +207,7 @@ Example 3: Limit discovery to top types:
   });
 
   const dbaQuery = ai.tool({
-    name: 'dba_query',
+    name: 'query',
     description: 'Execute complex SQL-like queries across data types',
     instructions: `Use this to execute complex queries that span multiple data types, including:
 - SELECT with joins, subqueries, aggregations, window functions
@@ -266,9 +266,9 @@ Example 3: Aggregation with GROUP BY:
         ...globalToolProperties,
       });
     },
-    input: getOperationInput('dba_query'),
+    input: getOperationInput('query'),
     applicable: ({ config }) => config.getData().types.length > 0,
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'dba_query', input }, ctx),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx),
   });
 
   return [

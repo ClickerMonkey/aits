@@ -1203,12 +1203,12 @@ function describeQuery(query: Query): string {
   return '';
 }
 
-export const dba_query = operationOf<
+export const query = operationOf<
   { query: Query },
   QueryResult
 >({
   mode: 'update', // Can modify data, so requires update mode
-  signature: 'dba_query(query: Query)',
+  signature: 'query(query: Query)',
   status: ({ query }) => `Executing ${getQueryKind(query)} query`,
   analyze: async ({ input: { query } }, { config }) => {
     const types = config.getData().types;
@@ -1249,7 +1249,7 @@ export const dba_query = operationOf<
     
     return renderOperation(
       op,
-      `DbaQuery(${kind}${description ? `: ${description}` : ''})`,
+      `Query(${kind}${description ? `: ${description}` : ''})`,
       (op) => {
         if (op.output) {
           const parts: string[] = [];
