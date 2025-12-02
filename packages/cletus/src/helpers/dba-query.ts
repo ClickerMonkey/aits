@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DataFile, DataRecord, TypeDefinition } from "../schemas";
 import type {
   BooleanValue,
+  ColumnValue,
   CTEStatement,
   DataSource,
   Delete,
@@ -1342,9 +1343,9 @@ async function executeInsert(
           // Update on conflict - validate types
           const updates: Record<string, unknown> = {};
           for (let i = 0; i < stmt.onConflict.update.length; i++) {
-            const cv = stmt.onConflict.update[i];
-            const normalizedColumn = cv.column.toLowerCase();
-            const value = await evaluateValueAsync(cv.value, existing, ctx);
+            const conflictUpdate: ColumnValue = stmt.onConflict.update[i];
+            const normalizedColumn = conflictUpdate.column.toLowerCase();
+            const value = await evaluateValueAsync(conflictUpdate.value, existing, ctx);
 
             // Type check for ON CONFLICT UPDATE
             const expectedType = getFieldType(ctx, stmt.table, normalizedColumn);
@@ -1352,14 +1353,14 @@ async function executeInsert(
             if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, normalizedColumn)) {
               const actualType = getValueType(value);
               addValidationError(ctx, `insert.onConflict.update[${i}]`,
-                `Column '${cv.column}' expects ${expectedType}, got ${actualType}`,
+                `Column '${conflictUpdate.column}' expects ${expectedType}, got ${actualType}`,
                 {
                   expectedType,
                   actualType,
                   suggestion: ctx.types.has(expectedType)
-                    ? `Use string ID for relationship field ${cv.column}`
-                    : `Use ${expectedType} value for ${cv.column}`,
-                  metadata: { column: cv.column, table: stmt.table }
+                    ? `Use string ID for relationship field ${conflictUpdate.column}`
+                    : `Use ${expectedType} value for ${conflictUpdate.column}`,
+                  metadata: { column: conflictUpdate.column, table: stmt.table }
                 }
               );
             }
@@ -1369,12 +1370,12 @@ async function executeInsert(
               const enumValidation = validateEnumValue(value, stmt.table, normalizedColumn, ctx);
               if (!enumValidation.valid && enumValidation.allowedValues) {
                 addValidationError(ctx, `insert.onConflict.update[${i}]`,
-                  `Column '${cv.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
+                  `Column '${conflictUpdate.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
                   {
                     expectedType: 'enum',
                     actualType: String(value),
                     suggestion: `Use one of the allowed enum values: ${enumValidation.allowedValues.join(', ')}`,
-                    metadata: { column: cv.column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
+                    metadata: { column: conflictUpdate.column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
                   }
                 );
               }

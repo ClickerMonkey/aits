@@ -25,11 +25,28 @@ const SyntaxHighlight: React.FC<{ code: string; language?: string }> = ({ code, 
 const parseInlineFormatting = (text: string): LineSegment[] => {
   if (!text) return [];
 
+  // Step 0: Process escape characters and create processed text
+  // Build processed text where escaped characters are preserved but escapes are removed
+  let processedText = '';
+
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\' && i + 1 < text.length) {
+      const nextChar = text[i + 1];
+      // Escape special markdown characters
+      if ('*_~`[]()\\|'.includes(nextChar)) {
+        processedText += nextChar;
+        i++; // Skip the next character
+        continue;
+      }
+    }
+    processedText += text[i];
+  }
+
   // Step 1: Find all code segments (highest priority)
   const codeSegments: Array<{ start: number; end: number; content: string }> = [];
   const codeRegex = /`(([^`]|\\`)+)`/g;
   let match;
-  while ((match = codeRegex.exec(text)) !== null) {
+  while ((match = codeRegex.exec(processedText)) !== null) {
     codeSegments.push({
       start: match.index,
       end: match.index + match[0].length,
@@ -40,7 +57,7 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
   // Step 2: Find all link segments (second priority)
   const linkSegments: Array<{ start: number; end: number; text: string; url: string }> = [];
   const linkRegex = /\[(!\[[^\]]+\]\([^\)]+\)|[^\]]+)\]\(([^)]+)\)/g;
-  while ((match = linkRegex.exec(text)) !== null) {
+  while ((match = linkRegex.exec(processedText)) !== null) {
     linkSegments.push({
       start: match.index,
       end: match.index + match[0].length,
@@ -82,15 +99,15 @@ const parseInlineFormatting = (text: string): LineSegment[] => {
     lastEnd = range.end;
   }
 
-  if (lastEnd < text.length) {
-    formattableRanges.push({ start: lastEnd, end: text.length });
+  if (lastEnd < processedText.length) {
+    formattableRanges.push({ start: lastEnd, end: processedText.length });
   }
 
   // Step 5: Apply formatting (bold, italic, underline, strikethrough) to formattable ranges
   const formattedRanges: Array<{ start: number; segments: LineSegment[] }> = [];
 
   for (const range of formattableRanges) {
-    const rangeText = text.substring(range.start, range.end);
+    const rangeText = processedText.substring(range.start, range.end);
     const segments = applyFormatting(rangeText);
     formattedRanges.push({ start: range.start, segments });
   }
