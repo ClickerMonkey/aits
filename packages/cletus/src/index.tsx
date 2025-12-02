@@ -9,7 +9,7 @@ import { InkChatView } from './components/InkChatView';
 import { InkInitWizard } from './components/InkInitWizard';
 import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
-import { configExists, setProfile, setEnableDBA } from './file-manager';
+import { configExists, setProfile } from './file-manager';
 import { initWorker } from './embed';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
@@ -87,10 +87,9 @@ const App: React.FC = () => {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { profile?: string; dba: boolean } {
+function parseArgs(): { profile?: string } {
   const args = process.argv.slice(2);
   let profile: string | undefined;
-  let dba = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -104,20 +103,15 @@ function parseArgs(): { profile?: string; dba: boolean } {
       profile = args[i + 1];
       i++; // Skip next argument
     }
-    // Handle --dba flag
-    else if (arg === '--dba') {
-      dba = true;
-    }
   }
 
-  return { profile, dba };
+  return { profile };
 }
 
 async function main() {
-  // Parse command line arguments and set global profile and DBA flag
-  const { profile, dba } = parseArgs();
+  // Parse command line arguments and set global profile
+  const { profile } = parseArgs();
   setProfile(profile);
-  setEnableDBA(dba);
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');

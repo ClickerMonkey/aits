@@ -3,7 +3,6 @@ import { cosineSimilarity } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
 import { CletusAIContext } from './ai';
-import { TypeDefinition } from './schemas';
 
 /**
  * Registered tool with embedded instructions for semantic search
@@ -192,21 +191,14 @@ export class ToolRegistry {
 export const toolRegistry = new ToolRegistry();
 
 /**
- * Static toolset names (non-DBA toolsets)
+ * Static toolset names
  */
-export const STATIC_TOOLSETS = ['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet'] as const;
+export const STATIC_TOOLSETS = ['planner', 'librarian', 'clerk', 'secretary', 'architect', 'artist', 'internet', 'dba'] as const;
 
 /**
- * Available static toolset names (DBA toolsets are dynamic based on type names)
+ * Available static toolset names
  */
 export type StaticToolsetName = typeof STATIC_TOOLSETS[number] | 'utility';
-
-/**
- * Get DBA toolset name for a type
- */
-export function getDBAToolsetName(typeName: string): string {
-  return `dba:${typeName}`;
-}
 
 /**
  * Extract instructions from a tool (uses instructions first, falls back to description)

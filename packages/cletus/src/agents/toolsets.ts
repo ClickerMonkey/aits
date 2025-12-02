@@ -1,7 +1,7 @@
 import { AnyTool, Names, Tuple } from '@aeye/core';
 import type { CletusAI, CletusAIContext } from '../ai';
 import { Operations } from '../operations/types';
-import { OperationKind, TypeDefinition } from '../schemas';
+import { OperationKind } from '../schemas';
 import { createArchitectTools } from '../tools/architect';
 import { createArtistTools } from '../tools/artist';
 import { createClerkTools } from '../tools/clerk';
@@ -23,11 +23,7 @@ export function createToolsets(ai: CletusAI) {
   const architectTools = createArchitectTools(ai);
   const artistTools = createArtistTools(ai);
   const internetTools = createInternetTools(ai);
-
-  // Create DBA tools factory for dynamic type-specific tools
-  const createDBAToolsForType = (type: TypeDefinition): AnyTool[] => {
-    return createDBATools(ai, type);
-  };
+  const dbaTools = createDBATools(ai);
 
   return {
     plannerTools,
@@ -37,7 +33,7 @@ export function createToolsets(ai: CletusAI) {
     architectTools,
     artistTools,
     internetTools,
-    createDBATools: createDBAToolsForType,
+    dbaTools,
   };
 }
 

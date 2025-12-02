@@ -1,255 +1,265 @@
-import { AnyTool } from '@aeye/core';
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
-import { generateExampleFields, generateExampleWhere, getSchemas } from '../helpers/type';
-import type { TypeDefinition } from '../schemas';
 import { getOperationInput } from '../operations/types';
+import { createDBASchemas } from '../helpers/dba';
 
 /**
- * Create DBA tools for a specific type definition.
+ * Create static DBA tools.
  * Returns an array of tools that can be registered in the tool registry.
  */
-export function createDBATools(ai: CletusAI, type: TypeDefinition): AnyTool[] {
-  // Pre-compute instructions with the type for embedding purposes
-  const firstField = type.fields[0];
-  const sortField = type.fields.find(f => f.type === 'number' || f.type === 'date') || firstField;
-  const updateField = type.fields[1] || firstField;
-  const groupField = type.fields.find(f => f.type === 'string' || f.type === 'enum') || type.fields[0];
-  const aggField = type.fields.find(f => f.type === 'number') || type.fields[0];
-  const aggFunc = aggField.type === 'number' ? 'avg' : 'count';
-
-  const dataCreate = ai.tool({
-    name: 'data_create',
-    description: `Create a new ${type.friendlyName} record`,
-    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nNOTE: A unique 'id' will be automatically generated for the new record - do not provide an 'id' field.\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }
-
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      fields: getSchemas(type, cache).fields.describe('Field values for the new record'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_create'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_create', input: { name: type.name, fields: input.fields } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataUpdate = ai.tool({
-    name: 'data_update',
-    description: `Update a ${type.friendlyName} record by ID`,
-    instructions: `Use this to update specific fields in an existing ${type.friendlyName}. Only provide fields you want to change.\n\nExample: Update a record:\n{ "id": "abc-123", "fields": ${generateExampleFields(type.fields.slice(0, 2))} }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      id: z.string().describe('Record ID'),
-      fields: getSchemas(type, cache).set.describe('Fields to update'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_update'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update', input: { name: type.name, id: input.id, fields: input.fields } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataDelete = ai.tool({
-    name: 'data_delete',
-    description: `Delete a ${type.friendlyName} record by ID`,
-    instructions: `Use this to permanently delete a ${type.friendlyName}.\n\nExample: Delete a record by ID:\n{ "id": "abc-123" }
- 
-{{modeInstructions}}`,
-    schema: z.object({
-      id: z.string().describe('Record ID'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_delete'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete', input: { name: type.name, id: input.id } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataSelect = ai.tool({
-    name: 'data_select',
-    description: `Query ${type.friendlyName} records`,
-    instructions: `Use this to search and retrieve ${type.friendlyName} records. Supports:
-- where: Filter by field values with and/or logic
-- offset/limit: Pagination
-- orderBy: Sort by field(s)
-
-Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}
-
-Example 1: Find records with filter:
-{ "where": ${generateExampleWhere(firstField)}, "limit": 10 }
-
-Example 2: Query with sorting:
-{ "where": ${generateExampleWhere(firstField)}, "orderBy": [{ "field": "${sortField.name}", "direction": "desc" }] }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      where: getSchemas(type, cache).where.optional().describe('Filter conditions with and/or logic'),
-      offset: z.number().optional().default(0).describe('Starting position'),
-      limit: z.number().optional().default(10).describe('Maximum results'),
-      orderBy: z.array(
-        z.object({
-          field: getSchemas(type, cache).fieldNames,
-          direction: z.enum(['asc', 'desc']).default('asc'),
-        })
-      ).optional().describe('Sort order'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_select'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_select', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataUpdateMany = ai.tool({
-    name: 'data_update_many',
-    description: `Update multiple ${type.friendlyName} records`,
-    instructions: `Use this to bulk update ${type.friendlyName} records that match a where clause.\n\nExample: Bulk update records:\n{ "set": ${generateExampleFields([updateField])}, "where": ${generateExampleWhere(firstField)} }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      set: getSchemas(type, cache).set.describe('Fields to set on matching records'),
-      where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
-      limit: z.number().optional().describe('Maximum records to update'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_update_many'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_update_many', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataDeleteMany = ai.tool({
-    name: 'data_delete_many',
-    description: `Delete multiple ${type.friendlyName} records`,
-    instructions: `Use this to bulk delete ${type.friendlyName} records that match a where clause.\n\nExample: Delete matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      where: getSchemas(type, cache).where.describe('Filter conditions'),
-      limit: z.number().optional().describe('Maximum records to delete'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_delete_many'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_delete_many', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataCount = ai.tool({
-    name: 'data_count',
-    description: `Count ${type.friendlyName} records`,
-    instructions: `Use this to count the number of ${type.friendlyName} records that match a where clause.\n\nExample: Count matching records:\n{ "where": ${generateExampleWhere(type.fields[0])} }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      where: getSchemas(type, cache).where.optional().describe('Filter conditions'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_count'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_count', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
-  });
-
-  const dataAggregate = ai.tool({
-    name: 'data_aggregate',
-    description: `Perform aggregation queries on ${type.friendlyName}`,
-    instructions: `Use this for analytics and reporting on ${type.friendlyName} data:
-- groupBy: Group by field(s)
-- where: Filter before aggregation
-- having: Filter after aggregation
-- select: Aggregation functions (count, sum, avg, min, max)
-- orderBy: Sort results
-
-Available fields: ${type.fields.map(f => `${f.name} (${f.type})`).join(', ')}
-
-Example 1: Count records by field:
-{ "groupBy": ["${groupField.name}"], "select": [{ "function": "count", "alias": "total" }] }
-
-Example 2: Aggregate with filter:
-{ "where": ${generateExampleWhere(groupField)}, "select": [{ "function": "${aggFunc}", ${aggFunc !== 'count' ? `"field": "${aggField.name}", ` : ''}"alias": "result" }] }
- 
-{{modeInstructions}}`,
-    schema: ({ cache }) => z.object({
-      where: getSchemas(type, cache).where.optional().describe('Pre-aggregation filter'),
-      having: getSchemas(type, cache).where.optional().describe('Post-aggregation filter'),
-      groupBy: z.array(getSchemas(type, cache).fieldNames).optional().describe('Fields to group by'),
-      orderBy: z.array(
-        z.object({
-          field: getSchemas(type, cache).fieldNames,
-          direction: z.enum(['asc', 'desc']).default('asc'),
-        })
-      ).optional().describe('Sort order'),
-      select: z.array(
-        z.object({
-          function: z.enum(['count', 'sum', 'avg', 'min', 'max']),
-          field: getSchemas(type, cache).fieldNames.optional(),
-          alias: z.string().optional(),
-        })
-      ).describe('Aggregation functions'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('data_aggregate'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_aggregate', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
-  });
-
+export function createDBATools(ai: CletusAI) {
   const dataIndex = ai.tool({
     name: 'data_index',
-    description: `Index ${type.friendlyName} records for knowledge base`,
-    instructions: `Use this to (re)index ${type.friendlyName} records into the knowledge base for improved search and retrieval. 
+    description: 'Index records of a type for knowledge base',
+    instructionsFn: (ctx) => {
+      const types = ctx.config.getData().types.map((t) => t.name);
+      return `Use this to (re)index records of a data type into the knowledge base for improved search and retrieval. 
 This should be done if an embedding model has changed or a knowledge template has changed.
+
+Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+
+Example: Index all records of a type:
+{ "type": "task" }
  
-{{modeInstructions}}`,
-    schema: z.object({
-      ...globalToolProperties,
-    }),
+{{modeInstructions}}`;
+    },
+    schema: ({ config }) => {
+      const typeNames = config.getData().types.map(t => t.name);
+      // Return undefined if no types - tool can't be used
+      if (typeNames.length === 0) {
+        return undefined;
+      }
+      return z.object({
+        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to index'),
+        ...globalToolProperties,
+      });
+    },
     input: getOperationInput('data_index'),
-    call: async (_, __, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: type.name } }, ctx as unknown as CletusAIContext),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_index', input }, ctx as unknown as CletusAIContext),
   });
 
   const dataImport = ai.tool({
     name: 'data_import',
-    description: `Import ${type.friendlyName} records from files`,
-    instructions: `Use this to import ${type.friendlyName} records from files. The tool will:
+    description: 'Import records from files into a data type',
+    instructionsFn: (ctx) => {
+      const types = ctx.config.getData().types.map((t) => t.name);
+      return `Use this to import records from files. The tool will:
 1. Find files matching the glob pattern
 2. Process readable files (text, PDF, Excel, Word documents)
 3. Extract structured data using AI with schema validation
 4. Determine unique fields automatically to avoid duplicates
 5. Merge data, updating existing records or creating new ones
 
+Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+
 Example: Import from CSV or text files:
-{ "glob": "data/*.csv" }
+{ "type": "task", "glob": "data/*.csv" }
 
 Example: Import with image text extraction:
-{ "glob": "documents/**/*.pdf", "transcribeImages": true }
+{ "type": "document", "glob": "documents/**/*.pdf", "transcribeImages": true }
  
-{{modeInstructions}}`,
-    schema: z.object({
-      glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
-      transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
-      ...globalToolProperties,
-    }),
+{{modeInstructions}}`;
+    },
+    schema: ({ config }) => {
+      const typeNames = config.getData().types.map(t => t.name);
+      // Return undefined if no types - tool can't be used
+      if (typeNames.length === 0) {
+        return undefined;
+      }
+      return z.object({
+        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to import into'),
+        glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
+        transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
+        ...globalToolProperties,
+      });
+    },
     input: getOperationInput('data_import'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: type.name, ...input } }, ctx as unknown as CletusAIContext),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input }, ctx as unknown as CletusAIContext),
   });
     
   const dataSearch = ai.tool({
     name: 'data_search',
-    description: `Search ${type.friendlyName} records by semantic similarity`,
-    instructions: `Use this to find relevant ${type.friendlyName} records from the knowledge base using semantic search. Provide a query and optionally specify the number of results.
+    description: 'Search records by semantic similarity',
+    instructionsFn: (ctx) => {
+      const types = ctx.config.getData().types.map((t) => t.name);
+      return `Use this to find relevant records from the knowledge base using semantic search. Provide a type, query text, and optionally specify the number of results.
+
+Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
 
 Example: Search for relevant records:
-{ "query": "user preferences for notifications", "n": 5 }
+{ "type": "task", "query": "user preferences for notifications", "n": 5 }
  
-{{modeInstructions}}`,
-    schema: z.object({
-      query: z.string().describe('Search query text'),
-      n: z.number().optional().describe('Maximum results (default: 10)'),
-      ...globalToolProperties,
-    }),
+{{modeInstructions}}`;
+    },
+    schema: ({ config }) => {
+      const typeNames = config.getData().types.map(t => t.name);
+      // Return undefined if no types - tool can't be used
+      if (typeNames.length === 0) {
+        return undefined;
+      }
+      return z.object({
+        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to search'),
+        query: z.string().describe('Search query text'),
+        n: z.number().optional().describe('Maximum results (default: 10)'),
+        ...globalToolProperties,
+      });
+    },
     input: getOperationInput('data_search'),
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: type.name, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input }, ctx as unknown as CletusAIContext),
+  });
+
+  const dbaQuery = ai.tool({
+    name: 'query',
+    description: 'Execute complex SQL-like queries across data types',
+    instructionsFn: (ctx) => {
+      const types = ctx.config.getData().types.map((t) => t.name);
+      return `Use this to execute complex queries that span multiple data types, including:
+- SELECT with joins, subqueries, aggregations, window functions
+- INSERT with conflict handling and returning
+- UPDATE with joins and complex conditions
+- DELETE with joins and complex conditions
+- UNION, INTERSECT, EXCEPT set operations
+- WITH (CTE) statements including recursive CTEs
+
+Available tables: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+
+The query is a structured JSON object representing SQL operations.
+
+Example 1: Simple SELECT with filter:
+{
+  "kind": "select",
+  "values": [{ "alias": "name", "value": { "source": "users", "column": "name" } }],
+  "from": { "kind": "table", "table": "users" },
+  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": true }],
+  "limit": 10
+}
+
+Example 2: JOIN query:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "userName", "value": { "source": "u", "column": "name" } },
+    { "alias": "orderTotal", "value": { "source": "o", "column": "total" } }
+  ],
+  "from": { "kind": "table", "table": "users", "as": "u" },
+  "joins": [{
+    "source": { "kind": "table", "table": "orders", "as": "o" },
+    "type": "inner",
+    "on": [{ "kind": "comparison", "left": { "source": "u", "column": "id" }, "cmp": "=", "right": { "source": "o", "column": "userId" } }]
+  }]
+}
+
+Example 3: Aggregation with GROUP BY:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "category", "value": { "source": "products", "column": "category" } },
+    { "alias": "avgPrice", "value": { "kind": "aggregate", "aggregate": "avg", "value": { "source": "products", "column": "price" } } }
+  ],
+  "from": { "kind": "table", "table": "products" },
+  "groupBy": [{ "source": "products", "column": "category" }]
+}
+
+Example 4: Simple INSERT with constant values:
+{
+  "kind": "insert",
+  "table": "users",
+  "columns": ["name", "email", "age"],
+  "values": ["Alice Smith", "alice@example.com", 30]
+}
+
+Example 5: INSERT with ON CONFLICT:
+{
+  "kind": "insert",
+  "table": "users",
+  "columns": ["email", "name"],
+  "values": ["bob@example.com", "Bob Jones"],
+  "onConflict": {
+    "columns": ["email"],
+    "update": [{ "column": "name", "value": "Bob Jones" }]
+  }
+}
+
+Example 6: INSERT from SELECT:
+{
+  "kind": "insert",
+  "table": "archive_users",
+  "columns": ["name", "email"],
+  "select": {
+    "kind": "select",
+    "values": [
+      { "alias": "name", "value": { "source": "users", "column": "name" } },
+      { "alias": "email", "value": { "source": "users", "column": "email" } }
+    ],
+    "from": { "kind": "table", "table": "users" },
+    "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": false }]
+  }
+}
+
+Example 7: UPDATE with WHERE:
+{
+  "kind": "update",
+  "table": "users",
+  "set": [
+    { "column": "active", "value": false },
+    { "column": "deactivatedAt", "value": { "kind": "function", "function": "now", "args": [] } }
+  ],
+  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "lastLogin" }, "cmp": "<", "right": "2023-01-01" }]
+}
+
+Example 8: DELETE with WHERE:
+{
+  "kind": "delete",
+  "table": "temp_data",
+  "where": [{ "kind": "comparison", "left": { "source": "temp_data", "column": "created" }, "cmp": "<", "right": "2024-01-01" }]
+}
+
+Example 9: SELECT all columns using * wildcard:
+{
+  "kind": "select",
+  "values": [{ "alias": "all", "value": { "source": "users", "column": "*" } }],
+  "from": { "kind": "table", "table": "users" },
+  "limit": 10
+}
+
+Example 10: SELECT with * and additional specific columns:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "all", "value": { "source": "users", "column": "*" } },
+    { "alias": "fullName", "value": { "kind": "binary", "left": { "source": "users", "column": "firstName" }, "op": "+", "right": { "source": "users", "column": "lastName" } } }
+  ],
+  "from": { "kind": "table", "table": "users" }
+}
+
+{{modeInstructions}}`;
+    },
+    schema: ({ config }) => {
+      // Build schema dynamically from current config types
+      const currentTypes = config.getData().types;
+      const dbaSchemas = createDBASchemas(currentTypes);
+      return z.object({
+        query: dbaSchemas.QuerySchema.describe('The query to execute'),
+        ...globalToolProperties,
+      });
+    },
+    input: getOperationInput('query'),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx as unknown as CletusAIContext),
   });
 
   return [
-    dataCreate,
-    dataUpdate,
-    dataDelete,
-    dataSelect,
-    dataUpdateMany,
-    dataDeleteMany,
-    dataCount,
-    dataAggregate,
     dataIndex,
     dataImport,
     dataSearch,
-  ] as AnyTool[];
+    dbaQuery,
+  ] as [
+    typeof dataIndex,
+    typeof dataImport,
+    typeof dataSearch,
+    typeof dbaQuery,
+  ];
 }

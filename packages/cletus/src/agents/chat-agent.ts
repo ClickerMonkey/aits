@@ -1,11 +1,9 @@
 import { AnyTool } from '@aeye/core';
 import type { CletusAI, CletusAIContext } from '../ai';
 import { ADAPTIVE_TOOLING } from '../constants';
-import { isDBAEnabled } from '../file-manager';
 import { Operations } from '../operations/types';
 import {
   buildToolSelectionQuery,
-  getDBAToolsetName,
   getToolInstructions,
   RegisteredTool,
   toolRegistry
@@ -25,7 +23,7 @@ async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof 
     architectTools,
     artistTools,
     internetTools,
-    createDBATools,
+    dbaTools,
   } = toolsets;
 
   const ctx = await ai.buildContext({});
@@ -39,69 +37,11 @@ async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof 
   await toolRegistry.registerToolset('architect', architectTools, instruct);
   await toolRegistry.registerToolset('artist', artistTools, instruct);
   await toolRegistry.registerToolset('internet', internetTools, instruct);
+  await toolRegistry.registerToolset('dba', dbaTools, instruct);
 
   // Register utility tools
   const utilityTools = createUtilityTools(ai);
   await toolRegistry.registerToolset('utility', utilityTools, instruct);
-
-  // Register DBA tools for existing types only if enabled
-  if (!isDBAEnabled()) {
-    return;
-  }
-
-  const config = ai.config.defaultContext?.config;
-  if (!config) return;
-
-  const types = config.getData().types;
-  for (const type of types) {
-    const dbaTools = createDBATools(type);
-    const toolsetName = getDBAToolsetName(type.name);
-    await toolRegistry.registerToolset(toolsetName, dbaTools, instruct);
-  }
-}
-
-/**
- * Update DBA tools when types change
- */
-export function updateDBATools(ai: CletusAI, toolsets: ReturnType<typeof createToolsets>) {
-  // Skip DBA tools if not enabled
-  if (!isDBAEnabled()) {
-    return;
-  }
-
-  const { createDBATools } = toolsets;
-  const config = ai.config.defaultContext?.config;
-
-  if (!config) {
-    return;
-  }
-
-  const types = config.getData().types;
-
-  // Get current DBA toolsets
-  const currentDBAToolsets = toolRegistry.getToolsets().filter(t => t.startsWith('dba:'));
-  const expectedDBAToolsets = types.map(t => getDBAToolsetName(t.name));
-
-  // Remove old DBA toolsets
-  for (const toolset of currentDBAToolsets) {
-    if (!expectedDBAToolsets.includes(toolset)) {
-      toolRegistry.unregisterToolset(toolset);
-    }
-  }
-
-  // Add/update DBA toolsets
-  for (const type of types) {
-    const toolsetName = getDBAToolsetName(type.name);
-    toolRegistry.unregisterToolset(toolsetName);
-    const dbaTools = createDBATools(type);
-    toolRegistry.registerToolset(toolsetName, dbaTools, getToolInstructions);
-  }
-
-  // Re-embed all DBA tools
-  for (const type of types) {
-    const toolsetName = getDBAToolsetName(type.name);
-    toolRegistry.reembedToolset(toolsetName);
-  }
 }
 
 /**
@@ -151,15 +91,6 @@ export function createChatAgent(ai: CletusAI) {
   // Initialize the tool registry
   initializeToolRegistry(ai, toolsets);
 
-  // Register listener for type changes to update DBA tools dynamically
-  // Using a named listener so subsequent chat agents replace the previous listener
-  const config = ai.config.defaultContext?.config;
-  if (config) {
-    config.onTypeChange('chat-agent', () => {
-      updateDBATools(ai, toolsets);
-    });
-  }
-
   // Create utility tools (always available)
   const utilityTools = createUtilityTools(ai);
 
@@ -168,47 +99,22 @@ export function createChatAgent(ai: CletusAI) {
     const toolsetNames = toolRegistry.getToolsets();
     const descriptions: string[] = [];
 
-    // Collect DBA toolsets separately to avoid duplicating signatures
-    const dbaToolsets: string[] = [];
-    let dbaToolSignatures: string | null = null;
-
     for (const name of toolsetNames) {
       if (name === 'utility') {
         continue; // Skip utility, it's always available
       }
       
-      if (name.startsWith('dba:')) {
-        // Collect DBA toolset names
-        dbaToolsets.push(name);
-        // Get signatures from first DBA toolset (they're all the same)
-        if (!dbaToolSignatures) {
-          const tools = toolRegistry.getToolset(name);
-          dbaToolSignatures = tools
-            .map(t => {
-              const opName = t.name as keyof typeof Operations;
-              return Operations[opName]?.signature || t.name;
-            })
-            .join('\n  - ');
-        }
-      } else {
-        // Non-DBA toolsets
-        const tools = toolRegistry.getToolset(name);
-        const toolSignatures = tools
-          .map(t => {
-            const opName = t.name as keyof typeof Operations;
-            return Operations[opName]?.signature || t.name;
-          })
-          .join('\n  - ');
-        
-        const desc = getToolsetDescription(name);
-        descriptions.push(`- **${name}**: ${desc}\n  - ${toolSignatures}`);
-      }
-    }
-
-    // Add consolidated DBA toolsets description
-    if (dbaToolsets.length > 0 && dbaToolSignatures) {
-      const dbaNames = dbaToolsets.map(t => t.substring(4)).join(', ');
-      descriptions.push(`- **dba:[type]**: Data operations for types: ${dbaNames}\n  - ${dbaToolSignatures}`);
+      // All toolsets including DBA
+      const tools = toolRegistry.getToolset(name);
+      const toolSignatures = tools
+        .map(t => {
+          const opName = t.name as keyof typeof Operations;
+          return Operations[opName]?.signature || t.name;
+        })
+        .join('\n  - ');
+      
+      const desc = getToolsetDescription(name);
+      descriptions.push(`- **${name}**: ${desc}\n  - ${toolSignatures}`);
     }
 
     return descriptions.join('\n\n');
@@ -293,6 +199,7 @@ Tools:
       ...toolsets.architectTools,
       ...toolsets.artistTools,
       ...toolsets.clerkTools,
+      ...toolsets.dbaTools,
       ...toolsets.internetTools,
       ...toolsets.librarianTools,
       ...toolsets.plannerTools,
@@ -329,11 +236,6 @@ Tools:
  * Get a human-readable description for a toolset
  */
 function getToolsetDescription(name: string): string {
-  if (name.startsWith('dba:')) {
-    const typeName = name.substring(4);
-    return `Data operations for ${typeName} records (create, read, update, delete, search, aggregate)`;
-  }
-
   const descriptions: Record<string, string> = {
     planner: 'Task planning and todo management for multi-step operations',
     librarian: 'Knowledge search and management using semantic search',
@@ -342,6 +244,7 @@ function getToolsetDescription(name: string): string {
     architect: 'Type definitions and data schema management',
     artist: 'Image generation, editing, analysis, and search',
     internet: 'Web searches, page fetching, and REST API calls',
+    dba: 'Data operations for records (import, index, query, search)',
     utility: 'Core utilities like retool for switching toolsets',
   };
 

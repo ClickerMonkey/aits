@@ -462,6 +462,14 @@ describe('DBA Query Type Validation', () => {
         fields: { name: 'Alice', team_id: null },
       });
 
+      // Add the referenced team record
+      ctx.addRecord('teams', {
+        id: 't1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Engineering' },
+      });
+
       // Query: UPDATE with string ID for relationship field (should succeed)
       const query: Query = {
         kind: 'update',
