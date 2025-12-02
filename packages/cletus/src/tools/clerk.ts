@@ -362,6 +362,41 @@ Example: Attach a document:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_attach', input }, ctx),
   });
 
+  const shell = ai.tool({
+    name: 'shell',
+    description: 'Execute shell commands',
+    instructions: `⚠️ IMPORTANT: This tool should ONLY be used when NO other available tools can accomplish the task. Always prefer using specialized tools (file operations, text search, etc.) over shell commands.
+
+Use this to run shell commands on the system. The command will be executed in the current working directory.
+
+SYSTEM INFORMATION:
+- Operating System: ${process.platform}
+- Architecture: ${process.arch}
+- Shell: ${process.env.SHELL || (process.platform === 'win32' ? 'cmd.exe' : '/bin/sh')}
+
+The command should be appropriate for the operating system and shell available.
+
+${process.platform === 'win32' 
+  ? `Example: List files in current directory:
+{ "command": "dir" }
+
+Example: Check disk space:
+{ "command": "wmic logicaldisk get size,freespace,caption" }`
+  : `Example: List files in current directory:
+{ "command": "ls -la" }
+
+Example: Check disk usage:
+{ "command": "df -h" }`}
+
+{{modeInstructions}}`,
+    schema: z.object({
+      command: z.string().describe('Shell command to execute'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('shell'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'shell', input }, ctx),
+  });
+
   return [
     fileSearch,
     fileSummary,
@@ -377,6 +412,7 @@ Example: Attach a document:
     dirCreate,
     dirSummary,
     fileAttach,
+    shell,
   ] as [
     typeof fileSearch,
     typeof fileSummary,
@@ -392,5 +428,6 @@ Example: Attach a document:
     typeof dirCreate,
     typeof dirSummary,
     typeof fileAttach,
+    typeof shell,
   ];
 }
