@@ -365,7 +365,9 @@ Example: Attach a document:
   const shell = ai.tool({
     name: 'shell',
     description: 'Execute shell commands',
-    instructions: `Use this to run shell commands on the system. The command will be executed in the current working directory.
+    instructions: `⚠️ IMPORTANT: This tool should ONLY be used when NO other available tools can accomplish the task. Always prefer using specialized tools (file operations, text search, etc.) over shell commands.
+
+Use this to run shell commands on the system. The command will be executed in the current working directory.
 
 SYSTEM INFORMATION:
 - Operating System: ${process.platform}
@@ -374,12 +376,17 @@ SYSTEM INFORMATION:
 
 The command should be appropriate for the operating system and shell available.
 
-Example: List files in current directory:
-{ "command": "ls -la" } (Unix/Linux/Mac)
-{ "command": "dir" } (Windows)
+${process.platform === 'win32' 
+  ? `Example: List files in current directory:
+{ "command": "dir" }
+
+Example: Check disk space:
+{ "command": "wmic logicaldisk get size,freespace,caption" }`
+  : `Example: List files in current directory:
+{ "command": "ls -la" }
 
 Example: Check disk usage:
-{ "command": "df -h" } (Unix/Linux/Mac)
+{ "command": "df -h" }`}
 
 {{modeInstructions}}`,
     schema: z.object({
