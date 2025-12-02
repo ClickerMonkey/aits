@@ -670,6 +670,34 @@ describe('executeQuery', () => {
       expect(records).toHaveLength(1);
       expect(records[0].fields.name).toBe('Alice');
     });
+
+    it('should throw error when columns and values count mismatch', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'email', friendlyName: 'Email', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      // Query: INSERT with 3 columns but only 2 values
+      const query: Query = {
+        kind: 'insert',
+        table: 'users',
+        columns: ['name', 'email', 'age'],
+        values: ['Alice', 'alice@example.com'], // Missing age value
+      };
+
+      // Execute and expect error
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+        'INSERT column/value count mismatch: 3 columns but 2 values provided'
+      );
+    });
   });
 
   describe('UPDATE queries', () => {
@@ -3130,6 +3158,625 @@ describe('executeQuery', () => {
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].name).toBe('Bob');
+    });
+  });
+
+  describe('Column validation', () => {
+    it('should throw error when referencing non-existent column on a table', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query with non-existent column 'email'
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'name', value: { source: 'users', column: 'name' } },
+          { alias: 'email', value: { source: 'users', column: 'email' } }, // Invalid column
+        ],
+        from: { kind: 'table', table: 'users' },
+      };
+
+      // Execute - should throw error
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+        "Column 'email' does not exist on type 'users'"
+      );
+    });
+
+    it('should throw error when referencing non-existent column in WHERE clause', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query with non-existent column in WHERE
+      const query: Query = {
+        kind: 'select',
+        values: [{ alias: 'name', value: { source: 'users', column: 'name' } }],
+        from: { kind: 'table', table: 'users' },
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'invalidColumn' }, // Invalid column
+            cmp: '=',
+            right: 'test',
+          },
+        ],
+      };
+
+      // Execute - should throw error
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+        "Column 'invalidColumn' does not exist on type 'users'"
+      );
+    });
+
+    it('should throw error when referencing non-existent column in ORDER BY', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query with non-existent column in ORDER BY
+      const query: Query = {
+        kind: 'select',
+        values: [{ alias: 'name', value: { source: 'users', column: 'name' } }],
+        from: { kind: 'table', table: 'users' },
+        orderBy: [
+          {
+            value: { source: 'users', column: 'nonExistentColumn' }, // Invalid column
+            dir: 'asc',
+          },
+        ],
+      };
+
+      // Execute - should throw error
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+        "Column 'nonExistentColumn' does not exist on type 'users'"
+      );
+    });
+
+    it('should throw error for non-existent column in UPDATE SET clause', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query trying to read from non-existent column
+      const query: Query = {
+        kind: 'update',
+        table: 'users',
+        set: [
+          {
+            column: 'name',
+            value: { source: 'users', column: 'invalidColumn' }, // Invalid column
+          },
+        ],
+      };
+
+      // Execute - should throw error
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+        "Column 'invalidColumn' does not exist on type 'users'"
+      );
+    });
+
+    it('should allow columns from aliased sources and CTEs without strict validation', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query with CTE - the final query references columns from the CTE
+      const query: Query = {
+        kind: 'withs',
+        withs: [
+          {
+            kind: 'cte',
+            name: 'user_data',
+            statement: {
+              kind: 'select',
+              values: [
+                { alias: 'user_name', value: { source: 'users', column: 'name' } },
+                { alias: 'constant_value', value: 123 },
+              ],
+              from: { kind: 'table', table: 'users' },
+            },
+          },
+        ],
+        final: {
+          kind: 'select',
+          values: [
+            { alias: 'name', value: { source: 'user_data', column: 'user_name' } },
+            { alias: 'value', value: { source: 'user_data', column: 'constant_value' } },
+          ],
+          from: { kind: 'table', table: 'user_data' },
+        },
+      };
+
+      // Execute - should work because user_data is a CTE, not a table
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toEqual({ name: 'Alice', value: 123 });
+    });
+  });
+
+  describe('Wildcard column selection (*)', () => {
+    it('should expand * to all columns including system fields', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      const now = Date.now();
+      ctx.addRecord('users', {
+        id: 'user1',
+        created: now,
+        updated: now,
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query using * to select all columns
+      const query: Query = {
+        kind: 'select',
+        values: [{ alias: 'all', value: { source: 'users', column: '*' } }],
+        from: { kind: 'table', table: 'users' },
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should expand to all columns (id, created, updated, name, age)
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', 'user1');
+      expect(result.rows[0]).toHaveProperty('created', now);
+      expect(result.rows[0]).toHaveProperty('updated', now);
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('age', 30);
+    });
+
+    it('should combine * with other specific columns', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: 'user1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query combining * with specific column
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'all', value: { source: 'users', column: '*' } },
+          { alias: 'double_age', value: { kind: 'binary', left: { source: 'users', column: 'age' }, op: '*', right: 2 } },
+        ],
+        from: { kind: 'table', table: 'users' },
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', 'user1');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('age', 30);
+      expect(result.rows[0]).toHaveProperty('double_age', 60);
+    });
+
+    it('should handle * in queries with WHERE clause', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: 'user1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      ctx.addRecord('users', {
+        id: 'user2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Bob', age: 25 },
+      });
+
+      // Query with * and WHERE clause
+      const query: Query = {
+        kind: 'select',
+        values: [{ alias: 'all', value: { source: 'users', column: '*' } }],
+        from: { kind: 'table', table: 'users' },
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'age' },
+            cmp: '>',
+            right: 26,
+          },
+        ],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - only Alice matches
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('age', 30);
+    });
+
+    it('should handle * with aliased tables', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: 'user1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query with aliased table using *
+      const query: Query = {
+        kind: 'select',
+        values: [{ alias: 'all', value: { source: 'u', column: '*' } }],
+        from: { kind: 'table', table: 'users', as: 'u' },
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', 'user1');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+    });
+
+    it('should handle * in JOIN queries', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addType({
+        name: 'orders',
+        friendlyName: 'Orders',
+        description: 'Order records',
+        knowledgeTemplate: '{{userid}}',
+        fields: [
+          { name: 'userid', friendlyName: 'User ID', type: 'string', required: true },
+          { name: 'amount', friendlyName: 'Amount', type: 'number', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      ctx.addRecord('orders', {
+        id: 'o1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { userid: '1', amount: 100 },
+      });
+
+      // Query with * from joined tables
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'user_all', value: { source: 'u', column: '*' } },
+          { alias: 'order_amount', value: { source: 'o', column: 'amount' } },
+        ],
+        from: { kind: 'table', table: 'users', as: 'u' },
+        joins: [
+          {
+            type: 'inner',
+            source: { kind: 'table', table: 'orders', as: 'o' },
+            on: [
+              {
+                kind: 'comparison',
+                left: { source: 'u', column: 'id' },
+                cmp: '=',
+                right: { source: 'o', column: 'userid' },
+              },
+            ],
+          },
+        ],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should have user columns expanded plus order amount
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', '1');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('order_amount', 100);
+    });
+
+    it('should handle * with GROUP BY', async () => {
+      // Setup
+      ctx.addType({
+        name: 'orders',
+        friendlyName: 'Orders',
+        description: 'Order records',
+        knowledgeTemplate: '{{customer}}',
+        fields: [
+          { name: 'customer', friendlyName: 'Customer', type: 'string', required: true },
+          { name: 'amount', friendlyName: 'Amount', type: 'number', required: true },
+        ],
+      });
+
+      ctx.addRecord('orders', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { customer: 'Alice', amount: 100 },
+      });
+
+      ctx.addRecord('orders', {
+        id: '2',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { customer: 'Alice', amount: 150 },
+      });
+
+      // Query with * in GROUP BY context (getting first record of group)
+      const query: Query = {
+        kind: 'select',
+        values: [
+          { alias: 'customer', value: { source: 'orders', column: 'customer' } },
+          { alias: 'total', value: { kind: 'aggregate', aggregate: 'sum', value: { source: 'orders', column: 'amount' } } },
+        ],
+        from: { kind: 'table', table: 'orders' },
+        groupBy: [{ source: 'orders', column: 'customer' }],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toEqual({ customer: 'Alice', total: 250 });
+    });
+
+    it('should handle * in INSERT...RETURNING', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      // Query: INSERT with RETURNING *
+      const query: Query = {
+        kind: 'insert',
+        table: 'users',
+        columns: ['name', 'age'],
+        values: ['Alice', 30],
+        returning: [{ alias: 'all', value: { source: 'users', column: '*' } }],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should return all columns of inserted record
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id');
+      expect(result.rows[0]).toHaveProperty('created');
+      expect(result.rows[0]).toHaveProperty('updated');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('age', 30);
+    });
+
+    it('should handle * in UPDATE...RETURNING', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+          { name: 'age', friendlyName: 'Age', type: 'number', required: false },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice', age: 30 },
+      });
+
+      // Query: UPDATE with RETURNING *
+      const query: Query = {
+        kind: 'update',
+        table: 'users',
+        set: [{ column: 'age', value: 31 }],
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'name' },
+            cmp: '=',
+            right: 'Alice',
+          },
+        ],
+        returning: [{ alias: 'all', value: { source: 'users', column: '*' } }],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should return all columns with updated age
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', '1');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+      expect(result.rows[0]).toHaveProperty('age', 31);
+    });
+
+    it('should handle * in DELETE...RETURNING', async () => {
+      // Setup
+      ctx.addType({
+        name: 'users',
+        friendlyName: 'Users',
+        description: 'User records',
+        knowledgeTemplate: '{{name}}',
+        fields: [
+          { name: 'name', friendlyName: 'Name', type: 'string', required: true },
+        ],
+      });
+
+      ctx.addRecord('users', {
+        id: '1',
+        created: Date.now(),
+        updated: Date.now(),
+        fields: { name: 'Alice' },
+      });
+
+      // Query: DELETE with RETURNING *
+      const query: Query = {
+        kind: 'delete',
+        table: 'users',
+        where: [
+          {
+            kind: 'comparison',
+            left: { source: 'users', column: 'name' },
+            cmp: '=',
+            right: 'Alice',
+          },
+        ],
+        returning: [{ alias: 'all', value: { source: 'users', column: '*' } }],
+      };
+
+      // Execute
+      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+
+      // Assert - should return all columns of deleted record
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toHaveProperty('id', '1');
+      expect(result.rows[0]).toHaveProperty('name', 'Alice');
+
+      // Verify deletion
+      const manager = ctx.getMockManager('users');
+      expect(manager.getAll()).toHaveLength(0);
     });
   });
 });

@@ -116,6 +116,20 @@ export type OperationDefinition<TInput, TOutput, TCache> = {
    * For example, file_read might include instructions to respect spacing and formatting.
    */
   instructions?: string;
+
+  /**
+   * Format for rendering input in operation messages. Defaults to 'yaml'.
+   * - 'yaml': Renders as bullet-point list with hyphens (the default)
+   * - 'json': Renders as formatted JSON
+   */
+  inputFormat?: 'json' | 'yaml';
+
+  /**
+   * Format for rendering output in operation messages. Defaults to 'yaml'.
+   * - 'yaml': Renders as bullet-point list with hyphens (the default)
+   * - 'json': Renders as formatted JSON
+   */
+  outputFormat?: 'json' | 'yaml';
 };
 
 // Operation definition for a specific operation kind

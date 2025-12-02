@@ -146,6 +146,21 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
 }
 
 /**
+ * Format a value for display based on format type.
+ *
+ * @param value - value to format
+ * @param format - format type ('json' or 'yaml', defaults to 'yaml')
+ * @param alreadyIndented - whether content should be indented/hyphenated (only for yaml)
+ * @returns formatted string
+ */
+export function formatValueWithFormat(value: any, format: 'json' | 'yaml' = 'yaml', alreadyIndented: boolean = false): string {
+  if (format === 'json') {
+    return JSON.stringify(value, null, 2);
+  }
+  return formatValue(value, alreadyIndented);
+}
+
+/**
  * Pluralize a word based on count.
  * 
  * @param count - number of items

@@ -35,7 +35,7 @@ export type Source = string; // table or alias or with statement name
 export type Table = string; // table that can be read from
 export type Column = string; // column name, used for insert/update (lvalues)
 export type Alias = string; // alias for a value, used for select or returning
-export type SourceColumn = { source: Source, column: Column }; // used for rvalues
+export type SourceColumn = { source: Source, column: Column | '*' }; // used for rvalues, '*' expands to all columns
 export type Constant = number | string | boolean | null; // dates are represented as strings in yyyy-mm-dd format and dateTimes include millisecond precision. duration fields are stored as pg intervals
 export type Aggregate = 'count' | 'min' | 'max' | 'avg' | 'sum';
 export type Binary = '+' | '-' | '*' | '/';
@@ -197,14 +197,14 @@ export function createDBASchemas(types: TypeDefinition[]) {
 
       return z.object({
         source: z.literal(t.name),
-        column: z.enum(['id', 'created', 'updated', ...t.fields.map(f => f.name)] as [string, ...string[]]).describe(`Column from ${t.name} (${t.friendlyName}). Fields: ${fieldDescriptions}`),
+        column: z.enum(['id', 'created', 'updated', ...t.fields.map(f => f.name), '*'] as [string, ...string[]]).describe(`Column from ${t.name} (${t.friendlyName}). Use '*' to select all columns. Fields: ${fieldDescriptions}`),
       }).describe(`Reference to a column from ${t.friendlyName} table (${t.name})`);
     }),
     z.object({
       source: SourceSchema.describe('Alias or CTE name'),
-      column: ColumnSchema.describe('Column name from the source'),
+      column: z.union([ColumnSchema, z.literal('*')]).describe('Column name from the source, or "*" to select all columns'),
     }).describe('Reference to a column from a CTE, aliased table/subquery'),
-  ]).meta({ aid: 'SourceColumn' }).describe('Reference to a column from a specific source')
+  ]).meta({ aid: 'SourceColumn' }).describe('Reference to a column from a specific source. Use column: "*" to select all columns from that source.')
 
   const ConstantSchema: z.ZodType<Constant> = z.union([
     z.number(),

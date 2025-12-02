@@ -774,12 +774,26 @@ async function executeSelect(
     for (const [, groupRecs] of groups) {
       const row: Record<string, unknown> = {};
       for (const aliasValue of stmt.values) {
-        row[aliasValue.alias] = await evaluateValueAsync(
+        const evaluatedValue = await evaluateValueAsync(
           aliasValue.value,
           groupRecs[0],
           ctx,
           groupRecs
         );
+
+        // Handle "*" expansion
+        if (
+          isSourceColumn(aliasValue.value) &&
+          aliasValue.value.column === '*' &&
+          typeof evaluatedValue === 'object' &&
+          evaluatedValue !== null &&
+          !Array.isArray(evaluatedValue)
+        ) {
+          // Expand all columns into the row
+          Object.assign(row, evaluatedValue);
+        } else {
+          row[aliasValue.alias] = evaluatedValue;
+        }
       }
       rowsWithGroups.push({ row, groupRecs });
     }
@@ -812,12 +826,26 @@ async function executeSelect(
       // Single aggregate result
       const row: Record<string, unknown> = {};
       for (const aliasValue of stmt.values) {
-        row[aliasValue.alias] = await evaluateValueAsync(
+        const evaluatedValue = await evaluateValueAsync(
           aliasValue.value,
           records[0],
           ctx,
           records
         );
+
+        // Handle "*" expansion
+        if (
+          isSourceColumn(aliasValue.value) &&
+          aliasValue.value.column === '*' &&
+          typeof evaluatedValue === 'object' &&
+          evaluatedValue !== null &&
+          !Array.isArray(evaluatedValue)
+        ) {
+          // Expand all columns into the row
+          Object.assign(row, evaluatedValue);
+        } else {
+          row[aliasValue.alias] = evaluatedValue;
+        }
       }
       rows = [row];
     } else if (records.length === 0 && stmt.values.length > 0) {
@@ -825,12 +853,26 @@ async function executeSelect(
       if (hasAggregates) {
         const row: Record<string, unknown> = {};
         for (const aliasValue of stmt.values) {
-          row[aliasValue.alias] = await evaluateValueAsync(
+          const evaluatedValue = await evaluateValueAsync(
             aliasValue.value,
             null,
             ctx,
             []
           );
+
+          // Handle "*" expansion
+          if (
+            isSourceColumn(aliasValue.value) &&
+            aliasValue.value.column === '*' &&
+            typeof evaluatedValue === 'object' &&
+            evaluatedValue !== null &&
+            !Array.isArray(evaluatedValue)
+          ) {
+            // Expand all columns into the row
+            Object.assign(row, evaluatedValue);
+          } else {
+            row[aliasValue.alias] = evaluatedValue;
+          }
         }
         rows = [row];
       } else {
@@ -842,7 +884,21 @@ async function executeSelect(
         const row: Record<string, unknown> = {};
         for (const aliasValue of stmt.values) {
           // Pass all records for window function support
-          row[aliasValue.alias] = await evaluateValueAsync(aliasValue.value, record, ctx, records);
+          const evaluatedValue = await evaluateValueAsync(aliasValue.value, record, ctx, records);
+
+          // Handle "*" expansion - if the value is an object with multiple keys from getAllColumnValues
+          if (
+            isSourceColumn(aliasValue.value) &&
+            aliasValue.value.column === '*' &&
+            typeof evaluatedValue === 'object' &&
+            evaluatedValue !== null &&
+            !Array.isArray(evaluatedValue)
+          ) {
+            // Expand all columns into the row
+            Object.assign(row, evaluatedValue);
+          } else {
+            row[aliasValue.alias] = evaluatedValue;
+          }
         }
         rows.push(row);
       }
@@ -891,6 +947,14 @@ async function executeInsert(
   let valuesToInsert: Record<string, unknown>[];
 
   if (stmt.values?.length) {
+    // Validate that columns and values arrays match
+    if (stmt.values.length !== stmt.columns.length) {
+      throw new Error(
+        `INSERT column/value count mismatch: ${stmt.columns.length} columns but ${stmt.values.length} values provided. ` +
+        `Columns: [${stmt.columns.join(', ')}]`
+      );
+    }
+
     // Direct values
     const record: Record<string, unknown> = {};
     for (let i = 0; i < stmt.columns.length; i++) {
@@ -955,7 +1019,21 @@ async function executeInsert(
     for (const record of insertedRecords) {
       const row: Record<string, unknown> = {};
       for (const av of stmt.returning) {
-        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
+        const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
+
+        // Handle "*" expansion
+        if (
+          isSourceColumn(av.value) &&
+          av.value.column === '*' &&
+          typeof evaluatedValue === 'object' &&
+          evaluatedValue !== null &&
+          !Array.isArray(evaluatedValue)
+        ) {
+          // Expand all columns into the row
+          Object.assign(row, evaluatedValue);
+        } else {
+          row[av.alias] = evaluatedValue;
+        }
       }
       rows.push(row);
     }
@@ -1030,7 +1108,21 @@ async function executeUpdate(
     for (const record of updatedRecords) {
       const row: Record<string, unknown> = {};
       for (const av of stmt.returning) {
-        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
+        const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
+
+        // Handle "*" expansion
+        if (
+          isSourceColumn(av.value) &&
+          av.value.column === '*' &&
+          typeof evaluatedValue === 'object' &&
+          evaluatedValue !== null &&
+          !Array.isArray(evaluatedValue)
+        ) {
+          // Expand all columns into the row
+          Object.assign(row, evaluatedValue);
+        } else {
+          row[av.alias] = evaluatedValue;
+        }
       }
       rows.push(row);
     }
@@ -1080,7 +1172,21 @@ async function executeDelete(
     for (const record of recordsToDelete) {
       const row: Record<string, unknown> = {};
       for (const av of stmt.returning) {
-        row[av.alias] = await evaluateValueAsync(av.value, record, ctx);
+        const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
+
+        // Handle "*" expansion
+        if (
+          isSourceColumn(av.value) &&
+          av.value.column === '*' &&
+          typeof evaluatedValue === 'object' &&
+          evaluatedValue !== null &&
+          !Array.isArray(evaluatedValue)
+        ) {
+          // Expand all columns into the row
+          Object.assign(row, evaluatedValue);
+        } else {
+          row[av.alias] = evaluatedValue;
+        }
       }
       rows.push(row);
     }
@@ -1507,6 +1613,48 @@ function getColumnValue(record: DataRecord, column: string): unknown {
 }
 
 /**
+ * Get all column names for a type (including system columns)
+ */
+function getTypeColumns(typeName: string, ctx: QueryContext): string[] {
+  const typeDef = ctx.types.get(typeName);
+  if (!typeDef) {
+    return [];
+  }
+  return ['id', 'created', 'updated', ...typeDef.fields.map(f => f.name)];
+}
+
+/**
+ * Validate that a column exists on a type, throwing an error if not
+ */
+function validateColumnOnType(typeName: string, column: string, ctx: QueryContext): void {
+  if (column === '*') {
+    return; // '*' is always valid
+  }
+
+  const typeDef = ctx.types.get(typeName);
+  if (!typeDef) {
+    throw new Error(`Type '${typeName}' not found`);
+  }
+
+  const validColumns = ['id', 'created', 'updated', ...typeDef.fields.map(f => f.name)];
+  if (!validColumns.includes(column)) {
+    throw new Error(`Column '${column}' does not exist on type '${typeName}'. Valid columns: ${validColumns.join(', ')}`);
+  }
+}
+
+/**
+ * Get all column values from a record as an object (for "*" expansion)
+ */
+function getAllColumnValues(record: DataRecord): Record<string, unknown> {
+  return {
+    id: record.id,
+    created: record.created,
+    updated: record.updated,
+    ...record.fields,
+  };
+}
+
+/**
  * Evaluate a value expression - async version for subquery support
  */
 async function evaluateValueAsync(
@@ -1533,6 +1681,11 @@ async function evaluateValueAsync(
   if (isSourceColumn(value)) {
     if (!record) return null;
 
+    // Validate column exists on type if source is a table name
+    if (ctx.types.has(value.source)) {
+      validateColumnOnType(value.source, value.column, ctx);
+    }
+
     // Check aliases first, then direct field access
     const aliasRecords = ctx.aliases.get(value.source);
     if (aliasRecords?.length) {
@@ -1552,24 +1705,40 @@ async function evaluateValueAsync(
         }
 
         if (sourceRecord) {
+          // Handle "*" expansion
+          if (value.column === '*') {
+            return getAllColumnValues(sourceRecord);
+          }
           return getColumnValue(sourceRecord, value.column);
         }
       } else {
         // Regular record - first try to find it in the alias by ID match
         const aliasRecord = aliasRecords.find((r) => r.id === record.id);
         if (aliasRecord) {
+          // Handle "*" expansion
+          if (value.column === '*') {
+            return getAllColumnValues(aliasRecord);
+          }
           return getColumnValue(aliasRecord, value.column);
         }
-        
+
         // If we have exactly one record in the alias (e.g., for correlated subqueries),
         // use that record directly - this handles cross-context lookups
         if (aliasRecords.length === 1) {
           const singleRecord = aliasRecords[0];
+          // Handle "*" expansion
+          if (value.column === '*') {
+            return getAllColumnValues(singleRecord);
+          }
           return getColumnValue(singleRecord, value.column);
         }
       }
     }
 
+    // Handle "*" expansion for direct record access
+    if (value.column === '*') {
+      return getAllColumnValues(record);
+    }
     return getColumnValue(record, value.column);
   }
 
@@ -1971,12 +2140,27 @@ function evaluateValueSync(
   }
   if (isSourceColumn(value)) {
     if (!record) return null;
+
+    // Validate column exists on type if source is a table name
+    if (ctx.types.has(value.source)) {
+      validateColumnOnType(value.source, value.column, ctx);
+    }
+
     const aliasRecords = ctx.aliases.get(value.source);
     if (aliasRecords?.length) {
       const aliasRecord = aliasRecords.find((r) => r.id === record.id);
       if (aliasRecord) {
+        // Handle "*" expansion
+        if (value.column === '*') {
+          return getAllColumnValues(aliasRecord);
+        }
         return getColumnValue(aliasRecord, value.column);
       }
+    }
+
+    // Handle "*" expansion
+    if (value.column === '*') {
+      return getAllColumnValues(record);
     }
     return getColumnValue(record, value.column);
   }

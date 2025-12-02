@@ -258,6 +258,60 @@ Example 3: Aggregation with GROUP BY:
   "groupBy": [{ "source": "products", "column": "category" }]
 }
 
+Example 4: Simple INSERT with constant values:
+{
+  "kind": "insert",
+  "table": "users",
+  "columns": ["name", "email", "age"],
+  "values": ["Alice Smith", "alice@example.com", 30]
+}
+
+Example 5: INSERT with ON CONFLICT:
+{
+  "kind": "insert",
+  "table": "users",
+  "columns": ["email", "name"],
+  "values": ["bob@example.com", "Bob Jones"],
+  "onConflict": {
+    "columns": ["email"],
+    "update": [{ "column": "name", "value": "Bob Jones" }]
+  }
+}
+
+Example 6: INSERT from SELECT:
+{
+  "kind": "insert",
+  "table": "archive_users",
+  "columns": ["name", "email"],
+  "select": {
+    "kind": "select",
+    "values": [
+      { "alias": "name", "value": { "source": "users", "column": "name" } },
+      { "alias": "email", "value": { "source": "users", "column": "email" } }
+    ],
+    "from": { "kind": "table", "table": "users" },
+    "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": false }]
+  }
+}
+
+Example 7: UPDATE with WHERE:
+{
+  "kind": "update",
+  "table": "users",
+  "set": [
+    { "column": "active", "value": false },
+    { "column": "deactivatedAt", "value": { "kind": "function", "function": "now", "args": [] } }
+  ],
+  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "lastLogin" }, "cmp": "<", "right": "2023-01-01" }]
+}
+
+Example 8: DELETE with WHERE:
+{
+  "kind": "delete",
+  "table": "temp_data",
+  "where": [{ "kind": "comparison", "left": { "source": "temp_data", "column": "created" }, "cmp": "<", "right": "2024-01-01" }]
+}
+
 {{modeInstructions}}`,
     schema: ({ config }) => {
       // Build schema dynamically from current config types

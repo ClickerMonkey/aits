@@ -1249,6 +1249,8 @@ export const query = operationOf<
   mode: 'update', // Can modify data, so requires update mode
   signature: 'query(query: Query, commit?: boolean = true)',
   status: ({ query }) => `Executing ${getQueryKind(query)} query`,
+  inputFormat: 'json',
+  outputFormat: 'json',
   analyze: async ({ input: { query } }, { config }) => {
     const types = config.getData().types;
 
