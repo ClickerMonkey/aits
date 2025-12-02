@@ -244,22 +244,20 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     await onChatUpdate({ questions: [] });
     setChatMeta({ ...chatMeta, questions: [] });
     setCurrentQuestionIndex(0);
+    setCurrentOptionIndex(0);
     setQuestionAnswers({});
     setQuestionCustomAnswers({});
     
     // Add the formatted answer as a user message
     addMessage({
       role: 'user',
+      name: config.getData().user.name,
       content: [{ type: 'text', content: answerText }],
       created: Date.now(),
     });
     
-    // Trigger chat orchestrator by calling handleExecution
-    setIsWaitingForResponse(true);
-    // Need to wait for the message to be added to state
-    setTimeout(async () => {
-      await handleExecution();
-    }, 100);
+    // Trigger chat orchestrator
+    await handleExecution();
   };
 
   // Load messages from file on mount
@@ -1352,14 +1350,17 @@ After installation and the SoX executable is in the path, restart Cletus and try
           
           {/* Question tabs */}
           <Box marginBottom={1}>
-            {chatMeta.questions.map((q, idx) => (
-              <Box key={idx} marginRight={1}>
-                <Text color={idx === currentQuestionIndex ? 'cyan' : 'gray'} bold={idx === currentQuestionIndex}>
-                  {idx === currentQuestionIndex ? '▶ ' : '  '}
-                  {q.name}
-                </Text>
-              </Box>
-            ))}
+            {chatMeta.questions.map((q, questionIndex) => {
+              const isCurrentQuestion = questionIndex === currentQuestionIndex;
+              return (
+                <Box key={questionIndex} marginRight={1}>
+                  <Text color={isCurrentQuestion ? 'cyan' : 'gray'} bold={isCurrentQuestion}>
+                    {isCurrentQuestion ? '▶ ' : '  '}
+                    {q.name}
+                  </Text>
+                </Box>
+              );
+            })}
           </Box>
 
           {/* Current question content */}
@@ -1376,11 +1377,11 @@ After installation and the SoX executable is in the path, restart Cletus and try
                   </Text>
                 </Box>
                 
-                {question.options.map((option, optIdx) => {
-                  const isSelected = selections.has(optIdx);
-                  const isHighlighted = optIdx === currentOptionIndex;
+                {question.options.map((option, optionIndex) => {
+                  const isSelected = selections.has(optionIndex);
+                  const isHighlighted = optionIndex === currentOptionIndex;
                   return (
-                    <Box key={optIdx} marginBottom={0}>
+                    <Box key={optionIndex} marginBottom={0}>
                       <Text color={isSelected ? 'green' : (isHighlighted ? 'cyan' : 'white')} bold={isHighlighted}>
                         {isHighlighted ? '▶ ' : '  '}
                         {isRadio ? (isSelected ? '◉ ' : '◯ ') : (isSelected ? '☑ ' : '☐ ')}
