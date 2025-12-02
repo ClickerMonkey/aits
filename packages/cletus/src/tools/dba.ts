@@ -111,6 +111,43 @@ Example: Search for relevant records:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input }, ctx as unknown as CletusAIContext),
   });
 
+  const dataGet = ai.tool({
+    name: 'data_get',
+    description: 'Get paginated records of a data type',
+    instructionsFn: (ctx) => {
+      const types = ctx.config.getData().types.map((t) => t.name);
+      return `Use this for simple paged data retrieval. Returns a page of records and the total count for a given type.
+
+If any filtering, sorting, or complex operations are needed for accuracy, use the query tool instead.
+
+Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+
+Example: Get first 10 records:
+{ "type": "task" }
+
+Example: Get records 20-30:
+{ "type": "task", "offset": 20, "limit": 10 }
+
+{{modeInstructions}}`;
+    },
+    schema: ({ config }) => {
+      const typeNames = config.getData().types.map(t => t.name);
+      // Return undefined if no types - tool can't be used
+      if (typeNames.length === 0) {
+        return undefined;
+      }
+      return z.object({
+        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to retrieve records from'),
+        offset: z.number().optional().describe('Number of records to skip (default: 0)'),
+        limit: z.number().optional().describe('Maximum records to return (default: 10)'),
+        ...globalToolProperties,
+      });
+    },
+    input: getOperationInput('data_get'),
+    applicable: ({ config }) => config.getData().types.length > 0,
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_get', input }, ctx as unknown as CletusAIContext),
+  });
+
   const dbaQuery = ai.tool({
     name: 'query',
     description: 'Execute complex SQL-like queries across data types',
@@ -255,11 +292,13 @@ Example 10: SELECT with * and additional specific columns:
     dataIndex,
     dataImport,
     dataSearch,
+    dataGet,
     dbaQuery,
   ] as [
     typeof dataIndex,
     typeof dataImport,
     typeof dataSearch,
+    typeof dataGet,
     typeof dbaQuery,
   ];
 }
