@@ -203,7 +203,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     z.object({
       source: SourceSchema.describe('Alias or CTE name'),
       column: ColumnSchema.describe('Column name from the source'),
-    })
+    }).describe('Reference to a column from a CTE, aliased table/subquery'),
   ]).meta({ aid: 'SourceColumn' }).describe('Reference to a column from a specific source')
 
   const ConstantSchema: z.ZodType<Constant> = z.union([
@@ -341,7 +341,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     z.object({
       kind: z.literal('table'),
       table: TableSchema.describe('Table name'),
-      as: z.string().nullable().optional().describe('Table alias'),
+      as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
     }).describe('Table data source'),
     z.object({
       kind: z.literal('subquery'),
@@ -358,7 +358,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
 
   const SelectSchema: z.ZodType<Select> = z.lazy(() => z.object({
     kind: z.literal('select'),
-    distinct: z.boolean().nullable().optional().describe('Whether to return distinct rows'),
+    distinct: z.boolean().nullable().optional().describe('Whether to return distinct rows, use false by default true if required to satisfy requirements'),
     values: z.array(AliasValueSchema).describe('Values to select'),
     from: DataSourceSchema.nullable().optional().describe('FROM data source'),
     joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
@@ -387,7 +387,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     return z.object({
       kind: z.literal('insert'),
       table: z.literal(t.name).describe(`Insert into ${t.name} table`),
-      as: z.string().nullable().optional().describe('Table alias'),
+      as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
       columns: z.array(TypedColumnSchema).describe(`Columns to insert into ${t.name}`),
       values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
       select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
@@ -404,7 +404,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
   const genericInsertSchema = z.object({
     kind: z.literal('insert'),
     table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
+    as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
     columns: z.array(ColumnSchema).describe('Columns to insert into'),
     values: z.array(ValueSchema).nullable().optional().describe('Values to insert (mutually exclusive with select)'),
     select: SelectOrSetSchema.nullable().optional().describe('SELECT query for values (mutually exclusive with values)'),
@@ -438,7 +438,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
       kind: z.literal('update'),
       set: z.array(TypedColumnValueSchema).describe(`Column assignments for ${t.name}`),
       table: z.literal(t.name).describe(`Update ${t.name} table`),
-      as: z.string().nullable().optional().describe('Table alias'),
+      as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
       from: DataSourceSchema.nullable().optional().describe('FROM data source'),
       joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
       where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
@@ -451,7 +451,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     kind: z.literal('update'),
     set: z.array(ColumnValueSchema).describe('Column assignments'),
     table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
+    as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
     from: DataSourceSchema.nullable().optional().describe('FROM data source'),
     joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
     where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
@@ -470,7 +470,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     return z.object({
       kind: z.literal('delete'),
       table: z.literal(t.name).describe(`Delete from ${t.name} table`),
-      as: z.string().nullable().optional().describe('Table alias'),
+      as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
       joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
       where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
       returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
@@ -481,7 +481,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
   const genericDeleteSchema = z.object({
     kind: z.literal('delete'),
     table: TableSchema.describe('Target table'),
-    as: z.string().nullable().optional().describe('Table alias'),
+    as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
     joins: z.array(JoinSchema).nullable().optional().describe('JOIN clauses'),
     where: z.array(BooleanValueSchema).nullable().optional().describe('WHERE conditions (ANDed together)'),
     returning: z.array(AliasValueSchema).nullable().optional().describe('RETURNING clause'),
