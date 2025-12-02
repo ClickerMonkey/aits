@@ -279,6 +279,7 @@ Tools:
 - If you need tools from a different toolset, use the 'retool' utility to switch or enable adaptive selection.
 - The adaptive tool selection uses embedding similarity to find the most relevant tools for your current task.
 - Use 'retool' with null to re-enable adaptive selection if you've been focused on a specific toolset.
+- Choose the simplest tool that accomplishes the task. Avoid over-engineering solutions.
 </rules>
 
 <importantRules>

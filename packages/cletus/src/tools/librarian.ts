@@ -9,11 +9,23 @@ export function createLibrarianTools(ai: CletusAI) {
   const knowledgeSearch = ai.tool({
     name: 'knowledge_search',
     description: 'Search knowledge base by semantic similarity',
-    instructions: `Use this to find relevant information from the knowledge base using semantic search. Provide a query and optionally filter by source prefix (e.g., "user", "file@path:", "task:id").
+    instructions: `Use this to find relevant information from PREVIOUSLY INDEXED content using semantic search. This searches embeddings that were created earlier via file_index or knowledge_add.
+
+IMPORTANT: This only searches content that has already been indexed. If you need to understand a specific file that hasn't been indexed, use file_read instead.
+
+When to use:
+- Searching across many previously indexed documents
+- Finding relevant context from user memories
+- Retrieving information from a prepared knowledge base
+
+When NOT to use:
+- File hasn't been indexed yet - use file_read instead
+- Just need to read a specific file - use file_read
+- No knowledge base has been set up yet
 
 Example: Search for user preferences:
 { "query": "user's preferred programming languages", "limit": 5, "sourcePrefix": "user" }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       query: z.string().describe('Search query text'),
@@ -28,11 +40,23 @@ Example: Search for user preferences:
   const knowledgeSources = ai.tool({
     name: 'knowledge_sources',
     description: 'List all unique source prefixes in knowledge base',
-    instructions: `Use this to see what types of knowledge are available. Sources are prefixed like "user", "task:", "file@{path}:".
+    instructions: `Use this to DISCOVER what types of knowledge have been indexed. This lists source prefixes only (e.g., "user", "task:", "file@{path}:"). It does NOT retrieve actual content.
+
+When to use:
+- User asks "what's in the knowledge base"
+- Determining if specific content has been indexed
+- Understanding available knowledge sources before searching
+
+When NOT to use:
+- To retrieve actual information - use knowledge_search instead
+- To understand a file - use file_read instead
+- Don't call this repeatedly - once is enough to see what's available
+
+This is a lightweight metadata query that just lists source types, not content.
 
 Example: Simply call with no parameters:
 {}
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       ...globalToolProperties,

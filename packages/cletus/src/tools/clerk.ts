@@ -53,14 +53,27 @@ Example: Summarize a PDF document:
   const fileIndex = ai.tool({
     name: 'file_index',
     description: 'Index files for semantic search by content or summary',
-    instructions: `Use this to index files for semantic search. Choose "content" to embed the full text in chunks, or "summary" to embed an AI-generated summary. Supports image description and OCR.
+    instructions: `IMPORTANT: This tool is for BULK INDEXING files to make them semantically searchable in the future. This is NOT for reading or understanding file contents.
+
+When to use:
+- User explicitly asks to "index" files for search
+- Setting up semantic search over large collections of files
+- Building a searchable knowledge base from multiple documents
+
+When NOT to use (use file_read instead):
+- User asks "what can you tell me about [file]" - just read the file
+- Understanding a specific file's content
+- Analyzing or examining individual files
+- Quick file inspection
+
+This operation is expensive (generates embeddings) and should only be used when semantic search capability is actually needed.
 
 Example 1: Index all markdown files by content:
 { "glob": "**/*.md", "index": "content" }
 
 Example 2: Index images with descriptions:
 { "glob": "images/**/*.jpg", "index": "summary", "describeImages": true }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to index'),
@@ -168,11 +181,19 @@ Example: Delete a temporary file:
   const fileRead = ai.tool({
     name: 'file_read',
     description: 'Read file content',
-    instructions: `Use this to read a file into context. Supports text files, PDFs, Office docs, and images (with description/transcription). Large files can be truncated using characterLimit.
+    instructions: `Use this to read and understand file contents. This is the PRIMARY tool for examining files. Supports text files, PDFs, Office docs, and images (with description/transcription).
+
+When to use:
+- User asks about a specific file ("what can you tell me about X")
+- Understanding file contents
+- Analyzing code, configuration, or documentation
+- Any time you need to see what's in a file
+
+This is fast and efficient - always prefer this over file_index for understanding individual files.
 
 Example: Read a source file:
 { "path": "src/main.ts" }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),

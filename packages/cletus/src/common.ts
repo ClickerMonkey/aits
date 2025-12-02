@@ -120,7 +120,7 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
     if (value.length === 0) {
       return `[]`;
     }
-    return '\n' + value.map((item, i) => `${hyphenPrefix}${formatValue(item, true).split('\n').join('\n  ')}`).join('\n');
+    return value.map((item, i) => `${hyphenPrefix}${formatValue(item, true).split('\n').join('\n  ')}`).join('\n');
   }
   
   // Non-objects (primitives): use String(x)
