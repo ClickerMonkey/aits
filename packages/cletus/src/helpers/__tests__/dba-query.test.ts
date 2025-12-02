@@ -695,7 +695,7 @@ describe('executeQuery', () => {
 
       // Execute and expect error
       await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
-        'INSERT column/value count mismatch: 3 columns but 2 values provided'
+        'Column count (3) != value count (2)'
       );
     });
   });

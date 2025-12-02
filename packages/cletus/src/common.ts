@@ -395,7 +395,6 @@ export function gate() {
  */
 export async function convertMessage(msg: Message): Promise<AIMessage> {
   const contents = msg.content.slice();
-  let nextRequest = 0;
   for (let i = 0; i < contents.length; i++) {
     const content = contents[i];
     if (content.operationIndex === undefined) {
@@ -405,18 +404,6 @@ export async function convertMessage(msg: Message): Promise<AIMessage> {
     if (operation?.message) {
       content.content = operation.message;
     }
-    if (operation?.requestIndex !== nextRequest) {
-      continue;
-    }
-    const request = msg.requests?.[operation.requestIndex];
-    if (!request) {
-      continue;
-    }
-    contents.splice(i, 0, {
-      type: 'text',
-      content: `Delegated to agent "${request.agent}"${request.typeName ? ` for type ${request.typeName}` : ''}${request.simulateMode ? ` (mode=${request.simulateMode})`: ''} with request:\n${request.request}`,
-    });
-    nextRequest++;
     i++;
   }
 

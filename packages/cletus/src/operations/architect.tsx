@@ -1299,14 +1299,19 @@ export const query = operationOf<
       parts.push(`delete ${pluralize(count, 'record')}`);
     }
 
+    const action = result.affectedCount === 0 ? 'did' : 'will';
     const detailedAnalysis = parts.length > 0
-      ? `This will ${parts.join(', ')}.`
-      : `This will execute a ${kind} query${description ? ` (${description})` : ''}.`;
+      ? `This ${action} ${parts.join(', ')}.`
+      : `This ${action} execute a ${kind} query${description ? ` (${description})` : ''}.`;
 
     return {
       analysis: detailedAnalysis,
-      doable: true,
+      doable: result.canCommit,
       cache: { payload },
+      ...(result.affectedCount === 0 ? { 
+        done: true, 
+        output: result 
+      } : {}),
     };
   },
   do: async ({ input: { query, commit = true }, cache }, { config }) => {

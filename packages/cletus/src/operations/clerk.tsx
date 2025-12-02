@@ -785,9 +785,9 @@ type FileEditInput = {
 }
 
 type FileEditResult = {
-  insertStart: number;
-  insertEnd: number;
-  insert: string;
+  insertStart?: number;
+  insertEnd?: number;
+  insert?: string;
   lastModified: number;
   changed: boolean;
   diff: string;
@@ -864,16 +864,26 @@ export const file_edit = operationOf<
       newNormalizedContent,
       'before',
       'after',
-      { ignoreWhitespace: true, stripTrailingCr: true, context: 3 },
+      { 
+        ignoreWhitespace: true, 
+        stripTrailingCr: true, 
+        context: 3,
+      },
     );
 
+    const changed = normalizedContent !== newNormalizedContent;
+
+    // Only include insert/insertStart/insertEnd if there are actual changes
+    // This avoids storing entire file contents in chat JSON when nothing changed
     return {
       diff,
       lastModified,
-      changed: normalizedContent !== newNormalizedContent,
-      insert: newPaginatedContent,
-      insertStart: paginatedIndex,
-      insertEnd: paginatedIndex + paginatedContent.length,
+      changed,
+      ...(changed ? {
+        insert: newPaginatedContent,
+        insertStart: paginatedIndex,
+        insertEnd: paginatedIndex + paginatedContent.length,
+      } : {}),
       originalNewlineType,
     };
   },
@@ -910,8 +920,8 @@ export const file_edit = operationOf<
     const result = await this.diff(input, fileContent, fileStats.mtimeMs, ai, signal);
 
     return {
-      analysis: result.diff,
-      doable: true,
+      analysis: result.changed ? result.diff : 'No changes needed.',
+      doable: result.changed,
       cache: result,
     };
   },
@@ -929,20 +939,27 @@ export const file_edit = operationOf<
       throw new Error(`File "${input.path}" was modified since analysis. Aborting edit to prevent overwriting changes.`);
     }
 
-    // Normalize file content for consistent processing with cached result
-    const normalizedContent = normalizeNewlines(fileContent);
+    // Only write file if there are actual changes
+    if (result.changed && result.insert !== undefined && result.insertStart !== undefined && result.insertEnd !== undefined) {
+      // Normalize file content for consistent processing with cached result
+      const normalizedContent = normalizeNewlines(fileContent);
 
-    // Build new content using normalized data and cached insert positions
-    const newNormalizedContent = ''
-      + normalizedContent.slice(0, result.insertStart)
-      + result.insert
-      + normalizedContent.slice(result.insertEnd);
-    
-    // Convert back to original newline type
-    const newFileContent = convertNewlines(newNormalizedContent, result.originalNewlineType);
-    
-    // Write the new content back to the file
-    await fs.writeFile(fullPath, newFileContent, 'utf-8');
+      // Build new content using normalized data and cached insert positions
+      const newNormalizedContent = ''
+        + normalizedContent.slice(0, result.insertStart)
+        + result.insert
+        + normalizedContent.slice(result.insertEnd);
+
+      // Convert back to original newline type
+      const newFileContent = convertNewlines(newNormalizedContent, result.originalNewlineType);
+
+      // Write the new content back to the file
+      await fs.writeFile(
+        fullPath, 
+        newFileContent, 
+        { encoding: 'utf-8', signal }
+      );
+    }
 
     return {
       output: result.diff,
@@ -953,6 +970,16 @@ export const file_edit = operationOf<
     op,
     `Edit("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
+      // Check if there are no changes to apply
+      if (op.cache?.changed === false) {
+        return (
+          <Box flexDirection="row">
+            <Text>{'   → '}</Text>
+            <Text>No changes</Text>
+          </Box>
+        );
+      }
+
       // diff format:
       // Index: [filename]
       // ===================================================================
@@ -990,7 +1017,7 @@ export const file_edit = operationOf<
           if (line.startsWith('-')) {
             removed++;
             subtractions++;
-          } else {
+          } else if (line.startsWith('+')) {
             currentLineNumber -= removed;
             removed = 0;
             additions++;
@@ -1031,10 +1058,12 @@ export const file_edit = operationOf<
 
       const fullPath = path.resolve(ai.config.defaultContext!.cwd!, op.input.path);
       const url = fileProtocol(fullPath);
-      
-      const boxStyle = op.output 
-        ? {} 
-        : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
+
+      const boxStyle = op.output
+        ? {}
+        : op.status === 'rejected'
+          ? { borderStyle: 'round', borderColor: 'gray' } as const
+          : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
 
       return (
         <Box {...boxStyle} flexDirection="column" flexGrow={1}>

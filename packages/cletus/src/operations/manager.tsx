@@ -129,8 +129,15 @@ export class OperationManager {
         op.status = 'analyzing';
         const analysisResult = await def.analyze(op, ctx);
         op.analysis = analysisResult.analysis;
-        op.status = analysisResult.doable ? 'analyzed' : 'analyzedBlocked';
         op.cache = analysisResult.cache;
+
+        // Check if analysis completed the operation
+        if (analysisResult.done) {
+          op.output = analysisResult.output;
+          op.status = 'done';
+        } else {
+          op.status = analysisResult.doable ? 'analyzed' : 'analyzedBlocked';
+        }
       }
     } catch (e: any) {
       ctx.log(`op error: ${op.type} error=${e.message || String(e)} stack=${e.stack}`);
@@ -140,6 +147,22 @@ export class OperationManager {
     } finally {
       op.end = performance.now();
     }
+
+    // Update the operation message based on its current state.
+    const message = this.updateMessage(op);
+
+    ctx.log(op);
+
+    return message;
+  }
+
+  /**
+   * Update the operation message based on its current state.
+   * 
+   * @param op - Operation to update
+   */
+  public updateMessage(op: Operation): string {
+    const def = Operations[op.type] as OperationDefinition<any, any, any>;
 
     // Check if operation definition has a custom content formatter
     if (def.content) {
@@ -152,7 +175,9 @@ export class OperationManager {
           ? `Operation ${op.type} completed successfully:`
           : op.status === 'analyzed'
             ? `Operation ${op.type} requires approval:`
-            : `Operation ${op.type} cannot be performed:`;
+            : op.status === 'rejected'
+              ? `Operation ${op.type} was rejected by the user.`
+              : `Operation ${op.type} cannot be performed:`;
 
       // Get format preferences from operation definition
       const inputFormat = def.inputFormat || 'yaml';
@@ -180,9 +205,7 @@ export class OperationManager {
     }
 
     this.onOperationUpdated?.(op, this.operations.indexOf(op));
-
-    ctx.log(op);
-
+    
     return op.message;
   }
 }

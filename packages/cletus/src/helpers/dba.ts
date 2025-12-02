@@ -282,7 +282,7 @@ export function createDBASchemas(types: TypeDefinition[]) {
     }).describe('BETWEEN predicate'),
     z.object({
       kind: z.literal('isNull'),
-      isNull: ValueSchema.describe('Value to test for NULL')
+      isNull: ValueSchema.describe('Value to test for NULL. Should not be a constant, should be a column or expression.')
     }).describe('IS NULL predicate'),
     z.object({
       kind: z.literal('exists'),

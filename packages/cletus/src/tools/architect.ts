@@ -312,6 +312,24 @@ Example 8: DELETE with WHERE:
   "where": [{ "kind": "comparison", "left": { "source": "temp_data", "column": "created" }, "cmp": "<", "right": "2024-01-01" }]
 }
 
+Example 9: SELECT all columns using * wildcard:
+{
+  "kind": "select",
+  "values": [{ "alias": "all", "value": { "source": "users", "column": "*" } }],
+  "from": { "kind": "table", "table": "users" },
+  "limit": 10
+}
+
+Example 10: SELECT with * and additional specific columns:
+{
+  "kind": "select",
+  "values": [
+    { "alias": "all", "value": { "source": "users", "column": "*" } },
+    { "alias": "fullName", "value": { "kind": "binary", "left": { "source": "users", "column": "firstName" }, "op": "+", "right": { "source": "users", "column": "lastName" } } }
+  ],
+  "from": { "kind": "table", "table": "users" }
+}
+
 {{modeInstructions}}`,
     schema: ({ config }) => {
       // Build schema dynamically from current config types

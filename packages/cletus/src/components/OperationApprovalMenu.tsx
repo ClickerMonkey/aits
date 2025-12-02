@@ -153,30 +153,6 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         onUsageUpdate(ctx.usage.accumulated, ctx.usage.accumulatedCost);
       }
 
-      /*
-      const elapsed = (performance.now() - startTime);
-
-      // Generate summary message
-      let summaryText = '';
-      if (indices.length === 1) {
-        const op = operations[indices[0]];
-        if (failed > 0) {
-          summaryText = `Operation ${formatName(op.type)} failed after ${formatTime(elapsed)}`;
-        } else {
-          summaryText = `Operation ${formatName(op.type)} executed in ${formatTime(elapsed)}`;
-        }
-      } else {
-        summaryText = `${indices.length} operations executed in ${formatTime(elapsed)}`;
-      }
-
-      // Update the message with new operation states and summary
-      message.content.push({
-        type: 'text',
-        content: `__${summaryText}__`,
-      });
-      onMessageUpdate?.(message)
-      */
-
       result = {
         success,
         failed,
@@ -203,27 +179,18 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
 
     try {
       const operations = message.operations || [];
+      const manager = new OperationManager(
+        'none',
+        operations,
+        undefined,
+        updateMessageContent,
+      );
 
       // Mark operations as rejected
       for (const idx of indices) {
         operations[idx].status = 'rejected';
-        operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
-        updateMessageContent(operations[idx], idx);
+        manager.updateMessage(operations[idx]);
       }
-
-      /*
-      // Generate summary message
-      const summaryText = indices.length === 1
-        ? 'Operation rejected'
-        : `${indices.length} operations rejected`;
-
-      // Update the message
-      message.content.push({
-        type: 'text',
-        content: `__${summaryText}__`,
-      });
-      onMessageUpdate?.(message)
-      */
 
       result = {
         success: 0,
@@ -289,7 +256,6 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
       setIsProcessing(true);
       setMenuState('processing');
       setElapsedTime(0);
-      const startTime = performance.now();
       let result: CompletionResult = {
         success: 0,
         failed: approved.length,
@@ -333,33 +299,8 @@ export const OperationApprovalMenu: React.FC<OperationApprovalMenuProps> = ({
         // Mark rejected operations
         for (const idx of rejected) {
           operations[idx].status = 'rejected';
-          operations[idx].message = `Operation ${formatName(operations[idx].type)} rejected by user`;
-          updateMessageContent(operations[idx], idx);
+          manager.updateMessage(operations[idx]);
         }
-
-        /*
-        const elapsed = (performance.now() - startTime);
-
-        // Generate summary message
-        const parts: string[] = [];
-        if (success > 0) {
-          parts.push(`${success} executed`);
-        }
-        if (failed > 0) {
-          parts.push(`${failed} failed`);
-        }
-        if (rejected.length > 0) {
-          parts.push(`${rejected.length} rejected`);
-        }
-        const summaryText = `${parts.join(', ')} in ${formatTime(elapsed)}`;
-
-        // Update the message
-        message.content.push({
-          type: 'text',
-          content: `__${summaryText}__`,
-        });
-        onMessageUpdate?.(message)
-        */
 
         result = {
           success,

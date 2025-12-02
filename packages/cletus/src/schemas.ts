@@ -312,7 +312,6 @@ export const OperationSchema = z.object({
   end: z.number().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
-  requestIndex: z.number().optional(),
 });
 
 // ============================================================================
@@ -377,7 +376,6 @@ export const MessageSchema = z.object({
   usage: UsageSchema,
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
-  requests: z.array(AgentRequest).optional(),
 });
 
 

@@ -22,6 +22,24 @@ import type {
 } from "./dba";
 
 /**
+ * Validation error collected during query execution
+ */
+export interface QueryValidationError {
+  /** Path in query where error occurred (e.g., "insert.values[0]", "where[1].left") */
+  path: string;
+  /** Human-readable error message */
+  message: string;
+  /** Expected field type (if applicable) */
+  expectedType?: string;
+  /** Actual value type received */
+  actualType?: string;
+  /** Suggestion for how to fix the error */
+  suggestion?: string;
+  /** Additional metadata for programmatic handling */
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * Interface for data management operations
  */
 export interface IDataManager {
@@ -47,6 +65,10 @@ export interface QueryResult {
   updated?: QueryResultType[];
   /** Deleted record IDs (for DELETE) */
   deleted?: QueryResultType[];
+  /** Validation errors collected during execution */
+  validationErrors?: QueryValidationError[];
+  /** Whether the query can be committed (false if validation errors exist) */
+  canCommit: boolean;
 }
 
 /**
@@ -96,6 +118,10 @@ interface QueryContext {
   tableStates: Map<string, TableState>;
   /** Data managers for committing */
   dataManagers: Map<string, IDataManager>;
+  /** Validation errors collected during execution */
+  validationErrors: QueryValidationError[];
+  /** Map of table name -> column name -> field type for validation */
+  fieldTypes: Map<string, Map<string, string>>;
 }
 
 /**
@@ -135,6 +161,140 @@ export interface CanCommitResult {
   reason?: string;
   /** Tables that have been modified since the query was executed */
   modifiedTables?: string[];
+}
+
+/**
+ * Build a map of table -> column -> field type from type definitions
+ */
+function buildFieldTypeMap(types: TypeDefinition[]): Map<string, Map<string, string>> {
+  const map = new Map<string, Map<string, string>>();
+
+  for (const type of types) {
+    const cols = new Map<string, string>();
+    // Standard fields
+    cols.set('id', 'string');
+    cols.set('created', 'number');
+    cols.set('updated', 'number');
+
+    // Type-specific fields
+    for (const field of type.fields) {
+      cols.set(field.name, field.type);
+    }
+
+    map.set(type.name, cols);
+  }
+
+  return map;
+}
+
+/**
+ * Add a validation error to the query context
+ */
+function addValidationError(
+  ctx: QueryContext,
+  path: string,
+  message: string,
+  meta?: Partial<QueryValidationError>
+): void {
+  ctx.validationErrors.push({
+    path,
+    message,
+    ...meta,
+  });
+}
+
+/**
+ * Get the field type for a specific column in a table/source
+ */
+function getFieldType(ctx: QueryContext, source: string, column: string): string | undefined {
+  return ctx.fieldTypes.get(source)?.get(column);
+}
+
+/**
+ * Get the type of a runtime value
+ */
+function getValueType(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'string') return 'string';
+  if (typeof value === 'boolean') return 'boolean';
+  if (value instanceof Date) return 'date';
+  return typeof value;
+}
+
+/**
+ * Check if a field type is valid for a given value
+ * Handles relationship fields which store string IDs and enum fields
+ */
+function isValidFieldType(
+  value: unknown,
+  expectedType: string,
+  ctx: QueryContext,
+  tableName?: string,
+  columnName?: string
+): boolean {
+  if (value === null || value === undefined) return true; // Nulls are always valid
+
+  const actualType = getValueType(value);
+
+  // Direct type match
+  if (actualType === expectedType) return true;
+
+  // Enum fields: accept string or number values
+  if (expectedType === 'enum') {
+    return actualType === 'string' || actualType === 'number';
+  }
+
+  // Relationship fields: if expectedType is a custom type name, accept string IDs
+  const isCustomType = ctx.types.has(expectedType);
+  if (isCustomType && actualType === 'string') return true;
+
+  return false;
+}
+
+/**
+ * Validate enum value is in allowed options
+ */
+function validateEnumValue(
+  value: unknown,
+  tableName: string,
+  columnName: string,
+  ctx: QueryContext
+): { valid: boolean; allowedValues?: string[] } {
+  if (value === null || value === undefined) return { valid: true };
+
+  const typeDef = ctx.types.get(tableName);
+  if (!typeDef) return { valid: true };
+
+  const field = typeDef.fields.find(f => f.name === columnName);
+  if (!field || field.type !== 'enum' || !field.enumOptions) {
+    return { valid: true };
+  }
+
+  const stringValue = String(value);
+  const valid = field.enumOptions.includes(stringValue);
+
+  return { valid, allowedValues: field.enumOptions };
+}
+
+/**
+ * Check if a field is required
+ */
+function isFieldRequired(
+  tableName: string,
+  columnName: string,
+  ctx: QueryContext
+): boolean {
+  const typeDef = ctx.types.get(tableName);
+  if (!typeDef) return false;
+
+  const field = typeDef.fields.find(f => f.name === columnName);
+  if (!field) return false;
+
+  // If required is explicitly set, use that value
+  // Otherwise, default to true if no default value exists
+  if (field.required !== undefined) return field.required;
+  return field.default === undefined;
 }
 
 /**
@@ -350,83 +510,6 @@ function addDelete(state: TableState, id: string): void {
 }
 
 /**
- * Commit all pending changes to disk
- */
-async function commitChanges(ctx: QueryContext): Promise<{
-  inserted: QueryResultType[];
-  updated: QueryResultType[];
-  deleted: QueryResultType[];
-}> {
-  const result = {
-    inserted: [] as QueryResultType[],
-    updated: [] as QueryResultType[],
-    deleted: [] as QueryResultType[],
-  };
-
-  const now = Date.now();
-  
-  for (const [tableName, state] of ctx.tableStates) {
-    const manager = ctx.dataManagers.get(tableName);
-    if (!manager) {
-      continue;
-    }
-
-    await manager.save(async (dataFile) => {
-      // Inserts
-      const inserts: QueryResultType = { type: tableName, ids: [] };
-      for (const [tempId, fields] of state.insertedIds) {
-        const newRecord: DataRecord = {
-          id: uuidv4(),
-          updated: now,
-          created: now,
-          fields,
-        };
-        dataFile.data.push(newRecord);
-        inserts.ids.push(newRecord.id);
-      }
-      if (inserts.ids.length > 0) {
-        result.inserted.push(inserts);
-      }
-
-      // Update
-      const updates: QueryResultType = { type: tableName, ids: [] };
-      for (const [id, fields] of state.updatedIds) {
-        if (!state.insertedIds.has(id)) {
-          const item = dataFile.data.find((item) => item.id === id);
-          if (!item) {
-            throw new Error(`Item with ID ${id} not found in ${tableName}`);
-          }
-          Object.assign(item.fields, fields);
-          item.updated = now;
-          updates.ids.push(id);
-        }
-      }
-      if (updates.ids.length > 0) {
-        result.updated.push(updates);
-      }
-
-      // Deletes
-      const deletes: QueryResultType = { type: tableName, ids: [] };
-      for (const id of state.deletedIds) {
-        if (!state.insertedIds.has(id)) {
-          const index = dataFile.data.findIndex((item) => item.id === id);
-          if (index === -1) {
-            throw new Error(`Item with ID ${id} not found in ${tableName}`);
-          }
-          dataFile.data.splice(index, 1);
-          deletes.ids.push(id);
-        }
-      }
-      if (deletes.ids.length > 0) {
-        result.deleted.push(deletes);
-      }
-    });
-  }
-  
-  return result;
-}
-
-/**
  * Execute a DBA query without committing changes
  * Returns a payload that can be committed later via commitQueryChanges
  */
@@ -453,6 +536,8 @@ export async function executeQueryWithoutCommit(
     types,
     tableStates: new Map(),
     dataManagers: new Map(),
+    validationErrors: [],
+    fieldTypes: buildFieldTypeMap(getTypes()),
   };
 
   // Pre-load all referenced tables
@@ -494,6 +579,12 @@ export async function executeQueryWithoutCommit(
 
     deltas.push(delta);
   }
+
+  // Add validation errors to result
+  if (ctx.validationErrors.length > 0) {
+    result.validationErrors = ctx.validationErrors;
+  }
+  result.canCommit = ctx.validationErrors.length === 0;
 
   // Return the execution payload without committing
   return {
@@ -545,6 +636,14 @@ export async function commitQueryChanges(
   payload: QueryExecutionPayload,
   getManager: (typeName: string) => IDataManager
 ): Promise<QueryResult> {
+  // Check for validation errors first
+  if (!payload.result.canCommit) {
+    const errorMessages = payload.result.validationErrors
+      ?.map((e, i) => `[${i + 1}] ${e.path}: ${e.message}`)
+      .join('\n') || 'Unknown validation errors';
+    throw new Error(`Cannot commit query with validation errors:\n${errorMessages}`);
+  }
+
   // First check if the payload can be committed
   const canCommit = await canCommitQueryResult(payload, getManager);
   if (!canCommit.canCommit) {
@@ -620,6 +719,7 @@ export async function commitQueryChanges(
     inserted: committedInserted.length > 0 ? committedInserted : undefined,
     updated: committedUpdated.length > 0 ? committedUpdated : undefined,
     deleted: committedDeleted.length > 0 ? committedDeleted : undefined,
+    canCommit: true, // Always true for committed results
   };
 }
 
@@ -781,19 +881,7 @@ async function executeSelect(
           groupRecs
         );
 
-        // Handle "*" expansion
-        if (
-          isSourceColumn(aliasValue.value) &&
-          aliasValue.value.column === '*' &&
-          typeof evaluatedValue === 'object' &&
-          evaluatedValue !== null &&
-          !Array.isArray(evaluatedValue)
-        ) {
-          // Expand all columns into the row
-          Object.assign(row, evaluatedValue);
-        } else {
-          row[aliasValue.alias] = evaluatedValue;
-        }
+        handleWildcardExpansion(row, aliasValue.alias, evaluatedValue, aliasValue.value);
       }
       rowsWithGroups.push({ row, groupRecs });
     }
@@ -833,19 +921,7 @@ async function executeSelect(
           records
         );
 
-        // Handle "*" expansion
-        if (
-          isSourceColumn(aliasValue.value) &&
-          aliasValue.value.column === '*' &&
-          typeof evaluatedValue === 'object' &&
-          evaluatedValue !== null &&
-          !Array.isArray(evaluatedValue)
-        ) {
-          // Expand all columns into the row
-          Object.assign(row, evaluatedValue);
-        } else {
-          row[aliasValue.alias] = evaluatedValue;
-        }
+        handleWildcardExpansion(row, aliasValue.alias, evaluatedValue, aliasValue.value);
       }
       rows = [row];
     } else if (records.length === 0 && stmt.values.length > 0) {
@@ -860,19 +936,7 @@ async function executeSelect(
             []
           );
 
-          // Handle "*" expansion
-          if (
-            isSourceColumn(aliasValue.value) &&
-            aliasValue.value.column === '*' &&
-            typeof evaluatedValue === 'object' &&
-            evaluatedValue !== null &&
-            !Array.isArray(evaluatedValue)
-          ) {
-            // Expand all columns into the row
-            Object.assign(row, evaluatedValue);
-          } else {
-            row[aliasValue.alias] = evaluatedValue;
-          }
+          handleWildcardExpansion(row, aliasValue.alias, evaluatedValue, aliasValue.value);
         }
         rows = [row];
       } else {
@@ -886,19 +950,7 @@ async function executeSelect(
           // Pass all records for window function support
           const evaluatedValue = await evaluateValueAsync(aliasValue.value, record, ctx, records);
 
-          // Handle "*" expansion - if the value is an object with multiple keys from getAllColumnValues
-          if (
-            isSourceColumn(aliasValue.value) &&
-            aliasValue.value.column === '*' &&
-            typeof evaluatedValue === 'object' &&
-            evaluatedValue !== null &&
-            !Array.isArray(evaluatedValue)
-          ) {
-            // Expand all columns into the row
-            Object.assign(row, evaluatedValue);
-          } else {
-            row[aliasValue.alias] = evaluatedValue;
-          }
+          handleWildcardExpansion(row, aliasValue.alias, evaluatedValue, aliasValue.value);
         }
         rows.push(row);
       }
@@ -929,7 +981,7 @@ async function executeSelect(
     rows = rows.slice(0, stmt.limit);
   }
 
-  return { rows };
+  return { rows, canCommit: true };
 }
 
 /**
@@ -949,26 +1001,131 @@ async function executeInsert(
   if (stmt.values?.length) {
     // Validate that columns and values arrays match
     if (stmt.values.length !== stmt.columns.length) {
-      throw new Error(
-        `INSERT column/value count mismatch: ${stmt.columns.length} columns but ${stmt.values.length} values provided. ` +
-        `Columns: [${stmt.columns.join(', ')}]`
+      addValidationError(ctx, 'insert.values',
+        `Column count (${stmt.columns.length}) != value count (${stmt.values.length})`,
+        {
+          metadata: {
+            columns: stmt.columns,
+            valueCount: stmt.values.length
+          }
+        }
       );
     }
 
-    // Direct values
+    // Direct values - validate types
     const record: Record<string, unknown> = {};
     for (let i = 0; i < stmt.columns.length; i++) {
-      record[stmt.columns[i]] = await evaluateValueAsync(stmt.values[i], null, ctx);
+      const column = stmt.columns[i];
+      const value = await evaluateValueAsync(stmt.values[i], null, ctx);
+
+      // Type check - validate value type matches expected field type
+      const expectedType = getFieldType(ctx, stmt.table, column);
+
+      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, column)) {
+        const actualType = getValueType(value);
+        addValidationError(ctx, `insert.values[${i}]`,
+          `Column '${column}' expects ${expectedType}, got ${actualType}`,
+          {
+            expectedType,
+            actualType,
+            suggestion: ctx.types.has(expectedType)
+              ? `Use string ID for relationship field ${column}`
+              : `Use ${expectedType} value for ${column}`,
+            metadata: { column, table: stmt.table }
+          }
+        );
+      }
+
+      // Enum validation - check value is in allowed options
+      if (expectedType === 'enum') {
+        const enumValidation = validateEnumValue(value, stmt.table, column, ctx);
+        if (!enumValidation.valid && enumValidation.allowedValues) {
+          addValidationError(ctx, `insert.values[${i}]`,
+            `Column '${column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
+            {
+              expectedType: 'enum',
+              actualType: String(value),
+              suggestion: `Use one of the allowed enum values: ${enumValidation.allowedValues.join(', ')}`,
+              metadata: { column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
+            }
+          );
+        }
+      }
+
+      // Required field validation
+      if ((value === null || value === undefined) && isFieldRequired(stmt.table, column, ctx)) {
+        addValidationError(ctx, `insert.values[${i}]`,
+          `Column '${column}' is required but received ${value === null ? 'null' : 'undefined'}`,
+          {
+            expectedType: expectedType || 'unknown',
+            actualType: 'null',
+            suggestion: `Provide a value for required field ${column}`,
+            metadata: { column, table: stmt.table, required: true }
+          }
+        );
+      }
+
+      record[column] = value;
     }
     valuesToInsert = [record];
   } else if (stmt.select) {
     // Values from SELECT
     const selectResult = await executeStatement(stmt.select, ctx);
-    valuesToInsert = selectResult.rows.map((row) => {
+    valuesToInsert = selectResult.rows.map((row, rowIdx) => {
       const record: Record<string, unknown> = {};
       for (let i = 0; i < stmt.columns.length; i++) {
+        const column = stmt.columns[i];
         const selectAlias = Object.keys(row)[i];
-        record[stmt.columns[i]] = row[selectAlias];
+        const value = row[selectAlias];
+
+        // Type check for INSERT from SELECT
+        const expectedType = getFieldType(ctx, stmt.table, column);
+
+        if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, column)) {
+          const actualType = getValueType(value);
+          addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
+            `Column '${column}' expects ${expectedType}, got ${actualType}`,
+            {
+              expectedType,
+              actualType,
+              suggestion: ctx.types.has(expectedType)
+                ? `Ensure SELECT returns string ID for relationship field ${column}`
+                : `Ensure SELECT returns ${expectedType} for column ${column}`,
+              metadata: { column, table: stmt.table, selectAlias }
+            }
+          );
+        }
+
+        // Enum validation
+        if (expectedType === 'enum') {
+          const enumValidation = validateEnumValue(value, stmt.table, column, ctx);
+          if (!enumValidation.valid && enumValidation.allowedValues) {
+            addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
+              `Column '${column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
+              {
+                expectedType: 'enum',
+                actualType: String(value),
+                suggestion: `Ensure SELECT returns one of: ${enumValidation.allowedValues.join(', ')}`,
+                metadata: { column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
+              }
+            );
+          }
+        }
+
+        // Required field validation
+        if ((value === null || value === undefined) && isFieldRequired(stmt.table, column, ctx)) {
+          addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
+            `Column '${column}' is required but SELECT returned ${value === null ? 'null' : 'undefined'}`,
+            {
+              expectedType: expectedType || 'unknown',
+              actualType: 'null',
+              suggestion: `Ensure SELECT returns a value for required field ${column}`,
+              metadata: { column, table: stmt.table, required: true }
+            }
+          );
+        }
+
+        record[column] = value;
       }
       return record;
     });
@@ -994,10 +1151,49 @@ async function executeInsert(
         if (stmt.onConflict.doNothing) {
           continue;
         } else if (stmt.onConflict.update?.length) {
-          // Update on conflict
+          // Update on conflict - validate types
           const updates: Record<string, unknown> = {};
-          for (const cv of stmt.onConflict.update) {
-            updates[cv.column] = await evaluateValueAsync(cv.value, existing, ctx);
+          for (let i = 0; i < stmt.onConflict.update.length; i++) {
+            const cv = stmt.onConflict.update[i];
+            const value = await evaluateValueAsync(cv.value, existing, ctx);
+
+            // Type check for ON CONFLICT UPDATE
+            const expectedType = getFieldType(ctx, stmt.table, cv.column);
+
+            if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, cv.column)) {
+              const actualType = getValueType(value);
+              addValidationError(ctx, `insert.onConflict.update[${i}]`,
+                `Column '${cv.column}' expects ${expectedType}, got ${actualType}`,
+                {
+                  expectedType,
+                  actualType,
+                  suggestion: ctx.types.has(expectedType)
+                    ? `Use string ID for relationship field ${cv.column}`
+                    : `Use ${expectedType} value for ${cv.column}`,
+                  metadata: { column: cv.column, table: stmt.table }
+                }
+              );
+            }
+
+            // Enum validation
+            if (expectedType === 'enum') {
+              const enumValidation = validateEnumValue(value, stmt.table, cv.column, ctx);
+              if (!enumValidation.valid && enumValidation.allowedValues) {
+                addValidationError(ctx, `insert.onConflict.update[${i}]`,
+                  `Column '${cv.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
+                  {
+                    expectedType: 'enum',
+                    actualType: String(value),
+                    suggestion: `Use one of the allowed enum values: ${enumValidation.allowedValues.join(', ')}`,
+                    metadata: { column: cv.column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
+                  }
+                );
+              }
+            }
+
+            // Note: Don't check required for UPDATE - updates can set fields to null if not required
+
+            updates[cv.column] = value;
           }
           addUpdate(state, existing.id, updates);
           insertResult.ids.push(existing.id);
@@ -1021,19 +1217,7 @@ async function executeInsert(
       for (const av of stmt.returning) {
         const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
 
-        // Handle "*" expansion
-        if (
-          isSourceColumn(av.value) &&
-          av.value.column === '*' &&
-          typeof evaluatedValue === 'object' &&
-          evaluatedValue !== null &&
-          !Array.isArray(evaluatedValue)
-        ) {
-          // Expand all columns into the row
-          Object.assign(row, evaluatedValue);
-        } else {
-          row[av.alias] = evaluatedValue;
-        }
+        handleWildcardExpansion(row, av.alias, evaluatedValue, av.value);
       }
       rows.push(row);
     }
@@ -1043,6 +1227,7 @@ async function executeInsert(
     rows,
     affectedCount: insertResult.ids.length,
     inserted: insertResult.ids.length ? [insertResult] : undefined,
+    canCommit: true,
   };
 }
 
@@ -1089,8 +1274,47 @@ async function executeUpdate(
   // Update matching records
   for (const record of records) {
     const updates: Record<string, unknown> = {};
-    for (const cv of stmt.set) {
-      updates[cv.column] = await evaluateValueAsync(cv.value, record, ctx);
+    for (let i = 0; i < stmt.set.length; i++) {
+      const cv = stmt.set[i];
+      const value = await evaluateValueAsync(cv.value, record, ctx);
+
+      // Type check for UPDATE SET
+      const expectedType = getFieldType(ctx, stmt.table, cv.column);
+
+      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, cv.column)) {
+        const actualType = getValueType(value);
+        addValidationError(ctx, `update.set[${i}]`,
+          `Column '${cv.column}' expects ${expectedType}, got ${actualType}`,
+          {
+            expectedType,
+            actualType,
+            suggestion: ctx.types.has(expectedType)
+              ? `Use string ID for relationship field ${cv.column}`
+              : `Use ${expectedType} value for ${cv.column}`,
+            metadata: { column: cv.column, table: stmt.table, recordId: record.id }
+          }
+        );
+      }
+
+      // Enum validation
+      if (expectedType === 'enum') {
+        const enumValidation = validateEnumValue(value, stmt.table, cv.column, ctx);
+        if (!enumValidation.valid && enumValidation.allowedValues) {
+          addValidationError(ctx, `update.set[${i}]`,
+            `Column '${cv.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
+            {
+              expectedType: 'enum',
+              actualType: String(value),
+              suggestion: `Use one of the allowed enum values: ${enumValidation.allowedValues.join(', ')}`,
+              metadata: { column: cv.column, table: stmt.table, allowedValues: enumValidation.allowedValues, value }
+            }
+          );
+        }
+      }
+
+      // Note: Don't check required for UPDATE - updates can set fields to null if not required
+
+      updates[cv.column] = value;
     }
     addUpdate(state, record.id, updates);
     updateResult.ids.push(record.id);
@@ -1110,19 +1334,7 @@ async function executeUpdate(
       for (const av of stmt.returning) {
         const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
 
-        // Handle "*" expansion
-        if (
-          isSourceColumn(av.value) &&
-          av.value.column === '*' &&
-          typeof evaluatedValue === 'object' &&
-          evaluatedValue !== null &&
-          !Array.isArray(evaluatedValue)
-        ) {
-          // Expand all columns into the row
-          Object.assign(row, evaluatedValue);
-        } else {
-          row[av.alias] = evaluatedValue;
-        }
+        handleWildcardExpansion(row, av.alias, evaluatedValue, av.value);
       }
       rows.push(row);
     }
@@ -1132,6 +1344,7 @@ async function executeUpdate(
     rows,
     affectedCount: updateResult.ids.length,
     updated: updateResult.ids.length ? [updateResult] : undefined,
+    canCommit: true,
   };
 }
 
@@ -1174,19 +1387,7 @@ async function executeDelete(
       for (const av of stmt.returning) {
         const evaluatedValue = await evaluateValueAsync(av.value, record, ctx);
 
-        // Handle "*" expansion
-        if (
-          isSourceColumn(av.value) &&
-          av.value.column === '*' &&
-          typeof evaluatedValue === 'object' &&
-          evaluatedValue !== null &&
-          !Array.isArray(evaluatedValue)
-        ) {
-          // Expand all columns into the row
-          Object.assign(row, evaluatedValue);
-        } else {
-          row[av.alias] = evaluatedValue;
-        }
+        handleWildcardExpansion(row, av.alias, evaluatedValue, av.value);
       }
       rows.push(row);
     }
@@ -1202,6 +1403,7 @@ async function executeDelete(
     rows,
     affectedCount: deleteResult.ids.length,
     deleted: deleteResult.ids.length ? [deleteResult] : undefined,
+    canCommit: true,
   };
 }
 
@@ -1251,7 +1453,7 @@ async function executeSetOperation(
     });
   }
 
-  return { rows };
+  return { rows, canCommit: true };
 }
 
 /**
@@ -1436,7 +1638,7 @@ async function evaluateSingleBooleanAsync(
     case "comparison": {
       const left = await evaluateValueAsync(value.left, record, ctx);
       const right = await evaluateValueAsync(value.right, record, ctx);
-      return evaluateComparison(left, value.cmp, right);
+      return evaluateComparison(left, value.cmp, right, ctx, 'where.comparison');
     }
 
     case "in": {
@@ -1534,7 +1736,7 @@ async function evaluateSingleBooleanWithGroupAsync(
     case "comparison": {
       const left = await evaluateValueAsync(value.left, record, ctx, groupRecords);
       const right = await evaluateValueAsync(value.right, record, ctx, groupRecords);
-      return evaluateComparison(left, value.cmp, right);
+      return evaluateComparison(left, value.cmp, right, ctx, 'having.comparison');
     }
 
     case "in": {
@@ -1758,7 +1960,7 @@ async function evaluateValueAsync(
       case "binary": {
         const left = await evaluateValueAsync(value.left, record, ctx, groupRecords);
         const right = await evaluateValueAsync(value.right, record, ctx, groupRecords);
-        return evaluateBinaryOp(left, value.op, right);
+        return evaluateBinaryOp(left, value.op, right, ctx, 'binary_operation');
       }
 
       case "unary": {
@@ -1775,7 +1977,8 @@ async function evaluateValueAsync(
           value.aggregate,
           value.value,
           records,
-          ctx
+          ctx,
+          `aggregate.${value.aggregate}`
         );
       }
 
@@ -1835,13 +2038,68 @@ function isSourceColumn(value: Value): value is SourceColumn {
 }
 
 /**
+ * Check if a value expression should expand "*" to all columns
+ */
+function shouldExpandWildcard(valueExpr: Value): boolean {
+  return isSourceColumn(valueExpr) && valueExpr.column === '*';
+}
+
+/**
+ * Handle "*" expansion - if evaluated value is an object, spread it; otherwise assign to alias
+ */
+function handleWildcardExpansion(
+  row: Record<string, unknown>,
+  alias: string,
+  evaluatedValue: unknown,
+  valueExpr: Value
+): void {
+  if (
+    shouldExpandWildcard(valueExpr) &&
+    typeof evaluatedValue === 'object' &&
+    evaluatedValue !== null &&
+    !Array.isArray(evaluatedValue)
+  ) {
+    // Expand all columns into the row
+    Object.assign(row, evaluatedValue);
+  } else {
+    // Regular assignment
+    row[alias] = evaluatedValue;
+  }
+}
+
+/**
  * Evaluate a binary operation
  */
 function evaluateBinaryOp(
   left: unknown,
   op: string,
-  right: unknown
+  right: unknown,
+  ctx?: QueryContext,
+  path?: string
 ): unknown {
+  // NULL handling - SQL semantics (any operation with null returns null)
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return null;
+  }
+
+  const leftType = getValueType(left);
+  const rightType = getValueType(right);
+
+  // Type mixing check - detect operations between different types
+  if (leftType !== rightType && leftType !== 'null' && rightType !== 'null') {
+    if (ctx && path) {
+      addValidationError(ctx, path,
+        `Cannot perform '${op}' on ${leftType} and ${rightType}`,
+        {
+          actualType: `${leftType} ${op} ${rightType}`,
+          suggestion: 'Ensure both operands are the same type',
+          metadata: { operator: op, leftType, rightType }
+        }
+      );
+    }
+    return null; // Return safe default instead of throwing
+  }
+
   const l = typeof left === "number" ? left : Number(left);
   const r = typeof right === "number" ? right : Number(right);
 
@@ -1874,7 +2132,8 @@ async function evaluateAggregateAsync(
   aggregate: string,
   valueExpr: Value | "*",
   records: DataRecord[],
-  ctx: QueryContext
+  ctx: QueryContext,
+  path?: string
 ): Promise<unknown> {
   if (valueExpr === "*") {
     if (aggregate === "count") {
@@ -1894,15 +2153,30 @@ async function evaluateAggregateAsync(
   switch (aggregate) {
     case "count":
       return values.length;
-    case "sum": {
-      const nums = values.map(Number).filter((n) => !isNaN(n));
-      return nums.reduce((a, b) => a + b, 0);
-    }
+    case "sum":
     case "avg": {
-      const nums = values.map(Number).filter((n) => !isNaN(n));
-      return nums.length > 0
-        ? nums.reduce((a, b) => a + b, 0) / nums.length
-        : null;
+      // Validate all values are numeric
+      const nonNumeric = values.filter(v => typeof v !== 'number');
+      if (nonNumeric.length > 0 && path) {
+        const firstNonNumeric = nonNumeric[0];
+        addValidationError(ctx, path,
+          `${aggregate.toUpperCase()} requires numeric values, found ${getValueType(firstNonNumeric)}`,
+          {
+            expectedType: 'number',
+            actualType: getValueType(firstNonNumeric),
+            suggestion: `Use ${aggregate.toUpperCase()} on numeric columns only`,
+            metadata: { aggregate, nonNumericCount: nonNumeric.length }
+          }
+        );
+        return 0; // Safe default
+      }
+
+      const nums = values.filter(v => typeof v === 'number') as number[];
+      if (aggregate === 'sum') {
+        return nums.reduce((a, b) => a + b, 0);
+      } else {
+        return nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+      }
     }
     case "min": {
       if (values.length === 0) return null;
@@ -2122,7 +2396,8 @@ async function evaluateWindowAsync(
     window.function,
     window.value,
     partitionedRecords,
-    ctx
+    ctx,
+    `window.${window.function}`
   );
 }
 
@@ -2173,8 +2448,37 @@ function evaluateValueSync(
 function evaluateComparison(
   left: unknown,
   cmp: string,
-  right: unknown
+  right: unknown,
+  ctx?: QueryContext,
+  path?: string
 ): boolean {
+  // Special case: null = null should return true
+  if ((left === null || left === undefined) && (right === null || right === undefined)) {
+    return cmp === '=' || cmp === '<=>' || cmp === '>=';
+  }
+
+  // SQL semantics: comparisons with null return false
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return false; // SQL: 5 < null => false
+  }
+
+  const leftType = getValueType(left);
+  const rightType = getValueType(right);
+
+  // Type mismatch check (except for LIKE which always operates on strings)
+  if (leftType !== rightType && cmp !== "like" && cmp !== "notLike") {
+    if (ctx && path) {
+      addValidationError(ctx, path,
+        `Cannot compare ${leftType} with ${rightType}`,
+        {
+          metadata: { leftType, rightType, operator: cmp },
+          suggestion: 'Ensure both operands have the same type'
+        }
+      );
+    }
+    return false; // Safe default
+  }
+
   switch (cmp) {
     case "=":
       return compare(left, right) === 0;
@@ -2188,17 +2492,29 @@ function evaluateComparison(
       return compare(left, right) <= 0;
     case ">=":
       return compare(left, right) >= 0;
-    case "like": {
-      const pattern = String(right ?? "")
-        .replace(/%/g, ".*")
-        .replace(/_/g, ".");
-      return new RegExp(`^${pattern}$`, "i").test(String(left ?? ""));
-    }
+    case "like":
     case "notLike": {
+      // Validate both are strings for LIKE operator
+      if (leftType !== 'string' || rightType !== 'string') {
+        if (ctx && path) {
+          addValidationError(ctx, path,
+            `${cmp.toUpperCase()} operator requires string operands, got ${leftType} and ${rightType}`,
+            {
+              expectedType: 'string',
+              actualType: leftType,
+              suggestion: 'Use LIKE only on string columns',
+              metadata: { operator: cmp }
+            }
+          );
+        }
+        return false;
+      }
+
       const pattern = String(right ?? "")
         .replace(/%/g, ".*")
         .replace(/_/g, ".");
-      return !new RegExp(`^${pattern}$`, "i").test(String(left ?? ""));
+      const result = new RegExp(`^${pattern}$`, "i").test(String(left ?? ""));
+      return cmp === "like" ? result : !result;
     }
     default:
       return false;

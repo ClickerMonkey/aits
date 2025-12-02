@@ -48,7 +48,8 @@ type CommandType =
   | '/do'
   | '/transcribe'
   | '/cd'
-  | '/debug';
+  | '/debug'
+  | '/clear';
 
 
 interface Command {
@@ -71,6 +72,7 @@ const COMMANDS: Command[] = [
   { name: '/do', description: 'Add a todo', takesInput: true, placeholder: 'todo description' },
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
   { name: '/reset', description: 'Clear all todos', takesInput: false },
+  { name: '/clear', description: 'Clear all chat messages (requires confirmation)', takesInput: false },
   { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
   { name: '/cd', description: 'Change current working directory', takesInput: true, optionalInput: true, placeholder: 'directory path' },
   { name: '/debug', description: 'Toggle debug logging', takesInput: false },
@@ -109,6 +111,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deleteConfirmationIndex, setDeleteConfirmationIndex] = useState(0);
   const [deleteAndThen, setDeleteAndThen] = useState<'exit' | 'quit'>('exit');
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [clearConfirmationIndex, setClearConfirmationIndex] = useState(0);
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -192,7 +196,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
   // Convenience function to add system message
   const addSystemMessage = (content: string) => {
-    addMessage({ role: 'system', content: [{ type: 'text', content }], created: performance.now() });
+    addMessage({ role: 'system', content: [{ type: 'text', content }], created: Date.now() });
   };
 
   // Load messages from file on mount
@@ -402,6 +406,33 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
     }
 
+    // Handle clear confirmation navigation
+    if (showClearConfirmation) {
+      if (key.upArrow) {
+        setClearConfirmationIndex((prev) => (prev > 0 ? prev - 1 : 1));
+      } else if (key.downArrow) {
+        setClearConfirmationIndex((prev) => (prev < 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        if (clearConfirmationIndex === 0) {
+          // Yes - clear all messages
+          setChatMessages([]);
+          saveMessages();
+          setShowClearConfirmation(false);
+          setClearConfirmationIndex(0);
+          addSystemMessage('✓ All messages cleared');
+        } else {
+          // No - cancel
+          setShowClearConfirmation(false);
+          setClearConfirmationIndex(0);
+        }
+      } else if (key.escape) {
+        // ESC cancels
+        setShowClearConfirmation(false);
+        setClearConfirmationIndex(0);
+      }
+      return interceptInput();
+    }
+
     // Handle delete confirmation navigation
     if (showDeleteConfirmation) {
       if (key.upArrow) {
@@ -568,6 +599,7 @@ AVAILABLE COMMANDS:
 /do         - Add a new todo
 /done       - Mark a todo as complete
 /reset      - Clear all todos
+/clear      - Clear all chat messages (requires confirmation)
 /cd         - Change or view current working directory
 
 KEYBOARD SHORTCUTS:
@@ -718,6 +750,11 @@ TIP: Type '/' to see all available commands with descriptions!`,
         const debugEnabled = config.getData().user.debug;
         logger.setDebug(debugEnabled);
         addSystemMessage(`✓ Debug logging ${debugEnabled ? 'enabled' : 'disabled'}`);
+        break;
+
+      case '/clear':
+        setShowClearConfirmation(true);
+        setClearConfirmationIndex(0);
         break;
 
       default:
@@ -1040,7 +1077,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       role: 'user',
       name: config.getData().user.name,
       content: [{ type: 'text', content: inputValue }],
-      created: performance.now(),
+      created: Date.now(),
     });
 
     // Reset history navigation
@@ -1144,6 +1181,31 @@ After installation and the SoX executable is in the path, restart Cletus and try
           </>
         )}
       </Box>
+
+      {/* Clear Confirmation Prompt */}
+      {showClearConfirmation && (
+        <Box
+          borderStyle="round"
+          borderColor="yellow"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="yellow">
+            Are you sure you want to clear all messages? (↑↓ to navigate, Enter to select):
+          </Text>
+          <Box>
+            <Text color={clearConfirmationIndex === 0 ? 'cyan' : 'white'}>
+              {clearConfirmationIndex === 0 ? '▶ ' : '  '}Yes, clear all messages
+            </Text>
+          </Box>
+          <Box>
+            <Text color={clearConfirmationIndex === 1 ? 'cyan' : 'white'}>
+              {clearConfirmationIndex === 1 ? '▶ ' : '  '}No, cancel
+            </Text>
+          </Box>
+        </Box>
+      )}
 
       {/* Delete Confirmation Prompt */}
       {showDeleteConfirmation && (
