@@ -1652,6 +1652,13 @@ export const file_attach = operationOf<
   ),
 });
 
+// Helper function to process shell output
+const processShellOutput = (stdout: string, stderr: string) => {
+  const allOutput = stdout + stderr;
+  const lines = allOutput.split('\n').filter(l => l.length > 0);
+  return { allOutput, lines, lineCount: lines.length };
+};
+
 export const shell = operationOf<
   { command: string },
   { stdout: string; stderr: string; exitCode: number | null; signal: string | null }
@@ -1688,8 +1695,7 @@ export const shell = operationOf<
         const now = Date.now();
         // Only process output if enough time has passed
         if (now - lastUpdate >= UPDATE_INTERVAL) {
-          const allOutput = stdout + stderr;
-          const lineCount = allOutput.split('\n').filter(l => l.length > 0).length;
+          const { lineCount } = processShellOutput(stdout, stderr);
           chatStatus(`Executing... ${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output`);
           lastUpdate = now;
         }
@@ -1710,9 +1716,8 @@ export const shell = operationOf<
       });
 
       childProcess.on('close', (exitCode, signalName) => {
-        const allOutput = stdout + stderr;
-        const lines = allOutput.split('\n').filter(l => l.length > 0);
-        chatStatus(`Completed with exit code ${exitCode ?? 'signal ' + signalName}. ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} of output.`);
+        const { lineCount } = processShellOutput(stdout, stderr);
+        chatStatus(`Completed with exit code ${exitCode ?? 'signal ' + signalName}. ${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output.`);
         
         resolve({
           stdout,
@@ -1737,9 +1742,7 @@ export const shell = operationOf<
         return 'Executing...';
       }
 
-      const allOutput = (op.output.stdout + op.output.stderr).trim();
-      const lines = allOutput.split('\n').filter(l => l.length > 0);
-      const lineCount = lines.length;
+      const { lines, lineCount } = processShellOutput(op.output.stdout, op.output.stderr);
       const lastLines = lines.slice(-4);
       const exitCode = op.output.exitCode;
       const signal = op.output.signal;
