@@ -846,53 +846,41 @@ export const query = operationOf<
  */
 async function updateKnowledgeFromQueryResult(ctx: CletusAIContext, result: QueryResult): Promise<void> {
   // Collect all affected record IDs by type
-  const updatedByType = new Map<string, string[]>();
-  const deletedByType = new Map<string, string[]>();
+  const changesByType = new Map<string, { updated: string[]; deleted: string[] }>();
   
   // Process inserted records
   if (result.inserted) {
-    for (const { typeName, ids } of result.inserted) {
-      if (!updatedByType.has(typeName)) {
-        updatedByType.set(typeName, []);
-      }
-      updatedByType.get(typeName)!.push(...ids);
-    }
+    for (const { type, ids } of result.inserted) {
+      const byType = changesByType.get(type) || { updated: [], deleted: [] };
+      byType.updated.push(...ids);
+      changesByType.set(type, byType);
+    } 
   }
   
   // Process updated records
   if (result.updated) {
-    for (const { typeName, ids } of result.updated) {
-      if (!updatedByType.has(typeName)) {
-        updatedByType.set(typeName, []);
-      }
-      updatedByType.get(typeName)!.push(...ids);
+    for (const { type, ids } of result.updated) {
+      const byType = changesByType.get(type) || { updated: [], deleted: [] };
+      byType.updated.push(...ids);
+      changesByType.set(type, byType);
     }
   }
   
   // Process deleted records
   if (result.deleted) {
-    for (const { typeName, ids } of result.deleted) {
-      if (!deletedByType.has(typeName)) {
-        deletedByType.set(typeName, []);
-      }
-      deletedByType.get(typeName)!.push(...ids);
+    for (const { type, ids } of result.deleted) {
+      const byType = changesByType.get(type) || { updated: [], deleted: [] };
+      byType.deleted.push(...ids);
+      changesByType.set(type, byType);
     }
   }
   
   // Update knowledge base for each affected type
-  for (const [typeName, ids] of updatedByType.entries()) {
+  for (const [type, { updated, deleted }] of changesByType.entries()) {
     try {
-      await updateKnowledge(ctx, typeName, ids, []);
+      await updateKnowledge(ctx, type, updated,deleted);
     } catch (e) {
-      ctx.log(`Warning: failed to update knowledge base for ${typeName}: ${(e as Error).message}`);
-    }
-  }
-  
-  for (const [typeName, ids] of deletedByType.entries()) {
-    try {
-      await updateKnowledge(ctx, typeName, [], ids);
-    } catch (e) {
-      ctx.log(`Warning: failed to update knowledge base for deleted ${typeName} records: ${(e as Error).message}`);
+      ctx.log(`Warning: failed to update knowledge base for ${type}: ${(e as Error).message}`);
     }
   }
 }
@@ -932,7 +920,7 @@ async function updateKnowledge(ctx: CletusAIContext, typeName: string, update: s
     })
     .filter(t => t !== null && t.text.trim().length > 0) as { id: string; text: string }[];
 
-  const embeddings = await embed(updateTemplates.map(t => t.text)) || [];
+  const embeddings = await embed(updateTemplates.map(t => t.text), ctx.signal) || [];
   const knowledge: KnowledgeEntry[] = embeddings.map((vector, i) => ({
     source: `${typeName}:${updateTemplates[i].id}`,
     text: updateTemplates[i].text,
