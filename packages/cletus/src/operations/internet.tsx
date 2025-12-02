@@ -30,11 +30,16 @@ export const web_search = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }, { config }) => {
+  do: async ({ input }, { config, signal }) => {
     const tavilyConfig = config.getData().tavily;
-    
+
     if (!tavilyConfig?.apiKey) {
       throw new Error('Tavily API key not configured');
+    }
+
+    // Check if operation was cancelled
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
     }
 
     const client = tavily({ apiKey: tavilyConfig.apiKey });
@@ -135,23 +140,41 @@ export const web_get_page = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }) => {
+  do: async ({ input }, { signal }) => {
+    // Check if operation was cancelled before starting
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
     try {
+      // Check signal after browser launch
+      if (signal?.aborted) {
+        await browser.close();
+        throw new Error('Operation cancelled');
+      }
+
       const page = await browser.newPage();
-      
+
       // Set user agent to avoid being blocked
       await page.setUserAgent(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       );
-      
+
+      // Check signal before navigation
+      if (signal?.aborted) {
+        await browser.close();
+        throw new Error('Operation cancelled');
+      }
+
       await page.goto(input.url, {
         waitUntil: ['domcontentloaded', 'networkidle2'],
         timeout: 30000,
+        signal,
       });
 
       let content: string;
@@ -278,9 +301,9 @@ export const web_api_call = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }) => {
+  do: async ({ input }, { signal }) => {
     const headers: Record<string, string> = { ...(input.headers || {}) };
-    
+
     // Set appropriate Content-Type header based on requestType
     if (input.body && ['POST', 'PUT', 'PATCH'].includes(input.method)) {
       const requestType = input.requestType || 'text';
@@ -296,6 +319,7 @@ export const web_api_call = operationOf<
     const options: RequestInit = {
       method: input.method,
       headers,
+      signal,
     };
 
     if (input.body && ['POST', 'PUT', 'PATCH'].includes(input.method)) {

@@ -1,6 +1,27 @@
 import z from "zod";
 import { TypeDefinition, TypeField } from "../schemas";
 import { FieldCondition, WhereClause } from "./data";
+import { ConfigFile } from "../config";
+
+/**
+ * Get a type definition by name from config
+ */
+export function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
+export function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
+export function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
+  const type = config.getData().types.find((t) => t.name === typeName);
+  if (!type && !optional) {
+    throw new Error(`Data type not found: ${typeName}`);
+  }
+  return type;
+}
+
+/**
+ * Get the friendly name of a type, or return the type name if not found
+ */
+export function getTypeName(config: ConfigFile, typeName: string): string {
+  return getType(config, typeName, true)?.friendlyName || typeName;
+}
 
 /**
  * Generate example field values based on field type

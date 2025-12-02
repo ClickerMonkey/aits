@@ -120,7 +120,7 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
     if (value.length === 0) {
       return `[]`;
     }
-    return '\n' + value.map((item, i) => `${hyphenPrefix}${formatValue(item, true).split('\n').join('\n  ')}`).join('\n');
+    return value.map((item, i) => `${hyphenPrefix}${formatValue(item, true).split('\n').join('\n  ')}`).join('\n');
   }
   
   // Non-objects (primitives): use String(x)
@@ -143,6 +143,21 @@ export function formatValue(value: any, alreadyIndented: boolean = false): strin
       return `${prefix} ${formatValue(val).split('\n').join('\n  ')}`;
     }
   }).join('\n');
+}
+
+/**
+ * Format a value for display based on format type.
+ *
+ * @param value - value to format
+ * @param format - format type ('json' or 'yaml', defaults to 'yaml')
+ * @param alreadyIndented - whether content should be indented/hyphenated (only for yaml)
+ * @returns formatted string
+ */
+export function formatValueWithFormat(value: any, format: 'json' | 'yaml' = 'yaml', alreadyIndented: boolean = false): string {
+  if (format === 'json') {
+    return JSON.stringify(value, null, 2);
+  }
+  return formatValue(value, alreadyIndented);
 }
 
 /**
@@ -380,7 +395,6 @@ export function gate() {
  */
 export async function convertMessage(msg: Message): Promise<AIMessage> {
   const contents = msg.content.slice();
-  let nextRequest = 0;
   for (let i = 0; i < contents.length; i++) {
     const content = contents[i];
     if (content.operationIndex === undefined) {
@@ -390,18 +404,6 @@ export async function convertMessage(msg: Message): Promise<AIMessage> {
     if (operation?.message) {
       content.content = operation.message;
     }
-    if (operation?.requestIndex !== nextRequest) {
-      continue;
-    }
-    const request = msg.requests?.[operation.requestIndex];
-    if (!request) {
-      continue;
-    }
-    contents.splice(i, 0, {
-      type: 'text',
-      content: `Delegated to agent "${request.agent}"${request.typeName ? ` for type ${request.typeName}` : ''}${request.simulateMode ? ` (mode=${request.simulateMode})`: ''} with request:\n${request.request}`,
-    });
-    nextRequest++;
     i++;
   }
 

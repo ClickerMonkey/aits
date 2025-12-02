@@ -53,14 +53,41 @@ Example: Summarize a PDF document:
   const fileIndex = ai.tool({
     name: 'file_index',
     description: 'Index files for semantic search by content or summary',
-    instructions: `Use this to index files for semantic search. Choose "content" to embed the full text in chunks, or "summary" to embed an AI-generated summary. Supports image description and OCR.
+    instructions: `IMPORTANT: This tool is for BULK INDEXING files to make them semantically searchable in the future. This is NOT for reading or understanding file contents.
+
+⚠️ WARNING - EXPENSIVE OPERATION:
+This operation can take a LONG TIME and consume significant resources (API calls, embeddings, storage).
+NEVER run this without EXPLICIT USER APPROVAL after showing them:
+1. How many files will be indexed
+2. The total size of files to be indexed
+3. The types of files that will be indexed
+4. Estimated time/cost if possible
+
+WORKFLOW REQUIRED:
+1. First use file_search to find matching files
+2. Show the user the count, types, and sizes
+3. Ask for explicit confirmation before proceeding
+4. Only then execute the indexing operation
+
+When to use:
+- User explicitly asks to "index" files for search
+- Setting up semantic search over large collections of files
+- Building a searchable knowledge base from multiple documents
+- ONLY after user has confirmed they want to proceed
+
+When NOT to use (use file_read instead):
+- User asks "what can you tell me about [file]" - just read the file
+- Understanding a specific file's content
+- Analyzing or examining individual files
+- Quick file inspection
+- User hasn't explicitly requested indexing
 
 Example 1: Index all markdown files by content:
 { "glob": "**/*.md", "index": "content" }
 
 Example 2: Index images with descriptions:
 { "glob": "images/**/*.jpg", "index": "summary", "describeImages": true }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       glob: z.string().describe('Glob pattern for files to index'),
@@ -136,9 +163,17 @@ Example 2: Move multiple files into a directory:
     description: 'Get file statistics and metadata',
     instructions: `Use this to get metadata about a file (size, timestamps, type, line/character counts for text files).
 
+IMPORTANT: Use this BEFORE reading, editing, or summarizing a file when you need to:
+- Determine the appropriate tool based on file type (text, PDF, image, etc.)
+- Check file size to decide between file_read vs file_summary
+- See line count to know if you need pagination for editing
+- Understand file characteristics before processing
+
+For example, if a file is 100K+ characters, you might want to use file_summary instead of file_read, or use limit/offset parameters.
+
 Example: Get stats for a source file:
 { "path": "src/index.ts" }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),
@@ -168,11 +203,19 @@ Example: Delete a temporary file:
   const fileRead = ai.tool({
     name: 'file_read',
     description: 'Read file content',
-    instructions: `Use this to read a file into context. Supports text files, PDFs, Office docs, and images (with description/transcription). Large files can be truncated using characterLimit.
+    instructions: `Use this to read and understand file contents. This is the PRIMARY tool for examining files. Supports text files, PDFs, Office docs, and images (with description/transcription).
+
+When to use:
+- User asks about a specific file ("what can you tell me about X")
+- Understanding file contents
+- Analyzing code, configuration, or documentation
+- Any time you need to see what's in a file
+
+This is fast and efficient - always prefer this over file_index for understanding individual files.
 
 Example: Read a source file:
 { "path": "src/main.ts" }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),

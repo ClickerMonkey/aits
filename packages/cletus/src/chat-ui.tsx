@@ -1,6 +1,7 @@
 import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import path from 'path';
+import fs from 'fs';
 import events from 'events'
 import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai';
@@ -10,6 +11,7 @@ import { MessageDisplay } from './components/MessageDisplay';
 import { ModelSelector } from './components/ModelSelector';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
 import { ConfigFile } from './config';
+import { getChatPath } from './file-manager';
 import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
 import { getTotalTokens } from '@aeye/core';
 // @ts-ignore
@@ -46,7 +48,8 @@ type CommandType =
   | '/do'
   | '/transcribe'
   | '/cd'
-  | '/debug';
+  | '/debug'
+  | '/clear';
 
 
 interface Command {
@@ -69,6 +72,7 @@ const COMMANDS: Command[] = [
   { name: '/do', description: 'Add a todo', takesInput: true, placeholder: 'todo description' },
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
   { name: '/reset', description: 'Clear all todos', takesInput: false },
+  { name: '/clear', description: 'Clear all chat messages (requires confirmation)', takesInput: false },
   { name: '/transcribe', description: 'Voice input - requires SoX (ESC or silence to stop)', takesInput: false },
   { name: '/cd', description: 'Change current working directory', takesInput: true, optionalInput: true, placeholder: 'directory path' },
   { name: '/debug', description: 'Toggle debug logging', takesInput: false },
@@ -104,6 +108,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showExitPrompt, setShowExitPrompt] = useState(false);
   const [exitOptionIndex, setExitOptionIndex] = useState(0);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteConfirmationIndex, setDeleteConfirmationIndex] = useState(0);
+  const [deleteAndThen, setDeleteAndThen] = useState<'exit' | 'quit'>('exit');
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [clearConfirmationIndex, setClearConfirmationIndex] = useState(0);
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -187,7 +196,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
   // Convenience function to add system message
   const addSystemMessage = (content: string) => {
-    addMessage({ role: 'system', content: [{ type: 'text', content }], created: performance.now() });
+    addMessage({ role: 'system', content: [{ type: 'text', content }], created: Date.now() });
   };
 
   // Load messages from file on mount
@@ -237,8 +246,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         // Cancel the exit prompt if they press Ctrl+C again
         setShowExitPrompt(false);
         setExitOptionIndex(0);
+      } else if (inputValue.trim()) {
+        // Clear input if there is text
+        setInputValue('');
+        setHistoryIndex(-1);
+        setSavedInput('');
       } else {
-        // Show exit prompt
+        // Show exit prompt only if input is empty
         setShowExitPrompt(true);
         setExitOptionIndex(0);
       }
@@ -392,23 +406,109 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       }
     }
 
+    // Handle clear confirmation navigation
+    if (showClearConfirmation) {
+      if (key.upArrow) {
+        setClearConfirmationIndex((prev) => (prev > 0 ? prev - 1 : 1));
+      } else if (key.downArrow) {
+        setClearConfirmationIndex((prev) => (prev < 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        if (clearConfirmationIndex === 0) {
+          // Yes - clear all messages
+          setChatMessages([]);
+          saveMessages();
+          setShowClearConfirmation(false);
+          setClearConfirmationIndex(0);
+          addSystemMessage('✓ All messages cleared');
+        } else {
+          // No - cancel
+          setShowClearConfirmation(false);
+          setClearConfirmationIndex(0);
+        }
+      } else if (key.escape) {
+        // ESC cancels
+        setShowClearConfirmation(false);
+        setClearConfirmationIndex(0);
+      }
+      return interceptInput();
+    }
+
+    // Handle delete confirmation navigation
+    if (showDeleteConfirmation) {
+      if (key.upArrow) {
+        setDeleteConfirmationIndex((prev) => (prev > 0 ? prev - 1 : 1));
+      } else if (key.downArrow) {
+        setDeleteConfirmationIndex((prev) => (prev < 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        if (deleteConfirmationIndex === 0) {
+          // Yes - delete the chat
+          const chatFilePath = getChatPath(chat.id);
+          try {
+            if (fs.existsSync(chatFilePath)) {
+              fs.unlinkSync(chatFilePath);
+            }
+            // Perform the action after deletion
+            if (deleteAndThen === 'exit') {
+              onExit();
+            } else {
+              process.exit(0);
+            }
+          } catch (error: any) {
+            addSystemMessage(`❌ Failed to delete chat: ${error.message}`);
+            setShowDeleteConfirmation(false);
+            setDeleteConfirmationIndex(0);
+            setShowExitPrompt(false);
+            setExitOptionIndex(0);
+          }
+        } else {
+          // No - cancel deletion
+          setShowDeleteConfirmation(false);
+          setDeleteConfirmationIndex(0);
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
+        }
+      } else if (key.escape) {
+        // ESC cancels
+        setShowDeleteConfirmation(false);
+        setDeleteConfirmationIndex(0);
+        setShowExitPrompt(false);
+        setExitOptionIndex(0);
+      }
+      return;
+    }
+
     // Handle exit prompt navigation
     if (showExitPrompt) {
       if (key.upArrow) {
-        setExitOptionIndex((prev) => (prev > 0 ? prev - 1 : 2));
+        setExitOptionIndex((prev) => (prev > 0 ? prev - 1 : 4));
       } else if (key.downArrow) {
-        setExitOptionIndex((prev) => (prev < 2 ? prev + 1 : 0));
+        setExitOptionIndex((prev) => (prev < 4 ? prev + 1 : 0));
       } else if (key.return) {
-        setShowExitPrompt(false);
-        setExitOptionIndex(0);
         if (exitOptionIndex === 0) {
           // Exit to main menu
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
           onExit();
         } else if (exitOptionIndex === 1) {
           // Quit application
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
           process.exit(0);
+        } else if (exitOptionIndex === 2) {
+          // Exit to main menu and delete chat
+          setDeleteAndThen('exit');
+          setShowDeleteConfirmation(true);
+          setDeleteConfirmationIndex(0);
+        } else if (exitOptionIndex === 3) {
+          // Quit application and delete chat
+          setDeleteAndThen('quit');
+          setShowDeleteConfirmation(true);
+          setDeleteConfirmationIndex(0);
+        } else if (exitOptionIndex === 4) {
+          // Cancel
+          setShowExitPrompt(false);
+          setExitOptionIndex(0);
         }
-        // else: Cancel (index 2) - just close the prompt
       } else if (key.escape) {
         // ESC also cancels
         setShowExitPrompt(false);
@@ -499,6 +599,7 @@ AVAILABLE COMMANDS:
 /do         - Add a new todo
 /done       - Mark a todo as complete
 /reset      - Clear all todos
+/clear      - Clear all chat messages (requires confirmation)
 /cd         - Change or view current working directory
 
 KEYBOARD SHORTCUTS:
@@ -649,6 +750,11 @@ TIP: Type '/' to see all available commands with descriptions!`,
         const debugEnabled = config.getData().user.debug;
         logger.setDebug(debugEnabled);
         addSystemMessage(`✓ Debug logging ${debugEnabled ? 'enabled' : 'disabled'}`);
+        break;
+
+      case '/clear':
+        setShowClearConfirmation(true);
+        setClearConfirmationIndex(0);
         break;
 
       default:
@@ -919,7 +1025,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
         addSystemMessage(`❌ Error: ${error.message}`);
       }
 
-      logger.log(`error: ${error.message} ${error.stack}`);
+      logger.log(`error: ${JSON.stringify(error)}`);
     } finally {
       setIsWaitingForResponse(false);
       setPendingMessage(null);
@@ -971,7 +1077,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       role: 'user',
       name: config.getData().user.name,
       content: [{ type: 'text', content: inputValue }],
-      created: performance.now(),
+      created: Date.now(),
     });
 
     // Reset history navigation
@@ -1076,8 +1182,58 @@ After installation and the SoX executable is in the path, restart Cletus and try
         )}
       </Box>
 
+      {/* Clear Confirmation Prompt */}
+      {showClearConfirmation && (
+        <Box
+          borderStyle="round"
+          borderColor="yellow"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="yellow">
+            Are you sure you want to clear all messages? (↑↓ to navigate, Enter to select):
+          </Text>
+          <Box>
+            <Text color={clearConfirmationIndex === 0 ? 'cyan' : 'white'}>
+              {clearConfirmationIndex === 0 ? '▶ ' : '  '}Yes, clear all messages
+            </Text>
+          </Box>
+          <Box>
+            <Text color={clearConfirmationIndex === 1 ? 'cyan' : 'white'}>
+              {clearConfirmationIndex === 1 ? '▶ ' : '  '}No, cancel
+            </Text>
+          </Box>
+        </Box>
+      )}
+
+      {/* Delete Confirmation Prompt */}
+      {showDeleteConfirmation && (
+        <Box
+          borderStyle="round"
+          borderColor="red"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="red">
+            Are you sure you want to delete this chat? (↑↓ to navigate, Enter to select):
+          </Text>
+          <Box>
+            <Text color={deleteConfirmationIndex === 0 ? 'cyan' : 'white'}>
+              {deleteConfirmationIndex === 0 ? '▶ ' : '  '}Yes, delete the chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={deleteConfirmationIndex === 1 ? 'cyan' : 'white'}>
+              {deleteConfirmationIndex === 1 ? '▶ ' : '  '}No, cancel
+            </Text>
+          </Box>
+        </Box>
+      )}
+
       {/* Exit Prompt */}
-      {showExitPrompt && (
+      {showExitPrompt && !showDeleteConfirmation && (
         <Box
           borderStyle="round"
           borderColor="yellow"
@@ -1100,7 +1256,17 @@ After installation and the SoX executable is in the path, restart Cletus and try
           </Box>
           <Box>
             <Text color={exitOptionIndex === 2 ? 'cyan' : 'white'}>
-              {exitOptionIndex === 2 ? '▶ ' : '  '}Cancel
+              {exitOptionIndex === 2 ? '▶ ' : '  '}Exit to main menu and delete chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 3 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 3 ? '▶ ' : '  '}Quit application and delete chat
+            </Text>
+          </Box>
+          <Box>
+            <Text color={exitOptionIndex === 4 ? 'cyan' : 'white'}>
+              {exitOptionIndex === 4 ? '▶ ' : '  '}Cancel
             </Text>
           </Box>
         </Box>
@@ -1195,9 +1361,36 @@ After installation and the SoX executable is in the path, restart Cletus and try
       )}
 
       {/* Status Display */}
-      {currentStatus && (
+      {(currentStatus || isWaitingForResponse) && (
         <Box>
-          <InkAnimatedText text={currentStatus} />
+          {currentStatus && (
+            <Box marginRight={2}>
+              <InkAnimatedText text={currentStatus} />
+            </Box>
+          )}
+          {isWaitingForResponse && (
+            <Box>
+              <Text dimColor>( </Text>
+              <Text color="cyan">
+                {(elapsedTime / 1000).toFixed(1)}s
+              </Text>
+              <Text dimColor> │ </Text>
+              <Text color="green">
+                ~{tokenCount >= 1000 ? (tokenCount/1000).toFixed(1) + 'k' : tokenCount.toFixed(0)} tokens
+              </Text>
+              {accumulatedCost > 0 && (
+                <>
+                  <Text dimColor> │ </Text>
+                  <Text color="yellow">
+                    ${accumulatedCost.toFixed(4)}
+                  </Text>
+                </>
+              )}
+              <Text dimColor> │ </Text>
+              <Text dimColor>esc to interrupt</Text>
+              <Text dimColor> )</Text>
+            </Box>
+          )}
         </Box>
       )}
 
@@ -1256,35 +1449,18 @@ After installation and the SoX executable is in the path, restart Cletus and try
       </Box>
 
       {/* Footer */}
-      <Box marginTop={1}>
+      <Box>
         <Text dimColor>
           {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
           {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
-          {(pendingMessage ? accumulatedCost : totalMessageCost) > 0 && (
+          {totalMessageCost > 0 && (
             <>
               {' │ '}
               <Text color="yellow">
-                ${(pendingMessage ? accumulatedCost : totalMessageCost).toFixed(4)}
+                ${totalMessageCost.toFixed(4)}
               </Text>
-            </>
-          )}
-          {isWaitingForResponse ? (
-            <>
-              {' │ '}
-              <Text color="cyan">
-                {(elapsedTime / 1000).toFixed(1)}s
-              </Text>
-              {' │ '}
-              <Text color="green">
-                ~{tokenCount >= 1000 ? (tokenCount/1000).toFixed(1) + 'k' : tokenCount.toFixed(0)} tokens
-              </Text>
-              {' | ESC: interrupt '}
-            </>
-          ): (
-            <>
-              {' | Ctrl+C: exit │ ESC: interrupt'}
             </>
           )}
         </Text>

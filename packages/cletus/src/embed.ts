@@ -74,7 +74,7 @@ function createWorker(): Worker {
     return newWorker;
 }
 
-function sendMessage<T>(message: Omit<WorkerMessage, 'id'>): Promise<T> {
+function sendMessage<T>(message: Omit<WorkerMessage, 'id'>, signal?: AbortSignal): Promise<T> {
     return new Promise((resolve, reject) => {
         if (!worker) {
             reject(new Error('Worker not initialized'));
@@ -82,7 +82,39 @@ function sendMessage<T>(message: Omit<WorkerMessage, 'id'>): Promise<T> {
         }
 
         const id = ++messageId;
-        pendingMessages.set(id, { resolve, reject });
+
+        // Set up abort handler
+        const abortHandler = () => {
+            const pending = pendingMessages.get(id);
+            if (pending) {
+                pendingMessages.delete(id);
+                reject(new Error('Operation cancelled'));
+            }
+        };
+
+        if (signal) {
+            if (signal.aborted) {
+                reject(new Error('Operation cancelled'));
+                return;
+            }
+            signal.addEventListener('abort', abortHandler);
+        }
+
+        pendingMessages.set(id, {
+            resolve: (value) => {
+                if (signal) {
+                    signal.removeEventListener('abort', abortHandler);
+                }
+                resolve(value);
+            },
+            reject: (error) => {
+                if (signal) {
+                    signal.removeEventListener('abort', abortHandler);
+                }
+                reject(error);
+            }
+        });
+
         worker.postMessage({ ...message, id });
     });
 }
@@ -133,15 +165,25 @@ export async function canEmbed(): Promise<boolean> {
  * Generate embeddings for the given texts using a worker thread.
  * This runs in a separate thread to avoid blocking the UI.
  */
-export async function embed(text: string[]): Promise<number[][] | null> {
+export async function embed(text: string[], signal?: AbortSignal): Promise<number[][] | null> {
+    // Check if cancelled before starting
+    if (signal?.aborted) {
+        throw new Error('Operation cancelled');
+    }
+
     const start = performance.now();
     const initialized = await initWorker();
     if (!initialized || !worker) {
         return null;
     }
 
+    // Check again after initialization
+    if (signal?.aborted) {
+        throw new Error('Operation cancelled');
+    }
+
     try {
-        const result = await sendMessage<number[][]>({ type: 'embed', texts: text });
+        const result = await sendMessage<number[][]>({ type: 'embed', texts: text }, signal);
         return result;
     } catch (err) {
         logger.log(`Embedding: Embedding failed: ${err}`);

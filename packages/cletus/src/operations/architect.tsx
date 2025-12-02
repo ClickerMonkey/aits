@@ -8,8 +8,14 @@ import { operationOf } from "./types";
 import { renderOperation } from '../helpers/render';
 import { searchFiles, processFile } from '../helpers/files';
 import { getAssetPath } from '../file-manager';
-import { get } from 'http';
+import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/dba-query';
+import type { Query } from '../helpers/dba';
+import { DataManager } from '../data';
+import { getType, getTypeName } from '../helpers/type';
 
+// Reserved names that cannot be used
+const RESERVED_FIELD_NAMES = ['id', 'created', 'updated'];
+const RESERVED_TYPE_NAMES = ['string', 'number', 'boolean', 'date', 'enum'];
 
 function validateTemplate(template: string, fields: TypeField[]): string | true {
   try {
@@ -34,20 +40,6 @@ function validateTemplate(template: string, fields: TypeField[]): string | true 
   } catch (error: any) {
     return `Invalid knowledge template: ${error.message}`;
   }
-}
-
-function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
-function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
-function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
-  const type = config.getData().types.find((t) => t.name === typeName);
-  if (!type && !optional) {
-    throw new Error(`Data type not found: ${typeName}`);
-  }
-  return type;
-}
-
-function getTypeName(config: ConfigFile, typeName: string): string {
-  return getType(config, typeName, true)?.friendlyName || typeName;
 }
 
 export const type_info = operationOf<
@@ -81,19 +73,24 @@ export const type_info = operationOf<
     
     return { type: type || null };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `${formatName(op.cache?.typeName || op.input.name)}Info()`,
-    (op) => {
-      if (op.output?.type) {
-        return `Found type: ${op.output.type.friendlyName}`;
-      } else if (op.output?.type === null) {
-        return `Type not found`;
-      }
-      return null;
-    },
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Info()`,
+      (op) => {
+        if (op.output?.type) {
+          return `Found type: ${op.output.type.friendlyName}`;
+        } else if (op.output?.type === null) {
+          return `Type not found`;
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
 });
 
 export const type_list = operationOf<
@@ -149,7 +146,8 @@ type TypeUpdate = {
 export const type_update = operationOf<
   TypeUpdate,
   { name: string; updated: boolean },
-  { validate: (input: TypeUpdate, config: ConfigFile) => string; fieldify(input: TypeUpdate, fields: TypeField[]): TypeField[] }
+  { validate: (input: TypeUpdate, config: ConfigFile) => string; fieldify(input: TypeUpdate, fields: TypeField[]): TypeField[] },
+  { typeName: string }
 >({
   mode: 'update',
   signature: 'type_update(name: string, update...)',
@@ -167,12 +165,14 @@ export const type_update = operationOf<
           return `Field name "${fieldName}" must be lowercase`;
         }
 
+        // Validate field name is not reserved
+        if (RESERVED_FIELD_NAMES.includes(fieldName)) {
+          return `Field name "${fieldName}" is reserved and cannot be used`;
+        }
+
         if (!fieldUpdate) {
-          // Deleting a field - check if it's required (breaking change)
-          const existingField = existing.fields.find((f) => f.name === fieldName);
-          if (existingField?.required) {
-            return `Cannot delete required field "${fieldName}" - this is a breaking change`;
-          }
+          // Deleting a field - allowed for any field
+          // No additional validation needed
         } else {
           // Adding or updating a field
           const existingField = existing.fields.find((f) => f.name === fieldName);
@@ -249,14 +249,18 @@ export const type_update = operationOf<
     return newFields;
   },
   async analyze({ input }, { config }) {
+    const type = getType(config, input.name, true);
+    const typeName = type?.friendlyName ?? input.name;
+
     const validation = this.validate(input, config);
     if (validation) {
       return {
         analysis: `This would fail - ${validation}`,
         doable: false,
+        cache: { typeName },
       };
     }
-    
+
     const changes: string[] = [];
     if (input.update.friendlyName) {
       changes.push(`friendlyName to "${input.update.friendlyName}"`);
@@ -272,15 +276,19 @@ export const type_update = operationOf<
     }
 
     return {
-      analysis: `This will update type "${input.name}": ${changes.join(', ')}.`,
+      analysis: `This will update type "${typeName}": ${changes.join(', ')}.`,
       doable: true,
+      cache: { typeName },
     };
   },
-  async do({ input }, { config }) {
+  async do({ input, cache }, { config }) {
     const validation = this.validate(input, config);
     if (validation) {
       throw new Error(`Type update failed - ${validation}`);
     }
+
+    const type = getType(config, input.name, true);
+    const typeName = cache?.typeName ?? type?.friendlyName ?? input.name;
 
     await config.saveWithTypeCheck((data) => {
       const dataType = data.types.find((t) => t.name === input.name);
@@ -302,20 +310,29 @@ export const type_update = operationOf<
       }
     });
 
-    return { name: input.name, updated: true };
+    return {
+      output: { name: input.name, updated: true },
+      cache: { typeName },
+    };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `${formatName(op.input.name)}Update(${Object.keys(op.input.update).join(', ')})`,
-    (op) => op.output?.updated ? 'Updated type successfully' : null,
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Update(${Object.keys(op.input.update).join(', ')})`,
+      (op) => op.output?.updated ? 'Updated type successfully' : null,
+      showInput, showOutput
+    );
+  },
 });
 
 export const type_create = operationOf<
   TypeDefinition,
   { type: TypeDefinition; created: boolean },
-  { validate: (input: TypeDefinition, config: ConfigFile) => string; }
+  { validate: (input: TypeDefinition, config: ConfigFile) => string; },
+  { typeName: string }
 >({
   mode: 'create',
   signature: 'type_create(type: TypeDefinition)',
@@ -324,6 +341,11 @@ export const type_create = operationOf<
     const existing = config.getData().types.find((t) => t.name === input.name);
     if (existing) {
       return `Type already exists: ${input.name}`;
+    }
+
+    // Validate type name is not reserved
+    if (RESERVED_TYPE_NAMES.includes(input.name)) {
+      return `Type name "${input.name}" is reserved and cannot be used`;
     }
 
     // Validate fields for duplicates and required properties
@@ -337,6 +359,12 @@ export const type_create = operationOf<
       if (!field.name) {
         return `Field must have a name`;
       }
+
+      // Validate field name is not reserved
+      if (RESERVED_FIELD_NAMES.includes(field.name)) {
+        return `Field name "${field.name}" is reserved and cannot be used`;
+      }
+
       if (!field.friendlyName) {
         return `Field "${field.name}" must have a friendlyName`;
       }
@@ -360,20 +388,22 @@ export const type_create = operationOf<
   },
   async analyze({ input }, { config }) {
     const validation = this.validate(input, config);
-    
+
     if (validation) {
       return {
         analysis: `This would fail - ${validation}`,
         doable: false,
+        cache: { typeName: input.friendlyName },
       };
     }
 
     return {
       analysis: `This will create a new data type: ${JSON.stringify(input, undefined, 2)}`,
       doable: true,
+      cache: { typeName: input.friendlyName },
     };
   },
-  async do({ input }, { config }) {
+  async do({ input, cache }, { config }) {
     const validation = this.validate(input, config);
     if (validation) {
       throw new Error(`Type creation failed - ${validation}`);
@@ -381,14 +411,22 @@ export const type_create = operationOf<
 
     await config.addType(input);
 
-    return { type: input, created: true };
+    return {
+      output: { type: input, created: true },
+      cache: { typeName: cache?.typeName ?? input.friendlyName },
+    };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `${formatName(op.input.name)}Create(fields: [${op.input.fields.map(f => f.friendlyName).join(', ')}])`,
-    (op) => op.output?.created ? `Created type: ${op.output.type.friendlyName}` : null,
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? op.input.friendlyName;
+
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Create(fields: [${op.input.fields.map(f => f.friendlyName).join(', ')}])`,
+      (op) => op.output?.created ? `Created type: ${op.output.type.friendlyName}` : null,
+      showInput, showOutput
+    );
+  },
 });
 
 // Type import constants
@@ -409,7 +447,9 @@ export interface DiscoveredType {
 
 export const type_delete = operationOf<
   { name: string },
-  { name: string; deleted: boolean }
+  { name: string; deleted: boolean },
+  {},
+  { typeName: string }
 >({
   mode: 'delete',
   signature: 'type_delete(name: string)',
@@ -417,16 +457,17 @@ export const type_delete = operationOf<
   analyze: async ({ input }, { config }) => {
     const types = config.getData().types;
     const type = types.find((t) => t.name === input.name);
-    
+
     if (!type) {
       return {
         analysis: `This would fail - type not found: ${input.name}`,
         doable: false,
+        cache: { typeName: input.name },
       };
     }
 
     // Check if any other types reference this type
-    const referencingTypes = types.filter(t => 
+    const referencingTypes = types.filter(t =>
       t.fields.some(f => f.type === input.name)
     );
 
@@ -435,24 +476,28 @@ export const type_delete = operationOf<
       return {
         analysis: `This would fail - type "${type.friendlyName}" is referenced by: ${typeList}. Delete these references first.`,
         doable: false,
+        cache: { typeName: type.friendlyName },
       };
     }
 
     return {
       analysis: `This will delete type "${type.friendlyName}".`,
       doable: true,
+      cache: { typeName: type.friendlyName },
     };
   },
-  do: async ({ input }, { config }) => {
+  do: async ({ input, cache }, { config }) => {
     const types = config.getData().types;
     const type = types.find((t) => t.name === input.name);
-    
+
     if (!type) {
       throw new Error(`Type not found: ${input.name}`);
     }
 
+    const typeName = cache?.typeName ?? type.friendlyName;
+
     // Check if any other types reference this type
-    const referencingTypes = types.filter(t => 
+    const referencingTypes = types.filter(t =>
       t.fields.some(f => f.type === input.name)
     );
 
@@ -468,14 +513,22 @@ export const type_delete = operationOf<
       }
     });
 
-    return { name: input.name, deleted: true };
+    return {
+      output: { name: input.name, deleted: true },
+      cache: { typeName },
+    };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `${formatName(op.input.name)}Delete()`,
-    (op) => op.output?.deleted ? `Deleted type: ${op.input.name}` : null,
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Delete()`,
+      (op) => op.output?.deleted ? `Deleted type: ${typeName}` : null,
+      showInput, showOutput
+    );
+  },
 });
 
 export const type_import = operationOf<
@@ -485,8 +538,8 @@ export const type_import = operationOf<
   mode: 'read',
   signature: 'type_import(glob: string, hints?, max?)',
   status: ({ glob }) => `Importing types from ${glob}`,
-  analyze: async ({ input: { glob, hints, max } }, { config, cwd }) => {
-    const files = await searchFiles(cwd, glob);
+  analyze: async ({ input: { glob, hints, max } }, { config, cwd, signal }) => {
+    const files = await searchFiles(cwd, glob, signal);
     const importable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image');
     
     let analysis = `This will scan ${importable.length} file(s) matching "${glob}" to discover type definitions.`;
@@ -506,10 +559,10 @@ export const type_import = operationOf<
     };
   },
   do: async ({ input: { glob, hints, max } }, ctx) => {
-    const { ai, config, cwd, log, chatStatus } = ctx;
+    const { ai, config, cwd, log, chatStatus, signal } = ctx;
     
     // Find and filter files
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     const importableFiles = files.filter(f => 
       f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image'
     );
@@ -638,22 +691,34 @@ When managing types:
           call: async (input) => {
             // Check if max limit would be exceeded
             if (max && discoveredTypes.size >= max) {
-              return { 
-                success: false, 
-                message: `Cannot add type "${input.name}": maximum of ${max} types reached. Remove a less frequent type first or increase the max limit.` 
+              return {
+                success: false,
+                message: `Cannot add type "${input.name}": maximum of ${max} types reached. Remove a less frequent type first or increase the max limit.`
               };
             }
-            
+
             const existing = discoveredTypes.get(input.name);
             if (existing) {
               return { success: false, message: `Type "${input.name}" already discovered. Use update_discovered or update_fields instead.` };
             }
-            
+
             // Check if name conflicts with existing types
             if (existingTypeNames.includes(input.name)) {
               return { success: false, message: `Type "${input.name}" already exists as an existing type. Choose a different name.` };
             }
-            
+
+            // Validate type name is not reserved
+            if (RESERVED_TYPE_NAMES.includes(input.name)) {
+              return { success: false, message: `Type name "${input.name}" is reserved and cannot be used.` };
+            }
+
+            // Validate field names are not reserved
+            for (const field of input.fields) {
+              if (RESERVED_FIELD_NAMES.includes(field.name)) {
+                return { success: false, message: `Field name "${field.name}" is reserved and cannot be used.` };
+              }
+            }
+
             discoveredTypes.set(input.name, {
               name: input.name,
               friendlyName: input.friendlyName,
@@ -661,7 +726,7 @@ When managing types:
               fields: input.fields as TypeField[],
               instanceCount: input.instanceCount || 1,
             });
-            
+
             return { success: true, message: `Added discovered type: ${input.friendlyName}` };
           },
         }),
@@ -679,16 +744,21 @@ When managing types:
             if (!type) {
               return { success: false, message: `Type "${input.oldName}" not found in discovered types.` };
             }
-            
+
             // Check if newName already exists
             if (existingTypeNames.includes(input.newName) || discoveredTypes.has(input.newName)) {
               return { success: false, message: `Type name "${input.newName}" already exists. Choose a different name.` };
             }
-            
+
+            // Validate new type name is not reserved
+            if (RESERVED_TYPE_NAMES.includes(input.newName)) {
+              return { success: false, message: `Type name "${input.newName}" is reserved and cannot be used.` };
+            }
+
             discoveredTypes.delete(input.oldName);
             type.name = input.newName;
             discoveredTypes.set(input.newName, type);
-            
+
             return { success: true, message: `Renamed type from ${input.oldName} to ${input.newName}` };
           },
         }),
@@ -747,7 +817,12 @@ When managing types:
                 // Validate add/update
                 const typedField = field as TypeField;
                 const existingFieldIndex = targetFields.findIndex(f => f.name === typedField.name);
-                
+
+                // Validate field name is not reserved
+                if (RESERVED_FIELD_NAMES.includes(typedField.name)) {
+                  errors.push(`Field name "${typedField.name}" is reserved and cannot be used`);
+                }
+
                 if (existingFieldIndex !== -1) {
                   // Validate update (only for discovered types)
                   if (!discoveredType) {
@@ -912,6 +987,7 @@ When managing types:
               describeImages: false,
               extractImages: false,
               summarize: false,
+              signal,
             });
             
             // Store sections for smarter splitting
@@ -1086,7 +1162,7 @@ When managing types:
           parts.push(`${pluralize(discoveredCount, 'new type')}`);
         }
         if (updatesCount > 0) {
-          parts.push(`${pluralize(updatesCount, 'type updaye')}`);
+          parts.push(`${pluralize(updatesCount, 'type update')}`);
         }
         
         return parts.length > 0 
@@ -1098,3 +1174,332 @@ When managing types:
     showInput, showOutput
   ),
 });
+
+/**
+ * Get the kind of a query statement for display
+ */
+function getQueryKind(query: Query): string {
+  if ('kind' in query) {
+    if (query.kind === 'withs') {
+      return 'CTE';
+    }
+    return query.kind.toUpperCase();
+  }
+  return 'QUERY';
+}
+
+/**
+ * Get a brief description of the query for display
+ */
+function describeQuery(query: Query): string {
+  if ('kind' in query) {
+    switch (query.kind) {
+      case 'select':
+        const selectParts: string[] = [];
+        if (query.from?.kind === 'table') {
+          selectParts.push(`from ${query.from.table}`);
+        }
+        if (query.joins?.length) {
+          selectParts.push(`${query.joins.length} join(s)`);
+        }
+        if (query.where?.length) {
+          selectParts.push('filtered');
+        }
+        if (query.groupBy?.length) {
+          selectParts.push('grouped');
+        }
+        return selectParts.length > 0 ? selectParts.join(', ') : 'simple';
+        
+      case 'insert':
+        return `into ${query.table}`;
+        
+      case 'update':
+        return `${query.table}`;
+        
+      case 'delete':
+        return `from ${query.table}`;
+        
+      case 'union':
+      case 'intersect':
+      case 'except':
+        return `${query.kind}`;
+        
+      case 'withs':
+        const cteNames = query.withs.map(w => w.name).join(', ');
+        return `CTEs: ${cteNames}`;
+        
+      default:
+        return '';
+    }
+  }
+  return '';
+}
+
+export interface QueryOperationCache {
+  payload?: QueryExecutionPayload;
+  canCommit?: CanCommitResult;
+}
+
+export const query = operationOf<
+  { query: Query; commit?: boolean },
+  QueryResult,
+  {},
+  QueryOperationCache
+>({
+  mode: 'update', // Can modify data, so requires update mode
+  signature: 'query(query: Query, commit?: boolean = true)',
+  status: ({ query }) => `Executing ${getQueryKind(query)} query`,
+  inputFormat: 'json',
+  outputFormat: 'json',
+  analyze: async ({ input: { query } }, { config }) => {
+    const types = config.getData().types;
+
+    // Validate that referenced tables exist
+    const referencedTables = new Set<string>();
+    collectReferencedTables(query, referencedTables);
+
+    const missingTables = Array.from(referencedTables).filter(
+      table => !types.some(t => t.name === table)
+    );
+
+    if (missingTables.length > 0) {
+      return {
+        analysis: `This would fail - referenced tables not found: ${missingTables.join(', ')}`,
+        doable: false,
+      };
+    }
+
+    const kind = getQueryKind(query);
+    const description = describeQuery(query);
+
+    // Execute the query without committing to see what would happen
+    const payload = await executeQueryWithoutCommit(
+      query,
+      () => config.getData().types,
+      (typeName: string) => new DataManager(typeName)
+    );
+
+    // Describe what the query would do based on the results
+    const result = payload.result;
+
+    // Check for validation errors
+    if (!result.canCommit && result.validationErrors && result.validationErrors.length > 0) {
+      const errorSummary = result.validationErrors
+        .map((err, i) => `[${i + 1}] ${err.path}: ${err.message}`)
+        .join('\n');
+
+      return {
+        analysis: `This would fail due to validation errors:\n${errorSummary}`,
+        doable: false,
+        cache: { payload },
+      };
+    }
+
+    const parts: string[] = [];
+
+    if (result.rows.length > 0) {
+      parts.push(`return ${pluralize(result.rows.length, 'row')}`);
+    }
+    if (result.inserted?.length) {
+      const count = result.inserted.reduce((a, b) => a + b.ids.length, 0);
+      parts.push(`insert ${pluralize(count, 'record')}`);
+    }
+    if (result.updated?.length) {
+      const count = result.updated.reduce((a, b) => a + b.ids.length, 0);
+      parts.push(`update ${pluralize(count, 'record')}`);
+    }
+    if (result.deleted?.length) {
+      const count = result.deleted.reduce((a, b) => a + b.ids.length, 0);
+      parts.push(`delete ${pluralize(count, 'record')}`);
+    }
+
+    const action = result.affectedCount === 0 ? 'did' : 'will';
+    const detailedAnalysis = parts.length > 0
+      ? `This ${action} ${parts.join(', ')}.`
+      : `This ${action} execute a ${kind} query${description ? ` (${description})` : ''}.`;
+
+    return {
+      analysis: detailedAnalysis,
+      doable: result.canCommit,
+      cache: { payload },
+      ...(result.affectedCount === 0 ? {
+        done: true,
+        output: result
+      } : {}),
+    };
+  },
+  do: async ({ input: { query, commit = true }, cache }, { config }) => {
+    const getManager = (typeName: string) => new DataManager(typeName);
+
+    // If we have a cached payload and commit is true, try to use it
+    if (cache?.payload && commit) {
+      // Check if the cached payload can still be committed
+      const canCommitResult = await canCommitQueryResult(cache.payload, getManager);
+      if (canCommitResult.canCommit) {
+        // Commit the cached payload
+        return {
+          output: await commitQueryChanges(cache.payload, getManager),
+          cache: { ...cache, canCommit: canCommitResult },
+        };
+      } else {
+        // Store the canCommit result in cache so render can show why it failed
+        const newCache = { ...cache, canCommit: canCommitResult };
+        // Try to re-execute the query
+        try {
+          const output = await executeQuery(
+            query,
+            () => config.getData().types,
+            getManager
+          );
+          return {
+            output,
+            cache: newCache,
+          };
+        } catch (error: any) {
+          // If re-execution also fails, throw with the canCommit reason
+          throw new Error(`Cannot commit query: ${canCommitResult.reason}`);
+        }
+      }
+    }
+
+    // Execute the query fresh
+    if (commit) {
+      return executeQuery(
+        query,
+        () => config.getData().types,
+        getManager
+      );
+    } else {
+      // Execute without committing (for testing)
+      const payload = await executeQueryWithoutCommit(
+        query,
+        () => config.getData().types,
+        getManager
+      );
+      return {
+        output: payload.result,
+        cache: { payload },
+      };
+    }
+  },
+  render: (op, ai, showInput, showOutput) => {
+    const kind = getQueryKind(op.input.query);
+    const description = describeQuery(op.input.query);
+
+    return renderOperation(
+      op,
+      `Query(${kind}${description ? `: ${description}` : ''})`,
+      (op) => {
+        if (op.output) {
+          const parts: string[] = [];
+          if (op.output.rows.length > 0) {
+            parts.push(`${pluralize(op.output.rows.length, 'row')}`);
+          }
+          if (op.output.inserted?.length) {
+            parts.push(`${op.output.inserted.reduce((a, b) => a + b.ids.length, 0)} inserted`);
+          }
+          if (op.output.updated?.length) {
+            parts.push(`${op.output.updated.reduce((a, b) => a + b.ids.length, 0)} updated`);
+          }
+          if (op.output.deleted?.length) {
+            parts.push(`${op.output.deleted.reduce((a, b) => a + b.ids.length, 0)} deleted`);
+          }
+          return parts.length > 0 ? parts.join(', ') : 'Query executed';
+        }
+
+        // If no output, check if we have canCommit status in cache
+        if (op.cache?.canCommit && !op.cache.canCommit.canCommit) {
+          return `Cannot execute: ${op.cache.canCommit.reason}`;
+        }
+
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
+});
+
+/**
+ * Collect all table names referenced in a query
+ */
+function collectReferencedTables(query: Query, tables: Set<string>): void {
+  if (!query || typeof query !== 'object') return;
+  
+  if ('kind' in query) {
+    switch (query.kind) {
+      case 'select':
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTables(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'insert':
+        tables.add(query.table);
+        if (query.select) {
+          collectReferencedTables(query.select, tables);
+        }
+        break;
+        
+      case 'update':
+        tables.add(query.table);
+        if (query.from?.kind === 'table') {
+          tables.add(query.from.table);
+        } else if (query.from?.kind === 'subquery') {
+          collectReferencedTables(query.from.subquery, tables);
+        }
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'delete':
+        tables.add(query.table);
+        if (query.joins) {
+          for (const join of query.joins) {
+            if (join.source.kind === 'table') {
+              tables.add(join.source.table);
+            } else if (join.source.kind === 'subquery') {
+              collectReferencedTables(join.source.subquery, tables);
+            }
+          }
+        }
+        break;
+        
+      case 'union':
+      case 'intersect':
+      case 'except':
+        collectReferencedTables(query.left, tables);
+        collectReferencedTables(query.right, tables);
+        break;
+        
+      case 'withs':
+        for (const withStmt of query.withs) {
+          if (withStmt.kind === 'cte') {
+            collectReferencedTables(withStmt.statement, tables);
+          } else if (withStmt.kind === 'cte-recursive') {
+            collectReferencedTables(withStmt.statement, tables);
+            collectReferencedTables(withStmt.recursiveStatement, tables);
+          }
+        }
+        collectReferencedTables(query.final, tables);
+        break;
+    }
+  }
+}

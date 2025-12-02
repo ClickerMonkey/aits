@@ -27,10 +27,10 @@ export const file_search = operationOf<
   signature: 'file_search(glob: string, limit?: number, offset?: number)',
   status: (input) => `Searching files: ${input.glob}`,
   async analyze({ input }, { cwd }) { return { analysis: `N/A`, doable: true }; },
-  async do({ input }, { cwd }) {
+  async do({ input }, { cwd, signal }) {
     const limit = input.limit || 50;
     const offset = input.offset || 0;
-    const files = await glob(input.glob, { cwd });
+    const files = await glob(input.glob, { cwd, signal });
 
     files.sort();
 
@@ -94,9 +94,9 @@ export const file_summary = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }, { cwd, ai, config }) => {
+  do: async ({ input }, { cwd, ai, config, signal }) => {
     const fullPath = path.resolve(cwd, input.path);
-    
+
     const summarized = await processFile(fullPath, input.path, {
       assetPath: await getAssetPath(true),
       sections: false,
@@ -104,9 +104,10 @@ export const file_summary = operationOf<
       extractImages: input.extractImages ?? false,
       transcribeImages: input.transcribeImages ?? false,
       summarize: true,
-      summarizer: (text) => summarize(ai, paginateText(text, input.limit, input.offset, input.limitOffsetMode)),
-      describer: (image) => describe(ai, image),
-      transcriber: (image) => transcribe(ai, image),
+      summarizer: (text) => summarize(ai, paginateText(text, input.limit, input.offset, input.limitOffsetMode), signal),
+      describer: (image) => describe(ai, image, signal),
+      transcriber: (image) => transcribe(ai, image, signal),
+      signal,
     });
 
     const size = summarized.sections.reduce((acc, sec) => acc + (sec?.length || 0), 0);
@@ -140,8 +141,8 @@ export const file_index = operationOf<
   mode: (input) => input.transcribeImages || input.extractImages || input.describeImages ? 'read' : 'local',
   signature: 'file_index(glob: string, index: "content" | "summary"...)',
   status: (input) => `Indexing files: ${input.glob}`,
-  async analyze({ input }, { cwd }) {
-    const files = await searchFiles(cwd, input.glob);
+  async analyze({ input }, { cwd, signal }) {
+    const files = await searchFiles(cwd, input.glob, signal);
 
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
     const unknown = files.filter(f => f.fileType === 'unknown').map(f => f.file);
@@ -164,13 +165,13 @@ export const file_index = operationOf<
 
     return { analysis, doable, cache: { indexableFiles } };
   },
-  async do({ input, cache }, { cwd, ai, chatStatus }) {
+  async do({ input, cache }, { cwd, ai, chatStatus, signal }) {
     // Use cached indexable files if available, otherwise search again
     let indexableFiles: Array<{ file: string; fileType: string }>;
     if (cache?.indexableFiles) {
       indexableFiles = cache.indexableFiles;
     } else {
-      const files = await searchFiles(cwd, input.glob);
+      const files = await searchFiles(cwd, input.glob, signal);
       indexableFiles = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable');
     }
 
@@ -190,8 +191,13 @@ export const file_index = operationOf<
     chatStatus(`Indexing ${indexableFiles.length} files...`);
 
     await Promise.allSettled(indexableFiles.map(async (file) => {
+      // Check if cancelled before processing each file
+      if (signal?.aborted) {
+        throw new Error('Operation cancelled');
+      }
+
       const fullPath = path.resolve(cwd, file.file);
-    
+
       const parsed = await processFile(fullPath, file.file, {
         assetPath: await getAssetPath(true),
         sections: true,
@@ -199,9 +205,10 @@ export const file_index = operationOf<
         extractImages: input.extractImages ?? false,
         transcribeImages: input.transcribeImages ?? false,
         summarize: input.index === 'summary',
-        summarizer: (text) => summarize(ai, paginateText(text)),
-        describer: (image) => describe(ai, image),
-        transcriber: (image) => transcribe(ai, image),
+        summarizer: (text) => summarize(ai, paginateText(text), signal),
+        describer: (image) => describe(ai, image, signal),
+        transcriber: (image) => transcribe(ai, image, signal),
+        signal,
       });
 
       filesProcessed++;
@@ -215,7 +222,7 @@ export const file_index = operationOf<
         : [parsed.description || ''];
 
       const embeddable = chunkables.filter(s => s && s.length > 0);
-      const embeddings = await embed(embeddable) || [];
+      const embeddings = await embed(embeddable, signal) || [];
 
       knowledge.push(...embeddings.map((vector, index) => ({
         source: getSource(index),
@@ -314,8 +321,8 @@ export const file_copy = operationOf<
   mode: 'create',
   signature: 'file_copy(glob: string, target: string)',
   status: (input) => `Copying: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
-  analyze: async ({ input }, { cwd }) => {
-    const source = await glob(input.glob, { cwd });
+  analyze: async ({ input }, { cwd, signal }) => {
+    const source = await glob(input.glob, { cwd, signal });
     const fullTarget = path.resolve(cwd, input.target);
     
     // Build array with full path and readability for each file
@@ -364,10 +371,10 @@ export const file_copy = operationOf<
       cache: { sourceFiles, fullTarget },
     };
   },
-  do: async ({ input, cache }, { cwd }) => {
+  do: async ({ input, cache }, { cwd, signal }) => {
     // Use cached source files if available, otherwise search again
     const sourceFiles = cache?.sourceFiles ?? await Promise.all(
-      (await glob(input.glob, { cwd })).map(async (file) => {
+      (await glob(input.glob, { cwd, signal })).map(async (file) => {
         const fullPath = path.resolve(cwd, file);
         const readable = await fileIsReadable(fullPath);
         return { file, fullPath, readable };
@@ -416,8 +423,8 @@ export const file_move = operationOf<
   mode: 'update',
   signature: 'file_move(glob: string, target: string)',
   status: (input) => `Moving: ${input.glob} → ${paginateText(input.target, 100, -100)}`,
-  analyze: async ({ input }, { cwd }) => {
-    const files = await glob(input.glob, { cwd });
+  analyze: async ({ input }, { cwd, signal }) => {
+    const files = await glob(input.glob, { cwd, signal });
     const targetPath = path.resolve(cwd, input.target);
 
     if (files.length === 0) {
@@ -451,9 +458,9 @@ export const file_move = operationOf<
       cache: { files, targetPath },
     };
   },
-  do: async ({ input, cache }, { cwd, chatStatus }) => {
+  do: async ({ input, cache }, { cwd, chatStatus, signal }) => {
     // Use cached files if available
-    const files = cache?.files ?? await glob(input.glob, { cwd });
+    const files = cache?.files ?? await glob(input.glob, { cwd, signal });
     const targetPath = cache?.targetPath ?? path.resolve(cwd, input.target);
 
     if (files.length === 0) {
@@ -494,6 +501,10 @@ export const file_move = operationOf<
       }
 
       await Promise.allSettled(files.map(async (file) => {
+        if (signal?.aborted) {
+          throw new Error('Operation cancelled');
+        }
+
         const sourcePath = path.resolve(cwd, file);
         const destPath = path.join(targetPath, file);
         await fs.mkdir(path.dirname(destPath), { recursive: true });
@@ -682,7 +693,7 @@ export const file_read = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }, { cwd, ai }) => {
+  do: async ({ input }, { cwd, ai, signal }) => {
     const fullPath = path.resolve(cwd, input.path);
     const limitOffsetMode = input.limitOffsetMode || 'characters';
 
@@ -704,8 +715,9 @@ export const file_read = operationOf<
       extractImages: input.extractImages ?? false,
       transcribeImages: input.transcribeImages ?? false,
       summarize: false,
-      describer: (image) => describe(ai, image),
-      transcriber: (image) => transcribe(ai, image),
+      describer: (image) => describe(ai, image, signal),
+      transcriber: (image) => transcribe(ai, image, signal),
+      signal,
     });
 
     let content = processed.sections.join('\n');
@@ -735,7 +747,29 @@ export const file_read = operationOf<
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Read ${linkFile(op.output.fullPath)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
+        const params: string[] = [];
+
+        // Add limit/offset info if non-default
+        const limitOffsetMode = op.input.limitOffsetMode || 'characters';
+        const defaultLimit = limitOffsetMode === 'characters' ? CONSTS.MAX_CHARACTERS : CONSTS.MAX_LINES;
+        if (op.input.limit && op.input.limit !== defaultLimit) {
+          params.push(`limit=${op.input.limit} ${limitOffsetMode}`);
+        }
+        if (op.input.offset) {
+          params.push(`offset=${op.input.offset}`);
+        }
+        if (op.input.limitOffsetMode && op.input.limitOffsetMode !== 'characters') {
+          params.push(`mode=${op.input.limitOffsetMode}`);
+        }
+
+        // Add boolean flags if enabled
+        if (op.input.showLines) params.push('lines');
+        if (op.input.describeImages) params.push('describe');
+        if (op.input.extractImages) params.push('extract');
+        if (op.input.transcribeImages) params.push('transcribe');
+
+        const paramsStr = params.length > 0 ? ` (${params.join(', ')})` : '';
+        return `Read ${linkFile(op.output.fullPath)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}${paramsStr}`;
       }
       return null;
     },
@@ -751,9 +785,9 @@ type FileEditInput = {
 }
 
 type FileEditResult = {
-  insertStart: number;
-  insertEnd: number;
-  insert: string;
+  insertStart?: number;
+  insertEnd?: number;
+  insert?: string;
   lastModified: number;
   changed: boolean;
   diff: string;
@@ -768,7 +802,8 @@ export const file_edit = operationOf<
       input: FileEditInput,
       fileContent: string,
       lastModified: number,
-      ai: CletusAI
+      ai: CletusAI,
+      signal?: AbortSignal
     ) => Promise<FileEditResult>; 
   },
   FileEditResult
@@ -781,7 +816,8 @@ export const file_edit = operationOf<
     input: FileEditInput,
     fileContent: string,
     lastModified: number,
-    ai: CletusAI
+    ai: CletusAI,
+    signal?: AbortSignal
   ): Promise<FileEditResult> {
     // Detect and normalize newlines for consistent processing
     const originalNewlineType = detectNewlineType(fileContent);
@@ -797,17 +833,18 @@ export const file_edit = operationOf<
     const response = await ai.chat.get({
       model,
       messages: [
-        { 
-          role: 'system', 
+        {
+          role: 'system',
           content: `You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.
           <request>${input.request}</request>`
         },
-        { 
-          role: 'user', 
-          content: paginatedContent, 
+        {
+          role: 'user',
+          content: paginatedContent,
         },
       ],
     }, {
+      signal,
       metadata: {
         minContextWindow: (paginatedContent.length / 4) + (input.request.length / 4) + 2000,
       }
@@ -827,20 +864,30 @@ export const file_edit = operationOf<
       newNormalizedContent,
       'before',
       'after',
-      { ignoreWhitespace: true, stripTrailingCr: true, context: 3 },
+      { 
+        ignoreWhitespace: true, 
+        stripTrailingCr: true, 
+        context: 3,
+      },
     );
 
+    const changed = normalizedContent !== newNormalizedContent;
+
+    // Only include insert/insertStart/insertEnd if there are actual changes
+    // This avoids storing entire file contents in chat JSON when nothing changed
     return {
       diff,
       lastModified,
-      changed: normalizedContent !== newNormalizedContent,
-      insert: newPaginatedContent,
-      insertStart: paginatedIndex,
-      insertEnd: paginatedIndex + paginatedContent.length,
+      changed,
+      ...(changed ? {
+        insert: newPaginatedContent,
+        insertStart: paginatedIndex,
+        insertEnd: paginatedIndex + paginatedContent.length,
+      } : {}),
       originalNewlineType,
     };
   },
-  async analyze({ input }, { cwd, ai }) {
+  async analyze({ input }, { cwd, ai, signal }) {
     const fullPath = path.resolve(cwd, input.path);
     const readable = await fileIsReadable(fullPath);
 
@@ -870,42 +917,49 @@ export const file_edit = operationOf<
     // Read the file content and generate diff in analyze phase
     const fileContent = await fs.readFile(fullPath, 'utf-8');
     const fileStats = await fs.stat(fullPath);
-    const result = await this.diff(input, fileContent, fileStats.mtimeMs, ai);
+    const result = await this.diff(input, fileContent, fileStats.mtimeMs, ai, signal);
 
     return {
-      analysis: result.diff,
-      doable: true,
+      analysis: result.changed ? result.diff : 'No changes needed.',
+      doable: result.changed,
       cache: result,
     };
   },
-  async do({ input, cache }, { cwd, ai }) {
+  async do({ input, cache }, { cwd, ai, signal }) {
     const fullPath = path.resolve(cwd, input.path);
 
     const fileContent = await fs.readFile(fullPath, 'utf-8');
     const lastModified = await fs.stat(fullPath).then(s => s.mtimeMs);
 
     // Retrieve diff from analyze phase if available
-    const result = cache || await this.diff(input, fileContent, lastModified, ai);
+    const result = cache || await this.diff(input, fileContent, lastModified, ai, signal);
 
     // Prevent overwriting changes if file was modified since analysis
     if (result.lastModified !== lastModified) {
       throw new Error(`File "${input.path}" was modified since analysis. Aborting edit to prevent overwriting changes.`);
     }
 
-    // Normalize file content for consistent processing with cached result
-    const normalizedContent = normalizeNewlines(fileContent);
+    // Only write file if there are actual changes
+    if (result.changed && result.insert !== undefined && result.insertStart !== undefined && result.insertEnd !== undefined) {
+      // Normalize file content for consistent processing with cached result
+      const normalizedContent = normalizeNewlines(fileContent);
 
-    // Build new content using normalized data and cached insert positions
-    const newNormalizedContent = ''
-      + normalizedContent.slice(0, result.insertStart)
-      + result.insert
-      + normalizedContent.slice(result.insertEnd);
-    
-    // Convert back to original newline type
-    const newFileContent = convertNewlines(newNormalizedContent, result.originalNewlineType);
-    
-    // Write the new content back to the file
-    await fs.writeFile(fullPath, newFileContent, 'utf-8');
+      // Build new content using normalized data and cached insert positions
+      const newNormalizedContent = ''
+        + normalizedContent.slice(0, result.insertStart)
+        + result.insert
+        + normalizedContent.slice(result.insertEnd);
+
+      // Convert back to original newline type
+      const newFileContent = convertNewlines(newNormalizedContent, result.originalNewlineType);
+
+      // Write the new content back to the file
+      await fs.writeFile(
+        fullPath, 
+        newFileContent, 
+        { encoding: 'utf-8', signal }
+      );
+    }
 
     return {
       output: result.diff,
@@ -916,6 +970,16 @@ export const file_edit = operationOf<
     op,
     `Edit("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
+      // Check if there are no changes to apply
+      if (op.cache?.changed === false) {
+        return (
+          <Box flexDirection="row">
+            <Text>{'   → '}</Text>
+            <Text>No changes</Text>
+          </Box>
+        );
+      }
+
       // diff format:
       // Index: [filename]
       // ===================================================================
@@ -953,7 +1017,7 @@ export const file_edit = operationOf<
           if (line.startsWith('-')) {
             removed++;
             subtractions++;
-          } else {
+          } else if (line.startsWith('+')) {
             currentLineNumber -= removed;
             removed = 0;
             additions++;
@@ -994,10 +1058,12 @@ export const file_edit = operationOf<
 
       const fullPath = path.resolve(ai.config.defaultContext!.cwd!, op.input.path);
       const url = fileProtocol(fullPath);
-      
-      const boxStyle = op.output 
-        ? {} 
-        : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
+
+      const boxStyle = op.output
+        ? {}
+        : op.status === 'rejected'
+          ? { borderStyle: 'round', borderColor: 'gray' } as const
+          : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
 
       return (
         <Box {...boxStyle} flexDirection="column" flexGrow={1}>
@@ -1027,9 +1093,9 @@ export const text_search = operationOf<
   mode: (input) => input.transcribeImages ? 'read' : 'local',
   signature: 'text_search(glob: string, regex: string, surrounding?: number, ...)',
   status: (input) => `Searching text: ${abbreviate(input.regex, 35)}`,
-  analyze: async ({ input }, { cwd }) => {
+  analyze: async ({ input }, { cwd, signal }) => {
     const surrounding = input.surrounding || 0;
-    const files = await searchFiles(cwd, input.glob);
+    const files = await searchFiles(cwd, input.glob, signal);
 
     if (files.length === 0) {
       return {
@@ -1056,7 +1122,7 @@ export const text_search = operationOf<
       cache: { searchableFiles },
     };
   },
-  do: async ({ input, cache }, { cwd, ai, chatStatus }) => {
+  do: async ({ input, cache }, { cwd, ai, chatStatus, signal }) => {
     // Use cached searchable files if available, otherwise search again
     const readable = cache?.searchableFiles ?? (await searchFiles(cwd, input.glob)).filter(f => f.fileType !== 'unreadable' && f.fileType !== 'unknown');
 
@@ -1076,6 +1142,11 @@ export const text_search = operationOf<
     chatStatus(`Searching ${readable.length} files...`);
 
     const results = await Promise.allSettled(readable.map(async (file) => {
+      // Check if cancelled before processing each file
+      if (signal?.aborted) {
+        throw new Error('Operation cancelled');
+      }
+
       const fullPath = path.resolve(cwd, file.file);
       const processed = await processFile(fullPath, file.file, {
         assetPath: await getAssetPath(true),
@@ -1084,7 +1155,8 @@ export const text_search = operationOf<
         extractImages: false,
         summarize: false,
         transcribeImages: input.transcribeImages ?? false,
-        transcriber: (image) => transcribe(ai, image),
+        transcriber: (image) => transcribe(ai, image, signal),
+        signal,
       });
 
       filesProcessed++;
@@ -1308,7 +1380,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       doable: true,
     };
   },
-  do: async ({ input }, { cwd }) => {
+  do: async ({ input }, { cwd, signal }) => {
     const targetPath = input.path || '.';
     const fullPath = path.resolve(cwd, targetPath);
     const kind = input.kind || 'all';
@@ -1321,6 +1393,7 @@ export const dir_summary = operationOf<DirSummaryInput, DirSummaryOutput>({
       cwd,
       dot: false,
       maxDepth: depth,
+      signal,
     });
 
     // Separate files and directories

@@ -34,6 +34,8 @@ export function getStatusInfo(status: Operation['status']): { color: string; lab
       return { color: COLORS.ERROR_TEXT, label: 'analysis error' };
     case 'analyzedBlocked':
       return { color: COLORS.ERROR_TEXT, label: 'blocked' };
+    case 'rejected':
+      return { color: COLORS.ERROR_TEXT, label: 'rejected' };
     default:
       return { color: COLORS.DIM_TEXT, label: status };
   }

@@ -78,7 +78,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`OpenAI Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx, metadata) => {
-            logger.log(`OpenAI Chat onError:\n${String(error)}`);
+            logger.log(`OpenAI Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
@@ -102,7 +102,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`OpenRouter Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx, metadata) => {
-            logger.log(`OpenRouter Chat onError:\n${String(error)}`);
+            logger.log(`OpenRouter Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
@@ -121,7 +121,7 @@ export function createCletusAI(configFile: ConfigFile) {
             logger.log(`Replicate Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
           },
           onError: (request, params, error, ctx) => {
-            logger.log(`Replicate Chat onError:\n${String(error)}`);
+            logger.log(`Replicate Chat onError:\n${JSON.stringify(error)}`);
           },
         }
       }
@@ -239,7 +239,7 @@ export const globalToolProperties = {
 /**
  * Summarize text using the AI
  */
-export async function summarize(ai: CletusAI, text: string): Promise<string> {
+export async function summarize(ai: CletusAI, text: string, signal?: AbortSignal): Promise<string> {
   const models = ai.config.defaultContext!.config!.getData().user.models;
   const model = models?.summary || models?.chat;
 
@@ -251,6 +251,7 @@ export async function summarize(ai: CletusAI, text: string): Promise<string> {
     ],
     maxTokens: 500,
   }, {
+    signal,
     metadata: {
       minContextWindow: (text.length / 4) + 1000,
       weights: {
@@ -265,7 +266,7 @@ export async function summarize(ai: CletusAI, text: string): Promise<string> {
 /**
  * Describe an image using the AI
  */
-export async function describe(ai: CletusAI, image: string): Promise<string> {
+export async function describe(ai: CletusAI, image: string, signal?: AbortSignal): Promise<string> {
   const models = ai.config.defaultContext!.config!.getData().user.models;
   const model = models?.describe || models?.imageAnalyze;
 
@@ -274,7 +275,7 @@ export async function describe(ai: CletusAI, image: string): Promise<string> {
     images: [image],
     prompt: DESCRIBE_PROMPT,
     maxTokens: 1000,
-  });
+  }, { signal });
 
   return response.content;
 }
@@ -282,7 +283,7 @@ export async function describe(ai: CletusAI, image: string): Promise<string> {
 /**
  * Transcribe an image to markdown using the AI
  */
-export async function transcribe(ai: CletusAI, image: string): Promise<string> {
+export async function transcribe(ai: CletusAI, image: string, signal?: AbortSignal): Promise<string> {
   const models = ai.config.defaultContext!.config!.getData().user.models;
   const model = models?.describe || models?.imageAnalyze;
 
@@ -291,7 +292,7 @@ export async function transcribe(ai: CletusAI, image: string): Promise<string> {
     images: [image],
     prompt: TRANSCRIBE_PROMPT,
     maxTokens: 4000,
-  });
+  }, { signal });
 
   return response.content;
 }

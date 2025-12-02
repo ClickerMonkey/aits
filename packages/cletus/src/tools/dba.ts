@@ -21,8 +21,8 @@ export function createDBATools(ai: CletusAI, type: TypeDefinition): AnyTool[] {
   const dataCreate = ai.tool({
     name: 'data_create',
     description: `Create a new ${type.friendlyName} record`,
-    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }
- 
+    instructions: `Use this to create a new ${type.friendlyName}. ${type.description || ''}\n\nNOTE: A unique 'id' will be automatically generated for the new record - do not provide an 'id' field.\n\nFields:\n${type.fields.map(f => `- ${f.friendlyName} (${f.name}): ${f.type}${f.required ? ' [required]' : ''}${f.default !== undefined ? ` [default: ${f.default}]` : ''}`).join('\n')}\n\nExample: Create a new record with field values:\n{ "fields": ${generateExampleFields(type.fields, true)} }
+
 {{modeInstructions}}`,
     schema: ({ cache }) => z.object({
       fields: getSchemas(type, cache).fields.describe('Field values for the new record'),

@@ -22,7 +22,7 @@ export type OperationMode = ChatMode | 'local';
 /**
  * Analysis result from an operation.
  */
-export type OperationAnalysis<TCache = Record<string, any>> = {
+export type OperationAnalysis<TOutput = any, TCache = Record<string, any>> = {
   /**
    * Description of what the operation would do.
    */
@@ -35,6 +35,15 @@ export type OperationAnalysis<TCache = Record<string, any>> = {
    * Optional cache data to store between analysis, execution, and rendering.
    */
   cache?: TCache;
+  /**
+   * If true, the operation is already complete and doesn't need execution.
+   * This is useful for read-only operations that can return results during analysis.
+   */
+  done?: boolean;
+  /**
+   * Optional output if the operation is already done during analysis.
+   */
+  output?: TOutput;
 };
 
 /**
@@ -69,16 +78,16 @@ export type OperationDefinition<TInput, TOutput, TCache> = {
    * This is used when the current chat mode does not allow automatic execution.
    *
    * @param input - Operation input
-   * @param context - Cletus core context
+   * @param context - Cletus core context (contains signal for cancellation via ctx.signal)
    * @returns Analysis result with description and doability
    */
-  analyze: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<OperationAnalysis>;
+  analyze: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<OperationAnalysis<TOutput, TCache>>;
 
   /**
    * Run the operation and return the output.
    *
    * @param input - Operation input
-   * @param context - Cletus core context
+   * @param context - Cletus core context (contains signal for cancellation via ctx.signal)
    * @returns - Operation output
    */
   do: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<TOutput | { output: TOutput; cache: TCache }>;
@@ -116,6 +125,20 @@ export type OperationDefinition<TInput, TOutput, TCache> = {
    * For example, file_read might include instructions to respect spacing and formatting.
    */
   instructions?: string;
+
+  /**
+   * Format for rendering input in operation messages. Defaults to 'yaml'.
+   * - 'yaml': Renders as bullet-point list with hyphens (the default)
+   * - 'json': Renders as formatted JSON
+   */
+  inputFormat?: 'json' | 'yaml';
+
+  /**
+   * Format for rendering output in operation messages. Defaults to 'yaml'.
+   * - 'yaml': Renders as bullet-point list with hyphens (the default)
+   * - 'json': Renders as formatted JSON
+   */
+  outputFormat?: 'json' | 'yaml';
 };
 
 // Operation definition for a specific operation kind

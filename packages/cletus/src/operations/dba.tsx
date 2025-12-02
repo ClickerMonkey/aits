@@ -12,25 +12,10 @@ import { getAssetPath } from "../file-manager";
 import { FieldCondition, WhereClause, countByWhere, filterByWhere } from "../helpers/data";
 import { processFile, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
-import { buildFieldsSchema } from "../helpers/type";
+import { buildFieldsSchema, getType, getTypeName } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
-
-
-function getType(config: ConfigFile, typeName: string, optional?: false): TypeDefinition
-function getType(config: ConfigFile, typeName: string, optional: true): TypeDefinition | undefined
-function getType(config: ConfigFile, typeName: string, optional: boolean = false): TypeDefinition | undefined {
-  const type = config.getData().types.find((t) => t.name === typeName);
-  if (!type && !optional) {
-    throw new Error(`Data type not found: ${typeName}`);
-  }
-  return type;
-}
-
-function getTypeName(config: ConfigFile, typeName: string): string {
-  return getType(config, typeName, true)?.friendlyName || typeName;
-}
 
 /**
  * Check if a field type is a reference to another type
@@ -1248,9 +1233,9 @@ export const data_import = operationOf<
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
   status: ({ name, glob }) => `Importing ${name} from ${glob}`,
-  analyze: async ({ input: { name, glob } }, { config, cwd }) => {
+  analyze: async ({ input: { name, glob } }, { config, cwd, signal }) => {
     const type = getType(config, name);
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
     const images = files.filter(f => f.fileType === 'image').map(f => f.file);
@@ -1276,13 +1261,13 @@ export const data_import = operationOf<
     };
   },
   do: async ({ input: { name, glob, transcribeImages = false } }, ctx) => {
-    const { chatStatus, ai, config, cwd, log } = ctx;
+    const { chatStatus, ai, config, cwd, log, signal } = ctx;
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
     
     // Find and filter files
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     const importableFiles = files.filter(f => {
       if (f.fileType === 'unknown' || f.fileType === 'unreadable') {
         return false;
@@ -1339,6 +1324,10 @@ Fields:
     let filesExtracted = 0;
     let filesFailed = 0;
     await Promise.all(importableFiles.map(async (file) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       const fullPath = path.resolve(cwd, file.file);
       
       try {
@@ -1350,7 +1339,8 @@ Fields:
           describeImages: false,
           extractImages: false,
           summarize: false,
-          transcriber: (image) => transcribe(ai, image),
+          transcriber: (image) => transcribe(ai, image, signal),
+          signal,
         });
         
         // Status update
@@ -1430,6 +1420,10 @@ Fields:
     let updated = 0;
     let updateSkippedNoChanges = 0;
     const updatedIds: string[] = [];
+
+    if (signal?.aborted) {
+      throw new Error('Operation aborted');
+    }
     
     // Use single save operation for all changes
     await dataManager.save((dataFile) => {

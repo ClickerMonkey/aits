@@ -367,30 +367,63 @@ export function toJSONSchema(
  * Main recursive conversion function
  */
 function convert(schema: z.ZodType | z.core.$ZodType, context: ConversionContext): JSONSchema {
-  const [js, jsId] = context.definitions.get(schema) || [];
-  // If we've seen this schema before
-  if (jsId && js) {
-    // If it's the root, return the # ref
-    if (schema === context.root) {
-      return { $ref: `#` };
-    }
-    
-    // If we haven't promoted the definition schema yet, do so now
-    if (!context.definitionSchemas.has(jsId)) {
-      // Add to global definitions
-      context.definitionSchemas.set(jsId, { ...js });
-      // Update reference to point to $defs
-      for (const prop in js) {
-        delete js[prop as keyof JSONSchema];
+  // For lazy schemas, we need to check by aid first to handle .describe()/.optional() wrappers
+  // that create new objects but share the same lazy getter
+  let cacheKey: z.ZodType | z.core.$ZodType = schema;
+  let unwrappedSchema: z.ZodType | z.core.$ZodType = schema;
+
+  // Check if this is a lazy schema and extract metadata early
+  if (schema instanceof z.ZodLazy) {
+    const metadata = (schema instanceof z.ZodType) ? schema.meta() : null;
+    const aid = metadata?.aid;
+
+    // If there's an aid, check if we've already seen this aid
+    if (aid) {
+      for (const [cachedSchema, [js, jsId]] of context.definitions.entries()) {
+        if (cachedSchema instanceof z.ZodType) {
+          const cachedMeta = cachedSchema.meta();
+          if (cachedMeta?.aid === aid && jsId && js) {
+            // Found a cached version with the same aid - use it
+            if (schema === context.root) {
+              return { $ref: `#` };
+            }
+
+            if (!context.definitionSchemas.has(jsId)) {
+              context.definitionSchemas.set(jsId, { ...js });
+              for (const prop in js) {
+                delete js[prop as keyof JSONSchema];
+              }
+              js.$ref = `#/$defs/${jsId}`;
+            }
+
+            return { $ref: `#/$defs/${jsId}` };
+          }
+        }
       }
-      // Schema is now just a $ref
-      js.$ref = `#/$defs/${jsId}`;
     }
 
-    return { $ref: `#/$defs/${jsId}` };
+    unwrappedSchema = schema.def.getter();
+  } else {
+    // Check cache by object identity for non-lazy schemas
+    const [js, jsId] = context.definitions.get(schema) || [];
+    if (jsId && js) {
+      if (schema === context.root) {
+        return { $ref: `#` };
+      }
+
+      if (!context.definitionSchemas.has(jsId)) {
+        context.definitionSchemas.set(jsId, { ...js });
+        for (const prop in js) {
+          delete js[prop as keyof JSONSchema];
+        }
+        js.$ref = `#/$defs/${jsId}`;
+      }
+
+      return { $ref: `#/$defs/${jsId}` };
+    }
   }
 
-  // Capture metadata
+  // Capture metadata from the original schema
   const metadata: {
     id?: string;
     aid?: string;
@@ -414,11 +447,12 @@ function convert(schema: z.ZodType | z.core.$ZodType, context: ConversionContext
   const target: JSONSchema = {};
 
   // Before converting, register this schema to handle recursion
-  context.definitions.set(schema, [target, id]);
+  context.definitions.set(cacheKey, [target, id]);
 
-  // Convert the schema and copy properties to target
-  const result = convertSchema(schema, context);
+  // Convert the unwrapped schema
+  const result = convertSchema(unwrappedSchema, context);
   Object.assign(result, metadata);
+  delete result.aid;
 
   // Promote it because user requested it or it's recursive
   if (save || context.definitionSchemas.has(id)) {
@@ -638,9 +672,11 @@ function convertSchema(schema: z.ZodType | z.core.$ZodType, context: ConversionC
     return innerJson;
   }
 
-  // Handle ZodLazy
+  // Handle ZodLazy - don't unwrap here, let convert() handle caching
+  // Just return empty schema since ZodLazy should be handled at convert() level
   if (schema instanceof z.ZodLazy) {
-    return convert(schema.def.getter(), context);
+    // This shouldn't be reached because convert() handles ZodLazy before calling convertSchema
+    throw new Error('ZodLazy should be handled in convert(), not convertSchema()');
   }
 
   // Handle ZodCodec
@@ -808,7 +844,34 @@ function makeNullable(schema: JSONSchema): JSONSchema {
   }
 
   if (schema.type) {
-    // Add null to the type
+    // Check if schema has type-specific properties that require anyOf structure
+    // Arrays have 'items', objects have 'properties', etc.
+    const hasTypeSpecificProps =
+      schema.items !== undefined ||
+      schema.properties !== undefined ||
+      schema.additionalProperties !== undefined ||
+      schema.patternProperties !== undefined ||
+      schema.minItems !== undefined ||
+      schema.maxItems !== undefined ||
+      schema.minProperties !== undefined ||
+      schema.maxProperties !== undefined;
+
+    // If there are type-specific properties, must use anyOf to separate type schemas
+    if (hasTypeSpecificProps) {
+      // Extract type-specific properties based on the type
+      const { type, description, ...rest } = schema;
+      const baseType = Array.isArray(type) ? type[0] : type;
+
+      return {
+        anyOf: [
+          { type: baseType, ...rest },
+          { type: 'null' },
+        ],
+        ...(description ? { description } : {}),
+      };
+    }
+
+    // For simple types without type-specific properties, can use array notation
     const types = Array.isArray(schema.type) ? schema.type : [schema.type];
     if (!types.includes('null')) {
       return {

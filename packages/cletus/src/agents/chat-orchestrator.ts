@@ -38,25 +38,24 @@ export type OrchestratorEvent =
 // Silly verbs for status messages
 const sillyVerbs = [
   'Conflabulating', 'Perambulating', 'Cogitating', 'Ruminating', 'Pontificating',
-  'Extrapolating', 'Prognosticating', 'Hypothesizing', 'Theorizing', 'Speculating',
+  'Extrapolating', 'Prognosticating', 'Theorizing', 'Speculating',
   'Deliberating', 'Contemplating', 'Meditating', 'Cerebrating', 'Lucubrating',
   'Ratiocinating', 'Excogitating', 'Noodling', 'Brainstorming', 'Puzzling',
   'Mulling', 'Ruminating', 'Brooding', 'Chewing', 'Digesting',
-  'Processing', 'Computing', 'Calculating', 'Analyzing', 'Synthesizing',
-  'Aggregating', 'Collating', 'Compiling', 'Assembling', 'Orchestrating',
-  'Configuring', 'Optimizing', 'Recalibrating', 'Adjusting', 'Tuning',
+  'Processing', 'Computing', 'Calculating', 'Synthesizing',
+  'Collating', 'Compiling', 'Assembling', 'Orchestrating',
+  'Adjusting', 'Tuning',
   'Harmonizing', 'Balancing', 'Aligning', 'Synchronizing', 'Coordinating',
-  'Triangulating', 'Interpolating', 'Extrapolating', 'Approximating', 'Estimating',
-  'Evaluating', 'Assessing', 'Appraising', 'Gauging', 'Measuring',
-  'Quantifying', 'Tabulating', 'Enumerating', 'Counting', 'Tallying',
-  'Indexing', 'Cataloging', 'Classifying', 'Categorizing', 'Sorting',
-  'Parsing', 'Decoding', 'Deciphering', 'Translating', 'Interpreting',
+  'Triangulating', 'Interpolating', 'Extrapolating',
+  'Quantifying', 'Tabulating', 'Enumerating', 'Tallying',
+  'Cataloging', 'Classifying', 'Categorizing', 'Sorting',
+  'Decoding', 'Deciphering', 'Translating', 'Interpreting',
   'Scrutinizing', 'Examining', 'Inspecting', 'Investigating', 'Probing',
-  'Exploring', 'Surveying', 'Scanning', 'Scouring', 'Perusing',
+  'Exploring', 'Surveying', 'Perusing',
   'Reviewing', 'Studying', 'Researching', 'Discovering', 'Uncovering',
   'Revealing', 'Exposing', 'Unveiling', 'Disclosing', 'Divulging',
-  'Manifesting', 'Materializing', 'Actualizing', 'Realizing', 'Implementing',
-  'Executing', 'Performing', 'Accomplishing', 'Achieving', 'Fulfilling',
+  'Manifesting', 'Materializing', 'Actualizing', 'Realizing',
+  'Accomplishing', 'Achieving', 'Fulfilling',
   'Cletusing', 'Cletusifying', 'Cletusating', 'Cletusizing', 'Cleting',
   'Cletering', 'Cletusting', 'Cletcletcleting', 'Cletarating', 'Cletabeating',
   'Cleticulating', 'Cletulating', 
@@ -137,7 +136,7 @@ export async function runChatOrchestrator(
         role: 'assistant',
         name: chatMeta.assistant,
         content: [],
-        created: performance.now(),
+        created: Date.now(),
         operations: [],
       };
 
@@ -287,6 +286,7 @@ export async function runChatOrchestrator(
 
             case 'textReset':
               {
+                /*
                 // Clear all non-operation text 
                 const last = pending.content[pending.content.length - 1];
                 if (last.operationIndex === undefined && last.type === 'text') {
@@ -298,6 +298,7 @@ export async function runChatOrchestrator(
                 }
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
+                */
               }
               break;
 
@@ -436,11 +437,13 @@ export async function runChatOrchestrator(
 
   } catch (error: any) {
     if (error.message !== 'Aborted') {
-      logger.log(`orchestrator: error - ${error.message}: ${error.stack}`);
+      logger.log(`orchestrator: error - ${JSON.stringify(error)}`);
+
       onEvent({ type: 'error', error: error.message });
     }
   } finally {
     logger.log('orchestrator: finished');
+    
     clearInterval(elapsedInterval);
   }
 }

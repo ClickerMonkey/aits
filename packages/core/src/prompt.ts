@@ -858,7 +858,7 @@ export class Prompt<
       }
 
       // If we are finished, parse the output
-      if (finishReason === 'stop') {
+      if (finishReason === 'stop' && toolExecutors.length === 0) {
         if (!schema || (schema instanceof ZodString)) {
           result = content as unknown as TOutput;
 

@@ -165,10 +165,6 @@ export const ChatMetaSchema = z.object({
   mode: ChatModeSchema.default('none'),
   agentMode: AgentModeSchema.default('default'),
   model: z.string().optional(),
-  /** 
-   * Current toolset name. When undefined, adaptive tool selection is used 
-   * based on embedding similarity. When set, only tools from that toolset are available.
-   */
   toolset: z.string().optional(),
   created: z.number(),
   updated: z.number(),
@@ -278,6 +274,8 @@ export const OperationKindSchema = z.enum([
   'data_index',
   'data_import',
   'data_search',
+  // architect (dba query)
+  'query',
   // librarian
   'knowledge_search',
   'knowledge_sources',
@@ -314,7 +312,6 @@ export const OperationSchema = z.object({
   end: z.number().optional(),
   error: z.string().optional(),
   message: z.string().optional(),
-  requestIndex: z.number().optional(),
 });
 
 // ============================================================================
@@ -379,7 +376,6 @@ export const MessageSchema = z.object({
   usage: UsageSchema,
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
-  requests: z.array(AgentRequest).optional(),
 });
 
 

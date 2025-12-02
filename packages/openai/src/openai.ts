@@ -181,6 +181,8 @@ export interface OpenAIConfig {
   organization?: string;
   // Optional project ID
   project?: string;
+  // If you want to allow OpenAI to store contents of calls. By default this is false.
+  store?: boolean;
   // Global retry configuration for all operations
   retry?: RetryConfig;
   // Global event handlers for retry lifecycle events
@@ -963,7 +965,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         logprobs: request.logProbabilities,
         prompt_cache_key: request.cacheKey,
         safety_identifier: request.userKey,
-        store: false,
+        store: effectiveConfig.store ?? false,
         stop: request.stop,
         tools,
         tool_choice,
@@ -1025,7 +1027,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       const response: Response = {
         content: choice.message.content || '',
         toolCalls,
-        finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : choice.finish_reason,
+        finishReason: choice.finish_reason === 'function_call' /* deprecated */ ? 'stop' : toolCalls?.length ? 'tool_calls' : choice.finish_reason,
         refusal: choice.finish_reason === 'content_filter' ? choice.message.content || undefined : undefined,
         model,
         usage: completion.usage ? convertOpenAIUsage(completion.usage) : undefined,
@@ -1082,7 +1084,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         logprobs: request.logProbabilities,
         prompt_cache_key: request.cacheKey,
         safety_identifier: request.userKey,
-        store: false,
+        store: effectiveConfig.store ?? false,
         stop: request.stop,
         tools,
         tool_choice,
@@ -1249,7 +1251,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           const finalResponse: Response = {
             content: accumulatedContent,
             toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
-            finishReason: finishReason || 'stop' as FinishReason,
+            finishReason: toolCalls.length ? 'tool_calls' : finishReason || 'stop' as FinishReason,
             model,
             usage: finalUsage,
           };
@@ -2271,7 +2273,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
         const finalResponse: Response = {
           content: accumulatedContent,
           toolCalls,
-          finishReason: finishReason || 'stop' as FinishReason,
+          finishReason: toolCalls.length ? 'tool_calls' : finishReason || 'stop' as FinishReason,
           model,
           usage: finalUsage,
         };
