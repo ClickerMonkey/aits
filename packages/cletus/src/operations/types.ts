@@ -10,6 +10,7 @@ import * as internet from './internet';
 import * as librarian from './librarian';
 import * as planner from './planner';
 import * as secretary from './secretary';
+import * as utility from './utility';
 
 /**
  * Operation mode. Similar to chat mode but includes 'local' for operations
@@ -159,6 +160,7 @@ export const Operations = {
   ...dba,
   ...artist,
   ...internet,
+  ...utility,
 } as const;
 
 // Operation type for a specific operation kind

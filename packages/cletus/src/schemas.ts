@@ -149,6 +149,20 @@ export const TodoItemSchema = z.object({
   id: z.string(),
 });
 
+export const QuestionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+});
+
+export const QuestionSchema = z.object({
+  name: z.string(),
+  min: z.number(),
+  max: z.number(),
+  custom: z.boolean(),
+  customLabel: z.string().optional(),
+  options: z.array(QuestionOptionSchema),
+});
+
 export const ChatModeSchema = z.enum(['none', 'read', 'create', 'update', 'delete']);
 
 export const OperationModeSchema = z.enum(['local', 'none', 'read', 'create', 'update', 'delete']);
@@ -169,6 +183,7 @@ export const ChatMetaSchema = z.object({
   created: z.number(),
   updated: z.number(),
   todos: z.array(TodoItemSchema).default([]),
+  questions: z.array(QuestionSchema).default([]),
 });
 
 // ============================================================================
@@ -291,6 +306,8 @@ export const OperationKindSchema = z.enum([
   'web_search',
   'web_get_page',
   'web_api_call',
+  // utility
+  'ask',
 ]);
 
 export const OperationSchema = z.object({
@@ -405,6 +422,8 @@ export type AWSBedrockConfig = z.infer<typeof AWSBedrockConfigSchema>;
 export type Providers = z.infer<typeof ProvidersSchema>;
 export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;
+export type QuestionOption = z.infer<typeof QuestionOptionSchema>;
+export type Question = z.infer<typeof QuestionSchema>;
 export type ChatMeta = z.infer<typeof ChatMetaSchema>;
 export type ChatMode = z.infer<typeof ChatModeSchema>;
 export type AgentMode = z.infer<typeof AgentModeSchema>;
