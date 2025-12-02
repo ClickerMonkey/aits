@@ -1686,10 +1686,10 @@ export const shell = operationOf<
 
       const updateStatus = () => {
         const now = Date.now();
+        // Only process output if enough time has passed
         if (now - lastUpdate >= UPDATE_INTERVAL) {
           const allOutput = stdout + stderr;
-          const lines = allOutput.split('\n').filter(l => l.length > 0);
-          const lineCount = lines.length;
+          const lineCount = allOutput.split('\n').filter(l => l.length > 0).length;
           chatStatus(`Executing... ${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output`);
           lastUpdate = now;
         }
@@ -1732,12 +1732,6 @@ export const shell = operationOf<
     });
   },
   render: (op, ai, showInput, showOutput) => {
-    const getLastLines = (text: string, count: number): string[] => {
-      if (!text) return [];
-      const lines = text.split('\n').filter(l => l.length > 0);
-      return lines.slice(-count);
-    };
-
     const formatOutput = () => {
       if (!op.output) {
         return 'Executing...';
@@ -1745,16 +1739,10 @@ export const shell = operationOf<
 
       const allOutput = (op.output.stdout + op.output.stderr).trim();
       const lines = allOutput.split('\n').filter(l => l.length > 0);
-      const lastLines = getLastLines(allOutput, 4);
       const lineCount = lines.length;
+      const lastLines = lines.slice(-4);
       const exitCode = op.output.exitCode;
       const signal = op.output.signal;
-
-      let summary = '';
-      
-      if (lastLines.length > 0) {
-        summary = lastLines.join('\n');
-      }
 
       const statusText = exitCode !== null 
         ? `Exit code: ${exitCode}`
@@ -1769,7 +1757,7 @@ export const shell = operationOf<
               {lineCount > 4 && (
                 <Text color="gray">... ({lineCount - 4} more lines)</Text>
               )}
-              <Text>{summary}</Text>
+              <Text>{lastLines.join('\n')}</Text>
             </>
           )}
           <Text color={exitCode === 0 ? 'green' : exitCode !== null ? 'red' : 'yellow'}>
