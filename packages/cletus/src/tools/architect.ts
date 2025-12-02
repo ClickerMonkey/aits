@@ -20,10 +20,11 @@ Example: Get information about a type:
 { "name": "task" }
  
 {{modeInstructions}}`,
-    schema: z.object({
-      name: z.string().describe('Type name'),
+    schema: (ctx) => z.object({
+      name: z.enum(ctx.config.getData().types.map(t => t.name)).describe('Type name to get information about'),
       ...globalToolProperties,
     }),
+    applicable: ({ config }) => config.getData().types.length > 0,
     input: getOperationInput('type_info'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_info', input }, ctx),
   });
@@ -45,8 +46,10 @@ Example: List all types:
 
   const typeUpdate = ai.tool({
     name: 'type_update',
-    description: 'Update a type definition in a backwards compatible way',
-    instructions: `Use this to modify an existing type definition.
+    description: 'Update an EXISTING type definition in a backwards compatible way',
+    instructions: `ONLY use this tool when the user explicitly asks to MODIFY, UPDATE, or CHANGE an existing type definition. DO NOT use this tool unless the user has clearly requested changes to an existing type.
+
+Use this to modify an existing type definition:
 - Never change field types (breaking change)
 - Never make optional fields required without a default value (breaking change)
 - You CAN add new fields (if required, must have default), update descriptions, update knowledgeTemplate, or delete any field
@@ -158,10 +161,11 @@ Example: Delete a type:
 { "name": "task" }
  
 {{modeInstructions}}`,
-    schema: z.object({
-      name: z.string().describe('Type name to delete'),
+    schema: (ctx) => z.object({
+      name: z.enum(ctx.config.getData().types.map(t => t.name)).describe('Type name to delete'),
       ...globalToolProperties,
     }),
+    applicable: ({ config }) => config.getData().types.length > 0,
     input: getOperationInput('type_delete'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_delete', input }, ctx),
   });

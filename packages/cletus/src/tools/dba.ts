@@ -8,32 +8,21 @@ import { createDBASchemas } from '../helpers/dba';
  * Returns an array of tools that can be registered in the tool registry.
  */
 export function createDBATools(ai: CletusAI) {
+
   const dataIndex = ai.tool({
     name: 'data_index',
     description: 'Index records of a type for knowledge base',
-    instructionsFn: (ctx) => {
-      const types = ctx.config.getData().types.map((t) => t.name);
-      return `Use this to (re)index records of a data type into the knowledge base for improved search and retrieval. 
+    instructions: `Use this to (re)index records of a data type into the knowledge base for improved search and retrieval. 
 This should be done if an embedding model has changed or a knowledge template has changed.
-
-Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
 
 Example: Index all records of a type:
 { "type": "task" }
  
-{{modeInstructions}}`;
-    },
-    schema: ({ config }) => {
-      const typeNames = config.getData().types.map(t => t.name);
-      // Return undefined if no types - tool can't be used
-      if (typeNames.length === 0) {
-        return undefined;
-      }
-      return z.object({
-        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to index'),
-        ...globalToolProperties,
-      });
-    },
+{{modeInstructions}}`,
+    schema: ({ config }) => z.object({
+      type: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).describe('Type name to index'),
+      ...globalToolProperties,
+    }),
     input: getOperationInput('data_index'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_index', input }, ctx as unknown as CletusAIContext),
@@ -42,16 +31,12 @@ Example: Index all records of a type:
   const dataImport = ai.tool({
     name: 'data_import',
     description: 'Import records from files into a data type',
-    instructionsFn: (ctx) => {
-      const types = ctx.config.getData().types.map((t) => t.name);
-      return `Use this to import records from files. The tool will:
+    instructions: `Use this to import records from files. The tool will:
 1. Find files matching the glob pattern
 2. Process readable files (text, PDF, Excel, Word documents)
 3. Extract structured data using AI with schema validation
 4. Determine unique fields automatically to avoid duplicates
 5. Merge data, updating existing records or creating new ones
-
-Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
 
 Example: Import from CSV or text files:
 { "type": "task", "glob": "data/*.csv" }
@@ -59,21 +44,13 @@ Example: Import from CSV or text files:
 Example: Import with image text extraction:
 { "type": "document", "glob": "documents/**/*.pdf", "transcribeImages": true }
  
-{{modeInstructions}}`;
-    },
-    schema: ({ config }) => {
-      const typeNames = config.getData().types.map(t => t.name);
-      // Return undefined if no types - tool can't be used
-      if (typeNames.length === 0) {
-        return undefined;
-      }
-      return z.object({
-        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to import into'),
-        glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
-        transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
-        ...globalToolProperties,
-      });
-    },
+{{modeInstructions}}`,
+    schema: ({ config }) => z.object({
+      type: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).describe('Type name to import into'),
+      glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
+      transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
+      ...globalToolProperties,
+    }),
     input: getOperationInput('data_import'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input }, ctx as unknown as CletusAIContext),
@@ -82,30 +59,18 @@ Example: Import with image text extraction:
   const dataSearch = ai.tool({
     name: 'data_search',
     description: 'Search records by semantic similarity',
-    instructionsFn: (ctx) => {
-      const types = ctx.config.getData().types.map((t) => t.name);
-      return `Use this to find relevant records from the knowledge base using semantic search. Provide a type, query text, and optionally specify the number of results.
-
-Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
+    instructions: `Use this to find relevant records from the knowledge base using semantic search. Provide a type, query text, and optionally specify the number of results.
 
 Example: Search for relevant records:
 { "type": "task", "query": "user preferences for notifications", "n": 5 }
  
-{{modeInstructions}}`;
-    },
-    schema: ({ config }) => {
-      const typeNames = config.getData().types.map(t => t.name);
-      // Return undefined if no types - tool can't be used
-      if (typeNames.length === 0) {
-        return undefined;
-      }
-      return z.object({
-        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to search'),
-        query: z.string().describe('Search query text'),
-        n: z.number().optional().describe('Maximum results (default: 10)'),
-        ...globalToolProperties,
-      });
-    },
+{{modeInstructions}}`,
+    schema: ({ config }) => z.object({
+      type: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).describe('Type name to search'),
+      query: z.string().describe('Search query text'),
+      n: z.number().optional().describe('Maximum results (default: 10)'),
+      ...globalToolProperties,
+    }),
     input: getOperationInput('data_search'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input }, ctx as unknown as CletusAIContext),
@@ -114,13 +79,9 @@ Example: Search for relevant records:
   const dataGet = ai.tool({
     name: 'data_get',
     description: 'Get paginated records of a data type',
-    instructionsFn: (ctx) => {
-      const types = ctx.config.getData().types.map((t) => t.name);
-      return `Use this for simple paged data retrieval. Returns a page of records and the total count for a given type.
+    instructions: `Use this for simple paged data retrieval. Returns a page of records and the total count for a given type.
 
 If any filtering, sorting, or complex operations are needed for accuracy, use the query tool instead.
-
-Available types: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
 
 Example: Get first 10 records:
 { "type": "task" }
@@ -128,21 +89,13 @@ Example: Get first 10 records:
 Example: Get records 20-30:
 { "type": "task", "offset": 20, "limit": 10 }
 
-{{modeInstructions}}`;
-    },
-    schema: ({ config }) => {
-      const typeNames = config.getData().types.map(t => t.name);
-      // Return undefined if no types - tool can't be used
-      if (typeNames.length === 0) {
-        return undefined;
-      }
-      return z.object({
-        type: z.enum(typeNames as [string, ...string[]]).describe('Type name to retrieve records from'),
-        offset: z.number().optional().describe('Number of records to skip (default: 0)'),
-        limit: z.number().optional().describe('Maximum records to return (default: 10)'),
-        ...globalToolProperties,
-      });
-    },
+{{modeInstructions}}`,
+    schema: ({ config }) => z.object({
+      type: z.enum(config.getData().types.map(t => t.name) as [string, ...string[]]).describe('Type name to retrieve records from'),
+      offset: z.number().optional().describe('Number of records to skip (default: 0)'),
+      limit: z.number().optional().describe('Maximum records to return (default: 10)'),
+      ...globalToolProperties,
+    }),
     input: getOperationInput('data_get'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_get', input }, ctx as unknown as CletusAIContext),
@@ -151,17 +104,13 @@ Example: Get records 20-30:
   const dbaQuery = ai.tool({
     name: 'query',
     description: 'Execute complex SQL-like queries across data types',
-    instructionsFn: (ctx) => {
-      const types = ctx.config.getData().types.map((t) => t.name);
-      return `Use this to execute complex queries that span multiple data types, including:
+    instructions: `Use this to execute complex queries that span multiple data types, including:
 - SELECT with joins, subqueries, aggregations, window functions
 - INSERT with conflict handling and returning
 - UPDATE with joins and complex conditions
 - DELETE with joins and complex conditions
 - UNION, INTERSECT, EXCEPT set operations
 - WITH (CTE) statements including recursive CTEs
-
-Available tables: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
 
 The query is a structured JSON object representing SQL operations.
 
@@ -272,17 +221,11 @@ Example 10: SELECT with * and additional specific columns:
   "from": { "kind": "table", "table": "users" }
 }
 
-{{modeInstructions}}`;
-    },
-    schema: ({ config }) => {
-      // Build schema dynamically from current config types
-      const currentTypes = config.getData().types;
-      const dbaSchemas = createDBASchemas(currentTypes);
-      return z.object({
-        query: dbaSchemas.QuerySchema.describe('The query to execute'),
-        ...globalToolProperties,
-      });
-    },
+{{modeInstructions}}`,
+    schema: ({ config }) => z.object({
+      query: createDBASchemas(config.getData().types).QuerySchema.describe('The query to execute'),
+      ...globalToolProperties,
+    }),
     input: getOperationInput('query'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx as unknown as CletusAIContext),

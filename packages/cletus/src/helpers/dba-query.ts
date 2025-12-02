@@ -207,7 +207,7 @@ function addValidationError(
  * Get the field type for a specific column in a table/source
  */
 function getFieldType(ctx: QueryContext, source: string, column: string): string | undefined {
-  return ctx.fieldTypes.get(source)?.get(column);
+  return ctx.fieldTypes.get(source.toLowerCase())?.get(column.toLowerCase());
 }
 
 /**
@@ -263,10 +263,10 @@ function validateEnumValue(
 ): { valid: boolean; allowedValues?: string[] } {
   if (value === null || value === undefined) return { valid: true };
 
-  const typeDef = ctx.types.get(tableName);
+  const typeDef = ctx.types.get(tableName.toLowerCase());
   if (!typeDef) return { valid: true };
 
-  const field = typeDef.fields.find(f => f.name === columnName);
+  const field = typeDef.fields.find(f => f.name === columnName.toLowerCase());
   if (!field || field.type !== 'enum' || !field.enumOptions) {
     return { valid: true };
   }
@@ -285,10 +285,10 @@ function isFieldRequired(
   columnName: string,
   ctx: QueryContext
 ): boolean {
-  const typeDef = ctx.types.get(tableName);
+  const typeDef = ctx.types.get(tableName.toLowerCase());
   if (!typeDef) return false;
 
-  const field = typeDef.fields.find(f => f.name === columnName);
+  const field = typeDef.fields.find(f => f.name === columnName.toLowerCase());
   if (!field) return false;
 
   // If required is explicitly set, use that value
@@ -305,10 +305,10 @@ function getOnDeleteBehavior(
   columnName: string,
   ctx: QueryContext
 ): 'restrict' | 'cascade' | 'setNull' | null {
-  const typeDef = ctx.types.get(tableName);
+  const typeDef = ctx.types.get(tableName.toLowerCase());
   if (!typeDef) return null;
 
-  const field = typeDef.fields.find(f => f.name === columnName);
+  const field = typeDef.fields.find(f => f.name === columnName.toLowerCase());
   if (!field) return null;
 
   // Check if this is a relationship field (type matches another type name)
@@ -477,71 +477,71 @@ async function processOnDeleteCascades(ctx: QueryContext): Promise<void> {
  */
 function collectReferencedTables(query: Query, tables: Set<string>): void {
   if (!query || typeof query !== 'object') return;
-  
+
   if ('kind' in query) {
     switch (query.kind) {
       case 'select':
         if (query.from?.kind === 'table') {
-          tables.add(query.from.table);
+          tables.add(query.from.table.toLowerCase());
         } else if (query.from?.kind === 'subquery') {
           collectReferencedTablesFromSelectOrSet(query.from.subquery, tables);
         }
         if (query.joins) {
           for (const join of query.joins) {
             if (join.source.kind === 'table') {
-              tables.add(join.source.table);
+              tables.add(join.source.table.toLowerCase());
             } else if (join.source.kind === 'subquery') {
               collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
             }
           }
         }
         break;
-        
+
       case 'insert':
-        tables.add(query.table);
+        tables.add(query.table.toLowerCase());
         if (query.select) {
           collectReferencedTablesFromSelectOrSet(query.select, tables);
         }
         break;
-        
+
       case 'update':
-        tables.add(query.table);
+        tables.add(query.table.toLowerCase());
         if (query.from?.kind === 'table') {
-          tables.add(query.from.table);
+          tables.add(query.from.table.toLowerCase());
         } else if (query.from?.kind === 'subquery') {
           collectReferencedTablesFromSelectOrSet(query.from.subquery, tables);
         }
         if (query.joins) {
           for (const join of query.joins) {
             if (join.source.kind === 'table') {
-              tables.add(join.source.table);
+              tables.add(join.source.table.toLowerCase());
             } else if (join.source.kind === 'subquery') {
               collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
             }
           }
         }
         break;
-        
+
       case 'delete':
-        tables.add(query.table);
+        tables.add(query.table.toLowerCase());
         if (query.joins) {
           for (const join of query.joins) {
             if (join.source.kind === 'table') {
-              tables.add(join.source.table);
+              tables.add(join.source.table.toLowerCase());
             } else if (join.source.kind === 'subquery') {
               collectReferencedTablesFromSelectOrSet(join.source.subquery, tables);
             }
           }
         }
         break;
-        
+
       case 'union':
       case 'intersect':
       case 'except':
         collectReferencedTables(query.left, tables);
         collectReferencedTables(query.right, tables);
         break;
-        
+
       case 'withs':
         for (const withStmt of query.withs) {
           if (withStmt.kind === 'cte') {
@@ -565,13 +565,14 @@ function collectReferencedTablesFromSelectOrSet(query: SelectOrSet, tables: Set<
  * Load table state, initializing if needed
  */
 async function getTableState(tableName: string, ctx: QueryContext): Promise<TableState> {
-  let state = ctx.tableStates.get(tableName);
+  const normalizedTableName = tableName.toLowerCase();
+  let state = ctx.tableStates.get(normalizedTableName);
   if (!state) {
-    let manager = ctx.dataManagers.get(tableName);
+    let manager = ctx.dataManagers.get(normalizedTableName);
     if (!manager) {
-      manager = ctx.getManager(tableName);
+      manager = ctx.getManager(normalizedTableName);
       await manager.load();
-      ctx.dataManagers.set(tableName, manager);
+      ctx.dataManagers.set(normalizedTableName, manager);
     }
 
     const original = manager.getAll();
@@ -583,7 +584,7 @@ async function getTableState(tableName: string, ctx: QueryContext): Promise<Tabl
       insertedIds: new Map(),
       version: computeTableVersion(original),
     };
-    ctx.tableStates.set(tableName, state);
+    ctx.tableStates.set(normalizedTableName, state);
   }
   return state;
 }
@@ -943,28 +944,29 @@ async function executeWithStatement(
   withStmt: WithStatement,
   ctx: QueryContext
 ): Promise<void> {
+  const normalizedName = withStmt.name.toLowerCase();
   if (withStmt.kind === "cte") {
     const result = await executeStatement(withStmt.statement, ctx);
     // Convert rows to DataRecord format for CTE storage
     const records: DataRecord[] = result.rows.map((row, index) => ({
-      id: `cte_${withStmt.name}_${index}`,
+      id: `cte_${normalizedName}_${index}`,
       created: Date.now(),
       updated: Date.now(),
       fields: row as Record<string, unknown>,
     }));
-    ctx.ctes.set(withStmt.name, records);
+    ctx.ctes.set(normalizedName, records);
   } else if (withStmt.kind === "cte-recursive") {
     // Execute initial statement
     const initialResult = await executeSelect(withStmt.statement, ctx);
     let allRecords: DataRecord[] = initialResult.rows.map((row, index) => ({
-      id: `cte_${withStmt.name}_${index}`,
+      id: `cte_${normalizedName}_${index}`,
       created: Date.now(),
       updated: Date.now(),
       fields: row as Record<string, unknown>,
     }));
 
     // Store initial results for recursive reference
-    ctx.ctes.set(withStmt.name, allRecords);
+    ctx.ctes.set(normalizedName, allRecords);
 
     // Execute recursive part until no new rows
     let iteration = 0;
@@ -977,7 +979,7 @@ async function executeWithStatement(
         ctx
       );
       newRecords = recursiveResult.rows.map((row, index) => ({
-        id: `cte_${withStmt.name}_recursive_${iteration}_${index}`,
+        id: `cte_${normalizedName}_recursive_${iteration}_${index}`,
         created: Date.now(),
         updated: Date.now(),
         fields: row,
@@ -985,7 +987,7 @@ async function executeWithStatement(
 
       if (newRecords.length > 0) {
         allRecords = [...allRecords, ...newRecords];
-        ctx.ctes.set(withStmt.name, allRecords);
+        ctx.ctes.set(normalizedName, allRecords);
       }
       iteration++;
     }
@@ -1030,9 +1032,9 @@ async function executeSelect(
   if (stmt.from) {
     records = await resolveDataSource(stmt.from, ctx);
     if (stmt.from.kind === "table" && stmt.from.as) {
-      ctx.aliases.set(stmt.from.as, records);
+      ctx.aliases.set(stmt.from.as.toLowerCase(), records);
     } else if (stmt.from.kind === "subquery") {
-      ctx.aliases.set(stmt.from.as, records);
+      ctx.aliases.set(stmt.from.as.toLowerCase(), records);
     }
   }
 
@@ -1200,12 +1202,13 @@ async function executeInsert(
     const record: Record<string, unknown> = {};
     for (let i = 0; i < stmt.columns.length; i++) {
       const column = stmt.columns[i];
+      const normalizedColumn = column.toLowerCase();
       const value = await evaluateValueAsync(stmt.values[i], null, ctx);
 
       // Type check - validate value type matches expected field type
-      const expectedType = getFieldType(ctx, stmt.table, column);
+      const expectedType = getFieldType(ctx, stmt.table, normalizedColumn);
 
-      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, column)) {
+      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, normalizedColumn)) {
         const actualType = getValueType(value);
         addValidationError(ctx, `insert.values[${i}]`,
           `Column '${column}' expects ${expectedType}, got ${actualType}`,
@@ -1222,7 +1225,7 @@ async function executeInsert(
 
       // Enum validation - check value is in allowed options
       if (expectedType === 'enum') {
-        const enumValidation = validateEnumValue(value, stmt.table, column, ctx);
+        const enumValidation = validateEnumValue(value, stmt.table, normalizedColumn, ctx);
         if (!enumValidation.valid && enumValidation.allowedValues) {
           addValidationError(ctx, `insert.values[${i}]`,
             `Column '${column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
@@ -1237,7 +1240,7 @@ async function executeInsert(
       }
 
       // Required field validation
-      if ((value === null || value === undefined) && isFieldRequired(stmt.table, column, ctx)) {
+      if ((value === null || value === undefined) && isFieldRequired(stmt.table, normalizedColumn, ctx)) {
         addValidationError(ctx, `insert.values[${i}]`,
           `Column '${column}' is required but received ${value === null ? 'null' : 'undefined'}`,
           {
@@ -1249,7 +1252,7 @@ async function executeInsert(
         );
       }
 
-      record[column] = value;
+      record[normalizedColumn] = value;
     }
     valuesToInsert = [record];
   } else if (stmt.select) {
@@ -1259,13 +1262,14 @@ async function executeInsert(
       const record: Record<string, unknown> = {};
       for (let i = 0; i < stmt.columns.length; i++) {
         const column = stmt.columns[i];
+        const normalizedColumn = column.toLowerCase();
         const selectAlias = Object.keys(row)[i];
         const value = row[selectAlias];
 
         // Type check for INSERT from SELECT
-        const expectedType = getFieldType(ctx, stmt.table, column);
+        const expectedType = getFieldType(ctx, stmt.table, normalizedColumn);
 
-        if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, column)) {
+        if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, normalizedColumn)) {
           const actualType = getValueType(value);
           addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
             `Column '${column}' expects ${expectedType}, got ${actualType}`,
@@ -1282,7 +1286,7 @@ async function executeInsert(
 
         // Enum validation
         if (expectedType === 'enum') {
-          const enumValidation = validateEnumValue(value, stmt.table, column, ctx);
+          const enumValidation = validateEnumValue(value, stmt.table, normalizedColumn, ctx);
           if (!enumValidation.valid && enumValidation.allowedValues) {
             addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
               `Column '${column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
@@ -1297,7 +1301,7 @@ async function executeInsert(
         }
 
         // Required field validation
-        if ((value === null || value === undefined) && isFieldRequired(stmt.table, column, ctx)) {
+        if ((value === null || value === undefined) && isFieldRequired(stmt.table, normalizedColumn, ctx)) {
           addValidationError(ctx, `insert.select.row[${rowIdx}].column[${i}]`,
             `Column '${column}' is required but SELECT returned ${value === null ? 'null' : 'undefined'}`,
             {
@@ -1309,7 +1313,7 @@ async function executeInsert(
           );
         }
 
-        record[column] = value;
+        record[normalizedColumn] = value;
       }
       return record;
     });
@@ -1322,11 +1326,11 @@ async function executeInsert(
     if (stmt.onConflict) {
       // Check for conflict using JSON.stringify for key
       const conflictKey = JSON.stringify(
-        stmt.onConflict.columns.map((col) => fields[col])
+        stmt.onConflict.columns.map((col) => fields[col.toLowerCase()])
       );
       const existing = getRecords(state).find((record) => {
         const existingKey = JSON.stringify(
-          stmt.onConflict!.columns.map((col) => record.fields[col])
+          stmt.onConflict!.columns.map((col) => record.fields[col.toLowerCase()])
         );
         return existingKey === conflictKey;
       });
@@ -1339,12 +1343,13 @@ async function executeInsert(
           const updates: Record<string, unknown> = {};
           for (let i = 0; i < stmt.onConflict.update.length; i++) {
             const cv = stmt.onConflict.update[i];
+            const normalizedColumn = cv.column.toLowerCase();
             const value = await evaluateValueAsync(cv.value, existing, ctx);
 
             // Type check for ON CONFLICT UPDATE
-            const expectedType = getFieldType(ctx, stmt.table, cv.column);
+            const expectedType = getFieldType(ctx, stmt.table, normalizedColumn);
 
-            if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, cv.column)) {
+            if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, normalizedColumn)) {
               const actualType = getValueType(value);
               addValidationError(ctx, `insert.onConflict.update[${i}]`,
                 `Column '${cv.column}' expects ${expectedType}, got ${actualType}`,
@@ -1361,7 +1366,7 @@ async function executeInsert(
 
             // Enum validation
             if (expectedType === 'enum') {
-              const enumValidation = validateEnumValue(value, stmt.table, cv.column, ctx);
+              const enumValidation = validateEnumValue(value, stmt.table, normalizedColumn, ctx);
               if (!enumValidation.valid && enumValidation.allowedValues) {
                 addValidationError(ctx, `insert.onConflict.update[${i}]`,
                   `Column '${cv.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
@@ -1377,7 +1382,7 @@ async function executeInsert(
 
             // Note: Don't check required for UPDATE - updates can set fields to null if not required
 
-            updates[cv.column] = value;
+            updates[normalizedColumn] = value;
           }
           addUpdate(state, existing.id, updates);
           insertResult.ids.push(existing.id);
@@ -1427,16 +1432,16 @@ async function executeUpdate(
 
   // Set up alias if specified
   if (stmt.as) {
-    ctx.aliases.set(stmt.as, records);
+    ctx.aliases.set(stmt.as.toLowerCase(), records);
   }
 
   // Apply FROM clause
   if (stmt.from) {
     const fromRecords = await resolveDataSource(stmt.from, ctx);
     if (stmt.from.kind === "table" && stmt.from.as) {
-      ctx.aliases.set(stmt.from.as, fromRecords);
+      ctx.aliases.set(stmt.from.as.toLowerCase(), fromRecords);
     } else if (stmt.from.kind === "subquery") {
-      ctx.aliases.set(stmt.from.as, fromRecords);
+      ctx.aliases.set(stmt.from.as.toLowerCase(), fromRecords);
     }
   }
 
@@ -1460,12 +1465,13 @@ async function executeUpdate(
     const updates: Record<string, unknown> = {};
     for (let i = 0; i < stmt.set.length; i++) {
       const cv = stmt.set[i];
+      const normalizedColumn = cv.column.toLowerCase();
       const value = await evaluateValueAsync(cv.value, record, ctx);
 
       // Type check for UPDATE SET
-      const expectedType = getFieldType(ctx, stmt.table, cv.column);
+      const expectedType = getFieldType(ctx, stmt.table, normalizedColumn);
 
-      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, cv.column)) {
+      if (expectedType && !isValidFieldType(value, expectedType, ctx, stmt.table, normalizedColumn)) {
         const actualType = getValueType(value);
         addValidationError(ctx, `update.set[${i}]`,
           `Column '${cv.column}' expects ${expectedType}, got ${actualType}`,
@@ -1482,7 +1488,7 @@ async function executeUpdate(
 
       // Enum validation
       if (expectedType === 'enum') {
-        const enumValidation = validateEnumValue(value, stmt.table, cv.column, ctx);
+        const enumValidation = validateEnumValue(value, stmt.table, normalizedColumn, ctx);
         if (!enumValidation.valid && enumValidation.allowedValues) {
           addValidationError(ctx, `update.set[${i}]`,
             `Column '${cv.column}' must be one of: ${enumValidation.allowedValues.join(', ')}. Got: ${value}`,
@@ -1498,7 +1504,7 @@ async function executeUpdate(
 
       // Note: Don't check required for UPDATE - updates can set fields to null if not required
 
-      updates[cv.column] = value;
+      updates[normalizedColumn] = value;
     }
     addUpdate(state, record.id, updates);
     updateResult.ids.push(record.id);
@@ -1544,7 +1550,7 @@ async function executeDelete(
 
   // Set up alias if specified
   if (stmt.as) {
-    ctx.aliases.set(stmt.as, records);
+    ctx.aliases.set(stmt.as.toLowerCase(), records);
   }
 
   // Apply joins
@@ -1648,13 +1654,13 @@ async function resolveDataSource(
   ctx: QueryContext
 ): Promise<DataRecord[]> {
   if (source.kind === "table") {
-    // Check if it's a CTE reference
-    const cteRecords = ctx.ctes.get(source.table);
+    // Check if it's a CTE reference (CTEs are stored lowercase)
+    const cteRecords = ctx.ctes.get(source.table.toLowerCase());
     if (cteRecords) {
       return cteRecords;
     }
 
-    // Load from table state
+    // Load from table state (getTableState will normalize the name)
     const state = await getTableState(source.table, ctx);
     return getRecords(state);
   } else if (source.kind === "subquery") {
@@ -1682,9 +1688,9 @@ async function applyJoin(
 
   // Store right records in aliases if needed
   if (join.source.kind === "table" && join.source.as) {
-    ctx.aliases.set(join.source.as, rightRecords);
+    ctx.aliases.set(join.source.as.toLowerCase(), rightRecords);
   } else if (join.source.kind === "subquery") {
-    ctx.aliases.set(join.source.as, rightRecords);
+    ctx.aliases.set(join.source.as.toLowerCase(), rightRecords);
   }
 
   const result: DataRecord[] = [];
@@ -1986,23 +1992,24 @@ async function evaluateSingleBooleanWithGroupAsync(
  * Get a column value from a DataRecord, handling internal columns (id, created, updated)
  */
 function getColumnValue(record: DataRecord, column: string): unknown {
-  if (column === 'id') {
+  const normalizedColumn = column.toLowerCase();
+  if (normalizedColumn === 'id') {
     return record.id;
   }
-  if (column === 'created') {
+  if (normalizedColumn === 'created') {
     return record.created;
   }
-  if (column === 'updated') {
+  if (normalizedColumn === 'updated') {
     return record.updated;
   }
-  return record.fields[column];
+  return record.fields[normalizedColumn];
 }
 
 /**
  * Get all column names for a type (including system columns)
  */
 function getTypeColumns(typeName: string, ctx: QueryContext): string[] {
-  const typeDef = ctx.types.get(typeName);
+  const typeDef = ctx.types.get(typeName.toLowerCase());
   if (!typeDef) {
     return [];
   }
@@ -2017,13 +2024,15 @@ function validateColumnOnType(typeName: string, column: string, ctx: QueryContex
     return; // '*' is always valid
   }
 
-  const typeDef = ctx.types.get(typeName);
+  const normalizedTypeName = typeName.toLowerCase();
+  const normalizedColumn = column.toLowerCase();
+  const typeDef = ctx.types.get(normalizedTypeName);
   if (!typeDef) {
     throw new Error(`Type '${typeName}' not found`);
   }
 
   const validColumns = ['id', 'created', 'updated', ...typeDef.fields.map(f => f.name)];
-  if (!validColumns.includes(column)) {
+  if (!validColumns.includes(normalizedColumn)) {
     throw new Error(`Column '${column}' does not exist on type '${typeName}'. Valid columns: ${validColumns.join(', ')}`);
   }
 }
@@ -2067,13 +2076,16 @@ async function evaluateValueAsync(
   if (isSourceColumn(value)) {
     if (!record) return null;
 
+    const normalizedSource = value.source.toLowerCase();
+    const normalizedColumn = value.column.toLowerCase();
+
     // Validate column exists on type if source is a table name
-    if (ctx.types.has(value.source)) {
-      validateColumnOnType(value.source, value.column, ctx);
+    if (ctx.types.has(normalizedSource)) {
+      validateColumnOnType(normalizedSource, normalizedColumn, ctx);
     }
 
     // Check aliases first, then direct field access
-    const aliasRecords = ctx.aliases.get(value.source);
+    const aliasRecords = ctx.aliases.get(normalizedSource);
     if (aliasRecords?.length) {
       // For combined records from joins, check stored original records
       const recordAny = record as { __left__?: DataRecord; __right__?: DataRecord };
@@ -2095,7 +2107,7 @@ async function evaluateValueAsync(
           if (value.column === '*') {
             return getAllColumnValues(sourceRecord);
           }
-          return getColumnValue(sourceRecord, value.column);
+          return getColumnValue(sourceRecord, normalizedColumn);
         }
       } else {
         // Regular record - first try to find it in the alias by ID match
@@ -2105,7 +2117,7 @@ async function evaluateValueAsync(
           if (value.column === '*') {
             return getAllColumnValues(aliasRecord);
           }
-          return getColumnValue(aliasRecord, value.column);
+          return getColumnValue(aliasRecord, normalizedColumn);
         }
 
         // If we have exactly one record in the alias (e.g., for correlated subqueries),
@@ -2116,7 +2128,7 @@ async function evaluateValueAsync(
           if (value.column === '*') {
             return getAllColumnValues(singleRecord);
           }
-          return getColumnValue(singleRecord, value.column);
+          return getColumnValue(singleRecord, normalizedColumn);
         }
       }
     }
@@ -2125,7 +2137,7 @@ async function evaluateValueAsync(
     if (value.column === '*') {
       return getAllColumnValues(record);
     }
-    return getColumnValue(record, value.column);
+    return getColumnValue(record, normalizedColumn);
   }
 
   // Handle complex value types
