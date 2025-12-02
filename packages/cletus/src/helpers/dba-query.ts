@@ -586,6 +586,9 @@ export async function executeQueryWithoutCommit(
   }
   result.canCommit = ctx.validationErrors.length === 0;
 
+  // Update affectedCount
+  result.affectedCount = deltas.reduce((sum, d) => sum + d.inserts.length + d.updates.length + d.deletes.length, 0);
+
   // Return the execution payload without committing
   return {
     result,

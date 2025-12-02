@@ -1281,6 +1281,20 @@ export const query = operationOf<
 
     // Describe what the query would do based on the results
     const result = payload.result;
+
+    // Check for validation errors
+    if (!result.canCommit && result.validationErrors && result.validationErrors.length > 0) {
+      const errorSummary = result.validationErrors
+        .map((err, i) => `[${i + 1}] ${err.path}: ${err.message}`)
+        .join('\n');
+
+      return {
+        analysis: `This would fail due to validation errors:\n${errorSummary}`,
+        doable: false,
+        cache: { payload },
+      };
+    }
+
     const parts: string[] = [];
 
     if (result.rows.length > 0) {
@@ -1308,9 +1322,9 @@ export const query = operationOf<
       analysis: detailedAnalysis,
       doable: result.canCommit,
       cache: { payload },
-      ...(result.affectedCount === 0 ? { 
-        done: true, 
-        output: result 
+      ...(result.affectedCount === 0 ? {
+        done: true,
+        output: result
       } : {}),
     };
   },
