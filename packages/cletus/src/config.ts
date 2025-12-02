@@ -1,4 +1,5 @@
-import { JsonFile, getConfigPath } from './file-manager';
+import fs from 'fs';
+import { JsonFile, getChatPath, getConfigPath } from './file-manager';
 import {
   ConfigSchema,
   type Config,
@@ -195,9 +196,18 @@ export class ConfigFile extends JsonFile<Config> {
    * Delete a chat
    */
   async deleteChat(chatId: string): Promise<void> {
-    await this.save((config) => {
+    const deleted = await this.save((config) => {
+      const chatCount = config.chats.length;
       config.chats = config.chats.filter((c) => c.id !== chatId);
+      return chatCount !== config.chats.length;
     });
+
+    if (deleted) {
+      const file = getChatPath(chatId);
+      await fs.promises.unlink(file).catch(() => {
+        // Ignore errors
+      });
+    }
   }
 
   /**

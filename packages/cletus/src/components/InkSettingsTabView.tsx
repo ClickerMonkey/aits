@@ -1,19 +1,18 @@
+import { ModelCapability } from '@aeye/ai';
+import { AWSBedrockProvider } from '@aeye/aws';
+import fs from 'fs/promises';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
-import React, { useState, useEffect, useCallback } from 'react';
-import type { ConfigFile } from '../config';
-import { logger } from '../logger';
-import { AUTONOMOUS } from '../constants';
-import { ModelSelector } from './ModelSelector';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createCletusAI } from '../ai';
-import type { Providers } from '../schemas';
-import fs from 'fs/promises';
-import { getChatPath, getDataPath } from '../file-manager';
-import { ModelCapability } from '@aeye/ai';
 import { abbreviate } from '../common';
-import { DEFAULT_PROMPT_FILES } from '../constants';
-import { AWSBedrockProvider } from '@aeye/aws';
+import type { ConfigFile } from '../config';
+import { AUTONOMOUS, DEFAULT_PROMPT_FILES } from '../constants';
+import { getDataPath } from '../file-manager';
+import { logger } from '../logger';
+import type { Providers } from '../schemas';
+import { ModelSelector } from './ModelSelector';
 
 type Tab = 'user' | 'prompts' | 'memory' | 'deletions' | 'providers' | 'tavily' | 'models' | 'autonomous' | 'debug';
 type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'summary' | 'describe' | 'transcribe' | 'edit';
@@ -750,13 +749,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
 
                 showConfirm(confirmMsg, async () => {
                   for (const chatToDelete of deleteChats) {
-                    try {
-                      await fs.unlink(getChatPath(chatToDelete.id));
-                    } catch (error: any) {
-                      if (error.code !== 'ENOENT') {
-                        console.error('Failed to delete chat messages:', error.message);
-                      }
-                    }
                     await config.deleteChat(chatToDelete.id);
                   }
                   const deletedCount = deleteChats.length;
@@ -813,13 +805,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                 if (item.value === '__delete_all__') {
                   showConfirm(`Delete ALL ${chats.length} chat${chats.length !== 1 ? 's' : ''} and their messages?`, async () => {
                     for (const chat of chats) {
-                      try {
-                        await fs.unlink(getChatPath(chat.id));
-                      } catch (error: any) {
-                        if (error.code !== 'ENOENT') {
-                          console.error('Failed to delete chat messages:', error.message);
-                        }
-                      }
                       await config.deleteChat(chat.id);
                     }
                     setMessage(`✓ All chats deleted`);

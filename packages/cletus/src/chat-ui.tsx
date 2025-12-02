@@ -442,17 +442,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       } else if (key.return) {
         if (deleteConfirmationIndex === 0) {
           // Yes - delete the chat
-          const chatFilePath = getChatPath(chat.id);
           try {
-            if (fs.existsSync(chatFilePath)) {
-              fs.unlinkSync(chatFilePath);
-            }
-            // Perform the action after deletion
-            if (deleteAndThen === 'exit') {
-              onExit();
-            } else {
-              process.exit(0);
-            }
+            // Delete from config file
+            config.deleteChat(chat.id).then(() => {
+              // Perform the action after deletion
+              if (deleteAndThen === 'exit') {
+                onExit();
+              } else {
+                process.exit(0);
+              }
+            });
           } catch (error: any) {
             addSystemMessage(`❌ Failed to delete chat: ${error.message}`);
             setShowDeleteConfirmation(false);
