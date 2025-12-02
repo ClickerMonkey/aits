@@ -25,12 +25,9 @@ Example: Index all records of a type:
     },
     schema: ({ config }) => {
       const typeNames = config.getData().types.map(t => t.name);
-      // Return empty schema if no types - applicable check will prevent usage anyway
+      // Return undefined if no types - tool can't be used
       if (typeNames.length === 0) {
-        return z.object({
-          type: z.string().describe('Type name to index'),
-          ...globalToolProperties,
-        });
+        return undefined;
       }
       return z.object({
         type: z.enum(typeNames as [string, ...string[]]).describe('Type name to index'),
@@ -39,7 +36,7 @@ Example: Index all records of a type:
     },
     input: getOperationInput('data_index'),
     applicable: ({ config }) => config.getData().types.length > 0,
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_index', input: { name: input.type } }, ctx as unknown as CletusAIContext),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_index', input }, ctx as unknown as CletusAIContext),
   });
 
   const dataImport = ai.tool({
@@ -66,14 +63,9 @@ Example: Import with image text extraction:
     },
     schema: ({ config }) => {
       const typeNames = config.getData().types.map(t => t.name);
-      // Return string schema if no types - applicable check will prevent usage anyway
+      // Return undefined if no types - tool can't be used
       if (typeNames.length === 0) {
-        return z.object({
-          type: z.string().describe('Type name to import into'),
-          glob: z.string().describe('Glob pattern for files to import (e.g., "data/*.csv", "**/*.txt")'),
-          transcribeImages: z.boolean().optional().describe('Extract text from images in documents (default: false)'),
-          ...globalToolProperties,
-        });
+        return undefined;
       }
       return z.object({
         type: z.enum(typeNames as [string, ...string[]]).describe('Type name to import into'),
@@ -84,7 +76,7 @@ Example: Import with image text extraction:
     },
     input: getOperationInput('data_import'),
     applicable: ({ config }) => config.getData().types.length > 0,
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input: { name: input.type, glob: input.glob, transcribeImages: input.transcribeImages } }, ctx as unknown as CletusAIContext),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_import', input }, ctx as unknown as CletusAIContext),
   });
     
   const dataSearch = ai.tool({
@@ -103,14 +95,9 @@ Example: Search for relevant records:
     },
     schema: ({ config }) => {
       const typeNames = config.getData().types.map(t => t.name);
-      // Return string schema if no types - applicable check will prevent usage anyway
+      // Return undefined if no types - tool can't be used
       if (typeNames.length === 0) {
-        return z.object({
-          type: z.string().describe('Type name to search'),
-          query: z.string().describe('Search query text'),
-          n: z.number().optional().describe('Maximum results (default: 10)'),
-          ...globalToolProperties,
-        });
+        return undefined;
       }
       return z.object({
         type: z.enum(typeNames as [string, ...string[]]).describe('Type name to search'),
@@ -121,7 +108,7 @@ Example: Search for relevant records:
     },
     input: getOperationInput('data_search'),
     applicable: ({ config }) => config.getData().types.length > 0,
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input: { name: input.type, query: input.query, n: input.n } }, ctx as unknown as CletusAIContext),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'data_search', input }, ctx as unknown as CletusAIContext),
   });
 
   const dbaQuery = ai.tool({

@@ -19,37 +19,37 @@ import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQ
 import type { Query } from '../helpers/dba';
 
 export const data_index = operationOf<
-  { name: string },
+  { type: string },
   { libraryKnowledgeUpdated: boolean },
   {},
   { typeName: string }
 >({
   mode: 'update',
   signature: 'data_index()',
-  status: ({ name }) => `Indexing ${name}`,
-  analyze: async ({ input: { name } }, { config }) => {
-    const type = getType(config, name);
+  status: ({ type }) => `Indexing ${type}`,
+  analyze: async ({ input: { type } }, { config }) => {
+    const typeDef = getType(config, type);
     
     return {
-      analysis: `This will update the knowledge for type "${type.friendlyName}".`,
+      analysis: `This will update the knowledge for type "${typeDef.friendlyName}".`,
       doable: true,
-      cache: { typeName: type.friendlyName },
+      cache: { typeName: typeDef.friendlyName },
     };
   },
-  do: async ({ input: { name } }, ctx) => {
-    const dataManager = new DataManager(name);
+  do: async ({ input: { type } }, ctx) => {
+    const dataManager = new DataManager(type);
     await dataManager.load();
 
     const allRecords = dataManager.getAll();
     const recordIds = allRecords.map(r => r.id);
 
-    const libraryKnowledgeUpdated = await updateKnowledge(ctx, name, recordIds, []);
+    const libraryKnowledgeUpdated = await updateKnowledge(ctx, type, recordIds, []);
 
     return { libraryKnowledgeUpdated };
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
-    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.type);
 
     return renderOperation(
       op,
@@ -66,16 +66,16 @@ export const data_index = operationOf<
 });
 
 export const data_import = operationOf<
-  { name: string; glob: string; transcribeImages?: boolean },
+  { type: string; glob: string; transcribeImages?: boolean },
   { imported: number; failed: number; updated: number; updateSkippedNoChanges: number; libraryKnowledgeUpdated: boolean },
   {},
   { typeName: string; importableCount: number }
 >({
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
-  status: ({ name, glob }) => `Importing ${name} from ${glob}`,
-  analyze: async ({ input: { name, glob } }, { config, cwd, signal }) => {
-    const type = getType(config, name);
+  status: ({ type, glob }) => `Importing ${type} from ${glob}`,
+  analyze: async ({ input: { type, glob } }, { config, cwd, signal }) => {
+    const typeDef = getType(config, type);
     const files = await searchFiles(cwd, glob, signal);
     
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
@@ -93,18 +93,18 @@ export const data_import = operationOf<
     if (unknown.length > 0) {
       analysis += `Found ${unknown.length} file(s) of unknown/unsupported format: ${unknown.join(', ')}.\n`;
     }
-    analysis += `This will import ${type.friendlyName} records from ${importable.length} file(s) matching "${glob}". Files will be processed with AI extraction.`;
+    analysis += `This will import ${typeDef.friendlyName} records from ${importable.length} file(s) matching "${glob}". Files will be processed with AI extraction.`;
     
     return {
       analysis,
       doable: importable.length > 0,
-      cache: { typeName: type.friendlyName, importableCount: importable.length },
+      cache: { typeName: typeDef.friendlyName, importableCount: importable.length },
     };
   },
-  do: async ({ input: { name, glob, transcribeImages = false } }, ctx) => {
+  do: async ({ input: { type, glob, transcribeImages = false } }, ctx) => {
     const { chatStatus, ai, config, cwd, log, signal } = ctx;
-    const type = getType(config, name);
-    const dataManager = new DataManager(name);
+    const typeDef = getType(config, type);
+    const dataManager = new DataManager(type);
     await dataManager.load();
     
     // Find and filter files
@@ -131,15 +131,15 @@ export const data_import = operationOf<
       content: `You are an expert data extraction assistant. Your task is to extract structured data from unstructured text based on the provided type definition.
 Provide only the extracted data in JSON format as specified, without any additional commentary or explanation.
     
-You are extracting all instances of {{type.friendlyName}} from the provided text.
+You are extracting all instances of {{typeDef.friendlyName}} from the provided text.
 Return an array of objects with the fields defined above. If no instances are found, return an empty array.
 
 <typeInformation>
-Type: {{type.friendlyName}}
-{{#if type.description}}Description: {{type.description}}{{/if}}
+Type: {{typeDef.friendlyName}}
+{{#if typeDef.description}}Description: {{typeDef.description}}{{/if}}
 
 Fields:
-{{#each type.fields}}
+{{#each typeDef.fields}}
 - {{this.name}} ({{this.type}}{{#if this.required}}, required{{/if}}{{#if this.enumOptions}}, options: {{this.enumOptions}}{{/if}}{{#if this.default}}, default: {{this.default}}{{/if}})
 {{/each}}
 </typeInformation>
@@ -148,9 +148,9 @@ Fields:
 {{text}}
 </text>`,
       schema: z.object({ 
-        results: z.array(buildFieldsSchema(type)),
+        results: z.array(buildFieldsSchema(typeDef)),
       }),
-      input: ({ text }: { text: string }) => ({ type, text }),
+      input: ({ text }: { text: string }) => ({ typeDef, text }),
       metadataFn: () => ({
         model: config.getData().user.models?.chat,
       }),
@@ -251,7 +251,7 @@ Fields:
     
     // Ask AI to determine unique fields
     chatStatus('Determining unique fields...');
-    const uniqueFields = await determineUniqueFields(ai, config, type, sampleRecords);
+    const uniqueFields = await determineUniqueFields(ai, config, typeDef, sampleRecords);
     chatStatus(`Importing data${uniqueFields.length > 0 ? ` using unique fields ${uniqueFields.join(', ')}` : ''}`);
     
     log(`data_import: using unique fields: ${uniqueFields.join(', ')}`);
@@ -312,7 +312,7 @@ Fields:
     // Update knowledge base
     let libraryKnowledgeUpdated = true;
     try {
-      libraryKnowledgeUpdated = await updateKnowledge(ctx, name, updatedIds, []);
+      libraryKnowledgeUpdated = await updateKnowledge(ctx, type, updatedIds, []);
     } catch (e) {
       log(`Warning: failed to update knowledge base after import: ${(e as Error).message}`);
       libraryKnowledgeUpdated = false;
@@ -322,7 +322,7 @@ Fields:
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
-    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.type);
     return renderOperation(
       op,
       `${formatName(typeName)}Import("${op.input.glob}")`,
@@ -340,16 +340,16 @@ Fields:
 });
 
 export const data_search = operationOf<
-  { name: string; query: string; n?: number },
+  { type: string; query: string; n?: number },
   { query: string; results: Array<{ source: string; text: string; similarity: number }> },
   {},
   { typeName: string; limit: number }
 >({
   mode: 'local',
   signature: 'data_search(query: string, n?)',
-  status: ({ name, query }) => `Searching ${name}: ${abbreviate(query, 25)}`,
-  analyze: async ({ input: { name, query, n } }, { config }) => {
-    const type = getType(config, name);
+  status: ({ type, query }) => `Searching ${type}: ${abbreviate(query, 25)}`,
+  analyze: async ({ input: { type, query, n } }, { config }) => {
+    const typeDef = getType(config, type);
     const limit = n || 10;
 
     if (!await canEmbed()) {
@@ -360,12 +360,12 @@ export const data_search = operationOf<
     }
 
     return {
-      analysis: `This will search ${type.friendlyName} knowledge for "${query}", returning up to ${limit} results.`,
+      analysis: `This will search ${typeDef.friendlyName} knowledge for "${query}", returning up to ${limit} results.`,
       doable: true,
-      cache: { typeName: type.friendlyName, limit },
+      cache: { typeName: typeDef.friendlyName, limit },
     };
   },
-  do: async ({ input: { name, query, n } }, { ai }) => {
+  do: async ({ input: { type, query, n } }, { ai }) => {
     if (!await canEmbed()) {
       throw new Error('Embedding model is not configured');
     }
@@ -382,7 +382,7 @@ export const data_search = operationOf<
     }
 
     // Search for similar entries with source prefix matching the type name
-    const sourcePrefix = `${name}:`;
+    const sourcePrefix = `${type}:`;
     const similarEntries = knowledge.searchBySimilarity(queryVector, limit, sourcePrefix);
 
     return {
@@ -396,7 +396,7 @@ export const data_search = operationOf<
   },
   render: (op, ai, showInput, showOutput) => {
     // Use cached typeName for consistent rendering even if type is deleted
-    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.name);
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.type);
     return renderOperation(
       op,
       `${formatName(typeName)}Search("${abbreviate(op.input.query, 20)}")`,

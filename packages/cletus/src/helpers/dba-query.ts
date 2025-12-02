@@ -298,6 +298,181 @@ function isFieldRequired(
 }
 
 /**
+ * Get the onDelete behavior for a relationship field
+ */
+function getOnDeleteBehavior(
+  tableName: string,
+  columnName: string,
+  ctx: QueryContext
+): 'restrict' | 'cascade' | 'setNull' | null {
+  const typeDef = ctx.types.get(tableName);
+  if (!typeDef) return null;
+
+  const field = typeDef.fields.find(f => f.name === columnName);
+  if (!field) return null;
+
+  // Check if this is a relationship field (type matches another type name)
+  const isRelationship = ctx.types.has(field.type);
+  if (!isRelationship) return null;
+
+  return field.onDelete || 'restrict'; // Default to restrict
+}
+
+/**
+ * Validate that all relationship fields reference existing records.
+ * This should be called after query execution but before commit.
+ */
+async function validateReferenceIntegrity(ctx: QueryContext): Promise<void> {
+  // For each table with pending changes
+  for (const [tableName, state] of ctx.tableStates) {
+    const typeDef = ctx.types.get(tableName);
+    if (!typeDef) continue;
+
+    // Find relationship fields for this type
+    const relationshipFields = typeDef.fields.filter(f => ctx.types.has(f.type));
+    if (relationshipFields.length === 0) continue;
+
+    // Validate inserts - all relationship field values must reference existing records
+    for (const [tempId, fields] of state.insertedIds) {
+      for (const field of relationshipFields) {
+        const value = fields[field.name];
+        if (value === null || value === undefined) continue;
+
+        const referencedType = field.type;
+        const referencedState = await getTableState(referencedType, ctx);
+        const referencedRecords = getRecords(referencedState);
+
+        // Check if the referenced record exists
+        const exists = referencedRecords.some(r => r.id === value);
+        if (!exists) {
+          addValidationError(ctx, `insert.${tableName}.${field.name}`,
+            `Referenced ${referencedType} record with ID '${value}' does not exist`,
+            {
+              expectedType: referencedType,
+              actualType: 'string',
+              suggestion: `Ensure the ${referencedType} record exists before referencing it`,
+              metadata: { 
+                field: field.name, 
+                table: tableName, 
+                referencedType,
+                referencedId: value 
+              }
+            }
+          );
+        }
+      }
+    }
+
+    // Validate updates - all relationship field values must reference existing records
+    for (const [id, fields] of state.updatedIds) {
+      for (const field of relationshipFields) {
+        if (!(field.name in fields)) continue; // Field not being updated
+
+        const value = fields[field.name];
+        if (value === null || value === undefined) continue;
+
+        const referencedType = field.type;
+        const referencedState = await getTableState(referencedType, ctx);
+        const referencedRecords = getRecords(referencedState);
+
+        // Check if the referenced record exists
+        const exists = referencedRecords.some(r => r.id === value);
+        if (!exists) {
+          addValidationError(ctx, `update.${tableName}.${field.name}`,
+            `Referenced ${referencedType} record with ID '${value}' does not exist`,
+            {
+              expectedType: referencedType,
+              actualType: 'string',
+              suggestion: `Ensure the ${referencedType} record exists before referencing it`,
+              metadata: { 
+                field: field.name, 
+                table: tableName, 
+                recordId: id,
+                referencedType,
+                referencedId: value 
+              }
+            }
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Process onDelete cascade logic for deleted records.
+ * This should be called after query execution but before commit.
+ * 
+ * For each deleted record:
+ * - restrict: Add validation error if any record references this
+ * - cascade: Delete all records that reference this
+ * - setNull: Set the referencing field to null
+ */
+async function processOnDeleteCascades(ctx: QueryContext): Promise<void> {
+  // Collect all deleted record IDs by type
+  const deletedByType = new Map<string, Set<string>>();
+  for (const [tableName, state] of ctx.tableStates) {
+    if (state.deletedIds.size > 0) {
+      deletedByType.set(tableName, state.deletedIds);
+    }
+  }
+
+  if (deletedByType.size === 0) return;
+
+  // For each type, find which other types have relationship fields pointing to it
+  for (const [deletedType, deletedIds] of deletedByType) {
+    // Find all types that reference this deleted type
+    for (const [otherTypeName, otherType] of ctx.types) {
+      const referencingFields = otherType.fields.filter(f => f.type === deletedType);
+      if (referencingFields.length === 0) continue;
+
+      // Get state for the referencing type
+      const otherState = await getTableState(otherTypeName, ctx);
+      const otherRecords = getRecords(otherState);
+
+      for (const field of referencingFields) {
+        const onDelete = field.onDelete || 'restrict';
+
+        for (const deletedId of deletedIds) {
+          // Find records that reference the deleted record
+          const referencingRecords = otherRecords.filter(r => r.fields[field.name] === deletedId);
+
+          for (const record of referencingRecords) {
+            switch (onDelete) {
+              case 'restrict':
+                addValidationError(ctx, `delete.${deletedType}`,
+                  `Cannot delete ${deletedType} record '${deletedId}' because it is referenced by ${otherTypeName} record '${record.id}' via field '${field.name}'`,
+                  {
+                    suggestion: `Delete or update the referencing ${otherTypeName} record first, or change the onDelete behavior`,
+                    metadata: { 
+                      deletedType, 
+                      deletedId, 
+                      referencingType: otherTypeName, 
+                      referencingId: record.id,
+                      referencingField: field.name
+                    }
+                  }
+                );
+                break;
+
+              case 'cascade':
+                // Delete the referencing record
+                addDelete(otherState, record.id);
+                break;
+
+              case 'setNull':
+                // Set the referencing field to null
+                addUpdate(otherState, record.id, { [field.name]: null });
+                break;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
  * Collect all table names referenced in a query for upfront loading
  */
 function collectReferencedTables(query: Query, tables: Set<string>): void {
@@ -554,6 +729,12 @@ export async function executeQueryWithoutCommit(
   } else {
     result = await executeStatement(query, ctx);
   }
+
+  // Process onDelete cascades first (may add more deletes or updates)
+  await processOnDeleteCascades(ctx);
+
+  // Validate reference integrity for all inserts and updates
+  await validateReferenceIntegrity(ctx);
 
   // Extract serializable deltas from table states
   const deltas: TableDelta[] = [];
