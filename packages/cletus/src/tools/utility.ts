@@ -277,15 +277,104 @@ After using this tool, inform the user they will need to manually change back to
     },
   });
 
+  const ask = ai.tool({
+    name: 'ask',
+    description: 'Ask the user multiple questions with a special UI interface. DO NOT use any other tools after this one until the user responds.',
+    instructions: `Use this tool when you need to gather multiple pieces of information from the user in a structured way.
+    
+<critical>
+When you use this tool, DO NOT use any other tools after it in the same response. The user needs to answer the questions before the conversation can continue. This tool will pause the conversation until the user provides their answers.
+</critical>
+
+This tool creates a special UI that:
+- Displays questions as tabs that the user can navigate through
+- Allows single selection (radio buttons) when min=1 and max=1
+- Allows multiple selection (checkboxes) when min and max differ
+- Can optionally allow custom answers if custom=true
+
+Each question must have:
+- name: A short name/identifier for the question
+- min: Minimum number of selections required
+- max: Maximum number of selections allowed
+- custom: Whether custom answers are allowed
+- customLabel: (optional) Label for the custom answer option (defaults to "Custom")
+- options: Array of {label, description} objects for the available choices
+
+Example usage for gathering project preferences:
+{
+  "questions": [
+    {
+      "name": "Framework",
+      "min": 1,
+      "max": 1,
+      "custom": false,
+      "options": [
+        {"label": "React", "description": "Component-based UI library"},
+        {"label": "Vue", "description": "Progressive framework"},
+        {"label": "Angular", "description": "Full-featured framework"}
+      ]
+    },
+    {
+      "name": "Features",
+      "min": 1,
+      "max": 3,
+      "custom": true,
+      "customLabel": "Other feature",
+      "options": [
+        {"label": "Authentication", "description": "User login system"},
+        {"label": "Database", "description": "Data persistence"},
+        {"label": "API", "description": "REST API endpoints"}
+      ]
+    }
+  ]
+}
+
+The user's answers will be formatted and submitted as a message, triggering the chat orchestrator to continue.`,
+    schema: z.object({
+      questions: z.array(z.object({
+        name: z.string().describe('Short name/identifier for the question'),
+        min: z.number().describe('Minimum number of selections required'),
+        max: z.number().describe('Maximum number of selections allowed'),
+        custom: z.boolean().describe('Whether custom answers are allowed'),
+        customLabel: z.string().optional().describe('Label for custom answer option (defaults to "Custom")'),
+        options: z.array(z.object({
+          label: z.string().describe('Option label'),
+          description: z.string().describe('Option description'),
+        })).describe('Available options for this question'),
+      })).min(1).describe('Array of questions to ask the user'),
+      ...globalToolProperties,
+    }),
+    call: async ({ questions }, _, ctx) => {
+      // Directly update the chat meta with questions
+      if (!ctx.chat) {
+        throw new Error('No active chat context available');
+      }
+      
+      // Update the chat meta with the questions
+      await ctx.config.save((cfg) => {
+        const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
+        if (chatMeta) {
+          chatMeta.questions = questions;
+        }
+      });
+      
+      ctx.chatStatus(`Asking ${questions.length} question${questions.length !== 1 ? 's' : ''}...`);
+      
+      return `Asked ${questions.length} question${questions.length !== 1 ? 's' : ''}. Waiting for user to answer...`;
+    },
+  });
+
   return [
     getOperationOutput,
     about,
     retool,
     hypothetical,
+    ask,
   ] as [
     typeof getOperationOutput,
     typeof about,
     typeof retool,
     typeof hypothetical,
+    typeof ask,
   ];
 }

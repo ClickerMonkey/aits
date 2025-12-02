@@ -123,6 +123,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [renderKey, setRenderKey] = useState(0);
   const [accumulatedUsage, setAccumulatedUsage] = useState<any>({});
   const [accumulatedCost, setAccumulatedCost] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentOptionIndex, setCurrentOptionIndex] = useState(0); // currently highlighted option
+  const [questionAnswers, setQuestionAnswers] = useState<Record<number, Set<number>>>({}); // question index -> set of selected option indices
+  const [questionCustomAnswers, setQuestionCustomAnswers] = useState<Record<number, string>>({}); // question index -> custom answer text
   const interceptingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
@@ -159,6 +163,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const showPendingMessage = !!(pendingMessage && (pendingMessage.content[0]?.content?.length || pendingMessage.operations?.length));
   const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
   const operationApprovalPending = showApprovalMenu && !pendingMessage && !!lastAssistantMessage?.operations?.some((op) => op.status === 'analyzed');
+  const hasQuestions = chatMeta.questions && chatMeta.questions.length > 0;
+  const showQuestions = hasQuestions && !isWaitingForResponse && !showApprovalMenu;
   
   // Calculate total cost of all messages in chat
   const totalMessageCost = chatMessages.reduce((sum, msg) => sum + (msg.cost || 0), 0);
@@ -199,6 +205,61 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     addMessage({ role: 'system', content: [{ type: 'text', content }], created: Date.now() });
   };
 
+  // Function to submit question answers
+  const submitQuestionAnswers = async () => {
+    if (!chatMeta.questions || chatMeta.questions.length === 0) {
+      return;
+    }
+    
+    // Format answers as markdown
+    let answerText = '## Question Answers\n\n';
+    
+    for (let i = 0; i < chatMeta.questions.length; i++) {
+      const question = chatMeta.questions[i];
+      const selections = questionAnswers[i] || new Set<number>();
+      const customAnswer = questionCustomAnswers[i];
+      
+      answerText += `**${question.name}:**\n`;
+      
+      if (selections.size > 0) {
+        Array.from(selections).forEach((optionIndex) => {
+          if (optionIndex < question.options.length) {
+            answerText += `- ${question.options[optionIndex].label}\n`;
+          }
+        });
+      }
+      
+      if (customAnswer) {
+        answerText += `- ${customAnswer}\n`;
+      }
+      
+      if (selections.size === 0 && !customAnswer) {
+        answerText += `- (no answer provided)\n`;
+      }
+      
+      answerText += '\n';
+    }
+    
+    // Clear questions from chat meta
+    await onChatUpdate({ questions: [] });
+    setChatMeta({ ...chatMeta, questions: [] });
+    setCurrentQuestionIndex(0);
+    setCurrentOptionIndex(0);
+    setQuestionAnswers({});
+    setQuestionCustomAnswers({});
+    
+    // Add the formatted answer as a user message
+    addMessage({
+      role: 'user',
+      name: config.getData().user.name,
+      content: [{ type: 'text', content: answerText }],
+      created: Date.now(),
+    });
+    
+    // Trigger chat orchestrator
+    await handleExecution();
+  };
+
   // Load messages from file on mount
   useEffect(() => {
     const loadMessages = async () => {
@@ -236,6 +297,96 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
   // Handle keyboard shortcuts
   useInput((input, key) => {
+    // Handle question UI navigation
+    if (showQuestions && chatMeta.questions && chatMeta.questions.length > 0) {
+      const currentQuestion = chatMeta.questions[currentQuestionIndex];
+      const currentSelections = questionAnswers[currentQuestionIndex] || new Set<number>();
+      const isRadio = currentQuestion.min === 1 && currentQuestion.max === 1;
+      const maxOptionIndex = currentQuestion.options.length - 1;
+      
+      // Ctrl+C to cancel questions
+      if (key.ctrl && input === 'c') {
+        // Clear questions from chat meta
+        onChatUpdate({ questions: [] });
+        setChatMeta({ ...chatMeta, questions: [] });
+        setCurrentQuestionIndex(0);
+        setCurrentOptionIndex(0);
+        setQuestionAnswers({});
+        setQuestionCustomAnswers({});
+        return interceptInput();
+      }
+      
+      // Left arrow to go to previous question
+      if (key.leftArrow && currentQuestionIndex > 0) {
+        setCurrentQuestionIndex(currentQuestionIndex - 1);
+        setCurrentOptionIndex(0);
+        return interceptInput();
+      }
+      
+      // Right arrow or Tab to go to next question
+      if ((key.rightArrow || key.tab) && currentQuestionIndex < chatMeta.questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setCurrentOptionIndex(0);
+        return interceptInput();
+      }
+      
+      // Up arrow to navigate to previous option
+      if (key.upArrow) {
+        const newIndex = currentOptionIndex > 0 ? currentOptionIndex - 1 : maxOptionIndex;
+        setCurrentOptionIndex(newIndex);
+        return interceptInput();
+      }
+      
+      // Down arrow to navigate to next option
+      if (key.downArrow) {
+        const newIndex = currentOptionIndex < maxOptionIndex ? currentOptionIndex + 1 : 0;
+        setCurrentOptionIndex(newIndex);
+        return interceptInput();
+      }
+      
+      // Space to toggle selection
+      if (input === ' ') {
+        const newSelections = new Set(currentSelections);
+        if (isRadio) {
+          // Radio: clear all and select current
+          newSelections.clear();
+          newSelections.add(currentOptionIndex);
+        } else {
+          // Checkbox: toggle current
+          if (newSelections.has(currentOptionIndex)) {
+            newSelections.delete(currentOptionIndex);
+          } else if (newSelections.size < currentQuestion.max) {
+            newSelections.add(currentOptionIndex);
+          }
+        }
+        setQuestionAnswers({ ...questionAnswers, [currentQuestionIndex]: newSelections });
+        return interceptInput();
+      }
+      
+      // Enter to go to next question or submit
+      if (key.return) {
+        // Check if we have minimum selections
+        if (currentSelections.size < currentQuestion.min) {
+          // Don't proceed if minimum not met
+          return interceptInput();
+        }
+        
+        // Check if this is the last question
+        if (currentQuestionIndex === chatMeta.questions.length - 1) {
+          // Submit all answers
+          submitQuestionAnswers();
+          return interceptInput();
+        } else {
+          // Move to next question
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+          setCurrentOptionIndex(0);
+          return interceptInput();
+        }
+      }
+      
+      return interceptInput();
+    }
+    
     // Don't handle input when approval menu is showing
     if (operationApprovalPending) {
       return interceptInput();
@@ -1181,6 +1332,99 @@ After installation and the SoX executable is in the path, restart Cletus and try
         )}
       </Box>
 
+      {/* Question UI */}
+      {showQuestions && chatMeta.questions && chatMeta.questions.length > 0 && (
+        <Box
+          borderStyle="round"
+          borderColor="cyan"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Box marginBottom={1}>
+            <Text bold color="cyan">
+              Questions ({currentQuestionIndex + 1}/{chatMeta.questions.length})
+            </Text>
+            <Text dimColor> - Use ←→ to navigate, Ctrl+C to cancel</Text>
+          </Box>
+          
+          {/* Question tabs */}
+          <Box marginBottom={1}>
+            {chatMeta.questions.map((q, questionIndex) => {
+              const isCurrentQuestion = questionIndex === currentQuestionIndex;
+              return (
+                <Box key={questionIndex} marginRight={1}>
+                  <Text color={isCurrentQuestion ? 'cyan' : 'gray'} bold={isCurrentQuestion}>
+                    {isCurrentQuestion ? '▶ ' : '  '}
+                    {q.name}
+                  </Text>
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Current question content */}
+          {chatMeta.questions[currentQuestionIndex] && (() => {
+            const question = chatMeta.questions[currentQuestionIndex];
+            const selections = questionAnswers[currentQuestionIndex] || new Set<number>();
+            const isRadio = question.min === 1 && question.max === 1;
+            
+            return (
+              <Box flexDirection="column">
+                <Box marginBottom={1}>
+                  <Text>
+                    {question.name} (select {question.min === question.max ? question.min : `${question.min}-${question.max}`})
+                  </Text>
+                </Box>
+                
+                {question.options.map((option, optionIndex) => {
+                  const isSelected = selections.has(optionIndex);
+                  const isHighlighted = optionIndex === currentOptionIndex;
+                  return (
+                    <Box key={optionIndex} marginBottom={0}>
+                      <Text color={isSelected ? 'green' : (isHighlighted ? 'cyan' : 'white')} bold={isHighlighted}>
+                        {isHighlighted ? '▶ ' : '  '}
+                        {isRadio ? (isSelected ? '◉ ' : '◯ ') : (isSelected ? '☑ ' : '☐ ')}
+                        {option.label}
+                      </Text>
+                      {option.description && (
+                        <Text dimColor> - {option.description}</Text>
+                      )}
+                    </Box>
+                  );
+                })}
+                
+                {question.custom && (
+                  <Box marginTop={1}>
+                    <Text dimColor>
+                      Custom answer: {questionCustomAnswers[currentQuestionIndex] || '(none)'}
+                    </Text>
+                  </Box>
+                )}
+                
+                <Box marginTop={1} flexDirection="column">
+                  <Text dimColor>Use ↑↓ to navigate options, Space to select/deselect</Text>
+                  <Box>
+                    {currentQuestionIndex > 0 && (
+                      <Text dimColor>← Back</Text>
+                    )}
+                    {currentQuestionIndex < chatMeta.questions.length - 1 && (
+                      <Text dimColor marginLeft={2}>→ Next</Text>
+                    )}
+                    {currentQuestionIndex === chatMeta.questions.length - 1 && selections.size >= question.min && (
+                      <Text color="green" marginLeft={2}>Enter to Submit</Text>
+                    )}
+                    {selections.size < question.min && (
+                      <Text color="yellow" marginLeft={2}>Select at least {question.min} option(s)</Text>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })()}
+        </Box>
+      )}
+
       {/* Clear Confirmation Prompt */}
       {showClearConfirmation && (
         <Box
@@ -1413,39 +1657,41 @@ After installation and the SoX executable is in the path, restart Cletus and try
       )}
 
       {/* Input Area */}
-      <Box
-        borderStyle="round"
-        borderColor={isTranscribing 
-          ? COLORS.INPUT_TRANSCRIBING 
-          : isWaitingForResponse 
-            ? COLORS.INPUT_WAITING 
-            : operationApprovalPending 
-              ? COLORS.INPUT_APPROVAL_MENU 
-              : COLORS.USER_INPUT_BORDER}
-        paddingX={1}
-      >
-        <Box width="100%">
-          {isTranscribing ? (
-            <Text color={COLORS.INPUT_TRANSCRIBING}>🎤 </Text>
-          ) : isWaitingForResponse ? (
-            <Text color={COLORS.INPUT_WAITING}>{'> '}</Text>
-          ) : (
-            <Text color={COLORS.USER_INPUT_PROMPT}>{'> '}</Text>
-          )}
-          <TextInput
-            value={inputValue}
-            onChange={handleInputChange}
-            onSubmit={handleSubmit}
-            placeholder={
-              isWaitingForResponse
-                ? 'Press ESC to interrupt...'
-                : 'Type / for commands or your message...'
-            }
-            showCursor={!isWaitingForResponse && !operationApprovalPending}
-            focus={!showExitPrompt && !operationApprovalPending}
-          />
+      {!showQuestions && (
+        <Box
+          borderStyle="round"
+          borderColor={isTranscribing 
+            ? COLORS.INPUT_TRANSCRIBING 
+            : isWaitingForResponse 
+              ? COLORS.INPUT_WAITING 
+              : operationApprovalPending 
+                ? COLORS.INPUT_APPROVAL_MENU 
+                : COLORS.USER_INPUT_BORDER}
+          paddingX={1}
+        >
+          <Box width="100%">
+            {isTranscribing ? (
+              <Text color={COLORS.INPUT_TRANSCRIBING}>🎤 </Text>
+            ) : isWaitingForResponse ? (
+              <Text color={COLORS.INPUT_WAITING}>{'> '}</Text>
+            ) : (
+              <Text color={COLORS.USER_INPUT_PROMPT}>{'> '}</Text>
+            )}
+            <TextInput
+              value={inputValue}
+              onChange={handleInputChange}
+              onSubmit={handleSubmit}
+              placeholder={
+                isWaitingForResponse
+                  ? 'Press ESC to interrupt...'
+                  : 'Type / for commands or your message...'
+              }
+              showCursor={!isWaitingForResponse && !operationApprovalPending}
+              focus={!showExitPrompt && !operationApprovalPending}
+            />
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Footer */}
       <Box>
