@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { formatName } from '../common';
-import { isDBAEnabled } from '../file-manager';
 import { AgentMode, ChatMode } from '../schemas';
-import { buildToolSelectionQuery, getDBAToolsetName, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
+import { buildToolSelectionQuery, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
 
 /**
@@ -74,15 +73,8 @@ export function createUtilityTools(ai: CletusAI) {
   const retool = ai.tool({
     name: 'retool',
     description: 'Switch between toolsets or enable adaptive tool selection',
-    instructionsFn: ({ config }) => {
-      const types = config.getData().types;
-      const dbaToolsets = isDBAEnabled() ? types.map(t => getDBAToolsetName(t.name)) : [];
-      const allToolsets = [...STATIC_TOOLSETS, ...dbaToolsets];
-
-      const dbaExample = isDBAEnabled() && dbaToolsets.length > 0
-        ? `\n\nExample 3: Focus on data operations for a specific type:
-{ "toolset": "${dbaToolsets[0]}" }`
-        : '';
+    instructionsFn: () => {
+      const allToolsets = [...STATIC_TOOLSETS];
 
       return `Use this to switch between different toolsets or enable adaptive tool selection.
 
@@ -106,12 +98,13 @@ Example 1: Switch to adaptive mode:
 { "toolset": null }
 
 Example 2: Focus on file operations:
-{ "toolset": "clerk" }${dbaExample}`;
+{ "toolset": "clerk" }
+
+Example 3: Focus on data operations:
+{ "toolset": "dba" }`;
     },
-    schema: ({ config }) => {
-      const types = config.getData().types;
-      const dbaToolsets = isDBAEnabled() ? types.map(t => getDBAToolsetName(t.name)) as string[] : [];
-      const allToolsets = [...STATIC_TOOLSETS, ...dbaToolsets] as [string, ...string[]];
+    schema: () => {
+      const allToolsets = [...STATIC_TOOLSETS] as [string, ...string[]];
 
       return z.object({
         toolset: z.enum(allToolsets).nullable().describe('The toolset to switch to, or null to enable adaptive tool selection'),

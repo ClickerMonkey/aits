@@ -263,18 +263,9 @@ export const OperationKindSchema = z.enum([
   'dir_summary',
   'file_attach',
   // dba
-  'data_create',
-  'data_update',
-  'data_delete',
-  'data_select',
-  'data_update_many',
-  'data_delete_many',
-  'data_count',
-  'data_aggregate',
   'data_index',
   'data_import',
   'data_search',
-  // architect (dba query)
   'query',
   // librarian
   'knowledge_search',

@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { getOperationInput } from '../operations/types';
-import { createDBASchemas } from '../helpers/dba';
 
 /**
  * Create architect tools for type definition management
@@ -208,143 +207,6 @@ Example 3: Limit discovery to top types:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'type_import', input }, ctx),
   });
 
-  const dbaQuery = ai.tool({
-    name: 'query',
-    description: 'Execute complex SQL-like queries across data types',
-    instructions: `Use this to execute complex queries that span multiple data types, including:
-- SELECT with joins, subqueries, aggregations, window functions
-- INSERT with conflict handling and returning
-- UPDATE with joins and complex conditions
-- DELETE with joins and complex conditions
-- UNION, INTERSECT, EXCEPT set operations
-- WITH (CTE) statements including recursive CTEs
-
-Available tables: ${types.length > 0 ? types.join(', ') : 'none defined yet'}
-
-The query is a structured JSON object representing SQL operations.
-
-Example 1: Simple SELECT with filter:
-{
-  "kind": "select",
-  "values": [{ "alias": "name", "value": { "source": "users", "column": "name" } }],
-  "from": { "kind": "table", "table": "users" },
-  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": true }],
-  "limit": 10
-}
-
-Example 2: JOIN query:
-{
-  "kind": "select",
-  "values": [
-    { "alias": "userName", "value": { "source": "u", "column": "name" } },
-    { "alias": "orderTotal", "value": { "source": "o", "column": "total" } }
-  ],
-  "from": { "kind": "table", "table": "users", "as": "u" },
-  "joins": [{
-    "source": { "kind": "table", "table": "orders", "as": "o" },
-    "type": "inner",
-    "on": [{ "kind": "comparison", "left": { "source": "u", "column": "id" }, "cmp": "=", "right": { "source": "o", "column": "userId" } }]
-  }]
-}
-
-Example 3: Aggregation with GROUP BY:
-{
-  "kind": "select",
-  "values": [
-    { "alias": "category", "value": { "source": "products", "column": "category" } },
-    { "alias": "avgPrice", "value": { "kind": "aggregate", "aggregate": "avg", "value": { "source": "products", "column": "price" } } }
-  ],
-  "from": { "kind": "table", "table": "products" },
-  "groupBy": [{ "source": "products", "column": "category" }]
-}
-
-Example 4: Simple INSERT with constant values:
-{
-  "kind": "insert",
-  "table": "users",
-  "columns": ["name", "email", "age"],
-  "values": ["Alice Smith", "alice@example.com", 30]
-}
-
-Example 5: INSERT with ON CONFLICT:
-{
-  "kind": "insert",
-  "table": "users",
-  "columns": ["email", "name"],
-  "values": ["bob@example.com", "Bob Jones"],
-  "onConflict": {
-    "columns": ["email"],
-    "update": [{ "column": "name", "value": "Bob Jones" }]
-  }
-}
-
-Example 6: INSERT from SELECT:
-{
-  "kind": "insert",
-  "table": "archive_users",
-  "columns": ["name", "email"],
-  "select": {
-    "kind": "select",
-    "values": [
-      { "alias": "name", "value": { "source": "users", "column": "name" } },
-      { "alias": "email", "value": { "source": "users", "column": "email" } }
-    ],
-    "from": { "kind": "table", "table": "users" },
-    "where": [{ "kind": "comparison", "left": { "source": "users", "column": "active" }, "cmp": "=", "right": false }]
-  }
-}
-
-Example 7: UPDATE with WHERE:
-{
-  "kind": "update",
-  "table": "users",
-  "set": [
-    { "column": "active", "value": false },
-    { "column": "deactivatedAt", "value": { "kind": "function", "function": "now", "args": [] } }
-  ],
-  "where": [{ "kind": "comparison", "left": { "source": "users", "column": "lastLogin" }, "cmp": "<", "right": "2023-01-01" }]
-}
-
-Example 8: DELETE with WHERE:
-{
-  "kind": "delete",
-  "table": "temp_data",
-  "where": [{ "kind": "comparison", "left": { "source": "temp_data", "column": "created" }, "cmp": "<", "right": "2024-01-01" }]
-}
-
-Example 9: SELECT all columns using * wildcard:
-{
-  "kind": "select",
-  "values": [{ "alias": "all", "value": { "source": "users", "column": "*" } }],
-  "from": { "kind": "table", "table": "users" },
-  "limit": 10
-}
-
-Example 10: SELECT with * and additional specific columns:
-{
-  "kind": "select",
-  "values": [
-    { "alias": "all", "value": { "source": "users", "column": "*" } },
-    { "alias": "fullName", "value": { "kind": "binary", "left": { "source": "users", "column": "firstName" }, "op": "+", "right": { "source": "users", "column": "lastName" } } }
-  ],
-  "from": { "kind": "table", "table": "users" }
-}
-
-{{modeInstructions}}`,
-    schema: ({ config }) => {
-      // Build schema dynamically from current config types
-      const currentTypes = config.getData().types;
-      const dbaSchemas = createDBASchemas(currentTypes);
-      return z.object({
-        query: dbaSchemas.QuerySchema.describe('The query to execute'),
-        ...globalToolProperties,
-      });
-    },
-    input: getOperationInput('query'),
-    applicable: ({ config }) => config.getData().types.length > 0,
-    call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx),
-  });
-
   return [
     typeInfo,
     typeUpdate,
@@ -352,7 +214,6 @@ Example 10: SELECT with * and additional specific columns:
     typeDelete,
     typeImport,
     typeList,
-    dbaQuery,
   ] as [
     typeof typeInfo,
     typeof typeUpdate,
@@ -360,6 +221,5 @@ Example 10: SELECT with * and additional specific columns:
     typeof typeDelete,
     typeof typeImport,
     typeof typeList,
-    typeof dbaQuery,
   ];
 }
