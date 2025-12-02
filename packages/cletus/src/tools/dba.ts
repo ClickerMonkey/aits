@@ -127,7 +127,7 @@ Example: Get first 10 records:
 
 Example: Get records 20-30:
 { "type": "task", "offset": 20, "limit": 10 }
- 
+
 {{modeInstructions}}`;
     },
     schema: ({ config }) => {
