@@ -538,8 +538,8 @@ export const type_import = operationOf<
   mode: 'read',
   signature: 'type_import(glob: string, hints?, max?)',
   status: ({ glob }) => `Importing types from ${glob}`,
-  analyze: async ({ input: { glob, hints, max } }, { config, cwd }) => {
-    const files = await searchFiles(cwd, glob);
+  analyze: async ({ input: { glob, hints, max } }, { config, cwd, signal }) => {
+    const files = await searchFiles(cwd, glob, signal);
     const importable = files.filter(f => f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image');
     
     let analysis = `This will scan ${importable.length} file(s) matching "${glob}" to discover type definitions.`;
@@ -559,10 +559,10 @@ export const type_import = operationOf<
     };
   },
   do: async ({ input: { glob, hints, max } }, ctx) => {
-    const { ai, config, cwd, log, chatStatus } = ctx;
+    const { ai, config, cwd, log, chatStatus, signal } = ctx;
     
     // Find and filter files
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     const importableFiles = files.filter(f => 
       f.fileType !== 'unknown' && f.fileType !== 'unreadable' && f.fileType !== 'image'
     );
@@ -987,6 +987,7 @@ When managing types:
               describeImages: false,
               extractImages: false,
               summarize: false,
+              signal,
             });
             
             // Store sections for smarter splitting

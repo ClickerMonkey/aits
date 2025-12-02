@@ -1233,9 +1233,9 @@ export const data_import = operationOf<
   mode: 'create',
   signature: 'data_import(glob: string, transcribeImages?)',
   status: ({ name, glob }) => `Importing ${name} from ${glob}`,
-  analyze: async ({ input: { name, glob } }, { config, cwd }) => {
+  analyze: async ({ input: { name, glob } }, { config, cwd, signal }) => {
     const type = getType(config, name);
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     
     const unreadable = files.filter(f => f.fileType === 'unreadable').map(f => f.file);
     const images = files.filter(f => f.fileType === 'image').map(f => f.file);
@@ -1261,13 +1261,13 @@ export const data_import = operationOf<
     };
   },
   do: async ({ input: { name, glob, transcribeImages = false } }, ctx) => {
-    const { chatStatus, ai, config, cwd, log } = ctx;
+    const { chatStatus, ai, config, cwd, log, signal } = ctx;
     const type = getType(config, name);
     const dataManager = new DataManager(name);
     await dataManager.load();
     
     // Find and filter files
-    const files = await searchFiles(cwd, glob);
+    const files = await searchFiles(cwd, glob, signal);
     const importableFiles = files.filter(f => {
       if (f.fileType === 'unknown' || f.fileType === 'unreadable') {
         return false;
@@ -1324,6 +1324,10 @@ Fields:
     let filesExtracted = 0;
     let filesFailed = 0;
     await Promise.all(importableFiles.map(async (file) => {
+      if (signal?.aborted) {
+        return;
+      }
+
       const fullPath = path.resolve(cwd, file.file);
       
       try {
@@ -1335,7 +1339,8 @@ Fields:
           describeImages: false,
           extractImages: false,
           summarize: false,
-          transcriber: (image) => transcribe(ai, image),
+          transcriber: (image) => transcribe(ai, image, signal),
+          signal,
         });
         
         // Status update
@@ -1415,6 +1420,10 @@ Fields:
     let updated = 0;
     let updateSkippedNoChanges = 0;
     const updatedIds: string[] = [];
+
+    if (signal?.aborted) {
+      throw new Error('Operation aborted');
+    }
     
     // Use single save operation for all changes
     await dataManager.save((dataFile) => {

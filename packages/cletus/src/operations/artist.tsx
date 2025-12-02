@@ -293,10 +293,10 @@ export const image_find = operationOf<
   mode: 'read',
   signature: 'image_find(query: string, glob: string, maxImages?: number, n?: number)',
   status: (input) => `Finding images: ${abbreviate(input.query, 35)}`,
-  analyze: async ({ input }, { cwd }) => {
+  analyze: async ({ input }, { cwd, signal }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
-    const files = await searchFiles(cwd, input.glob);
+    const files = await searchFiles(cwd, input.glob, signal);
     const images = files.filter(f => f.fileType === 'image').slice(0, maxImages);
     
     if (images.length === 0) {
@@ -319,10 +319,10 @@ export const image_find = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }, { ai, cwd, config, chatStatus }) => {
+  do: async ({ input }, { ai, cwd, config, chatStatus, signal }) => {
     const maxImages = input.maxImages || 100;
     const n = input.n || 5;
-    const files = await searchFiles(cwd, input.glob);
+    const files = await searchFiles(cwd, input.glob, signal);
     const images = files.filter(f => f.fileType === 'image').slice(0, maxImages);
 
     if (images.length === 0) {
@@ -381,7 +381,7 @@ Do not return any additional text other than the matching description subset.`;
 
     // Embed descriptions
     chatStatus(`Step 2/3: Embedding descriptions...`);
-    const imagesEmbeddings = await embed(imagesValid.map((d) => d.description));
+    const imagesEmbeddings = await embed(imagesValid.map((d) => d.description), signal);
     const imagesEmbedded = imagesValid.map((d, i) => ({
       ...d,
       embedding: imagesEmbeddings![i],
@@ -390,7 +390,7 @@ Do not return any additional text other than the matching description subset.`;
     chatStatus(`Step 3/3: Scoring and selecting top ${n} images...`);
 
     // Score images by cosine similarity to prompt embedding
-    const [promptEmbedding] = await embed([input.query]) || [];
+    const [promptEmbedding] = await embed([input.query], signal) || [];
 
     const imagesScored = imagesEmbedded.map((item) => ({
       score: cosineSimilarity(promptEmbedding, item.embedding),

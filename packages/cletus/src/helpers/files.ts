@@ -26,6 +26,8 @@ export interface FileOptions {
   summarizer?: (text: string) => Promise<string>;
   transcriber?: (base64Image: string) => Promise<string>;
   describer?: (base64Image: string) => Promise<string>;
+
+  signal?: AbortSignal;
 }
 
 // Get environment variable with default fallback
@@ -311,8 +313,8 @@ export async function categorizeFile(filePath: string, fileName: string = filePa
  * @param pattern - Glob pattern
  * @returns 
  */
-export async function searchFiles(cwd: string, pattern: string) {
-  const filePaths = await glob(pattern, { cwd, nocase: true });
+export async function searchFiles(cwd: string, pattern: string, signal?: AbortSignal): Promise<{ file: string; fileType: FileType | 'unreadable' }[]> {
+  const filePaths = await glob(pattern, { cwd, nocase: true, signal });
   const files = await Promise.all(filePaths.map(async (file) => ({
     file,
     fileType: await categorizeFile(path.join(cwd, file)).catch(() => 'unreadable') as FileType | 'unreadable',
@@ -326,6 +328,11 @@ export async function processFile(
   fileName: string,
   fileOptions: FileOptions,
 ): Promise<ProcessingResultWithSections> {
+  // Check if cancelled before starting
+  if (fileOptions?.signal?.aborted) {
+    throw new Error('Operation cancelled');
+  }
+
   let result: ProcessingResultWithSections = {
     sections: [],
   };
@@ -437,7 +444,7 @@ async function processImageFile(
   options: FileOptions,
 ): Promise<ProcessResult> {
   try {
-    const imageBuffer = await fs.promises.readFile(filePath);
+    const imageBuffer = await fs.promises.readFile(filePath, { signal: options.signal });
     const base64Image = imageBuffer.toString("base64");
 
     const sections: string[] = [];
@@ -503,7 +510,7 @@ async function processPdfFile(
     // Only extract text if we're NOT rendering pages (since we'll get markdown from rendered pages)
     if (!renderPages) {
       // Read PDF file
-      const pdfBuffer = await fs.promises.readFile(filePath);
+      const pdfBuffer = await fs.promises.readFile(filePath, { signal: options.signal });
       const pdfData = await pdfParse(pdfBuffer);
       const pdfText = pdfData.text;
 
@@ -608,6 +615,10 @@ async function processPdfFile(
         // Filter and process extracted images
         extractedFiles.forEach((imageFile, index) => {
           processing.push((async () => {
+            if (options.signal?.aborted) {
+              return;
+            }
+
             const imagePath = path.join(tempDir, imageFile);
 
             try {
@@ -684,6 +695,10 @@ async function processDocxFile(
           return { src: '' }; // Skip image extraction
         }
 
+        if (options.signal?.aborted) {
+          throw new Error('Operation cancelled');
+        }
+
         const ext = image.contentType.split('/')[1];
         const imageIndex = imageCount++;
         const imageFileName = `${parentFileName}-${imageIndex}.${ext}`;
@@ -691,8 +706,15 @@ async function processDocxFile(
         const imageFilePath = path.join(options.assetPath, imageFileName);
 
         processing.push((async () => {
+          if (options.signal?.aborted) {
+            throw new Error('Operation cancelled');
+          }
           try {
-            await fs.promises.writeFile(imageFilePath, await image.readAsBuffer());
+            await fs.promises.writeFile(
+              imageFilePath, 
+              await image.readAsBuffer(),
+              { signal: options.signal }
+            );
             const mimeType = await detectMimeType(imageFilePath, imageFileName);
             const size = (await fs.promises.stat(imageFilePath)).size;
 
@@ -728,7 +750,11 @@ async function processDocxFile(
       const markdownOriginalName = `${parentOriginalFileName}.md`;
       const markdownFilePath = path.join(options.assetPath, markdownFileName);
 
-      await fs.promises.writeFile(markdownFilePath, markdownContent);
+      await fs.promises.writeFile(
+        markdownFilePath, 
+        markdownContent, 
+        { signal: options.signal }
+      );
 
       markdownChild = {
         fileName: markdownFileName,
@@ -762,7 +788,7 @@ async function processTextFile(
 ): Promise<ProcessResult> {
   try {
     // Read and process text file
-    const textContent = await fs.promises.readFile(filePath, "utf-8");
+    const textContent = await fs.promises.readFile(filePath, { signal: options.signal, encoding: "utf-8" });
     
     // Use language-specific splitting based on file extension
     const sections = options.sections
@@ -795,6 +821,11 @@ async function processZipFile(
 
       if (!zipfile) {
         return resolve({ error: "Invalid zip file" });
+      }
+
+      if (options.signal?.aborted) {
+        zipfile.close();
+        return resolve({ error: "Operation cancelled" });
       }
 
       zipfile.readEntry();
@@ -844,6 +875,12 @@ async function processZipFile(
           if (!readStream) {
             zipfile.readEntry();
             return;
+          }
+
+          if (options.signal?.aborted) {
+            readStream.destroy();
+            zipfile.close();
+            return resolve({ error: "Operation cancelled" });
           }
 
           // Generate unique filename to avoid conflicts

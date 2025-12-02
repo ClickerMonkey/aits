@@ -69,7 +69,7 @@ export type OperationDefinition<TInput, TOutput, TCache> = {
    * This is used when the current chat mode does not allow automatic execution.
    *
    * @param input - Operation input
-   * @param context - Cletus core context
+   * @param context - Cletus core context (contains signal for cancellation via ctx.signal)
    * @returns Analysis result with description and doability
    */
   analyze: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<OperationAnalysis>;
@@ -78,7 +78,7 @@ export type OperationDefinition<TInput, TOutput, TCache> = {
    * Run the operation and return the output.
    *
    * @param input - Operation input
-   * @param context - Cletus core context
+   * @param context - Cletus core context (contains signal for cancellation via ctx.signal)
    * @returns - Operation output
    */
   do: (op: OperationOf<TInput, TOutput, TCache>, context: CletusAIContext) => Promise<TOutput | { output: TOutput; cache: TCache }>;

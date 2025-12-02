@@ -48,7 +48,7 @@ export abstract class JsonFile<T> {
       // Read current file state
       let fileData: any;
       try {
-        const content = await fs.readFile(this.filePath, 'utf-8');
+        const content = await fs.readFile(this.filePath, { encoding: 'utf-8' });
         fileData = JSON.parse(content);
 
         // Check for concurrent updates
@@ -78,7 +78,11 @@ export abstract class JsonFile<T> {
       await fs.mkdir(path.dirname(this.filePath), { recursive: true });
 
       // Write to disk
-      await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), 'utf-8');
+      await fs.writeFile(
+        this.filePath, 
+        JSON.stringify(this.data, null, 2), 
+        { encoding: 'utf-8' }
+      );
 
       return result;
     });
