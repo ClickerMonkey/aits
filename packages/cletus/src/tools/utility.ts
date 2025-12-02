@@ -279,11 +279,11 @@ After using this tool, inform the user they will need to manually change back to
 
   const ask = ai.tool({
     name: 'ask',
-    description: 'Ask the user multiple questions with a special UI interface',
+    description: 'Ask the user multiple questions with a special UI interface. DO NOT use any other tools after this one until the user responds.',
     instructions: `Use this tool when you need to gather multiple pieces of information from the user in a structured way.
     
 <critical>
-When you use this tool, DO NOT use any other tools after it in the same response. The user needs to answer the questions before the conversation can continue.
+When you use this tool, DO NOT use any other tools after it in the same response. The user needs to answer the questions before the conversation can continue. This tool will pause the conversation until the user provides their answers.
 </critical>
 
 This tool creates a special UI that:
@@ -345,7 +345,22 @@ The user's answers will be formatted and submitted as a message, triggering the 
       ...globalToolProperties,
     }),
     call: async ({ questions }, _, ctx) => {
-      return ctx.ops.handle({ type: 'ask', input: { questions } }, ctx);
+      // Directly update the chat meta with questions
+      if (!ctx.chat) {
+        throw new Error('No active chat context available');
+      }
+      
+      // Update the chat meta with the questions
+      await ctx.config.save((cfg) => {
+        const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
+        if (chatMeta) {
+          chatMeta.questions = questions;
+        }
+      });
+      
+      ctx.chatStatus(`Asking ${questions.length} question${questions.length !== 1 ? 's' : ''}...`);
+      
+      return `Asked ${questions.length} question${questions.length !== 1 ? 's' : ''}. Waiting for user to answer...`;
     },
   });
 
