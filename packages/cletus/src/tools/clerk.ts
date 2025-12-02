@@ -55,18 +55,32 @@ Example: Summarize a PDF document:
     description: 'Index files for semantic search by content or summary',
     instructions: `IMPORTANT: This tool is for BULK INDEXING files to make them semantically searchable in the future. This is NOT for reading or understanding file contents.
 
+⚠️ WARNING - EXPENSIVE OPERATION:
+This operation can take a LONG TIME and consume significant resources (API calls, embeddings, storage).
+NEVER run this without EXPLICIT USER APPROVAL after showing them:
+1. How many files will be indexed
+2. The total size of files to be indexed
+3. The types of files that will be indexed
+4. Estimated time/cost if possible
+
+WORKFLOW REQUIRED:
+1. First use file_search to find matching files
+2. Show the user the count, types, and sizes
+3. Ask for explicit confirmation before proceeding
+4. Only then execute the indexing operation
+
 When to use:
 - User explicitly asks to "index" files for search
 - Setting up semantic search over large collections of files
 - Building a searchable knowledge base from multiple documents
+- ONLY after user has confirmed they want to proceed
 
 When NOT to use (use file_read instead):
 - User asks "what can you tell me about [file]" - just read the file
 - Understanding a specific file's content
 - Analyzing or examining individual files
 - Quick file inspection
-
-This operation is expensive (generates embeddings) and should only be used when semantic search capability is actually needed.
+- User hasn't explicitly requested indexing
 
 Example 1: Index all markdown files by content:
 { "glob": "**/*.md", "index": "content" }
@@ -149,9 +163,17 @@ Example 2: Move multiple files into a directory:
     description: 'Get file statistics and metadata',
     instructions: `Use this to get metadata about a file (size, timestamps, type, line/character counts for text files).
 
+IMPORTANT: Use this BEFORE reading, editing, or summarizing a file when you need to:
+- Determine the appropriate tool based on file type (text, PDF, image, etc.)
+- Check file size to decide between file_read vs file_summary
+- See line count to know if you need pagination for editing
+- Understand file characteristics before processing
+
+For example, if a file is 100K+ characters, you might want to use file_summary instead of file_read, or use limit/offset parameters.
+
 Example: Get stats for a source file:
 { "path": "src/index.ts" }
- 
+
 {{modeInstructions}}`,
     schema: z.object({
       path: z.string().describe('Relative file path'),

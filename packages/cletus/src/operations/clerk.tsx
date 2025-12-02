@@ -735,7 +735,29 @@ export const file_read = operationOf<
     `Read("${paginateText(op.input.path, 100, -100)}")`,
     (op) => {
       if (op.output) {
-        return `Read ${linkFile(op.output.fullPath)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}`;
+        const params: string[] = [];
+
+        // Add limit/offset info if non-default
+        const limitOffsetMode = op.input.limitOffsetMode || 'characters';
+        const defaultLimit = limitOffsetMode === 'characters' ? CONSTS.MAX_CHARACTERS : CONSTS.MAX_LINES;
+        if (op.input.limit && op.input.limit !== defaultLimit) {
+          params.push(`limit=${op.input.limit} ${limitOffsetMode}`);
+        }
+        if (op.input.offset) {
+          params.push(`offset=${op.input.offset}`);
+        }
+        if (op.input.limitOffsetMode && op.input.limitOffsetMode !== 'characters') {
+          params.push(`mode=${op.input.limitOffsetMode}`);
+        }
+
+        // Add boolean flags if enabled
+        if (op.input.showLines) params.push('lines');
+        if (op.input.describeImages) params.push('describe');
+        if (op.input.extractImages) params.push('extract');
+        if (op.input.transcribeImages) params.push('transcribe');
+
+        const paramsStr = params.length > 0 ? ` (${params.join(', ')})` : '';
+        return `Read ${linkFile(op.output.fullPath)}: **${op.output.content.length.toLocaleString()}** characters${op.output.truncated ? ' *(truncated)*' : ''}${paramsStr}`;
       }
       return null;
     },
