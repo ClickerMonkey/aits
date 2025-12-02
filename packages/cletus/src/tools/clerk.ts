@@ -362,6 +362,34 @@ Example: Attach a document:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_attach', input }, ctx),
   });
 
+  const shell = ai.tool({
+    name: 'shell',
+    description: 'Execute shell commands',
+    instructions: `Use this to run shell commands on the system. The command will be executed in the current working directory.
+
+SYSTEM INFORMATION:
+- Operating System: ${process.platform}
+- Architecture: ${process.arch}
+- Shell: ${process.env.SHELL || (process.platform === 'win32' ? 'cmd.exe' : '/bin/sh')}
+
+The command should be appropriate for the operating system and shell available.
+
+Example: List files in current directory:
+{ "command": "ls -la" } (Unix/Linux/Mac)
+{ "command": "dir" } (Windows)
+
+Example: Check disk usage:
+{ "command": "df -h" } (Unix/Linux/Mac)
+
+{{modeInstructions}}`,
+    schema: z.object({
+      command: z.string().describe('Shell command to execute'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('shell'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'shell', input }, ctx),
+  });
+
   return [
     fileSearch,
     fileSummary,
@@ -377,6 +405,7 @@ Example: Attach a document:
     dirCreate,
     dirSummary,
     fileAttach,
+    shell,
   ] as [
     typeof fileSearch,
     typeof fileSummary,
@@ -392,5 +421,6 @@ Example: Attach a document:
     typeof dirCreate,
     typeof dirSummary,
     typeof fileAttach,
+    typeof shell,
   ];
 }

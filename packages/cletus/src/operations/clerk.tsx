@@ -1651,3 +1651,140 @@ export const file_attach = operationOf<
     showInput, showOutput
   ),
 });
+
+export const shell = operationOf<
+  { command: string },
+  { stdout: string; stderr: string; exitCode: number | null; signal: string | null }
+>({
+  mode: 'delete',
+  signature: 'shell(command: string)',
+  status: (input) => `Running: ${abbreviate(input.command, 50)}`,
+  analyze: async ({ input }, { cwd }) => {
+    return {
+      analysis: `This will execute the shell command: "${input.command}" in the directory ${cwd}`,
+      doable: true,
+    };
+  },
+  do: async ({ input }, { cwd, chatStatus, signal }) => {
+    const { spawn } = await import('child_process');
+    
+    return new Promise((resolve, reject) => {
+      // Determine shell and command arguments based on platform
+      const isWindows = process.platform === 'win32';
+      const shell = isWindows ? 'cmd.exe' : process.env.SHELL || '/bin/sh';
+      const shellArgs = isWindows ? ['/c', input.command] : ['-c', input.command];
+
+      const childProcess = spawn(shell, shellArgs, {
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let lastUpdate = Date.now();
+      const UPDATE_INTERVAL = 100; // Update status at most every 100ms
+
+      const updateStatus = () => {
+        const now = Date.now();
+        if (now - lastUpdate >= UPDATE_INTERVAL) {
+          const allOutput = stdout + stderr;
+          const lines = allOutput.split('\n').filter(l => l.length > 0);
+          const lineCount = lines.length;
+          chatStatus(`Executing... ${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output`);
+          lastUpdate = now;
+        }
+      };
+
+      childProcess.stdout?.on('data', (data: Buffer) => {
+        stdout += data.toString();
+        updateStatus();
+      });
+
+      childProcess.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString();
+        updateStatus();
+      });
+
+      childProcess.on('error', (error) => {
+        reject(new Error(`Failed to execute command: ${error.message}`));
+      });
+
+      childProcess.on('close', (exitCode, signalName) => {
+        const allOutput = stdout + stderr;
+        const lines = allOutput.split('\n').filter(l => l.length > 0);
+        chatStatus(`Completed with exit code ${exitCode ?? 'signal ' + signalName}. ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} of output.`);
+        
+        resolve({
+          stdout,
+          stderr,
+          exitCode,
+          signal: signalName,
+        });
+      });
+
+      // Handle abort signal
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          childProcess.kill();
+          reject(new Error('Command execution was cancelled'));
+        });
+      }
+    });
+  },
+  render: (op, ai, showInput, showOutput) => {
+    const getLastLines = (text: string, count: number): string[] => {
+      if (!text) return [];
+      const lines = text.split('\n').filter(l => l.length > 0);
+      return lines.slice(-count);
+    };
+
+    const formatOutput = () => {
+      if (!op.output) {
+        return 'Executing...';
+      }
+
+      const allOutput = (op.output.stdout + op.output.stderr).trim();
+      const lines = allOutput.split('\n').filter(l => l.length > 0);
+      const lastLines = getLastLines(allOutput, 4);
+      const lineCount = lines.length;
+      const exitCode = op.output.exitCode;
+      const signal = op.output.signal;
+
+      let summary = '';
+      
+      if (lastLines.length > 0) {
+        summary = lastLines.join('\n');
+      }
+
+      const statusText = exitCode !== null 
+        ? `Exit code: ${exitCode}`
+        : signal 
+          ? `Terminated by signal: ${signal}`
+          : 'Running...';
+
+      return (
+        <Box flexDirection="column">
+          {lastLines.length > 0 && (
+            <>
+              {lineCount > 4 && (
+                <Text color="gray">... ({lineCount - 4} more lines)</Text>
+              )}
+              <Text>{summary}</Text>
+            </>
+          )}
+          <Text color={exitCode === 0 ? 'green' : exitCode !== null ? 'red' : 'yellow'}>
+            {lineCount} {lineCount === 1 ? 'line' : 'lines'} • {statusText}
+          </Text>
+        </Box>
+      );
+    };
+
+    return renderOperation(
+      op,
+      `Shell("${abbreviate(op.input.command, 60)}")`,
+      formatOutput,
+      showInput,
+      showOutput
+    );
+  },
+});
