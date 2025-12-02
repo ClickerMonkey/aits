@@ -266,6 +266,7 @@ export const OperationKindSchema = z.enum([
   'data_index',
   'data_import',
   'data_search',
+  'data_get',
   'query',
   // librarian
   'knowledge_search',

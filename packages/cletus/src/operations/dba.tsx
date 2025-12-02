@@ -412,6 +412,58 @@ export const data_search = operationOf<
   },
 });
 
+export const data_get = operationOf<
+  { type: string; offset?: number; limit?: number },
+  { records: Array<{ id: string; created: number; updated: number; fields: Record<string, any> }>; total: number },
+  {},
+  { typeName: string }
+>({
+  mode: 'local',
+  signature: 'data_get(offset?, limit?)',
+  status: ({ type }) => `Getting ${type} records`,
+  analyze: async ({ input: { type, offset = 0, limit = 10 } }, { config }) => {
+    const typeDef = getType(config, type);
+
+    return {
+      analysis: `This will retrieve ${typeDef.friendlyName} records (offset: ${offset}, limit: ${limit}).`,
+      doable: true,
+      cache: { typeName: typeDef.friendlyName },
+    };
+  },
+  do: async ({ input: { type, offset = 0, limit = 10 } }) => {
+    const dataManager = new DataManager(type);
+    await dataManager.load();
+
+    const allRecords = dataManager.getAll();
+    const total = allRecords.length;
+    const records = allRecords.slice(offset, offset + limit).map((record) => ({
+      id: record.id,
+      created: record.created,
+      updated: record.updated,
+      fields: record.fields,
+    }));
+
+    return { records, total };
+  },
+  render: (op, ai, showInput, showOutput) => {
+    // Use cached typeName for consistent rendering even if type is deleted
+    const typeName = op.cache?.typeName ?? getTypeName(ai.config.defaultContext!.config!, op.input.type);
+    const offset = op.input.offset ?? 0;
+    const limit = op.input.limit ?? 10;
+    return renderOperation(
+      op,
+      `${formatName(typeName)}Get(${offset}, ${limit})`,
+      (op) => {
+        if (op.output) {
+          return `Retrieved ${op.output.records.length} of ${op.output.total} records`;
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
+});
+
 /**
  * Get the kind of a query statement for display
  */
