@@ -365,9 +365,10 @@ Example: Attach a document:
   const shell = ai.tool({
     name: 'shell',
     description: 'Execute shell commands',
-    instructions: `⚠️ IMPORTANT: This tool should ONLY be used when NO other available tools can accomplish the task. Always prefer using specialized tools (file operations, text search, etc.) over shell commands.
+    instructions: `IMPORTANT: This tool should ONLY be used when NO other available tools can accomplish the task. Always prefer using specialized tools (file operations, text search, etc.) over shell commands.
 
 Use this to run shell commands on the system. The command will be executed in the current working directory.
+You must only run commands that you know that can be executed safely and in a non-interactive way. Do not run run commands that cannot be run with the 'spawn' function from Node.js child_process module.
 
 SYSTEM INFORMATION:
 - Operating System: ${process.platform}

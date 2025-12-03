@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
-import { formatName } from '../common';
+import { formatName, pluralize } from '../common';
 import { AgentMode, ChatMode } from '../schemas';
 import { buildToolSelectionQuery, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
@@ -349,7 +349,7 @@ The user's answers will be formatted and submitted as a message, triggering the 
       if (!ctx.chat) {
         throw new Error('No active chat context available');
       }
-      
+
       // Update the chat meta with the questions
       await ctx.config.save((cfg) => {
         const chatMeta = cfg.chats.find(c => c.id === ctx.chat!.id);
@@ -357,10 +357,13 @@ The user's answers will be formatted and submitted as a message, triggering the 
           chatMeta.questions = questions;
         }
       });
-      
+
       ctx.chatStatus(`Asking ${questions.length} question${questions.length !== 1 ? 's' : ''}...`);
-      
-      return `Asked ${questions.length} question${questions.length !== 1 ? 's' : ''}. Waiting for user to answer...`;
+
+      // Notify chat-ui to refresh and show the questions
+      ctx.events?.onRefreshChat?.();
+
+      return `DO NOT respond after this tool. The user will be presented with ${pluralize(questions.length, 'question')} to answer before continuing the conversation. If you need to respond with no text and with a STOP token.`;
     },
   });
 

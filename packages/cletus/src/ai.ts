@@ -29,6 +29,10 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
+  events?: {
+    onRefreshPending?: () => void;
+    onRefreshChat?: () => void;
+  };
   usage: {
     accumulated: Usage;
     accumulatedCost: number;
@@ -233,7 +237,7 @@ export type CletusTypeAIContext = ContextInfer<CletusTypeAI>;
 
 // Global tool properties - useful for debugging
 export const globalToolProperties = {
-  explanation: z.string().describe('Provide an explanation on why this tool is being used'),
+  // explanation: z.string().describe('Provide an explanation on why this tool is being used'),
 } as const;
 
 /**

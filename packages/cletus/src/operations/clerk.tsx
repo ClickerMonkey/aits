@@ -1672,18 +1672,18 @@ export const shell = operationOf<
       doable: true,
     };
   },
-  do: async ({ input }, { cwd, chatStatus, signal }) => {
+  do: async ({ input }, { cwd, chatStatus, events, signal }) => {
     const { spawn } = await import('child_process');
-    
+
     return new Promise((resolve, reject) => {
       // Determine shell and command arguments based on platform
       const isWindows = process.platform === 'win32';
       const shell = isWindows ? 'cmd.exe' : process.env.SHELL || '/bin/sh';
-      const shellArgs = isWindows ? ['/c', input.command] : ['-c', input.command];
-
-      const childProcess = spawn(shell, shellArgs, {
+      const childProcess = spawn(input.command, [], {
         cwd,
+        shell,
         stdio: ['ignore', 'pipe', 'pipe'],
+        signal,
       });
 
       let stdout = '';
@@ -1696,7 +1696,8 @@ export const shell = operationOf<
         // Only process output if enough time has passed
         if (now - lastUpdate >= UPDATE_INTERVAL) {
           const { lineCount } = processShellOutput(stdout, stderr);
-          chatStatus(`Executing... ${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output`);
+          chatStatus(`Executing... ${pluralize(lineCount, 'line')} of output`);
+          events?.onRefreshPending?.();
           lastUpdate = now;
         }
       };
@@ -1754,7 +1755,7 @@ export const shell = operationOf<
           : 'Running...';
 
       return (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginLeft={3}>
           {lastLines.length > 0 && (
             <>
               {lineCount > 4 && (

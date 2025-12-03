@@ -20,6 +20,10 @@ export interface OrchestratorOptions {
   signal: AbortSignal;
   clearUsage: () => void;
   getUsage: () => { accumulated: Usage; accumulatedCost: number };
+  events?: {
+    onRefreshPending?: () => void;
+    onRefreshChat?: () => void;
+  };
 }
 
 /**
@@ -68,7 +72,7 @@ export async function runChatOrchestrator(
   options: OrchestratorOptions,
   onEvent: (event: OrchestratorEvent) => void,
 ): Promise<void> {
-  const { chatAgent, messages, chatMeta, config, chatData, signal, clearUsage, getUsage } = options;
+  const { chatAgent, messages, chatMeta, config, chatData, signal, clearUsage, getUsage, events } = options;
 
   const startTime = Date.now();
   const loopTimeout = config.getData().user.autonomous?.timeout ?? AUTONOMOUS.DEFAULT_TIMEOUT_MS;
@@ -215,6 +219,7 @@ export async function runChatOrchestrator(
         signal,
         messages: currentMessages,
         chatStatus: (status: string) => onEvent({ type: 'status', status }),
+        events,
         /*
         // @ts-ignore
         runner: withEvents<typeof chatAgent>({

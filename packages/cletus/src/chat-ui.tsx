@@ -1122,6 +1122,19 @@ After installation and the SoX executable is in the path, restart Cletus and try
           signal: controller.signal,
           clearUsage,
           getUsage,
+          events: {
+            onRefreshPending: () => {
+              // Force a re-render to show updated pending message
+              setRenderKey(k => k + 1);
+            },
+            onRefreshChat: () => {
+              // Reload chat meta from config to pick up questions
+              const updatedChatMeta = config.getData().chats.find(c => c.id === chatMeta.id);
+              if (updatedChatMeta) {
+                setChatMeta(updatedChatMeta);
+              }
+            },
+          },
         },
         (event) => {
           if (event.type !== 'elapsed' && event.type !== 'usage' && event.type !== 'pendingUpdate' && event.type !== 'status') {
@@ -1409,13 +1422,13 @@ After installation and the SoX executable is in the path, restart Cletus and try
                       <Text dimColor>← Back</Text>
                     )}
                     {currentQuestionIndex < chatMeta.questions.length - 1 && (
-                      <Text dimColor marginLeft={2}>→ Next</Text>
+                      <Text dimColor>{'  → Next'}</Text>
                     )}
                     {currentQuestionIndex === chatMeta.questions.length - 1 && selections.size >= question.min && (
-                      <Text color="green" marginLeft={2}>Enter to Submit</Text>
+                      <Text color="green">{'  Enter to Submit'}</Text>
                     )}
                     {selections.size < question.min && (
-                      <Text color="yellow" marginLeft={2}>Select at least {question.min} option(s)</Text>
+                      <Text color="yellow">{'  Select at least '}{question.min} option(s)</Text>
                     )}
                   </Box>
                 </Box>
@@ -1683,8 +1696,8 @@ After installation and the SoX executable is in the path, restart Cletus and try
               onSubmit={handleSubmit}
               placeholder={
                 isWaitingForResponse
-                  ? 'Press ESC to interrupt...'
-                  : 'Type / for commands or your message...'
+                  ? 'esc to interrupt...'
+                  : '/ for commands, ? for help, or your message...'
               }
               showCursor={!isWaitingForResponse && !operationApprovalPending}
               focus={!showExitPrompt && !operationApprovalPending}

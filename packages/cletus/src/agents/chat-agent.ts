@@ -75,7 +75,8 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
   const selectedTools = await toolRegistry.selectTools(
     query,
     ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT - utilityTools.length,
-    ['utility'] // Exclude utility since we add it separately
+    ['utility'], // Exclude utility since we add it separately
+    ctx,
   );
 
   return [...utilityTools, ...selectedTools];

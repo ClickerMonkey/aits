@@ -1,5 +1,5 @@
 import { AnyTool, Message, resolveFn } from '@aeye/core';
-import { cosineSimilarity } from './common';
+import { cosineSimilarity, pluralize } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
 import { CletusAIContext } from './ai';
@@ -111,8 +111,12 @@ export class ToolRegistry {
     }
   }
 
+  private getToolsToEmbed(): RegisteredTool[] {
+    return Array.from(this.tools.values()).filter(t => t.vector === null);
+  }
+
   private async _embedAllTools(): Promise<void> {
-    const toolsToEmbed = Array.from(this.tools.values()).filter(t => t.vector === null);
+    const toolsToEmbed = this.getToolsToEmbed();
     if (toolsToEmbed.length === 0) {
       return;
     }
@@ -146,8 +150,20 @@ export class ToolRegistry {
   async selectTools(
     query: string,
     topN: number = ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT,
-    excludeToolsets?: string[]
+    excludeToolsets?: string[],
+    ctx?: CletusAIContext
   ): Promise<RegisteredTool[]> {
+
+    if (ctx?.chatStatus) {
+      const embedTools = this.getToolsToEmbed();
+      const allTools = this.tools.size;
+      if (embedTools.length === allTools) {
+        ctx.chatStatus(`Initializing adaptive tools (${allTools} tools)...`);
+      } else if (embedTools.length > 0) {
+        ctx.chatStatus(`Updating adaptive tools (${pluralize(embedTools.length, 'tool')})...`);
+      }
+    }
+
     // Ensure all tools are embedded
     await this.embedAllTools();
 
