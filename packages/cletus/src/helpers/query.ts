@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { DataFile, DataRecord, TypeDefinition, TypeField } from "../schemas";
+import { DataFile, DataRecord, SelectRecord, TypeDefinition, TypeField } from "../schemas";
 import type {
   Aggregate,
   BooleanValue as BooleanValueDBA,
@@ -26,18 +26,107 @@ import type {
   WindowValue as WindowValueType,
   WithStatement,
 } from "./dba";
-import type {
-  QueryValidationError,
-  IDataManager,
-  QueryResult,
-  QueryResultType,
-  QueryExecutionPayload,
-  CanCommitResult,
-  TableDelta,
-} from "./dba-query";
+import { create } from 'handlebars';
 
-// Re-export types for external use
-export type { QueryValidationError, IDataManager, QueryResult, QueryExecutionPayload, CanCommitResult };
+/**
+ * Validation error collected during query execution
+ */
+export interface QueryValidationError {
+  /** Path in query where error occurred (e.g., "insert.values[0]", "where[1].left") */
+  path: string;
+  /** Human-readable error message */
+  message: string;
+  /** Expected field type (if applicable) */
+  expectedType?: string;
+  /** Actual value type received */
+  actualType?: string;
+  /** Suggestion for how to fix the error */
+  suggestion?: string;
+  /** Additional metadata for programmatic handling */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Interface for data management operations
+ */
+export interface IDataManager {
+  /** Load data from storage */
+  load(): Promise<void>;
+  /** Save data with optional transformation */
+  save(fn: (dataFile: DataFile) => void | Promise<void>): Promise<void>;
+  /** Get all records */
+  getAll(): DataRecord[];
+}
+
+/**
+ * Result of executing a DBA query
+ */
+export interface QueryResult {
+  /** Rows returned (for SELECT) or affected (for INSERT/UPDATE/DELETE with RETURNING) */
+  rows: Record<string, unknown>[];
+  /** Number of rows affected (for INSERT/UPDATE/DELETE) */
+  affectedCount?: number;
+  /** Inserted record IDs (for INSERT) */
+  inserted?: QueryResultType[];
+  /** Updated record IDs (for UPDATE) */
+  updated?: QueryResultType[];
+  /** Deleted record IDs (for DELETE) */
+  deleted?: QueryResultType[];
+  /** Validation errors collected during execution */
+  validationErrors?: QueryValidationError[];
+  /** Whether the query can be committed (false if validation errors exist) */
+  canCommit: boolean;
+}
+
+/**
+ * Type for inserted/updated/deleted IDs result
+ */
+export interface QueryResultType {
+  /** The type */
+  type: string;
+  /** The ids of the type affected  */
+  ids: string[];
+}
+
+/**
+ * Serializable table delta containing only the changes to be applied
+ */
+export interface TableDelta {
+  /** Table name */
+  tableName: string;
+  /** Version hash when the query was executed */
+  version: string;
+  /** Records to insert (temp ID -> field values) */
+  inserts: Array<{ tempId: string; fields: Record<string, unknown> }>;
+  /** Records to update (real ID -> field values to update) */
+  updates: Array<Omit<DataRecord, 'created' | 'updated'>>;
+  /** Record IDs to delete */
+  deletes: string[];
+}
+
+/**
+ * Execution payload that can be passed to commitQueryChanges
+ * Contains only serializable deltas and versions
+ */
+export interface QueryExecutionPayload {
+  /** The query result with temporary IDs for inserts */
+  result: QueryResult;
+  /** Deltas for each affected table */
+  deltas: TableDelta[];
+}
+
+/**
+ * Result of checking if a query execution payload can be committed
+ */
+export interface CanCommitResult {
+  /** Whether the payload can be committed */
+  canCommit: boolean;
+  /** Reason why it cannot be committed (if canCommit is false) */
+  reason?: string;
+  /** Tables that have been modified since the query was executed */
+  modifiedTables?: string[];
+}
+
 
 /**
  * =============================================================================
@@ -259,7 +348,7 @@ export interface QueryContext {
 /**
  * Transactional state for a table
  */
-interface TableState {
+export interface TableState {
   /** Original records loaded from disk */
   original: DataRecord[];
   /** Current records including pending changes */
@@ -287,11 +376,13 @@ export abstract class Expr {
   /**
    * Evaluate expression to a Value
    * Validation happens during evaluation - errors are added to ctx.validationErrors
+   * @param record - SelectRecord mapping source names to DataRecords, or null
+   * @param groupRecords - For aggregate functions, array of SelectRecords
    */
   abstract eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value>;
 
   /**
@@ -330,16 +421,47 @@ export abstract class Expr {
 
   /**
    * Check if this expression contains an aggregate function
+   * Note: This does NOT include window functions or subqueries, which behave differently in SELECT
    */
   containsAggregate(): boolean {
     let hasAggregate = false;
     this.walk((expr) => {
-      if (expr instanceof AggregateExpr || expr instanceof WindowExpr) {
+      // Don't walk into subqueries - aggregates inside subqueries don't affect outer query
+      if (expr instanceof SelectExpr || expr instanceof SetOperationExpr) {
+        return false; // Stop walking into this subtree
+      }
+      if (expr instanceof AggregateExpr) {
         hasAggregate = true;
         return false; // Stop walking
       }
     });
     return hasAggregate;
+  }
+
+  /**
+   * Handle wildcard expansion for SELECT/RETURNING clauses
+   * If expr is a wildcard SourceColumnExpr and evaluatedValue is an object,
+   * expand all properties into the row. Otherwise, assign to alias.
+   */
+  static handleWildcardExpansion(
+    row: Record<string, unknown>,
+    alias: string,
+    evaluatedValue: Value,
+    expr: Expr
+  ): void {
+    if (
+      expr instanceof SourceColumnExpr &&
+      expr.isWildcard() &&
+      typeof evaluatedValue.value === 'object' &&
+      evaluatedValue.value !== null &&
+      !Array.isArray(evaluatedValue.value)
+    ) {
+      // Expand all columns into the row
+      Object.assign(row, evaluatedValue.value);
+    } else {
+      // Regular assignment
+      row[alias] = evaluatedValue.value;
+    }
   }
 
   /**
@@ -360,18 +482,18 @@ export abstract class BooleanExpr extends Expr {
    * Evaluate as boolean (specialized method for boolean expressions)
    */
   abstract evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean>;
 
   /**
    * Default eval delegates to evalBoolean
    */
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     if (!record) return new Value(false);
     const result = await this.evalBoolean(record, ctx, groupRecords);
@@ -394,9 +516,9 @@ export class ConstantExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     return new Value(this.constant);
   }
@@ -419,9 +541,9 @@ export class SourceColumnExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     if (!record) return new Value(null);
 
@@ -434,17 +556,17 @@ export class SourceColumnExpr extends Expr {
       field = typeDef.fields.find(f => f.name === this.column);
 
       if (!field && !systemFields.includes(this.column)) {
+        const availableColumns = systemFields.concat(typeDef.fields.map(f => f.name)).join(', ');
         ctx.validationErrors.push({
           path: this.path,
-          message: `Column '${this.column}' does not exist on '${this.source}'`,
-          suggestion: `Available: ${systemFields.concat(typeDef.fields.map(f => f.name)).join(', ')}`,
+          message: `Column '${this.column}' does not exist on type '${this.source}'. Valid columns: ${availableColumns}`,
           metadata: { source: this.source, column: this.column }
         });
         return new Value(null);
       }
     }
 
-    // Extract value from record
+    // Extract value from SelectRecord
     const value = this.column === '*'
       ? this.getAllColumnValues(record, ctx)
       : this.getColumnValue(record, ctx);
@@ -454,43 +576,22 @@ export class SourceColumnExpr extends Expr {
     return new Value(value, field, referencedType);
   }
 
-  private getColumnValue(record: DataRecord, ctx: QueryContext): unknown {
-    // Check aliases first (for JOINs, FROM subqueries)
-    const aliasRecords = ctx.aliases.get(this.source);
-    if (aliasRecords?.length) {
-      const recordAny = record as { __left__?: DataRecord; __right__?: DataRecord };
+  private getColumnValue(record: SelectRecord, ctx: QueryContext): unknown {
+    // Extract the DataRecord for this source from the SelectRecord
+    const dataRecord = record[this.source];
 
-      // Handle joined records
-      if (recordAny.__left__ || recordAny.__right__) {
-        const leftRecord = recordAny.__left__;
-        const rightRecord = recordAny.__right__;
-
-        let sourceRecord: DataRecord | undefined;
-        if (leftRecord && aliasRecords.some(r => r.id === leftRecord.id)) {
-          sourceRecord = leftRecord;
-        } else if (rightRecord && aliasRecords.some(r => r.id === rightRecord.id)) {
-          sourceRecord = rightRecord;
-        }
-
-        if (sourceRecord) {
-          return this.extractColumnValue(sourceRecord);
-        }
-      } else {
-        // Regular record
-        const aliasRecord = aliasRecords.find(r => r.id === record.id);
-        if (aliasRecord) {
-          return this.extractColumnValue(aliasRecord);
-        }
-
-        // Correlated subquery: use single record if available
-        if (aliasRecords.length === 1) {
-          return this.extractColumnValue(aliasRecords[0]);
-        }
+    if (!dataRecord) {
+      // For correlated subqueries: check aliases for single record
+      const aliasRecords = ctx.aliases.get(this.source);
+      if (aliasRecords?.length === 1) {
+        return this.extractColumnValue(aliasRecords[0]);
       }
+
+      // Source doesn't exist in SelectRecord (e.g., unmatched side of outer join)
+      return undefined;
     }
 
-    // Direct field access
-    return this.extractColumnValue(record);
+    return this.extractColumnValue(dataRecord);
   }
 
   private extractColumnValue(record: DataRecord): unknown {
@@ -500,36 +601,42 @@ export class SourceColumnExpr extends Expr {
     return record.fields[this.column];
   }
 
-  private getAllColumnValues(record: DataRecord, ctx: QueryContext): Record<string, unknown> {
-    // Handle aliases for wildcard expansion
-    const aliasRecords = ctx.aliases.get(this.source);
-    let targetRecord = record;
+  private getAllColumnValues(record: SelectRecord, ctx: QueryContext): Record<string, unknown> {
+    // Extract the DataRecord for this source from the SelectRecord
+    const dataRecord = record[this.source];
 
-    if (aliasRecords?.length) {
-      const recordAny = record as { __left__?: DataRecord; __right__?: DataRecord };
-      if (recordAny.__left__ || recordAny.__right__) {
-        const leftRecord = recordAny.__left__;
-        const rightRecord = recordAny.__right__;
-
-        if (leftRecord && aliasRecords.some(r => r.id === leftRecord.id)) {
-          targetRecord = leftRecord;
-        } else if (rightRecord && aliasRecords.some(r => r.id === rightRecord.id)) {
-          targetRecord = rightRecord;
-        }
+    if (!dataRecord) {
+      // For correlated subqueries: check aliases for single record
+      const aliasRecords = ctx.aliases.get(this.source);
+      if (aliasRecords?.length === 1) {
+        const targetRecord = aliasRecords[0];
+        return {
+          id: targetRecord.id,
+          created: targetRecord.created,
+          updated: targetRecord.updated,
+          ...targetRecord.fields,
+        };
       }
+
+      return {};
     }
 
     return {
-      id: targetRecord.id,
-      created: targetRecord.created,
-      updated: targetRecord.updated,
-      ...targetRecord.fields,
+      id: dataRecord.id,
+      created: dataRecord.created,
+      updated: dataRecord.updated,
+      ...dataRecord.fields,
     };
   }
 
   // Accessor for walk pattern (used by getReferencedTables)
   getSource(): string {
     return this.source;
+  }
+
+  // Check if this is a wildcard column reference
+  isWildcard(): boolean {
+    return this.column === '*';
   }
 
   // No children to walk
@@ -550,9 +657,9 @@ export class BinaryExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     const leftValue = await this.left.eval(record, ctx, groupRecords);
     const rightValue = await this.right.eval(record, ctx, groupRecords);
@@ -630,9 +737,9 @@ export class UnaryExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     const operandValue = await this.operand.eval(record, ctx, groupRecords);
 
@@ -675,9 +782,9 @@ export class AggregateExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     const records = groupRecords || (record ? [record] : []);
 
@@ -747,28 +854,6 @@ export class AggregateExpr extends Expr {
   }
 }
 
-/**
- * =============================================================================
- * HELPER FUNCTIONS (from dba-query.ts)
- * =============================================================================
- */
-
-function getColumnValue(record: DataRecord, column: string): unknown {
-  const normalizedColumn = column.toLowerCase();
-  if (normalizedColumn === 'id') return record.id;
-  if (normalizedColumn === 'created') return record.created;
-  if (normalizedColumn === 'updated') return record.updated;
-  return record.fields[normalizedColumn];
-}
-
-function getAllColumnValues(record: DataRecord): Record<string, unknown> {
-  return {
-    id: record.id,
-    created: record.created,
-    updated: record.updated,
-    ...record.fields,
-  };
-}
 
 /**
  * Function call expression
@@ -783,9 +868,9 @@ export class FunctionCallExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     // Evaluate all arguments
     const argValues: Value[] = [];
@@ -1058,9 +1143,9 @@ export class WindowExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     const records = groupRecords || (record ? [record] : []);
 
@@ -1074,7 +1159,7 @@ export class WindowExpr extends Expr {
       }
       const partitionKey = JSON.stringify(partitionKeyValues);
 
-      const filtered: DataRecord[] = [];
+      const filtered: SelectRecord[] = [];
       for (const r of records) {
         const keyValues: unknown[] = [];
         for (const expr of this.partitionBy) {
@@ -1154,9 +1239,9 @@ export class CaseExpr extends Expr {
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     for (const branch of this.branches) {
       if (record) {
@@ -1191,15 +1276,16 @@ export class CaseExpr extends Expr {
 export class SemanticSimilarityExpr extends Expr {
   constructor(
     path: string,
-    private readonly table: string
+    private readonly table: string,
+    private readonly query: string
   ) {
     super(path);
   }
 
   async eval(
-    record: DataRecord | null,
+    record: SelectRecord | null,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<Value> {
     // TODO: Implement semantic similarity with embeddings
     return new Value(0);
@@ -1234,9 +1320,9 @@ export class ComparisonExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     const leftValue = await this.left.eval(record, ctx, groupRecords);
     const rightValue = await this.right.eval(record, ctx, groupRecords);
@@ -1303,9 +1389,9 @@ export class InExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     const val = await this.valueExpr.eval(record, ctx, groupRecords);
 
@@ -1319,9 +1405,15 @@ export class InExpr extends BooleanExpr {
       }
       return false;
     } else {
-      // Subquery IN - this requires statement execution which we'll handle later
-      // For now, placeholder
-      return false;
+      // Subquery IN - execute the subquery and check if value is in results
+      const subResult = await this.inValues.execute(ctx);
+      // Extract first value from each row (subquery should return single column)
+      const subValues = subResult.rows.map(r => Object.values(r)[0]);
+      // Check if any subquery value matches
+      return subValues.some(subVal => {
+        const subValue = new Value(subVal);
+        return val.compareTo(subValue) === 0;
+      });
     }
   }
 
@@ -1351,9 +1443,9 @@ export class BetweenExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     const val = await this.valueExpr.eval(record, ctx, groupRecords);
     const lowVal = await this.low.eval(record, ctx, groupRecords);
@@ -1382,9 +1474,9 @@ export class IsNullExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     const val = await this.valueExpr.eval(record, ctx, groupRecords);
     return val.isNull();
@@ -1407,27 +1499,27 @@ export class ExistsExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     // Handle correlated subqueries by setting up aliases
     const savedAliases = new Map<string, DataRecord[]>();
 
-    // Save current aliases
+    // Save current aliases and set up single-record context for correlation
     for (const [alias, records] of ctx.aliases) {
       savedAliases.set(alias, records);
-      // Find if current record matches this alias
-      const matchingRecord = records.find(r => r.id === record.id);
-      if (matchingRecord) {
-        ctx.aliases.set(alias, [matchingRecord]);
+      // Find if current SelectRecord contains this alias's DataRecord
+      const dataRecord = record[alias];
+      if (dataRecord) {
+        ctx.aliases.set(alias, [dataRecord]);
       }
     }
 
     try {
-      // Execute subquery - this requires statement execution which we'll handle later
-      // For now, placeholder
-      return false;
+      // Execute subquery
+      const result = await this.subquery.execute(ctx);
+      return result.rows.length > 0;
     } finally {
       // Restore original aliases
       for (const [alias, records] of savedAliases) {
@@ -1453,9 +1545,9 @@ export class AndExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     for (const operand of this.operands) {
       if (!(await operand.evalBoolean(record, ctx, groupRecords))) {
@@ -1484,9 +1576,9 @@ export class OrExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     for (const operand of this.operands) {
       if (await operand.evalBoolean(record, ctx, groupRecords)) {
@@ -1515,9 +1607,9 @@ export class NotExpr extends BooleanExpr {
   }
 
   async evalBoolean(
-    record: DataRecord,
+    record: SelectRecord,
     ctx: QueryContext,
-    groupRecords?: DataRecord[]
+    groupRecords?: SelectRecord[]
   ): Promise<boolean> {
     return !(await this.operand.evalBoolean(record, ctx, groupRecords));
   }
@@ -1570,6 +1662,13 @@ export class DataSourceExpr {
     return [];
   }
 
+  /**
+   * Get source name (alias or table name)
+   */
+  getSourceName(): string {
+    return this.as?.toLowerCase() || (this.kind === 'table' && this.table ? this.table.toLowerCase() : 'unknown');
+  }
+
   walk(visitor: (expr: Expr) => boolean | void): void {
     if (this.kind === 'subquery' && this.subquery) {
       this.subquery.walk(visitor);
@@ -1598,8 +1697,9 @@ export class JoinExpr {
     public readonly on: BooleanExpr[]
   ) {}
 
-  async apply(leftRecords: DataRecord[], ctx: QueryContext): Promise<DataRecord[]> {
+  async apply(leftSelectRecords: SelectRecord[], ctx: QueryContext): Promise<SelectRecord[]> {
     const rightRecords = await this.source.getRecords(ctx);
+    const rightSourceName = this.source.getSourceName();
 
     // Store right records in aliases if needed
     if (this.source.as) {
@@ -1608,13 +1708,13 @@ export class JoinExpr {
       ctx.aliases.set(this.source.table.toLowerCase(), rightRecords);
     }
 
-    const result: DataRecord[] = [];
+    const result: SelectRecord[] = [];
 
     switch (this.type) {
       case 'inner':
-        for (const left of leftRecords) {
+        for (const leftSR of leftSelectRecords) {
           for (const right of rightRecords) {
-            const combined = combineRecords(left, right);
+            const combined = combineSelectRecords(leftSR, createSelectRecord(rightSourceName, right));
             if (await this.evaluateOnConditions(combined, ctx)) {
               result.push(combined);
             }
@@ -1623,17 +1723,17 @@ export class JoinExpr {
         break;
 
       case 'left':
-        for (const left of leftRecords) {
+        for (const leftSR of leftSelectRecords) {
           let matched = false;
           for (const right of rightRecords) {
-            const combined = combineRecords(left, right);
+            const combined = combineSelectRecords(leftSR, createSelectRecord(rightSourceName, right));
             if (await this.evaluateOnConditions(combined, ctx)) {
               result.push(combined);
               matched = true;
             }
           }
           if (!matched) {
-            result.push(left);
+            result.push(leftSR);
           }
         }
         break;
@@ -1641,25 +1741,25 @@ export class JoinExpr {
       case 'right':
         for (const right of rightRecords) {
           let matched = false;
-          for (const left of leftRecords) {
-            const combined = combineRecords(left, right);
+          for (const leftSR of leftSelectRecords) {
+            const combined = combineSelectRecords(leftSR, createSelectRecord(rightSourceName, right));
             if (await this.evaluateOnConditions(combined, ctx)) {
               result.push(combined);
               matched = true;
             }
           }
           if (!matched) {
-            result.push(right);
+            result.push(createSelectRecord(rightSourceName, right));
           }
         }
         break;
 
       case 'full':
         const rightMatched = new Set<string>();
-        for (const left of leftRecords) {
+        for (const leftSR of leftSelectRecords) {
           let matched = false;
           for (const right of rightRecords) {
-            const combined = combineRecords(left, right);
+            const combined = combineSelectRecords(leftSR, createSelectRecord(rightSourceName, right));
             if (await this.evaluateOnConditions(combined, ctx)) {
               result.push(combined);
               matched = true;
@@ -1667,13 +1767,13 @@ export class JoinExpr {
             }
           }
           if (!matched) {
-            result.push(left);
+            result.push(leftSR);
           }
         }
         // Add unmatched right records
         for (const right of rightRecords) {
           if (!rightMatched.has(right.id)) {
-            result.push(right);
+            result.push(createSelectRecord(rightSourceName, right));
           }
         }
         break;
@@ -1682,9 +1782,9 @@ export class JoinExpr {
     return result;
   }
 
-  private async evaluateOnConditions(record: DataRecord, ctx: QueryContext): Promise<boolean> {
+  private async evaluateOnConditions(selectRecord: SelectRecord, ctx: QueryContext): Promise<boolean> {
     for (const cond of this.on) {
-      if (!(await cond.evalBoolean(record, ctx))) {
+      if (!(await cond.evalBoolean(selectRecord, ctx))) {
         return false;
       }
     }
@@ -1709,18 +1809,18 @@ export class JoinExpr {
 }
 
 /**
- * Combine two records for join operations
+ * Combine two SelectRecords for join operations
+ * Each SelectRecord maps source names to DataRecords
  */
-function combineRecords(left: DataRecord, right: DataRecord): DataRecord {
-  return {
-    id: `${left.id}_${right.id}`,
-    created: Math.min(left.created, right.created),
-    updated: Math.max(left.updated, right.updated),
-    fields: { ...left.fields, ...right.fields },
-    // Store original records as metadata
-    __left__: left,
-    __right__: right,
-  } as DataRecord;
+function combineSelectRecords(left: SelectRecord, right: SelectRecord): SelectRecord {
+  return { ...left, ...right };
+}
+
+/**
+ * Create a SelectRecord from a single DataRecord with a source name
+ */
+function createSelectRecord(sourceName: string, record: DataRecord): SelectRecord {
+  return { [sourceName]: record };
 }
 
 /**
@@ -1867,7 +1967,7 @@ export class SelectExpr extends Expr {
   }
 
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     // SELECT as scalar subquery - return first value from first row
     const result = await this.execute(ctx);
     if (result.rows.length === 0) return new Value(null);
@@ -1877,42 +1977,46 @@ export class SelectExpr extends Expr {
   }
 
   async execute(ctx: QueryContext): Promise<QueryResult> {
-    // 1. Get records from FROM clause
-    let records: DataRecord[] = [];
+    // 1. Get records from FROM clause and convert to SelectRecords
+    let selectRecords: SelectRecord[] = [];
     if (this.from) {
-      records = await this.from.getRecords(ctx);
+      const dataRecords = await this.from.getRecords(ctx);
+      const sourceName = this.from.getSourceName();
+
+      // Convert DataRecords to SelectRecords
+      selectRecords = dataRecords.map(dr => createSelectRecord(sourceName, dr));
 
       // Set up alias for FROM
       if (this.from.as) {
-        ctx.aliases.set(this.from.as.toLowerCase(), records);
+        ctx.aliases.set(this.from.as.toLowerCase(), dataRecords);
       } else if (this.from.kind === 'table' && this.from.table) {
-        ctx.aliases.set(this.from.table.toLowerCase(), records);
+        ctx.aliases.set(this.from.table.toLowerCase(), dataRecords);
       }
     }
 
     // 2. Apply JOINs
     if (this.joins) {
       for (const join of this.joins) {
-        records = await join.apply(records, ctx);
+        selectRecords = await join.apply(selectRecords, ctx);
       }
     }
 
     // 3. Apply WHERE
     if (this.where) {
-      const filtered: DataRecord[] = [];
-      for (const record of records) {
+      const filtered: SelectRecord[] = [];
+      for (const selectRecord of selectRecords) {
         let matches = true;
         for (const cond of this.where) {
-          if (!(await cond.evalBoolean(record, ctx))) {
+          if (!(await cond.evalBoolean(selectRecord, ctx))) {
             matches = false;
             break;
           }
         }
         if (matches) {
-          filtered.push(record);
+          filtered.push(selectRecord);
         }
       }
-      records = filtered;
+      selectRecords = filtered;
     }
 
     // 4. Apply GROUP BY and compute values
@@ -1920,21 +2024,21 @@ export class SelectExpr extends Expr {
 
     if (this.groupBy?.length) {
       // Group records
-      const groups = await this.groupRecords(records, this.groupBy, ctx);
-      const rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: DataRecord[] }> = [];
+      const groups = await this.groupRecords(selectRecords, this.groupBy, ctx);
+      const rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: SelectRecord[] }> = [];
 
       for (const [, groupRecs] of groups) {
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.values) {
           const evaluatedValue = await expr.eval(groupRecs[0], ctx, groupRecs);
-          this.handleWildcardExpansion(row, alias, evaluatedValue, expr);
+          Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
         rowsWithGroups.push({ row, groupRecs });
       }
 
       // Apply HAVING clause
       if (this.having?.length) {
-        const filteredRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: DataRecord[] }> = [];
+        const filteredRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: SelectRecord[] }> = [];
         for (const { row, groupRecs } of rowsWithGroups) {
           let matches = true;
           for (const cond of this.having) {
@@ -1955,21 +2059,21 @@ export class SelectExpr extends Expr {
       // No grouping - evaluate values for each record
       const hasAggregates = this.values.some(({ expr }) => expr.containsAggregate());
 
-      if (hasAggregates && records.length > 0) {
+      if (hasAggregates && selectRecords.length > 0) {
         // Single aggregate result
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.values) {
-          const evaluatedValue = await expr.eval(records[0], ctx, records);
-          this.handleWildcardExpansion(row, alias, evaluatedValue, expr);
+          const evaluatedValue = await expr.eval(selectRecords[0], ctx, selectRecords);
+          Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
         rows = [row];
-      } else if (records.length === 0 && this.values.length > 0) {
+      } else if (selectRecords.length === 0 && this.values.length > 0) {
         // No records but values requested
         if (hasAggregates) {
           const row: Record<string, unknown> = {};
           for (const { alias, expr } of this.values) {
             const evaluatedValue = await expr.eval(null, ctx, []);
-            this.handleWildcardExpansion(row, alias, evaluatedValue, expr);
+            Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
           }
           rows = [row];
         } else {
@@ -1977,11 +2081,11 @@ export class SelectExpr extends Expr {
         }
       } else {
         rows = [];
-        for (const record of records) {
+        for (const selectRecord of selectRecords) {
           const row: Record<string, unknown> = {};
           for (const { alias, expr } of this.values) {
-            const evaluatedValue = await expr.eval(record, ctx, records);
-            this.handleWildcardExpansion(row, alias, evaluatedValue, expr);
+            const evaluatedValue = await expr.eval(selectRecord, ctx, selectRecords);
+            Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
           }
           rows.push(row);
         }
@@ -2016,22 +2120,22 @@ export class SelectExpr extends Expr {
   }
 
   private async groupRecords(
-    records: DataRecord[],
+    selectRecords: SelectRecord[],
     groupBy: Expr[],
     ctx: QueryContext
-  ): Promise<Map<string, DataRecord[]>> {
-    const groups = new Map<string, DataRecord[]>();
+  ): Promise<Map<string, SelectRecord[]>> {
+    const groups = new Map<string, SelectRecord[]>();
 
-    for (const record of records) {
+    for (const selectRecord of selectRecords) {
       const keyValues: unknown[] = [];
       for (const expr of groupBy) {
-        const val = await expr.eval(record, ctx);
+        const val = await expr.eval(selectRecord, ctx);
         keyValues.push(val.value);
       }
       const key = JSON.stringify(keyValues);
 
       const group = groups.get(key) || [];
-      group.push(record);
+      group.push(selectRecord);
       groups.set(key, group);
     }
 
@@ -2043,22 +2147,25 @@ export class SelectExpr extends Expr {
     orderBy: SortExpr[],
     ctx: QueryContext
   ): Promise<Record<string, unknown>[]> {
-    // Create temp records and evaluate sort values
+    // Create temp select records and evaluate sort values
     const rowsWithValues: Array<{
       row: Record<string, unknown>;
       sortValues: Value[];
     }> = [];
 
     for (const row of rows) {
-      const tempRecord: DataRecord = {
+      // Create a temp DataRecord and wrap in SelectRecord
+      const tempDataRecord: DataRecord = {
         id: '',
         created: 0,
         updated: 0,
         fields: row as Record<string, unknown>,
       };
+      const tempSelectRecord: SelectRecord = { __temp__: tempDataRecord };
+
       const sortValues: Value[] = [];
       for (const sort of orderBy) {
-        const val = await sort.expr.eval(tempRecord, ctx);
+        const val = await sort.expr.eval(tempSelectRecord, ctx);
         sortValues.push(val);
       }
       rowsWithValues.push({ row, sortValues });
@@ -2076,30 +2183,6 @@ export class SelectExpr extends Expr {
     });
 
     return rowsWithValues.map(r => r.row);
-  }
-
-  private shouldExpandWildcard(expr: Expr): boolean {
-    return expr instanceof SourceColumnExpr && (expr as any).column === '*';
-  }
-
-  private handleWildcardExpansion(
-    row: Record<string, unknown>,
-    alias: string,
-    evaluatedValue: Value,
-    expr: Expr
-  ): void {
-    if (
-      this.shouldExpandWildcard(expr) &&
-      typeof evaluatedValue.value === 'object' &&
-      evaluatedValue.value !== null &&
-      !Array.isArray(evaluatedValue.value)
-    ) {
-      // Expand all columns into the row
-      Object.assign(row, evaluatedValue.value);
-    } else {
-      // Regular assignment
-      row[alias] = evaluatedValue.value;
-    }
   }
 
   protected walkChildren(visitor: (expr: Expr) => boolean | void): void {
@@ -2157,7 +2240,7 @@ export class InsertExpr extends Expr {
     super(path);
   }
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     const result = await this.execute(ctx);
     return new Value(result.affectedCount);
   }
@@ -2282,7 +2365,8 @@ export class InsertExpr extends Expr {
             const updates: Record<string, unknown> = {};
             for (const { column, expr } of this.onConflict.update) {
               const normalizedColumn = column.toLowerCase();
-              const value = await expr.eval(existing, ctx);
+              const selectExisting = createSelectRecord(tableName, existing);
+              const value = await expr.eval(selectExisting, ctx);
 
               // Validate update value
               const field = typeDef.fields.find(f => f.name === normalizedColumn);
@@ -2316,10 +2400,12 @@ export class InsertExpr extends Expr {
     let rows: Record<string, unknown>[] = [];
     if (this.returning?.length) {
       for (const record of insertedRecords) {
+        // Wrap DataRecord in SelectRecord for evaluation
+        const selectRecord = createSelectRecord(tableName, record);
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.returning) {
-          const evaluatedValue = await expr.eval(record, ctx);
-          row[alias] = evaluatedValue.value;
+          const evaluatedValue = await expr.eval(selectRecord, ctx);
+          Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
         rows.push(row);
       }
@@ -2379,7 +2465,7 @@ export class UpdateExpr extends Expr {
     super(path);
   }
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     const result = await this.execute(ctx);
     return new Value(result.affectedCount);
   }
@@ -2398,11 +2484,15 @@ export class UpdateExpr extends Expr {
     }
 
     const state = await getTableState(this.table, ctx);
-    let records = getRecords(state);
+    const dataRecords = getRecords(state);
+    const sourceAlias = this.as?.toLowerCase() || tableName;
+    let selectRecords: SelectRecord[] = dataRecords.map(dr => createSelectRecord(sourceAlias, dr));
 
     // Set up alias if specified
     if (this.as) {
-      ctx.aliases.set(this.as.toLowerCase(), records);
+      ctx.aliases.set(this.as.toLowerCase(), dataRecords);
+    } else {
+      ctx.aliases.set(tableName, dataRecords);
     }
 
     // Apply FROM clause
@@ -2418,37 +2508,41 @@ export class UpdateExpr extends Expr {
     // Apply JOINs
     if (this.joins) {
       for (const join of this.joins) {
-        records = await join.apply(records, ctx);
+        selectRecords = await join.apply(selectRecords, ctx);
       }
     }
 
     // Apply WHERE
     if (this.where) {
-      const filtered: DataRecord[] = [];
-      for (const record of records) {
+      const filtered: SelectRecord[] = [];
+      for (const selectRecord of selectRecords) {
         let matches = true;
         for (const cond of this.where) {
-          if (!(await cond.evalBoolean(record, ctx))) {
+          if (!(await cond.evalBoolean(selectRecord, ctx))) {
             matches = false;
             break;
           }
         }
         if (matches) {
-          filtered.push(record);
+          filtered.push(selectRecord);
         }
       }
-      records = filtered;
+      selectRecords = filtered;
     }
 
     const updateResult: QueryResultType = { type: this.table, ids: [] };
     const updatedRecords: DataRecord[] = [];
 
     // Update matching records
-    for (const record of records) {
+    for (const selectRecord of selectRecords) {
+      // Get the actual DataRecord for the target table
+      const record = selectRecord[sourceAlias];
+      if (!record) continue;
+
       const updates: Record<string, unknown> = {};
       for (const { column, expr } of this.set) {
         const normalizedColumn = column.toLowerCase();
-        const value = await expr.eval(record, ctx);
+        const value = await expr.eval(selectRecord, ctx);
 
         // Find field and validate
         const field = typeDef.fields.find(f => f.name === normalizedColumn);
@@ -2486,10 +2580,12 @@ export class UpdateExpr extends Expr {
     let rows: Record<string, unknown>[] = [];
     if (this.returning?.length) {
       for (const record of updatedRecords) {
+        // Wrap DataRecord in SelectRecord for evaluation
+        const selectRecord = createSelectRecord(tableName, record);
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.returning) {
-          const evaluatedValue = await expr.eval(record, ctx);
-          row[alias] = evaluatedValue.value;
+          const evaluatedValue = await expr.eval(selectRecord, ctx);
+          Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
         rows.push(row);
       }
@@ -2549,57 +2645,62 @@ export class DeleteExpr extends Expr {
     super(path);
   }
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     const result = await this.execute(ctx);
     return new Value(result.affectedCount);
   }
 
   async execute(ctx: QueryContext): Promise<QueryResult> {
     const state = await getTableState(this.table, ctx);
-    let records = getRecords(state);
+    const dataRecords = getRecords(state);
+    const tableName = this.table.toLowerCase();
+    const sourceAlias = this.as?.toLowerCase() || tableName;
+    let selectRecords: SelectRecord[] = dataRecords.map(dr => createSelectRecord(sourceAlias, dr));
 
     // Set up alias if specified
     if (this.as) {
-      ctx.aliases.set(this.as.toLowerCase(), records);
+      ctx.aliases.set(this.as.toLowerCase(), dataRecords);
+    } else {
+      ctx.aliases.set(tableName, dataRecords);
     }
 
     // Apply JOINs
     if (this.joins) {
       for (const join of this.joins) {
-        records = await join.apply(records, ctx);
+        selectRecords = await join.apply(selectRecords, ctx);
       }
     }
 
     // Apply WHERE
     if (this.where) {
-      const filtered: DataRecord[] = [];
-      for (const record of records) {
+      const filtered: SelectRecord[] = [];
+      for (const selectRecord of selectRecords) {
         let matches = true;
         for (const cond of this.where) {
-          if (!(await cond.evalBoolean(record, ctx))) {
+          if (!(await cond.evalBoolean(selectRecord, ctx))) {
             matches = false;
             break;
           }
         }
         if (matches) {
-          filtered.push(record);
+          filtered.push(selectRecord);
         }
       }
-      records = filtered;
+      selectRecords = filtered;
     }
 
     // Collect records for RETURNING before deletion
-    const recordsToDelete = [...records];
+    const recordsToDelete = selectRecords.map(sr => sr[sourceAlias]).filter((r): r is DataRecord => r !== undefined);
     const deleteResult: QueryResultType = { type: this.table, ids: [] };
 
     // Handle RETURNING before deletion
     let rows: Record<string, unknown>[] = [];
     if (this.returning?.length) {
-      for (const record of recordsToDelete) {
+      for (const selectRecord of selectRecords) {
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.returning) {
-          const evaluatedValue = await expr.eval(record, ctx);
-          row[alias] = evaluatedValue.value;
+          const evaluatedValue = await expr.eval(selectRecord, ctx);
+          Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
         rows.push(row);
       }
@@ -2658,7 +2759,7 @@ export class SetOperationExpr extends Expr {
     super(path);
   }
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     const result = await this.execute(ctx);
     return new Value(result.rows.length);
   }
@@ -2728,7 +2829,7 @@ export class CTEStatementExpr extends Expr {
     super(path);
   }
 
-  async eval(record: DataRecord | null, ctx: QueryContext, groupRecords?: DataRecord[]): Promise<Value> {
+  async eval(record: SelectRecord | null, ctx: QueryContext, groupRecords?: SelectRecord[]): Promise<Value> {
     const result = await this.execute(ctx);
     return new Value(result.rows.length);
   }
@@ -2905,7 +3006,7 @@ export function createExprFromValue(value: ValueDBA, path: string): Expr {
         );
 
       case 'semanticSimilarity':
-        return new SemanticSimilarityExpr(path, value.semanticSimilarity);
+        return new SemanticSimilarityExpr(path, value.table, value.query);
 
       case 'select':
         return createSelectExpr(value, path);
@@ -3259,6 +3360,34 @@ export function createQueryContext(
 }
 
 /**
+ * Commit a query execution payload
+ * This checks if the payload can be committed and applies all pending changes
+ */
+export async function commitQueryChanges(
+  payload: QueryExecutionPayload,
+  getManager: (typeName: string) => IDataManager
+): Promise<QueryResult> {
+  // Check for validation errors first
+  if (!payload.result.canCommit) {
+    const errorMessages = payload.result.validationErrors
+      ?.map((e, i) => `[${i + 1}] ${e.path}: ${e.message}`)
+      .join('\n') || 'Unknown validation errors';
+    throw new Error(`Cannot commit query with validation errors:\n${errorMessages}`);
+  }
+
+  // Check if the payload can be committed (data hasn't changed)
+  const canCommit = await canCommitQueryResult(payload, getManager);
+  if (!canCommit.canCommit) {
+    throw new Error(`Cannot commit query: ${canCommit.reason}`);
+  }
+
+  // Commit the changes
+  await commitChanges(payload.deltas, getManager);
+
+  return payload.result;
+}
+
+/**
  * Extract table deltas from context
  */
 export function extractTableDeltas(ctx: QueryContext): Map<string, TableDelta> {
@@ -3268,10 +3397,10 @@ export function extractTableDeltas(ctx: QueryContext): Map<string, TableDelta> {
 
     const delta: TableDelta = {
       tableName,
-      inserts: Array.from(state.inserted.entries().map(([tempId, fields]) => ({ tempId, fields }))),
+      inserts: Array.from(state.inserted.entries()).map(([tempId, fields]) => ({ tempId, fields })),
       updates: Array.from(state.updated.entries()).map(([id, fields]) => ({ id, fields })),
       deletes: Array.from(state.deleted),
-      version: ''
+      version: state.version
     };
 
     if (delta.inserts.length > 0 || delta.updates.length > 0 || delta.deletes.length > 0) {
@@ -3479,12 +3608,18 @@ export async function validateReferenceIntegrity(ctx: QueryContext): Promise<voi
  * Execute a DBA query using the class-based system (v2)
  * Compatible with existing executeQuery interface
  */
-export async function executeQueryV2(
+export async function executeQuery(
   query: Query,
   getTypes: () => TypeDefinition[],
   getManager: (typeName: string) => IDataManager
 ): Promise<QueryResult> {
-  const { result, deltas } = await executeQueryWithoutCommitV2(query, getTypes, getManager);
+  const { result, deltas } = await executeQueryWithoutCommit(query, getTypes, getManager);
+
+  // Throw on validation errors to match old behavior
+  if (result.validationErrors && result.validationErrors.length > 0) {
+    const firstError = result.validationErrors[0];
+    throw new Error(firstError.message);
+  }
 
   // 8. Commit if valid
   if (result.canCommit) {
@@ -3497,7 +3632,7 @@ export async function executeQueryV2(
 /**
  * Execute without committing (for preview/validation)
  */
-export async function executeQueryWithoutCommitV2(
+export async function executeQueryWithoutCommit(
   query: Query,
   getTypes: () => TypeDefinition[],
   getManager: (typeName: string) => IDataManager
@@ -3532,5 +3667,40 @@ export async function executeQueryWithoutCommitV2(
   return {
     result,
     deltas: Array.from(deltas.values())
+  };
+}
+
+/**
+ * Check if a query execution payload can be committed
+ * Verifies that table data hasn't changed since query execution
+ */
+export async function canCommitQueryResult(
+  payload: QueryExecutionPayload,
+  getManager: (typeName: string) => IDataManager
+): Promise<CanCommitResult> {
+  const modifiedTables: string[] = [];
+
+  for (const delta of payload.deltas) {
+    // Reload the table data to check if it has changed
+    const manager = getManager(delta.tableName);
+    await manager.load();
+    const currentRecords = manager.getAll();
+    const currentVersion = computeTableVersion(currentRecords);
+
+    if (currentVersion !== delta.version) {
+      modifiedTables.push(delta.tableName);
+    }
+  }
+
+  if (modifiedTables.length > 0) {
+    return {
+      canCommit: false,
+      reason: `Table(s) have been modified since query execution: ${modifiedTables.join(', ')}`,
+      modifiedTables,
+    };
+  }
+
+  return {
+    canCommit: true,
   };
 }

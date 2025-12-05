@@ -1,31 +1,13 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  executeQuery as executeQueryOld,
-  executeQueryWithoutCommit as executeQueryWithoutCommitOld,
+  executeQuery,
+  executeQueryWithoutCommit,
+  commitQueryChanges,
   canCommitQueryResult,
-  commitQueryChanges as commitQueryChangesOld,
   IDataManager,
-  QueryExecutionPayload,
-} from '../dba-query';
-import {
-  executeQueryV2 as executeQueryNew,
-  executeQueryWithoutCommitV2 as executeQueryWithoutCommitNew,
-  commitChanges as commitQueryChangesNew,
 } from '../query';
 import type { Query } from '../dba';
 import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
-
-
-const exprMode = true;
-const executeQuery = exprMode 
-  ? executeQueryNew 
-  : executeQueryOld;
-const executeQueryWithoutCommit = exprMode
-  ? executeQueryWithoutCommitNew
-  : executeQueryWithoutCommitOld;
-const commitQueryChanges: typeof commitQueryChangesOld = exprMode
-  ? (payload, getManager) => commitQueryChangesNew(payload.deltas, getManager).then(() => payload.result) 
-  : commitQueryChangesOld;
 
 /**
  * Mock implementation of IDataManager for testing

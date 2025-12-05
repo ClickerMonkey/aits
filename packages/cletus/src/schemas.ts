@@ -408,6 +408,8 @@ export const DataFileSchema = z.object({
   data: z.array(DataRecordSchema),
 });
 
+export const SelectRecordSchema = z.record(z.string(), DataRecordSchema);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -440,3 +442,4 @@ export type Message = z.infer<typeof MessageSchema>;
 export type ChatMessages = z.infer<typeof ChatMessagesSchema>;
 export type DataRecord = z.infer<typeof DataRecordSchema>;
 export type DataFile = z.infer<typeof DataFileSchema>;
+export type SelectRecord = z.infer<typeof SelectRecordSchema>;

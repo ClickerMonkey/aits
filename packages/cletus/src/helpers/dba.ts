@@ -83,7 +83,7 @@ export type Value =
   { kind: 'binary', left: Value, op: Binary, right: Value } | // +/*-
   { kind: 'unary', unary: Unary, value: Value } |
   { kind: 'aggregate', aggregate: Aggregate, value: Value | '*'} |
-  { kind: 'semanticSimilarity', semanticSimilarity: Table } | // special, returns a number between 1 and -1, 1 being most similar to the users question. expensive but if the user has a question that cant be perfectly represented as a query this can work well against an entire row of a table.
+  { kind: 'semanticSimilarity', table: Table, query: string } | // special, returns a number between 1 and -1, 1 being most similar to the users question. expensive but if the user has a question that cant be perfectly represented as a query this can work well against an entire row of a table.
   { kind: 'case', case: { when: BooleanValue, then: Value }[], else?: Value | null }
 
 export type Sort = { value: Value, dir: 'asc'|'desc' };
@@ -251,7 +251,8 @@ export function createDBASchemas(types: TypeDefinition[]) {
     }).describe('Aggregate operation'),
     z.object({
       kind: z.literal('semanticSimilarity'),
-      semanticSimilarity: TableSchema.describe('Table to compare against using semantic similarity')
+      table: TableSchema.describe('Table to compare against using semantic similarity'),
+      query: z.string().describe('User query to compare for semantic similarity'),
     }).describe('Semantic similarity search'),
     z.object({
       kind: z.literal('case'),

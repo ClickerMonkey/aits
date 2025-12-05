@@ -2,7 +2,7 @@
  * Shared test utilities for DBA query tests
  */
 
-import { IDataManager } from '../dba-query';
+import { IDataManager } from '../query';
 import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
 
 /**

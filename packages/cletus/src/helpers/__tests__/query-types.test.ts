@@ -3,7 +3,7 @@
  * Tests runtime type checking and validation error collection
  */
 
-import { executeQuery, executeQueryWithoutCommit, commitQueryChanges } from '../dba-query';
+import { executeQuery, executeQueryWithoutCommit, commitQueryChanges } from '../query';
 import type { Query } from '../dba';
 import { TestContext } from './test-helpers';
 
