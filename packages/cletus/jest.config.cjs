@@ -15,10 +15,11 @@ module.exports = {
     '^.+\\.m?jsx?$': 'babel-jest'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@aeye|uuid)/)'
+    'node_modules/(?!(@aeye|uuid|file-type)/)'
   ],
   moduleNameMapper: {
-    '^@aeye/(.*)$': '<rootDir>/../$1/src'
+    '^@aeye/(.*)$': '<rootDir>/../$1/src',
+    '^file-type$': '<rootDir>/src/__mocks__/file-type.ts'
   },
   collectCoverageFrom: [
     'src/**/*.ts',
