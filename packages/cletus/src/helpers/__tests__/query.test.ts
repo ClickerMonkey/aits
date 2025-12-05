@@ -1,114 +1,13 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
-import {
-  executeQuery,
-  executeQueryWithoutCommit,
-  commitQueryChanges,
-  canCommitQueryResult,
-  IDataManager,
-} from '../query';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { Query } from '../dba';
-import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
+import {
+  canCommitQueryResult,
+  commitQueryChanges,
+  executeQuery,
+  executeQueryWithoutCommit
+} from '../query';
+import { TestContext } from './test-helpers';
 
-/**
- * Mock implementation of IDataManager for testing
- */
-class MockDataManager implements IDataManager {
-  private data: DataFile;
-  private diskData: DataFile; // Simulates data on disk
-  private loaded: boolean = false;
-
-  constructor(private typeName: string, initialRecords: DataRecord[] = []) {
-    this.diskData = {
-      updated: Date.now(),
-      data: initialRecords,
-    };
-    this.data = {
-      updated: this.diskData.updated,
-      data: [...this.diskData.data], // Copy for in-memory state
-    };
-  }
-
-  async load(): Promise<void> {
-    this.loaded = true;
-    // Reload from "disk" - create a deep copy to simulate fresh load
-    this.data = {
-      updated: this.diskData.updated,
-      data: this.diskData.data.map(r => ({
-        ...r,
-        fields: { ...r.fields },
-      })),
-    };
-  }
-
-  async save(fn: (dataFile: DataFile) => void | Promise<void>): Promise<void> {
-    if (!this.loaded) {
-      throw new Error('Must call load() before save()');
-    }
-    await fn(this.data);
-    this.data.updated = Date.now();
-    // Save to "disk" - persist the changes
-    this.diskData = {
-      updated: this.data.updated,
-      data: this.data.data.map(r => ({
-        ...r,
-        fields: { ...r.fields },
-      })),
-    };
-  }
-
-  getAll(): DataRecord[] {
-    return this.data.data;
-  }
-
-  // Test helper methods
-  addRecord(record: DataRecord): void {
-    this.diskData.data.push(record);
-    this.data.data.push({ ...record, fields: { ...record.fields } });
-  }
-
-  getTypeName(): string {
-    return this.typeName;
-  }
-}
-
-/**
- * Test context for managing types and data managers
- */
-class TestContext {
-  private types: TypeDefinition[] = [];
-  private managers: Map<string, MockDataManager> = new Map();
-
-  addType(type: TypeDefinition): void {
-    this.types.push(type);
-    if (!this.managers.has(type.name)) {
-      this.managers.set(type.name, new MockDataManager(type.name));
-    }
-  }
-
-  getTypes = (): TypeDefinition[] => {
-    return this.types;
-  };
-
-  getManager = (typeName: string): IDataManager => {
-    let manager = this.managers.get(typeName);
-    if (!manager) {
-      manager = new MockDataManager(typeName);
-      this.managers.set(typeName, manager);
-    }
-    return manager;
-  };
-
-  getMockManager(typeName: string): MockDataManager {
-    return this.managers.get(typeName)!;
-  }
-
-  addRecord(typeName: string, record: DataRecord): void {
-    const manager = this.getMockManager(typeName);
-    if (manager) {
-      manager.addRecord(record);
-    }
-  }
-}
 
 describe('executeQuery', () => {
   let ctx: TestContext;
@@ -156,7 +55,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -210,7 +109,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -248,7 +147,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -307,7 +206,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(3);
@@ -359,7 +258,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -402,7 +301,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -462,7 +361,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -548,7 +447,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -580,7 +479,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(1);
@@ -617,7 +516,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -658,7 +557,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(0);
@@ -694,7 +593,7 @@ describe('executeQuery', () => {
       };
 
       // Execute and expect error
-      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed)).rejects.toThrow(
         'Column count (3) != value count (2)'
       );
     });
@@ -737,7 +636,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(1);
@@ -791,7 +690,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -841,7 +740,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(1);
@@ -891,7 +790,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -966,7 +865,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -1037,7 +936,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -1086,7 +985,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -1148,7 +1047,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -1204,7 +1103,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -1262,7 +1161,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -1310,7 +1209,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -1373,7 +1272,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -1457,7 +1356,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Alice (age 30, active true) and Charlie (age 35, active true) match
       expect(result.rows).toHaveLength(2);
@@ -1532,7 +1431,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Bob is in both sets
       expect(result.rows).toHaveLength(1);
@@ -1571,7 +1470,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Alice is in left but not in right
       expect(result.rows).toHaveLength(1);
@@ -1612,7 +1511,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - UNION ALL keeps duplicates
       expect(result.rows).toHaveLength(2);
@@ -1714,7 +1613,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Bob is young and in NYC
       expect(result.rows).toHaveLength(1);
@@ -1824,7 +1723,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Should find all employees in hierarchy
       expect(result.rows.length).toBeGreaterThanOrEqual(1);
@@ -1899,7 +1798,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Alice has total > 100
       expect(result.rows).toHaveLength(1);
@@ -1963,7 +1862,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Alice has more than 1 order
       expect(result.rows).toHaveLength(1);
@@ -2026,7 +1925,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(3);
@@ -2116,7 +2015,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Should include Bob even though he has no orders
       expect(result.rows).toHaveLength(2);
@@ -2152,7 +2051,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Should include order for non-existent user
       expect(result.rows).toHaveLength(2);
@@ -2188,7 +2087,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Should include all users and all orders
       expect(result.rows).toHaveLength(3); // Alice+order, Bob without order, order without user
@@ -2268,7 +2167,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Alice has orders
       expect(result.rows).toHaveLength(1);
@@ -2295,7 +2194,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - Only Alice is in the orders
       expect(result.rows).toHaveLength(1);
@@ -2330,7 +2229,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -2390,7 +2289,7 @@ describe('executeQuery', () => {
         from: { kind: 'table', table: 'products' },
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].avg_price).toBe(20);
     });
@@ -2411,7 +2310,7 @@ describe('executeQuery', () => {
         from: { kind: 'table', table: 'products' },
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].min_price).toBe(10);
     });
@@ -2432,7 +2331,7 @@ describe('executeQuery', () => {
         from: { kind: 'table', table: 'products' },
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].max_price).toBe(30);
     });
@@ -2530,7 +2429,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(3);
@@ -2604,7 +2503,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(1);
@@ -2685,7 +2584,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.affectedCount).toBe(1);
@@ -2783,7 +2682,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(2);
@@ -2826,7 +2725,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - payload should contain the result and deltas
       expect(payload.result.affectedCount).toBe(1);
@@ -2878,7 +2777,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Check if can commit (no changes to underlying data)
       const canCommit = await canCommitQueryResult(payload, ctx.getManager);
@@ -2924,7 +2823,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Small delay to ensure timestamp is different
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -2977,7 +2876,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Commit the payload
       const result = await commitQueryChanges(payload, ctx.getManager);
@@ -3033,7 +2932,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Small delay to ensure timestamp is different
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -3098,7 +2997,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should have deltas for both tables
       expect(payload.deltas.length).toBeGreaterThan(0);
@@ -3147,7 +3046,7 @@ describe('executeQuery', () => {
       };
 
       // Execute without committing
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - result should contain the returned rows
       expect(payload.result.rows).toHaveLength(1);
@@ -3193,7 +3092,7 @@ describe('executeQuery', () => {
       };
 
       // Execute - should throw error
-      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed)).rejects.toThrow(
         "Column 'email' does not exist on type 'users'"
       );
     });
@@ -3233,7 +3132,7 @@ describe('executeQuery', () => {
       };
 
       // Execute - should throw error
-      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed)).rejects.toThrow(
         "Column 'invalidcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
@@ -3271,7 +3170,7 @@ describe('executeQuery', () => {
       };
 
       // Execute - should throw error
-      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed)).rejects.toThrow(
         "Column 'nonexistentcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
@@ -3308,7 +3207,7 @@ describe('executeQuery', () => {
       };
 
       // Execute - should throw error
-      await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
+      await expect(executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed)).rejects.toThrow(
         "Column 'invalidcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
@@ -3360,7 +3259,7 @@ describe('executeQuery', () => {
       };
 
       // Execute - should work because user_data is a CTE, not a table
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]).toEqual({ name: 'Alice', value: 123 });
@@ -3397,7 +3296,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should expand to all columns (id, created, updated, name, age)
       expect(result.rows).toHaveLength(1);
@@ -3439,7 +3338,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -3492,7 +3391,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - only Alice matches
       expect(result.rows).toHaveLength(1);
@@ -3527,7 +3426,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -3597,7 +3496,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should have user columns expanded plus order amount
       expect(result.rows).toHaveLength(1);
@@ -3645,7 +3544,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert
       expect(result.rows).toHaveLength(1);
@@ -3675,7 +3574,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should return all columns of inserted record
       expect(result.rows).toHaveLength(1);
@@ -3723,7 +3622,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should return all columns with updated age
       expect(result.rows).toHaveLength(1);
@@ -3767,7 +3666,7 @@ describe('executeQuery', () => {
       };
 
       // Execute
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result  } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Assert - should return all columns of deleted record
       expect(result.rows).toHaveLength(1);

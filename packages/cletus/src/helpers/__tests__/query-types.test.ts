@@ -3,8 +3,8 @@
  * Tests runtime type checking and validation error collection
  */
 
-import { executeQuery, executeQueryWithoutCommit, commitQueryChanges } from '../query';
 import type { Query } from '../dba';
+import { commitQueryChanges, executeQuery, executeQueryWithoutCommit } from '../query';
 import { TestContext } from './test-helpers';
 
 describe('DBA Query Type Validation', () => {
@@ -51,7 +51,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'products' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -107,7 +107,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should not have validation errors (null is acceptable)
       expect(result.canCommit).toBe(true);
@@ -140,7 +140,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 'twenty-five', 1], // age should be number, active should be boolean
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -187,7 +187,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', null],
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -239,7 +239,7 @@ describe('DBA Query Type Validation', () => {
         },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -282,7 +282,7 @@ describe('DBA Query Type Validation', () => {
         },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -329,7 +329,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 'd1'], // String ID for relationship field
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should succeed - string IDs are valid for relationship fields
       expect(result.canCommit).toBe(true);
@@ -367,7 +367,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 123], // Number instead of string ID
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -417,7 +417,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -486,7 +486,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -530,7 +530,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'orders' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -581,7 +581,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'scores' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -638,7 +638,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'sales' },
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should succeed - nulls are filtered out
       expect(result.canCommit).toBe(true);
@@ -682,7 +682,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -737,7 +737,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should succeed - null comparisons are valid SQL
       expect(result.canCommit).toBe(true);
@@ -789,7 +789,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -833,7 +833,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -866,7 +866,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 'twenty-five'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.validationErrors).toBeDefined();
       const error = payload.result.validationErrors![0];
@@ -914,7 +914,7 @@ describe('DBA Query Type Validation', () => {
         values: [123, 'wrong', 'wrong'], // All wrong types
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -954,7 +954,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 25], // Correct types
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(true);
       expect(payload.result.validationErrors).toBeUndefined();
@@ -984,7 +984,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', 'invalid'], // Wrong type
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1013,7 +1013,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Widget', 'expensive'], // Wrong type for price
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Verify commit throws with validation error message
       await expect(commitQueryChanges(payload, ctx.getManager)).rejects.toThrow(
@@ -1071,7 +1071,7 @@ describe('DBA Query Type Validation', () => {
         groupBy: [{ source: 'items', column: 'name' }],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should have validation error
       expect(payload.result.canCommit).toBe(false);
@@ -1121,7 +1121,7 @@ describe('DBA Query Type Validation', () => {
         from: { kind: 'table', table: 'data' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should have validation error
       expect(payload.result.canCommit).toBe(false);
@@ -1160,7 +1160,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Task 1', 'todo'], // Valid enum value
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -1193,7 +1193,7 @@ describe('DBA Query Type Validation', () => {
         values: ['High', 1], // Number will be converted to string for enum
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -1226,7 +1226,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Task 1', 'completed'], // Invalid enum value
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1277,7 +1277,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1339,7 +1339,7 @@ describe('DBA Query Type Validation', () => {
         },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1377,7 +1377,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Item', null], // Null is OK for optional field
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(result.canCommit).toBe(true);
       expect(result.validationErrors).toBeUndefined();
@@ -1407,7 +1407,7 @@ describe('DBA Query Type Validation', () => {
         values: ['Alice', null, null], // email is required but null
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1445,7 +1445,7 @@ describe('DBA Query Type Validation', () => {
         values: ['config', null], // value has default, so null might be acceptable at this layer
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Field is required=true but has default, so null validation depends on implementation
       // Since required is explicitly true, it should still error
@@ -1498,7 +1498,7 @@ describe('DBA Query Type Validation', () => {
         },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -1542,7 +1542,7 @@ describe('DBA Query Type Validation', () => {
         ],
       };
 
-      const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+      const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should succeed - UPDATE doesn't validate required fields
       expect(result.canCommit).toBe(true);

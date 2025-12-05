@@ -17,8 +17,8 @@
  * - ON DELETE cascade validation
  */
 
-import { executeQuery, executeQueryWithoutCommit, commitQueryChanges } from '../query';
 import type { Query } from '../dba';
+import { commitQueryChanges, executeQueryWithoutCommit } from '../query';
 import { TestContext } from './test-helpers';
 
 describe('DBA Query Validation - Comprehensive', () => {
@@ -51,7 +51,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors).toBeDefined();
@@ -78,7 +78,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(true);
       expect(payload.result.validationErrors).toBeUndefined();
@@ -110,7 +110,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['invalid_status'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Value 'invalid_status' is not a valid option for enum field 'status'");
@@ -142,7 +142,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['pending'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(true);
     });
@@ -176,7 +176,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['My Post', 123], // number instead of string ID
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Foreign key field 'author' expects a string ID, got number");
@@ -202,7 +202,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [42],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign number to string field 'name'");
@@ -226,7 +226,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['not a number'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign string to number field 'price'");
@@ -248,7 +248,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['true'], // string instead of boolean
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign string to boolean field 'enabled'");
@@ -282,7 +282,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'users' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Column 'nonexistent' does not exist on type 'users'");
@@ -330,7 +330,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot perform '+' on number and string");
@@ -369,7 +369,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'numbers' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toBe('Division by zero');
@@ -408,7 +408,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // NULL in binary operations should return NULL, no error
       expect(payload.result.canCommit).toBe(true);
@@ -452,7 +452,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('Unary minus requires a number, got string');
@@ -499,7 +499,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('Cannot compare number with string');
@@ -535,7 +535,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('LIKE operator requires string operands');
@@ -578,7 +578,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('SUM requires numeric values, found string');
@@ -617,7 +617,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('AVG requires numeric values');
@@ -660,7 +660,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('substring requires at least 2');
@@ -697,7 +697,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('abs() argument 1 expects number, got string');
@@ -735,7 +735,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('replace requires 3 arguments');
@@ -772,7 +772,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('nullif requires 2 arguments');
@@ -792,7 +792,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['test'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Table 'nonexistent' does not exist");
@@ -814,7 +814,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['Alice', 'Bob'], // 2 values for 1 column
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('Column count (1) != value count (2)');
@@ -836,7 +836,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['Alice'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Column 'nonexistent' does not exist on table 'users'");
@@ -862,7 +862,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['Widget', 'not a number'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign string to number field 'price'");
@@ -898,7 +898,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign string to number field 'age'");
@@ -917,7 +917,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         set: [{ column: 'name', value: 'test' }],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Table 'nonexistent' does not exist");
@@ -945,7 +945,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         set: [{ column: 'nonexistent', value: 'test' }],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Column 'nonexistent' does not exist on table 'users'");
@@ -974,7 +974,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         set: [{ column: 'price', value: 'not a number' }],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign string to number field 'price'");
@@ -1013,7 +1013,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['My Post', 'nonexistent_user_id'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain('Foreign key violation');
@@ -1054,7 +1054,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['My Post', 'u1'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(true);
     });
@@ -1078,7 +1078,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['Alice', null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot assign null to required field 'email'");
@@ -1108,7 +1108,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['invalid_status'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Value 'invalid_status' is not a valid option");
@@ -1167,7 +1167,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
       expect(payload.result.validationErrors?.[0].message).toContain("Cannot delete users record 'u1': referenced by posts.author");
@@ -1220,7 +1220,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should cascade delete the post
       expect(payload.result.canCommit).toBe(true);
@@ -1274,7 +1274,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         ],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       // Should set author to null
       expect(payload.result.canCommit).toBe(true);
@@ -1303,7 +1303,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.validationErrors?.[0].path).toBeDefined();
       // Path starts with 'query' as the root path
@@ -1326,7 +1326,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['not a number'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.validationErrors?.[0].expectedType).toBe('number');
       expect(payload.result.validationErrors?.[0].actualType).toBe('string');
@@ -1348,7 +1348,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.validationErrors?.[0].suggestion).toBeDefined();
       expect(payload.result.validationErrors?.[0].suggestion).toContain('Provide a non-null value');
@@ -1389,7 +1389,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         from: { kind: 'table', table: 'items' },
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.validationErrors?.[0].metadata).toBeDefined();
       expect(payload.result.validationErrors?.[0].metadata?.operator).toBe('+');
@@ -1417,7 +1417,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: [null],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(false);
 
@@ -1442,7 +1442,7 @@ describe('DBA Query Validation - Comprehensive', () => {
         values: ['Widget'],
       };
 
-      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager);
+      const payload = await executeQueryWithoutCommit(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
       expect(payload.result.canCommit).toBe(true);
       expect(payload.result.validationErrors).toBeUndefined();

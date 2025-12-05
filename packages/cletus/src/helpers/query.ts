@@ -1,32 +1,27 @@
 import { v4 as uuidv4 } from 'uuid';
-import { DataFile, DataRecord, SelectRecord, TypeDefinition, TypeField } from "../schemas";
+import { cosineSimilarity } from '../common';
+import { DataFile, DataRecord, KnowledgeEntry, SelectRecord, TypeDefinition, TypeField } from "../schemas";
 import type {
   Aggregate,
-  BooleanValue as BooleanValueDBA,
   Binary,
+  BooleanValue as BooleanValueDBA,
   Comparison,
   Constant,
-  CTEStatement,
   DataSource as DataSourceDBA,
   Delete as DeleteDBA,
   Function as FunctionType,
-  FunctionCall as FunctionCallType,
   Insert as InsertDBA,
   Join as JoinDBA,
   Query,
   Select as SelectDBA,
-  SelectOrSet,
   SetOperation as SetOperationDBA,
   Sort as SortDBA,
   SourceColumn as SourceColumnDBA,
   Statement,
   Unary,
   Update as UpdateDBA,
-  Value as ValueDBA,
-  WindowValue as WindowValueType,
-  WithStatement,
+  Value as ValueDBA
 } from "./dba";
-import { create } from 'handlebars';
 
 /**
  * Validation error collected during query execution
@@ -74,6 +69,8 @@ export interface QueryResult {
   deleted?: QueryResultType[];
   /** Validation errors collected during execution */
   validationErrors?: QueryValidationError[];
+  /** Tables referenced */
+  tables: string[];
   /** Whether the query can be committed (false if validation errors exist) */
   canCommit: boolean;
 }
@@ -343,6 +340,12 @@ export interface QueryContext {
   validationErrors: QueryValidationError[];
   /** Map of table name -> column name -> field type for validation */
   fieldTypes: Map<string, Map<string, string>>;
+  /** Embedding for semantic search */
+  embedder: (text: string) => Promise<number[]>;
+  /** Cached Embeddings */
+  embeddingCache: Map<string, number[]>;
+  /** Function to get embedding for a record */
+  getRecordEmbedding: (table: string, id: string) => Promise<number[] | null>;
 }
 
 /**
@@ -1287,7 +1290,20 @@ export class SemanticSimilarityExpr extends Expr {
     ctx: QueryContext,
     groupRecords?: SelectRecord[]
   ): Promise<Value> {
-    // TODO: Implement semantic similarity with embeddings
+    let vector = ctx.embeddingCache.get(this.query);
+    if (!vector) {
+      vector = await ctx.embedder(this.query);
+      ctx.embeddingCache.set(this.query, vector);
+    }
+
+    const id = record?.[this.table]?.id;
+    if (id) {
+      const embedding = await ctx.getRecordEmbedding(this.table, id);
+      if (embedding) {
+        return new Value(cosineSimilarity(vector, embedding));
+      }
+    }
+
     return new Value(0);
   }
 
@@ -2116,7 +2132,7 @@ export class SelectExpr extends Expr {
       rows = rows.slice(0, this.limit);
     }
 
-    return { rows, canCommit: true };
+    return { rows, canCommit: true, tables: [] };
   }
 
   private async groupRecords(
@@ -2255,7 +2271,7 @@ export class InsertExpr extends Expr {
         message: `Table '${tableName}' does not exist`,
         suggestion: 'Check table name spelling'
       });
-      return { rows: [], canCommit: false };
+      return { rows: [], canCommit: false, tables: [] };
     }
 
     const state = await getTableState(this.table, ctx);
@@ -2269,7 +2285,7 @@ export class InsertExpr extends Expr {
         message: `Column count (${this.columns.length}) != value count (${this.values.length})`,
         metadata: { columns: this.columns, valueCount: this.values.length }
       });
-      return { rows: [], canCommit: false };
+      return { rows: [], canCommit: false, tables: [] };
     }
 
     // Get values to insert
@@ -2416,6 +2432,7 @@ export class InsertExpr extends Expr {
       affectedCount: insertResult.ids.length,
       inserted: insertResult.ids.length ? [insertResult] : undefined,
       canCommit: true,
+      tables: [],
     };
   }
 
@@ -2480,7 +2497,7 @@ export class UpdateExpr extends Expr {
         message: `Table '${tableName}' does not exist`,
         suggestion: 'Check table name spelling'
       });
-      return { rows: [], canCommit: false };
+      return { rows: [], canCommit: false, tables: [] };
     }
 
     const state = await getTableState(this.table, ctx);
@@ -2596,6 +2613,7 @@ export class UpdateExpr extends Expr {
       affectedCount: updateResult.ids.length,
       updated: updateResult.ids.length ? [updateResult] : undefined,
       canCommit: true,
+      tables: [],
     };
   }
 
@@ -2717,6 +2735,7 @@ export class DeleteExpr extends Expr {
       affectedCount: deleteResult.ids.length,
       deleted: deleteResult.ids.length ? [deleteResult] : undefined,
       canCommit: true,
+      tables: [],
     };
   }
 
@@ -2804,7 +2823,7 @@ export class SetOperationExpr extends Expr {
       });
     }
 
-    return { rows, canCommit: true };
+    return { rows, canCommit: true, tables: [] };
   }
 
   protected walkChildren(visitor: (expr: Expr) => boolean | void): void {
@@ -3323,7 +3342,9 @@ export function createQueryExpr(query: Query, path: string = 'query'): SelectExp
  */
 export function createQueryContext(
   getTypes: () => TypeDefinition[],
-  getManager: (typeName: string) => IDataManager
+  getManager: (typeName: string) => IDataManager,
+  getKnowledge: () => Promise<KnowledgeEntry[]>,
+  embed: (text: string) => Promise<number[]>
 ): QueryContext {
   const types = getTypes();
   const typeMap = new Map<string, TypeDefinition>();
@@ -3346,6 +3367,9 @@ export function createQueryContext(
     fieldTypesMap.set(normalizedName, fields);
   }
 
+  let knowledge: KnowledgeEntry[] = [];
+  let knowledgeLoading: Promise<void> | null = null;
+
   return {
     types: typeMap,
     aliases: new Map(),
@@ -3355,7 +3379,22 @@ export function createQueryContext(
     validationErrors: [],
     fieldTypes: fieldTypesMap,
     getTypes,
-    getManager
+    getManager,
+    embeddingCache: new Map(),
+    embedder: embed,
+    getRecordEmbedding: async (table, id) => {
+      if (!knowledgeLoading) {
+        knowledgeLoading = (async () => {
+          knowledge = await getKnowledge();
+        })();
+      }
+      await knowledgeLoading;
+      
+      const sourceKey = `${table}:${id}`;
+
+      const recordKnowledge = knowledge.find(k => k.source === sourceKey);
+      return recordKnowledge?.vector || null;
+    },
   };
 }
 
@@ -3611,9 +3650,12 @@ export async function validateReferenceIntegrity(ctx: QueryContext): Promise<voi
 export async function executeQuery(
   query: Query,
   getTypes: () => TypeDefinition[],
-  getManager: (typeName: string) => IDataManager
-): Promise<QueryResult> {
-  const { result, deltas } = await executeQueryWithoutCommit(query, getTypes, getManager);
+  getManager: (typeName: string) => IDataManager,
+  getKnowledge: () => Promise<KnowledgeEntry[]>,
+  embed: (text: string) => Promise<number[]>
+): Promise<QueryExecutionPayload> {
+  const payload = await executeQueryWithoutCommit(query, getTypes, getManager, getKnowledge, embed);
+  const { result, deltas } = payload;
 
   // Throw on validation errors to match old behavior
   if (result.validationErrors && result.validationErrors.length > 0) {
@@ -3626,7 +3668,7 @@ export async function executeQuery(
     await commitChanges(deltas, getManager);
   }
 
-  return result;
+  return payload;
 }
 
 /**
@@ -3635,13 +3677,15 @@ export async function executeQuery(
 export async function executeQueryWithoutCommit(
   query: Query,
   getTypes: () => TypeDefinition[],
-  getManager: (typeName: string) => IDataManager
+  getManager: (typeName: string) => IDataManager,
+  getKnowledge: () => Promise<KnowledgeEntry[]>,
+  embed: (text: string) => Promise<number[]>
 ): Promise<QueryExecutionPayload> {
   // 1. Convert to class instances
   const queryExpr = createQueryExpr(query);
 
   // 2. Build context
-  const ctx = createQueryContext(getTypes, getManager);
+  const ctx = createQueryContext(getTypes, getManager, getKnowledge, embed);
 
   // 3. Phase 1: Type resolution
   // 4. Collect and pre-load tables using walk pattern
@@ -3663,6 +3707,7 @@ export async function executeQueryWithoutCommit(
   const deltas = extractTableDeltas(ctx);  
   result.validationErrors = ctx.validationErrors.length > 0 ? ctx.validationErrors : undefined;
   result.canCommit = ctx.validationErrors.length === 0;
+  result.tables = Array.from(tables);
 
   return {
     result,

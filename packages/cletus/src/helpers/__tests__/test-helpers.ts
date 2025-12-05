@@ -3,7 +3,7 @@
  */
 
 import { IDataManager } from '../query';
-import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
+import { DataRecord, DataFile, TypeDefinition, KnowledgeEntry } from '../../schemas';
 
 /**
  * Mock implementation of IDataManager for testing
@@ -103,5 +103,13 @@ export class TestContext {
     if (manager) {
       manager.addRecord(record);
     }
+  }
+  
+  async embed (text: string): Promise<number[]>{
+    return [0];
+  }
+
+  async getKnowledge(): Promise<KnowledgeEntry[]> {
+    return [];
   }
 }

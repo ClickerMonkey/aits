@@ -15,8 +15,19 @@ import { buildFieldsSchema, getType, getTypeName } from "../helpers/type";
 import { KnowledgeFile } from "../knowledge";
 import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
-import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/dba-query';
+import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/query';
 import type { Query } from '../helpers/dba';
+
+
+const getKnowledge = async () => {
+  const knowledgeFile = new KnowledgeFile();
+  await knowledgeFile.load();
+  return knowledgeFile.getData().knowledge;
+};
+
+const embedQuery = (text: string) => embed([text]).then(vectors => vectors?.[0] || []);
+
+const getManager = (typeName: string) => new DataManager(typeName);
 
 export const data_index = operationOf<
   { type: string },
@@ -524,95 +535,9 @@ function describeQuery(query: Query): string {
   return '';
 }
 
-/**
- * Collect all table names referenced in a query
- */
-function collectReferencedTables(query: Query, tables: Set<string>): void {
-  if (!query || typeof query !== 'object') return;
-  
-  if ('kind' in query) {
-    switch (query.kind) {
-      case 'select':
-        if (query.from?.kind === 'table') {
-          tables.add(query.from.table);
-        } else if (query.from?.kind === 'subquery') {
-          collectReferencedTables(query.from.subquery, tables);
-        }
-        if (query.joins) {
-          for (const join of query.joins) {
-            if (join.source.kind === 'table') {
-              tables.add(join.source.table);
-            } else if (join.source.kind === 'subquery') {
-              collectReferencedTables(join.source.subquery, tables);
-            }
-          }
-        }
-        break;
-        
-      case 'insert':
-        tables.add(query.table);
-        if (query.select) {
-          collectReferencedTables(query.select, tables);
-        }
-        break;
-        
-      case 'update':
-        tables.add(query.table);
-        if (query.from?.kind === 'table') {
-          tables.add(query.from.table);
-        } else if (query.from?.kind === 'subquery') {
-          collectReferencedTables(query.from.subquery, tables);
-        }
-        if (query.joins) {
-          for (const join of query.joins) {
-            if (join.source.kind === 'table') {
-              tables.add(join.source.table);
-            } else if (join.source.kind === 'subquery') {
-              collectReferencedTables(join.source.subquery, tables);
-            }
-          }
-        }
-        break;
-        
-      case 'delete':
-        tables.add(query.table);
-        if (query.joins) {
-          for (const join of query.joins) {
-            if (join.source.kind === 'table') {
-              tables.add(join.source.table);
-            } else if (join.source.kind === 'subquery') {
-              collectReferencedTables(join.source.subquery, tables);
-            }
-          }
-        }
-        break;
-        
-      case 'union':
-      case 'intersect':
-      case 'except':
-        collectReferencedTables(query.left, tables);
-        collectReferencedTables(query.right, tables);
-        break;
-        
-      case 'withs':
-        for (const withStmt of query.withs) {
-          if (withStmt.kind === 'cte') {
-            collectReferencedTables(withStmt.statement, tables);
-          } else if (withStmt.kind === 'cte-recursive') {
-            collectReferencedTables(withStmt.statement, tables);
-            collectReferencedTables(withStmt.recursiveStatement, tables);
-          }
-        }
-        collectReferencedTables(query.final, tables);
-        break;
-    }
-  }
-}
-
 export interface QueryOperationCache {
   payload?: QueryExecutionPayload;
   canCommit?: CanCommitResult;
-  referencedTables?: string[];
 }
 
 export const query = operationOf<
@@ -629,21 +554,6 @@ export const query = operationOf<
   analyze: async ({ input: { query: queryInput } }, { config }) => {
     const types = config.getData().types;
 
-    // Validate that referenced tables exist
-    const referencedTables = new Set<string>();
-    collectReferencedTables(queryInput, referencedTables);
-
-    const missingTables = Array.from(referencedTables).filter(
-      table => !types.some(t => t.name === table)
-    );
-
-    if (missingTables.length > 0) {
-      return {
-        analysis: `This would fail - referenced tables not found: ${missingTables.join(', ')}`,
-        doable: false,
-      };
-    }
-
     const kind = getQueryKind(queryInput);
     const description = describeQuery(queryInput);
 
@@ -651,9 +561,11 @@ export const query = operationOf<
     const payload = await executeQueryWithoutCommit(
       queryInput,
       () => config.getData().types,
-      (typeName: string) => new DataManager(typeName)
+      getManager,
+      getKnowledge,
+      embedQuery,
     );
-
+    
     // Describe what the query would do based on the results
     const result = payload.result;
 
@@ -666,7 +578,7 @@ export const query = operationOf<
       return {
         analysis: `This would fail due to validation errors:\n${errorSummary}`,
         doable: false,
-        cache: { payload, referencedTables: Array.from(referencedTables) },
+        cache: { payload },
       };
     }
 
@@ -696,7 +608,7 @@ export const query = operationOf<
     return {
       analysis: detailedAnalysis,
       doable: result.canCommit,
-      cache: { payload, referencedTables: Array.from(referencedTables) },
+      cache: { payload },
       ...(result.affectedCount === 0 ? {
         done: true,
         output: result
@@ -727,10 +639,12 @@ export const query = operationOf<
         const newCache = { ...cache, canCommit: canCommitResult };
         // Try to re-execute the query
         try {
-          const output = await executeQuery(
+          const { result: output } = await executeQuery(
             queryInput,
             () => config.getData().types,
-            getManager
+            getManager,
+            getKnowledge,
+            embedQuery,
           );
           
           // Update knowledge base for affected records
@@ -749,38 +663,34 @@ export const query = operationOf<
 
     // Execute the query fresh
     if (commit) {
-      const output = await executeQuery(
+      const payload = await executeQuery(
         queryInput,
         () => config.getData().types,
-        getManager
+        getManager,
+        getKnowledge,
+        embedQuery,
       );
       
       // Update knowledge base for affected records
-      await updateKnowledgeFromQueryResult(ctx, output);
-      
-      // Get referenced tables for cache
-      const referencedTables = new Set<string>();
-      collectReferencedTables(queryInput, referencedTables);
+      await updateKnowledgeFromQueryResult(ctx, payload.result);
       
       return {
-        output,
-        cache: { referencedTables: Array.from(referencedTables) },
+        output: payload.result,
+        cache: { payload },
       };
     } else {
       // Execute without committing (for testing)
       const payload = await executeQueryWithoutCommit(
         queryInput,
         () => config.getData().types,
-        getManager
+        getManager,
+        getKnowledge,
+        embedQuery,
       );
-      
-      // Get referenced tables for cache
-      const referencedTables = new Set<string>();
-      collectReferencedTables(queryInput, referencedTables);
       
       return {
         output: payload.result,
-        cache: { payload, referencedTables: Array.from(referencedTables) },
+        cache: { payload },
       };
     }
   },
@@ -789,7 +699,7 @@ export const query = operationOf<
     const description = describeQuery(op.input.query);
     
     // Determine render name based on referenced tables
-    const referencedTables = op.cache?.referencedTables || [];
+    const referencedTables = op.cache?.payload?.result?.tables || [];
     let renderName: string;
     if (referencedTables.length === 1) {
       // Single table - use typeName format

@@ -1,104 +1,8 @@
 import { executeQuery, IDataManager } from '../query';
 import type { Query } from '../dba';
-import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
+import { DataRecord, DataFile, TypeDefinition, KnowledgeEntry } from '../../schemas';
+import { TestContext } from './test-helpers';
 
-/**
- * Mock implementation of IDataManager for testing
- */
-class MockDataManager implements IDataManager {
-  private data: DataFile;
-  private diskData: DataFile; // Simulates data on disk
-  private loaded: boolean = false;
-
-  constructor(private typeName: string, initialRecords: DataRecord[] = []) {
-    this.diskData = {
-      updated: Date.now(),
-      data: initialRecords,
-    };
-    this.data = {
-      updated: this.diskData.updated,
-      data: [...this.diskData.data], // Copy for in-memory state
-    };
-  }
-
-  async load(): Promise<void> {
-    this.loaded = true;
-    // Reload from "disk" - create a deep copy to simulate fresh load
-    this.data = {
-      updated: this.diskData.updated,
-      data: this.diskData.data.map(r => ({
-        ...r,
-        fields: { ...r.fields },
-      })),
-    };
-  }
-
-  async save(fn: (dataFile: DataFile) => void | Promise<void>): Promise<void> {
-    if (!this.loaded) {
-      throw new Error('Must call load() before save()');
-    }
-    await fn(this.data);
-    this.data.updated = Date.now();
-    // Save to "disk" - persist the changes
-    this.diskData = {
-      updated: this.data.updated,
-      data: this.data.data.map(r => ({
-        ...r,
-        fields: { ...r.fields },
-      })),
-    };
-  }
-
-  getAll(): DataRecord[] {
-    return this.data.data;
-  }
-
-  // Test helper methods
-  addRecord(record: DataRecord): void {
-    this.diskData.data.push(record);
-    this.data.data.push({ ...record, fields: { ...record.fields } });
-  }
-
-  getTypeName(): string {
-    return this.typeName;
-  }
-}
-
-class TestContext {
-  private types: TypeDefinition[] = [];
-  private managers: Map<string, MockDataManager> = new Map();
-
-  addType(type: TypeDefinition): void {
-    this.types.push(type);
-    if (!this.managers.has(type.name)) {
-      this.managers.set(type.name, new MockDataManager(type.name));
-    }
-  }
-
-  getTypes = (): TypeDefinition[] => {
-    return this.types;
-  };
-
-  getManager = (typeName: string): IDataManager => {
-    let manager = this.managers.get(typeName);
-    if (!manager) {
-      manager = new MockDataManager(typeName);
-      this.managers.set(typeName, manager);
-    }
-    return manager;
-  };
-
-  getMockManager(typeName: string): MockDataManager {
-    return this.managers.get(typeName)!;
-  }
-
-  addRecord(typeName: string, record: DataRecord): void {
-    const manager = this.getMockManager(typeName);
-    if (manager) {
-      manager.addRecord(record);
-    }
-  }
-}
 
 describe('executeQuery - JOIN column collision handling', () => {
   let ctx: TestContext;
@@ -184,7 +88,7 @@ describe('executeQuery - JOIN column collision handling', () => {
     };
 
     // Execute
-    const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+    const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
     // Assert - Both tables' id, created, updated should be preserved
     expect(result.rows).toHaveLength(1);
@@ -285,7 +189,7 @@ describe('executeQuery - JOIN column collision handling', () => {
     };
 
     // Execute
-    const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+    const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
     // Assert - Should have 2 rows (one project joined with 2 tasks)
     expect(result.rows).toHaveLength(2);
@@ -410,7 +314,7 @@ describe('executeQuery - JOIN column collision handling', () => {
     };
 
     // Execute
-    const result = await executeQuery(query, ctx.getTypes, ctx.getManager);
+    const { result } = await executeQuery(query, ctx.getTypes, ctx.getManager, ctx.getKnowledge, ctx.embed);
 
     // Assert - All three 'name' fields should be distinct
     expect(result.rows).toHaveLength(1);
