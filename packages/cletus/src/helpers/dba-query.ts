@@ -136,7 +136,7 @@ export interface TableDelta {
   /** Records to insert (temp ID -> field values) */
   inserts: Array<{ tempId: string; fields: Record<string, unknown> }>;
   /** Records to update (real ID -> field values to update) */
-  updates: Array<{ id: string; fields: Record<string, unknown> }>;
+  updates: Array<Omit<DataRecord, 'created' | 'updated'>>;
   /** Record IDs to delete */
   deletes: string[];
 }

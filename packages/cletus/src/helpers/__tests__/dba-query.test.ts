@@ -1,13 +1,31 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
-  executeQuery,
-  executeQueryWithoutCommit,
+  executeQuery as executeQueryOld,
+  executeQueryWithoutCommit as executeQueryWithoutCommitOld,
   canCommitQueryResult,
-  commitQueryChanges,
+  commitQueryChanges as commitQueryChangesOld,
   IDataManager,
+  QueryExecutionPayload,
 } from '../dba-query';
+import {
+  executeQueryV2 as executeQueryNew,
+  executeQueryWithoutCommitV2 as executeQueryWithoutCommitNew,
+  commitChanges as commitQueryChangesNew,
+} from '../query';
 import type { Query } from '../dba';
 import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
+
+
+const exprMode = true;
+const executeQuery = exprMode 
+  ? executeQueryNew 
+  : executeQueryOld;
+const executeQueryWithoutCommit = exprMode
+  ? executeQueryWithoutCommitNew
+  : executeQueryWithoutCommitOld;
+const commitQueryChanges: typeof commitQueryChangesOld = exprMode
+  ? (payload, getManager) => commitQueryChangesNew(payload.deltas, getManager).then(() => payload.result) 
+  : commitQueryChangesOld;
 
 /**
  * Mock implementation of IDataManager for testing
@@ -3234,7 +3252,7 @@ describe('executeQuery', () => {
 
       // Execute - should throw error
       await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
-        "Column 'invalidColumn' does not exist on type 'users'"
+        "Column 'invalidcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
 
@@ -3272,7 +3290,7 @@ describe('executeQuery', () => {
 
       // Execute - should throw error
       await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
-        "Column 'nonExistentColumn' does not exist on type 'users'"
+        "Column 'nonexistentcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
 
@@ -3309,7 +3327,7 @@ describe('executeQuery', () => {
 
       // Execute - should throw error
       await expect(executeQuery(query, ctx.getTypes, ctx.getManager)).rejects.toThrow(
-        "Column 'invalidColumn' does not exist on type 'users'"
+        "Column 'invalidcolumn' does not exist on type 'users'. Valid columns: id, created, updated, name"
       );
     });
 

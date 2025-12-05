@@ -32,6 +32,13 @@ export class ToolRegistry {
    */
   register(toolset: string, tool: AnyTool, instructions: string): void {
     const name = tool.name;
+
+    const existing = this.tools.get(name);
+    if (existing && existing.instructions === instructions) {
+      // Tool already registered with same instructions, skip
+      return;
+    }
+
     this.tools.set(name, {
       name,
       toolset,
