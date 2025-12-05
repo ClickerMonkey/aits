@@ -1,5 +1,5 @@
-import { Query, IDataManager } from '../dba';
-import { executeQueryV2 as executeQuery } from '../query';
+import { executeQuery, IDataManager } from '../query';
+import type { Query } from '../dba';
 import { DataRecord, DataFile, TypeDefinition } from '../../schemas';
 
 /**
