@@ -1,6 +1,7 @@
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { getModelCachePath } from './file-manager';
 import { logger } from './logger';
 
@@ -36,7 +37,10 @@ function getWorkerPath(): string {
 function createWorker(): Worker {
     const workerPath = getWorkerPath();
     const cacheDir = getModelCachePath();
-    
+
+    // Ensure cache directory exists before initializing worker
+    fs.mkdirSync(cacheDir, { recursive: true });
+
     const newWorker = new Worker(workerPath, {
         workerData: { cacheDir },
     });
