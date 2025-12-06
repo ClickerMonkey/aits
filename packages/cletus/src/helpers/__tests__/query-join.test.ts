@@ -70,11 +70,11 @@ describe('executeQuery - JOIN column collision handling', () => {
         { alias: 'department_created', value: { source: 'd', column: 'created' } },
         { alias: 'department_updated', value: { source: 'd', column: 'updated' } },
       ],
-      from: { kind: 'table', table: 'employees', as: 'e' },
+      from: { kind: 'aliased', table: 'employees', as: 'e' },
       joins: [
         {
           type: 'inner',
-          source: { kind: 'table', table: 'departments', as: 'd' },
+          source: { kind: 'aliased', table: 'departments', as: 'd' },
           on: [
             {
               kind: 'comparison',
@@ -171,11 +171,11 @@ describe('executeQuery - JOIN column collision handling', () => {
         { alias: 'task_name', value: { source: 't', column: 'name' } },
         { alias: 'task_status', value: { source: 't', column: 'status' } },
       ],
-      from: { kind: 'table', table: 'projects', as: 'p' },
+      from: { kind: 'aliased', table: 'projects', as: 'p' },
       joins: [
         {
           type: 'inner',
-          source: { kind: 'table', table: 'tasks', as: 't' },
+          source: { kind: 'aliased', table: 'tasks', as: 't' },
           on: [
             {
               kind: 'comparison',
@@ -284,11 +284,11 @@ describe('executeQuery - JOIN column collision handling', () => {
         { alias: 'book_name', value: { source: 'b', column: 'name' } },
         { alias: 'publisher_name', value: { source: 'p', column: 'name' } },
       ],
-      from: { kind: 'table', table: 'books', as: 'b' },
+      from: { kind: 'aliased', table: 'books', as: 'b' },
       joins: [
         {
           type: 'inner',
-          source: { kind: 'table', table: 'authors', as: 'a' },
+          source: { kind: 'aliased', table: 'authors', as: 'a' },
           on: [
             {
               kind: 'comparison',
@@ -300,7 +300,7 @@ describe('executeQuery - JOIN column collision handling', () => {
         },
         {
           type: 'inner',
-          source: { kind: 'table', table: 'publishers', as: 'p' },
+          source: { kind: 'aliased', table: 'publishers', as: 'p' },
           on: [
             {
               kind: 'comparison',
@@ -410,11 +410,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -498,11 +498,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'warehouse', value: { source: 'i', column: 'warehouse' } },
           { alias: 'quantity', value: { source: 'i', column: 'quantity' } },
         ],
-        from: { kind: 'table', table: 'inventory', as: 'i' },
+        from: { kind: 'aliased', table: 'inventory', as: 'i' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'shipments', as: 's' },
+            source: { kind: 'aliased', table: 'shipments', as: 's' },
             on: [
               {
                 kind: 'comparison',
@@ -544,11 +544,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -587,11 +587,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -627,11 +627,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'customer_name', value: { source: 'c', column: 'name' } },
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -666,11 +666,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'customer_name', value: { source: 'c', column: 'name' } },
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -707,11 +707,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'right',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -745,11 +745,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'right',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -789,11 +789,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'full',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -831,11 +831,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'customer_name', value: { source: 'c', column: 'name' } },
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'full',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -895,11 +895,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
             },
           },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -941,11 +941,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
             },
           },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -1041,11 +1041,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'quantity', value: { source: 'oi', column: 'quantity' } },
           { alias: 'price', value: { source: 'p', column: 'price' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -1057,7 +1057,7 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           },
           {
             type: 'inner',
-            source: { kind: 'table', table: 'order_items', as: 'oi' },
+            source: { kind: 'aliased', table: 'order_items', as: 'oi' },
             on: [
               {
                 kind: 'comparison',
@@ -1069,7 +1069,7 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           },
           {
             type: 'inner',
-            source: { kind: 'table', table: 'products', as: 'p' },
+            source: { kind: 'aliased', table: 'products', as: 'p' },
             on: [
               {
                 kind: 'comparison',
@@ -1111,11 +1111,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'order_number', value: { source: 'o', column: 'order_number' } },
           { alias: 'product_name', value: { source: 'p', column: 'name' } },
         ],
-        from: { kind: 'table', table: 'customers', as: 'c' },
+        from: { kind: 'aliased', table: 'customers', as: 'c' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -1127,7 +1127,7 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           },
           {
             type: 'left',
-            source: { kind: 'table', table: 'order_items', as: 'oi' },
+            source: { kind: 'aliased', table: 'order_items', as: 'oi' },
             on: [
               {
                 kind: 'comparison',
@@ -1139,7 +1139,7 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           },
           {
             type: 'inner',
-            source: { kind: 'table', table: 'products', as: 'p' },
+            source: { kind: 'aliased', table: 'products', as: 'p' },
             on: [
               {
                 kind: 'comparison',
@@ -1204,11 +1204,11 @@ describe('executeQuery - Comprehensive JOIN tests', () => {
           { alias: 'employee_name', value: { source: 'e', column: 'name' } },
           { alias: 'manager_name', value: { source: 'm', column: 'name' } },
         ],
-        from: { kind: 'table', table: 'employees', as: 'e' },
+        from: { kind: 'aliased', table: 'employees', as: 'e' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'employees', as: 'm' },
+            source: { kind: 'aliased', table: 'employees', as: 'm' },
             on: [
               {
                 kind: 'comparison',

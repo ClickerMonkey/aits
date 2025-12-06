@@ -91,7 +91,10 @@ export type Sort = { value: Value, dir: 'asc'|'desc' };
 export type DataSource =  {
   kind: 'table';
   table: Table;
-  as?: string | null;
+} | {
+  kind: 'aliased';
+  table: Table;
+  as: string;
 } | {
   kind: 'subquery';
   subquery: SelectOrSet;
@@ -342,12 +345,16 @@ export function createDBASchemas(types: TypeDefinition[]) {
     z.object({
       kind: z.literal('table'),
       table: TableSchema.describe('Table name'),
-      as: z.string().nullable().optional().describe('Table alias - should only be specified when it needs be disambiguated from another source of the same name'),
     }).describe('Table data source'),
+    z.object({
+      kind: z.literal('aliased'),
+      table: TableSchema.describe('Table name'),
+      as: z.string().describe('Alias'),
+    }).describe('Table data source when an alias is required'),
     z.object({
       kind: z.literal('subquery'),
       subquery: SelectOrSetSchema.describe('Subquery'),
-      as: z.string().describe('Subquery alias (required)'),
+      as: z.string().describe('Alias'),
     }).describe('Subquery data source')
   ])).meta({ aid: 'DataSource' }).describe('Data source for FROM clause');
 

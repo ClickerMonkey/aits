@@ -15,6 +15,9 @@
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "profile": "node --inspect dist/index.js",
+    "profile:break": "node --inspect-brk dist/index.js",
+    "profile:cpu": "node --cpu-prof dist/index.js",
     "prepublishOnly": "npm run build",
     "postinstall": "echo '\nCletus installed! Run \"cletus\" to start.\nFor first-time setup, you will need API keys for AI providers.\nSee: https://github.com/ClickerMonkey/aeye#readme\n'"
   },

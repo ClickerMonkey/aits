@@ -429,11 +429,11 @@ describe('executeQuery', () => {
           { alias: 'name', value: { source: 'u', column: 'name' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -1697,11 +1697,11 @@ describe('executeQuery', () => {
                 { alias: 'id', value: { source: 'e', column: 'id' } },
                 { alias: 'name', value: { source: 'e', column: 'name' } },
               ],
-              from: { kind: 'table', table: 'employees', as: 'e' },
+              from: { kind: 'aliased', table: 'employees', as: 'e' },
               joins: [
                 {
                   type: 'inner',
-                  source: { kind: 'table', table: 'reports', as: 'r' },
+                  source: { kind: 'aliased', table: 'reports', as: 'r' },
                   on: [
                     {
                       kind: 'comparison',
@@ -1997,11 +1997,11 @@ describe('executeQuery', () => {
           { alias: 'name', value: { source: 'u', column: 'name' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         joins: [
           {
             type: 'left',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -2033,11 +2033,11 @@ describe('executeQuery', () => {
           { alias: 'name', value: { source: 'u', column: 'name' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         joins: [
           {
             type: 'right',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -2069,11 +2069,11 @@ describe('executeQuery', () => {
           { alias: 'name', value: { source: 'u', column: 'name' } },
           { alias: 'amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         joins: [
           {
             type: 'full',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',
@@ -2144,7 +2144,7 @@ describe('executeQuery', () => {
       const query: Query = {
         kind: 'select',
         values: [{ alias: 'name', value: { source: 'u', column: 'name' } }],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         where: [
           {
             kind: 'exists',
@@ -2411,11 +2411,11 @@ describe('executeQuery', () => {
           { alias: 'industry', value: { source: 'c', column: 'industry' } },
           { alias: 'salary', value: { source: 'e', column: 'salary' } },
         ],
-        from: { kind: 'table', table: 'employees', as: 'e' },
+        from: { kind: 'aliased', table: 'employees', as: 'e' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'companies', as: 'c' },
+            source: { kind: 'aliased', table: 'companies', as: 'c' },
             on: [
               {
                 kind: 'comparison',
@@ -3422,7 +3422,7 @@ describe('executeQuery', () => {
       const query: Query = {
         kind: 'select',
         values: [{ alias: 'all', value: { source: 'u', column: '*' } }],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
       };
 
       // Execute
@@ -3478,11 +3478,11 @@ describe('executeQuery', () => {
           { alias: 'user_all', value: { source: 'u', column: '*' } },
           { alias: 'order_amount', value: { source: 'o', column: 'amount' } },
         ],
-        from: { kind: 'table', table: 'users', as: 'u' },
+        from: { kind: 'aliased', table: 'users', as: 'u' },
         joins: [
           {
             type: 'inner',
-            source: { kind: 'table', table: 'orders', as: 'o' },
+            source: { kind: 'aliased', table: 'orders', as: 'o' },
             on: [
               {
                 kind: 'comparison',

@@ -43,3 +43,6 @@ coverage/
 *.tmp
 .cache/
 .claude/
+
+# Profiling
+*.cpuprofile

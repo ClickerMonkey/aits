@@ -185,7 +185,7 @@ describe('Query Sorting and Grouping', () => {
           { alias: 'name', value: { source: 'e', column: 'name' } },
           { alias: 'salary', value: { source: 'e', column: 'salary' } },
         ],
-        from: { kind: 'table', table: 'employees', as: 'e' },
+        from: { kind: 'aliased', table: 'employees', as: 'e' },
         orderBy: [{ value: { source: 'e', column: 'salary' }, dir: 'desc' }],
       };
 

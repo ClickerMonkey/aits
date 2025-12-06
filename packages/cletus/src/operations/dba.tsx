@@ -624,10 +624,10 @@ export const query = operationOf<
       if (canCommitResult.canCommit) {
         // Commit the cached payload
         const output = await commitQueryChanges(cache.payload, getManager);
-        
+
         // Update knowledge base for affected records
         await updateKnowledgeFromQueryResult(ctx, output);
-        
+
         return {
           output,
           cache: { ...cache, canCommit: canCommitResult },

@@ -667,7 +667,7 @@ describe('DELETE queries', () => {
         as: 'u',
         joins: [
           {
-            source: { kind: 'table', table: 'departments', as: 'd' },
+            source: { kind: 'aliased', table: 'departments', as: 'd' },
             type: 'inner',
             on: [
               {

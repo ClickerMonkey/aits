@@ -3275,9 +3275,15 @@ function createDataSourceExpr(source: DataSourceDBA, path: string): DataSourceEx
     return new DataSourceExpr(
       path,
       'table',
+      source.table.toLowerCase()
+    );
+  } else if (source.kind === 'aliased') {
+    return new DataSourceExpr(
+      path,
+      'table',
       source.table.toLowerCase(),
       undefined,
-      source.as?.toLowerCase()
+      source.as.toLowerCase()
     );
   } else {
     // Subquery
@@ -3592,6 +3598,9 @@ export async function commitChanges(
   for (const delta of deltas) {
     const manager = getManager(delta.tableName);
 
+    // Load the current state to synchronize lastUpdated timestamp
+    await manager.load();
+
     // Apply all changes in a single save operation
     await manager.save((dataFile) => {
       const now = Date.now();
@@ -3804,6 +3813,137 @@ export async function executeQuery(
 }
 
 /**
+ * Validate that aliases are unique within their scope
+ * - CTE names must be unique across all CTEs
+ * - Source aliases (FROM, JOINs, main table in DELETE/UPDATE) must be unique within a statement
+ * - Final statement aliases shouldn't conflict with CTE names
+ */
+function validateAliasUniqueness(query: Query, ctx: QueryContext): void {
+  const cteNames = new Set<string>();
+
+  // Check if this is a CTE statement
+  if ('kind' in query && query.kind === 'withs') {
+    // Validate CTE names are unique
+    for (const withStmt of query.withs) {
+      const cteName = withStmt.name.toLowerCase();
+      if (cteNames.has(cteName)) {
+        ctx.validationErrors.push({
+          path: `query.withs`,
+          message: `Duplicate CTE name '${withStmt.name}'. Each CTE (WITH clause) must have a unique name.`,
+          metadata: { cteName: withStmt.name }
+        });
+      }
+      cteNames.add(cteName);
+    }
+
+    // Validate the final statement
+    validateStatementAliases(query.final, 'query.final', ctx, cteNames);
+  } else {
+    // Regular statement (not a CTE)
+    validateStatementAliases(query, 'query', ctx, cteNames);
+  }
+}
+
+/**
+ * Validate aliases within a single statement
+ */
+function validateStatementAliases(
+  stmt: Statement,
+  path: string,
+  ctx: QueryContext,
+  cteNames: Set<string>
+): void {
+  const sourceAliases = new Set<string>();
+
+  // Helper to add and validate a source alias
+  const addSourceAlias = (alias: string, explicitAlias: boolean, subPath: string) => {
+    const normalizedAlias = alias.toLowerCase();
+
+    // Check for duplicate within the same statement
+    if (sourceAliases.has(normalizedAlias)) {
+      ctx.validationErrors.push({
+        path: subPath,
+        message: `Duplicate source alias '${alias}'. Each table, subquery, or JOIN must have a unique alias within the same query.`,
+        metadata: { alias }
+      });
+    }
+
+    // Check for conflict with CTE names (only if it's an explicit alias)
+    // Implicit table names that match CTE names are OK (that's how you reference CTEs)
+    if (explicitAlias && cteNames.has(normalizedAlias)) {
+      ctx.validationErrors.push({
+        path: subPath,
+        message: `Explicit alias '${alias}' conflicts with a CTE name. Choose a different alias to avoid ambiguity.`,
+        metadata: { alias }
+      });
+    }
+
+    sourceAliases.add(normalizedAlias);
+  };
+
+  if (stmt.kind === 'select') {
+    // Check FROM clause
+    if (stmt.from) {
+      const fromAlias = getDataSourceName(stmt.from);
+      addSourceAlias(fromAlias, stmt.from.kind !== 'table', `${path}.from`);
+    }
+
+    // Check JOINs
+    if (stmt.joins) {
+      stmt.joins.forEach((join, i) => {
+        const joinAlias = getDataSourceName(join.source);
+        addSourceAlias(joinAlias, join.source.kind !== 'table', `${path}.joins[${i}]`);
+      });
+    }
+  } else if (stmt.kind === 'delete') {
+    // Check main table alias
+    const tableAlias = stmt.as || stmt.table;
+    addSourceAlias(tableAlias, !!stmt.as, `${path}.table`);
+
+    // Check JOINs
+    if (stmt.joins) {
+      stmt.joins.forEach((join, i) => {
+        const joinAlias = getDataSourceName(join.source);
+        addSourceAlias(joinAlias, join.source.kind !== 'table', `${path}.joins[${i}]`);
+      });
+    }
+  } else if (stmt.kind === 'update') {
+    // Check main table alias
+    const tableAlias = stmt.as || stmt.table;
+    addSourceAlias(tableAlias, !!stmt.as, `${path}.table`);
+
+    // Check FROM clause
+    if (stmt.from) {
+      const fromAlias = getDataSourceName(stmt.from);
+      addSourceAlias(fromAlias, stmt.from.kind !== 'table', `${path}.from`);
+    }
+
+    // Check JOINs
+    if (stmt.joins) {
+      stmt.joins.forEach((join, i) => {
+        const joinAlias = getDataSourceName(join.source);
+        addSourceAlias(joinAlias, join.source.kind !== 'table', `${path}.joins[${i}]`);
+      });
+    }
+  } else if (stmt.kind === 'union' || stmt.kind === 'intersect' || stmt.kind === 'except') {
+    // Set operations - validate both sides independently
+    validateStatementAliases(stmt.left, `${path}.left`, ctx, cteNames);
+    validateStatementAliases(stmt.right, `${path}.right`, ctx, cteNames);
+  }
+  // INSERT doesn't have aliases to validate
+}
+
+function getDataSourceName(source: DataSourceDBA): string {
+  if (source.kind === 'aliased') {
+    return source.as;
+  } else if (source.kind === 'table') {
+    return source.table;
+  } else {
+    return source.as;
+  }
+}
+
+/**
  * Execute without committing (for preview/validation)
  */
 export async function executeQueryWithoutCommit(
@@ -3819,8 +3959,11 @@ export async function executeQueryWithoutCommit(
   // 2. Build context
   const ctx = createQueryContext(getTypes, getManager, getKnowledge, embed);
 
-  // 3. Phase 1: Type resolution
-  // 4. Collect and pre-load tables using walk pattern
+  // 3. Validate alias uniqueness
+  validateAliasUniqueness(query, ctx);
+
+  // 4. Phase 1: Type resolution
+  // 5. Collect and pre-load tables using walk pattern
   const tables = queryExpr.getReferencedTables();
   for (const tableName of tables) {
     if (ctx.types.has(tableName)) {
@@ -3828,7 +3971,7 @@ export async function executeQueryWithoutCommit(
     }
   }
 
-  // 5. Phase 2: Execute
+  // 6. Phase 2: Execute
   const result = await queryExpr.execute(ctx);
 
   // 6. Post-execution validation
