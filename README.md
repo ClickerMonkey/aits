@@ -454,8 +454,7 @@ const ai = AI.with()
         modelId: 'gpt-4',
         overrides: {
           pricing: {
-            inputTokensPer1M: 30,
-            outputTokensPer1M: 60,
+            text: { input: 30, output: 60 },
           },
         },
       },
@@ -549,9 +548,8 @@ interface ReplicateConfig {
 const response = await ai.chat.get(messages);
 
 // Token usage
-console.log('Input tokens:', response.usage.inputTokens);
-console.log('Output tokens:', response.usage.outputTokens);
-console.log('Total tokens:', response.usage.totalTokens);
+console.log('Input tokens:', response.usage.text.input);
+console.log('Output tokens:', response.usage.text.output);
 
 // Cost (calculated or provider-reported)
 console.log('Cost: $', response.usage.cost);

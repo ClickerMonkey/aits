@@ -515,7 +515,7 @@ embeddingResponse.embeddings.forEach((item, i) => {
   console.log(`Embedding ${i}:`, item.embedding.length, 'dimensions');
 });
 
-console.log('Tokens used:', embeddingResponse.usage?.inputTokens);
+console.log('Tokens used:', embeddingResponse.usage?.text?.input);
 ```
 
 #### Custom Dimensions (for smaller embeddings)
@@ -622,7 +622,7 @@ const models = await provider.listModels();
 models.forEach(model => {
   console.log(`${model.id}: ${model.capabilities}`);
   console.log(`  Context window: ${model.contextWindow}`);
-  console.log(`  Pricing: $${model.pricing.inputTokensPer1M}/1M input tokens`);
+  console.log(`  Pricing: $${model.pricing.text.input}/1M input tokens`);
 });
 ```
 

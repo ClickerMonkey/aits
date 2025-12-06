@@ -112,56 +112,7 @@ const provider = new ReplicateProvider({
 
 ### Creating Custom Adapters
 
-TODO-FIX example
-
-```typescript
-import { ModelTransformer } from '@aeye/ai';
-import type { Request, Response } from '@aeye/core';
-
-const myCustomAdapter: ModelTransformer = {
-  // Convert @aeye request to model-specific input
-  transformRequest: (request: Request) => {
-    return {
-      prompt: request.messages[request.messages.length - 1].content,
-      temperature: request.temperature ?? 0.7,
-      max_tokens: request.maxTokens ?? 500,
-      // ... other model-specific parameters
-    };
-  },
-
-  // Convert model output to @aeye response
-  transformResponse: (output: unknown): Response => {
-    const result = output as { text: string; tokens_used?: number };
-
-    return {
-      content: result.text,
-      finishReason: 'stop',
-      usage: {
-        inputTokens: 0,
-        outputTokens: result.tokens_used ?? 0,
-        totalTokens: result.tokens_used ?? 0,
-      },
-    };
-  },
-
-  // Optional: streaming support
-  transformStreamChunk: (chunk: unknown) => {
-    const data = chunk as { text?: string };
-
-    return {
-      content: data.text,
-    };
-  },
-};
-
-// Register the adapter
-const provider = new ReplicateProvider({
-  apiKey: process.env.REPLICATE_API_KEY!,
-  transformers: {
-    'owner/my-custom-model': myCustomAdapter,
-  },
-});
-```
+TODO: correct example
 
 ## Usage Examples
 
@@ -502,9 +453,7 @@ export function createMyModelAdapter(): ModelTransformer {
         content,
         finishReason: 'stop',
         usage: {
-          inputTokens: 0, // Replicate doesn't always provide token counts
-          outputTokens: 0,
-          totalTokens: 0,
+          text: { input: 0, output: 0 },
         },
       };
     },

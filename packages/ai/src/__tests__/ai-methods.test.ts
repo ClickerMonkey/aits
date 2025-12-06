@@ -199,9 +199,9 @@ describe('AI Class Methods', () => {
         ]
       };
 
-      const tokens = ai.estimateRequestTokens(request);
+      const tokens = ai.estimateRequestUsage(request);
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens.text?.input).toBeGreaterThan(0);
     });
 
     it('should estimate tokens for multiple messages', () => {
@@ -220,9 +220,9 @@ describe('AI Class Methods', () => {
         ]
       };
 
-      const tokens = ai.estimateRequestTokens(request);
+      const tokens = ai.estimateRequestUsage(request);
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens.text?.input).toBeGreaterThan(0);
     });
 
     it('should estimate tokens for long messages', () => {
@@ -240,9 +240,9 @@ describe('AI Class Methods', () => {
         ]
       };
 
-      const tokens = ai.estimateRequestTokens(request);
+      const tokens = ai.estimateRequestUsage(request);
 
-      expect(tokens).toBeGreaterThan(100); // Should be hundreds of tokens
+      expect(tokens.text?.input).toBeGreaterThan(100); // Should be hundreds of tokens
     });
   });
 
@@ -254,12 +254,12 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({
+      const tokens = ai.estimateMessageUsage({
         role: 'user',
         content: 'Hello world this is a test message'
       });
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens.text?.input).toBeGreaterThan(0);
     });
 
     it('should estimate tokens for multipart message', () => {
@@ -269,7 +269,7 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({
+      const tokens = ai.estimateMessageUsage({
         role: 'user',
         content: [
           { type: 'text', content: 'What is in this image?' },
@@ -277,7 +277,7 @@ describe('AI Class Methods', () => {
         ]
       });
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens?.text?.input).toBeGreaterThan(0);
     });
   });
 
@@ -289,9 +289,9 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({ role: 'user', content: 'Hello world' });
+      const tokens = ai.estimateMessageUsage({ role: 'user', content: 'Hello world' });
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens.text?.input).toBeGreaterThan(0);
     });
 
     it('should estimate image content', () => {
@@ -301,12 +301,12 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({ role: 'user', content: [{
+      const tokens = ai.estimateMessageUsage({ role: 'user', content: [{
         type: 'image',
         content: 'https://example.com/image.png'
       }]});
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens.image?.input).toBeGreaterThan(0);
     });
 
     it('should estimate audio content', () => {
@@ -316,12 +316,12 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({ role: 'user', content: [{
+      const tokens = ai.estimateMessageUsage({ role: 'user', content: [{
         type: 'audio',
         content: Buffer.from('audio-data')
       }]});
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens?.audio?.input).toBeGreaterThan(0);
     });
 
     it('should estimate file content', () => {
@@ -331,12 +331,12 @@ describe('AI Class Methods', () => {
         .providers({ provider1 })
         .create({});
 
-      const tokens = ai.estimateMessageTokens({ role: 'user', content: [{
+      const tokens = ai.estimateMessageUsage({ role: 'user', content: [{
         type: 'file',
         content: Buffer.from('file-data')
       }]});
 
-      expect(tokens).toBeGreaterThan(0);
+      expect(tokens?.text?.input).toBeGreaterThan(0);
     });
   });
 
