@@ -12,14 +12,109 @@ import type {
   ModelCapability,
   ModelHandler,
   ModelInfo,
+  ModelMetrics,
   ModelOverride,
+  ModelPricing,
   ModelSelectionWeights,
   ModelSource,
   Provider,
   Providers,
+  RangeConstraint,
   ScoredModel,
   SelectedModel
 } from './types';
+
+// ============================================================================
+// Generic Constraint Helpers
+// ============================================================================
+
+/**
+ * Extracts a numeric value from a complex object for comparison.
+ * Supports nested paths and averaging of multiple values.
+ */
+function extractNumericValue(
+  value: number | ModelPricing | ModelMetrics | undefined,
+  path?: string
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'number') return value;
+  
+  // For ModelPricing, average input/output text costs
+  if ('text' in value) {
+    const pricing = value as ModelPricing;
+    const input = pricing.text?.input ?? 0;
+    const output = pricing.text?.output ?? 0;
+    if (input === 0 && output === 0) return undefined;
+    return (input + output) / 2;
+  }
+  
+  // For ModelMetrics, use tokensPerSecond as primary metric
+  if ('tokensPerSecond' in value) {
+    const metrics = value as ModelMetrics;
+    return metrics.tokensPerSecond;
+  }
+  
+  return undefined;
+}
+
+/**
+ * Checks if a model value satisfies a range constraint.
+ * Returns true if the value is acceptable, false otherwise.
+ */
+function satisfiesConstraint<T>(
+  modelValue: T | undefined,
+  constraint: RangeConstraint<T> | undefined
+): boolean {
+  if (!constraint) return true;
+  
+  // Extract numeric values for comparison
+  const numericValue = extractNumericValue(modelValue as any);
+  const minValue = extractNumericValue(constraint.min as any);
+  const maxValue = extractNumericValue(constraint.max as any);
+  
+  // If model doesn't have this metric, check if constraint requires it
+  if (numericValue === undefined) {
+    // If min or max is specified, model must have the metric
+    return minValue === undefined && maxValue === undefined;
+  }
+  
+  // Check min constraint
+  if (minValue !== undefined && numericValue < minValue) {
+    return false;
+  }
+  
+  // Check max constraint
+  if (maxValue !== undefined && numericValue > maxValue) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Calculates a target-based score for a model value.
+ * Returns a score between 0 and 1, where 1 is closest to target.
+ */
+function calculateTargetScore(
+  modelValue: number | undefined,
+  target: number | undefined,
+  minValue: number,
+  maxValue: number
+): number {
+  if (target === undefined || modelValue === undefined) return 0.5;
+  
+  // Normalize the range to 0-1
+  const range = maxValue - minValue;
+  if (range === 0) return 1;
+  
+  // Calculate distance from target as a proportion of the range
+  const distance = Math.abs(target - modelValue);
+  const normalizedDistance = distance / range;
+  
+  // Convert distance to score (1 = perfect match, 0 = furthest away)
+  // Use 1 - (distance / maxDistance) where maxDistance is the range
+  return Math.max(0, 1 - normalizedDistance);
+}
 
 // ============================================================================
 // Provider Capability Detection
@@ -504,8 +599,23 @@ export class ModelRegistry<
       }
     }
 
-    // Check minimum context window
-    if (criteria.minContextWindow && model.contextWindow && model.contextWindow < criteria.minContextWindow) {
+    // Check pricing constraints
+    if (!satisfiesConstraint(model.pricing, criteria.pricing)) {
+      return result; // score = 0
+    }
+
+    // Check context window constraints
+    if (!satisfiesConstraint(model.contextWindow, criteria.contextWindow)) {
+      return result; // score = 0
+    }
+
+    // Check output tokens constraints
+    if (!satisfiesConstraint(model.maxOutputTokens, criteria.outputTokens)) {
+      return result; // score = 0
+    }
+
+    // Check metrics constraints
+    if (!satisfiesConstraint(model.metrics, criteria.metrics)) {
       return result; // score = 0
     }
 
@@ -541,22 +651,47 @@ export class ModelRegistry<
     let score = 0;
     let weighted = 0;
 
-    // Cost score (lower is better, invert)
+    // Cost score with optional target-based scoring
     if (weights.cost) {
-      // TODO more sophisticated cost modeling
-      const avgCost = ((model.pricing.text?.input ?? 0) + (model.pricing.text?.output ?? 0)) / 2;
-      const costScore = 1 / (1 + avgCost / 10); // Normalize
-      score += weights.cost * costScore;
-      if (avgCost > 0) {
+      const avgCost = extractNumericValue(model.pricing);
+      if (avgCost !== undefined && avgCost > 0) {
+        let costScore: number;
+        
+        // If target pricing specified, use target-based scoring
+        if (metadata.pricing?.target) {
+          const targetCost = extractNumericValue(metadata.pricing.target) ?? avgCost;
+          // For target scoring, we need to know the range - use reasonable defaults
+          const minCost = extractNumericValue(metadata.pricing.min) ?? 0;
+          const maxCost = extractNumericValue(metadata.pricing.max) ?? targetCost * 2;
+          costScore = calculateTargetScore(avgCost, targetCost, minCost, maxCost);
+        } else {
+          // Default: lower cost is better
+          costScore = 1 / (1 + avgCost / 10);
+        }
+        
+        score += weights.cost * costScore;
         weighted++;
       }
     }
 
-    // Speed score
-    if (weights.speed && model.metrics?.tokensPerSecond) {
-      const speedScore = Math.min(model.metrics.tokensPerSecond / 100, 1); // Normalize to 0-1
-      score += weights.speed * speedScore;
-      if (speedScore > 0) {
+    // Speed score with optional target-based scoring
+    if (weights.speed) {
+      const speed = model.metrics?.tokensPerSecond;
+      if (speed !== undefined) {
+        let speedScore: number;
+        
+        // If target metrics specified with tokensPerSecond, use target-based scoring
+        if (metadata.metrics?.target?.tokensPerSecond) {
+          const targetSpeed = metadata.metrics.target.tokensPerSecond;
+          const minSpeed = metadata.metrics.min?.tokensPerSecond ?? 0;
+          const maxSpeed = metadata.metrics.max?.tokensPerSecond ?? targetSpeed * 2;
+          speedScore = calculateTargetScore(speed, targetSpeed, minSpeed, maxSpeed);
+        } else {
+          // Default: higher speed is better (normalize to 0-1)
+          speedScore = Math.min(speed / 100, 1);
+        }
+        
+        score += weights.speed * speedScore;
         weighted++;
       }
     }
@@ -565,21 +700,33 @@ export class ModelRegistry<
     if (weights.accuracy) {
       if (model.metrics?.accuracyScore) {
         score += weights.accuracy * model.metrics.accuracyScore;
+        weighted++;
       } else if (model.tier) {
         // Fallback to tier-based accuracy when metrics not available
         const tierScore = model.tier === 'flagship' ? 1.0 : model.tier === 'efficient' ? 0.7 : 0.5;
         score += weights.accuracy * tierScore;
-      }
-      if (model.metrics?.accuracyScore || model.tier) {
         weighted++;
       }
     }
 
-    // Context window score
+    // Context window score with optional target-based scoring
     if (weights.contextWindow) {
-      const contextScore = Math.min(model.contextWindow / 100000, 1); // Normalize
-      score += weights.contextWindow * contextScore;
-      if (model.contextWindow > 0) {
+      const contextWindow = model.contextWindow;
+      if (contextWindow > 0) {
+        let contextScore: number;
+        
+        // If target context window specified, use target-based scoring
+        if (metadata.contextWindow?.target) {
+          const targetWindow = metadata.contextWindow.target;
+          const minWindow = metadata.contextWindow.min ?? 0;
+          const maxWindow = metadata.contextWindow.max ?? targetWindow * 2;
+          contextScore = calculateTargetScore(contextWindow, targetWindow, minWindow, maxWindow);
+        } else {
+          // Default: larger context window is better (normalize to 0-1)
+          contextScore = Math.min(contextWindow / 100000, 1);
+        }
+        
+        score += weights.contextWindow * contextScore;
         weighted++;
       }
     }
