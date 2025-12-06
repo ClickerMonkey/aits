@@ -7,6 +7,32 @@ Cletus is a terminal-based AI assistant built with the @aeye library that demons
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
 
+## Installation
+
+### Global Installation
+
+```bash
+npm install -g @aeye/cletus
+```
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/ClickerMonkey/aeye.git
+cd aeye/packages/cletus
+
+# Install dependencies
+npm install
+
+# Build and link
+npm run build
+npm link
+
+# Run
+cletus
+```
+
 ## Features
 
 ### Adaptive Tooling
@@ -95,32 +121,6 @@ Here are some examples of what you can do with Cletus:
 - **File Intelligence** - Summarize, index, and search files (PDF, Word, Excel, images, etc.)
 - **Image Operations** - Generate, edit, analyze, and find images
 - **Web Integration** - Search the web, scrape pages, make API calls
-
-## Installation
-
-### Global Installation
-
-```bash
-npm install -g @aeye/cletus
-```
-
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/ClickerMonkey/aeye.git
-cd aeye/packages/cletus
-
-# Install dependencies
-npm install
-
-# Build and link
-npm run build
-npm link
-
-# Run
-cletus
-```
 
 ## Quick Start
 
