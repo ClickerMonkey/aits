@@ -53,9 +53,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
           content: `Mock response from ${providerName}`,
           finishReason: 'stop',
           usage: {
-            inputTokens: 10,
-            outputTokens: 20,
-            totalTokens: 30
+            text: { input: 10, output: 20 },
           }
         } as Response;
       };
@@ -66,7 +64,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
         const chunks = [
           { content: 'Hello', finishReason: null },
           { content: ' from ', finishReason: null },
-          { content: providerName, finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 15, totalTokens: 25 } }
+          { content: providerName, finishReason: 'stop', usage: { text: { input: 10, output: 15 } } }
         ];
 
         for (const chunk of chunks) {
@@ -99,9 +97,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
         }],
         model: request.model || `${providerName}-image-1`,
         usage: {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0
+          text: { input: 0, output: 0 },
         }
       };
     },
@@ -123,9 +119,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
         }],
         model: request.model || `${providerName}-edit-1`,
         usage: {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0
+          text: { input: 0, output: 0 },
         }
       };
     },
@@ -145,9 +139,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
         text: `Mock transcription from ${providerName}`,
         model: request.model || `${providerName}-whisper`,
         usage: {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0
+          text: { input: 0, output: 0 },
         }
       };
     },
@@ -176,9 +168,7 @@ export const createMockProvider = (options?: MockProviderOptions): Provider => {
         })),
         model: request.model || `${providerName}-embed`,
         usage: {
-          inputTokens: request.texts.length * 5,
-          outputTokens: 0,
-          totalTokens: request.texts.length * 5
+          text: { input: request.texts.length * 5, output: 0 },
         }
       };
     }
@@ -294,7 +284,7 @@ export const createRateLimitedProvider = (): Provider => {
         return {
           content: `Call ${callCount} succeeded`,
           finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 }
+          usage: { text: { input: 10, output: 20 } }
         } as Response;
       };
     }

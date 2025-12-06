@@ -289,7 +289,7 @@ const models = await source.fetchModels();
 
 models.forEach(model => {
   console.log(`${model.id}`);
-  console.log(`  Pricing: $${model.pricing.inputTokensPer1M}/1M input tokens`);
+  console.log(`  Pricing: $${model.pricing.text.input}/1M input tokens`);
   console.log(`  Context: ${model.contextWindow} tokens`);
   console.log(`  ZDR: ${model.capabilities.has('zdr')}`);
 });
@@ -356,8 +356,8 @@ const response = await ai.chat.get(messages, {
 });
 
 // Cost is automatically included
-console.log('Input tokens:', response.usage.inputTokens);
-console.log('Output tokens:', response.usage.outputTokens);
+console.log('Input tokens:', response.usage.text.input);
+console.log('Output tokens:', response.usage.text.output);
 console.log('Cost: $', response.usage.cost); // Actual USD cost
 
 // Cost calculation is skipped when provider returns cost

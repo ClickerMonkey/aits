@@ -78,9 +78,7 @@ export const mockResponse: Response = {
   content: 'This is a mock response',
   finishReason: 'stop',
   usage: {
-    inputTokens: 10,
-    outputTokens: 20,
-    totalTokens: 30
+    text: { input: 10, output: 20 },
   },
   model: 'mock-model',
 };
@@ -96,9 +94,7 @@ export const mockResponseWithToolCalls: Response = {
     }
   ],
   usage: {
-    inputTokens: 15,
-    outputTokens: 5,
-    totalTokens: 20
+    text: { input: 15, output: 5 },
   },
   model: 'mock-model',
 };
@@ -108,9 +104,7 @@ export const mockResponseWithRefusal: Response = {
   finishReason: 'stop',
   refusal: 'I cannot help with that request',
   usage: {
-    inputTokens: 8,
-    outputTokens: 12,
-    totalTokens: 20
+    text: { input: 8, output: 12 },
   },
   model: 'mock-model',
 };
@@ -122,7 +116,7 @@ export const mockResponseWithRefusal: Response = {
 export const mockChunks: Chunk[] = [
   { content: 'Hello' },
   { content: ' there' },
-  { content: '!', finishReason: 'stop', usage: { text: { input: 5, output: 10, total: 15 } } }
+  { content: '!', finishReason: 'stop', usage: { text: { input: 5, output: 10 } } }
 ];
 
 export const mockChunksWithToolCalls: Chunk[] = [
@@ -135,7 +129,7 @@ export const mockChunksWithToolCalls: Chunk[] = [
       name: 'get_weather',
       arguments: '{ "location": "San Francisco" }'
     },
-    usage: { text: { input: 12, output: 8, total: 20 } }
+    usage: { text: { input: 12, output: 8 } }
   }
 ];
 

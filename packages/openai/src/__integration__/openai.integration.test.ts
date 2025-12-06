@@ -68,10 +68,10 @@ describeIntegration('OpenAI Integration', () => {
       expect(typeof response.content).toBe('string');
       expect(response.finishReason).toBe('stop');
       expect(response.usage).toBeDefined();
-      expect(response.usage!.totalTokens).toBeGreaterThan(0);
+      expect(response.usage!.text?.output).toBeGreaterThan(0);
 
       console.log(`  Response: ${response.content}`);
-      console.log(`  Tokens: ${response.usage!.totalTokens}`);
+      console.log(`  Tokens: ${response.usage!.text?.output}`);
     }, 30000);
 
     it('should stream chat completion', async () => {
@@ -165,7 +165,7 @@ describeIntegration('OpenAI Integration', () => {
       const response = await provider.generateImage!(request, ctx as any);
 
       expect(response.images).toHaveLength(1);
-      expect(response.model).toContain('dall-e');
+      expect(response.model).toMatch(/dall-e/);
 
       console.log(`  Model: ${response.model}`);
     }, 60000);
@@ -185,7 +185,7 @@ describeIntegration('OpenAI Integration', () => {
 
       console.log(`  Generated ${response.embeddings.length} embeddings`);
       console.log(`  Dimension: ${response.embeddings[0].embedding.length}`);
-      console.log(`  Tokens: ${response.usage?.totalTokens}`);
+      console.log(`  Tokens: ${response.usage?.text?.output}`);
     }, 30000);
 
     it('should use model from context for embeddings', async () => {
@@ -202,7 +202,7 @@ describeIntegration('OpenAI Integration', () => {
       const response = await provider.embed!(request, ctx as any);
 
       expect(response.embeddings).toHaveLength(1);
-      expect(response.model).toContain('embedding');
+      expect(JSON.stringify(response.model)).toMatch(/embedding/);
 
       console.log(`  Model: ${response.model}`);
     }, 30000);

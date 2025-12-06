@@ -85,7 +85,7 @@ describe('Embed API', () => {
       const response = await ai.embed.get(request);
 
       expect(response.usage).toBeDefined();
-      expect(response.usage?.totalTokens).toBeGreaterThan(0);
+      expect(response.usage?.embeddings?.tokens).toBeGreaterThan(0);
     });
 
     it('should call hooks for embeddings', async () => {

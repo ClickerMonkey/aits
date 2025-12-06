@@ -12,14 +12,11 @@ import type {
   ModelCapability,
   ModelHandler,
   ModelInfo,
-  ModelMetrics,
   ModelOverride,
-  ModelPricing,
   ModelSelectionWeights,
   ModelSource,
   Provider,
   Providers,
-  RangeConstraint,
   ScoredModel,
   SelectedModel
 } from './types';
@@ -229,6 +226,12 @@ function calculateScore<T>(
   // For other types, can't calculate meaningful score
   return undefined;
 }
+
+type ModelApplicability = { 
+  matchedRequired: ModelCapability[]; 
+  matchedOptional: ModelCapability[]; 
+  missingRequired: ModelCapability[]
+};
 
 // ============================================================================
 // Provider Capability Detection
@@ -510,7 +513,7 @@ export class ModelRegistry<
     const providedModels = this.providedModels();
 
     // Step 1: Filter to applicable models
-    const applicableModels: Array<{ model: ModelInfo<TProviderKey>; applicability: NonNullable<ReturnType<typeof this.isModelApplicable>> }> = [];
+    const applicableModels: Array<{ model: ModelInfo<TProviderKey>; applicability: ModelApplicability }> = [];
     
     for (const model of providedModels) {
       const applicability = this.isModelApplicable(model, metadata);
@@ -685,7 +688,7 @@ export class ModelRegistry<
   private isModelApplicable(
     model: ModelInfo<TProviderKey>,
     criteria: AIBaseMetadata<TProviders>
-  ): { matchedRequired: ModelCapability[]; matchedOptional: ModelCapability[]; missingRequired: ModelCapability[] } | null {
+  ): ModelApplicability | null {
     // Check provider allowlist/blocklist
     if (criteria.providers) {
       if (criteria.providers.deny?.includes(model.provider)) {
@@ -1089,8 +1092,10 @@ export class ModelRegistry<
             capabilities: modelInfo.capabilities || new Set(['chat', 'streaming'] as ModelCapability[]),
             tier: modelInfo.tier || detectTier(modelInfo.name || modelInfo.id),
             pricing: modelInfo.pricing || {
-              inputTokensPer1M: this.defaultCostPerMillionTokens,
-              outputTokensPer1M: this.defaultCostPerMillionTokens * 2,
+              text: {
+                input: this.defaultCostPerMillionTokens,
+                output: this.defaultCostPerMillionTokens * 2,
+              },
             },
             contextWindow: modelInfo.contextWindow || 8192,
             maxOutputTokens: modelInfo.maxOutputTokens,

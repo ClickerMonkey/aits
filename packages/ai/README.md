@@ -377,25 +377,7 @@ type ContentPart =
 
 #### Response Format
 
-```typescript
-interface Response {
-  content: string;
-  finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter';
-  toolCalls?: ToolCall[];
-  refusal?: string;
-  reasoning?: string;  // For reasoning models
-  usage: Usage;
-}
-
-interface Usage {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  cachedTokens?: number;
-  reasoningTokens?: number;
-  cost?: number;  // Cost in dollars, if provided by the provider
-}
-```
+TODO: updated
 
 #### Examples
 
@@ -463,6 +445,8 @@ if (response.toolCalls) {
 ```
 
 **Streaming with Token Counting**
+
+TODO: update with new types
 
 ```typescript
 let totalTokens = 0;
@@ -675,7 +659,7 @@ models.forEach(model => {
   console.log(`${model.provider}/${model.id}`);
   console.log(`  Tier: ${model.tier}`);
   console.log(`  Capabilities: ${Array.from(model.capabilities).join(', ')}`);
-  console.log(`  Cost: $${model.pricing.inputTokensPer1M}/1M input tokens`);
+  console.log(`  Cost: $${model.pricing.text.input}/1M input tokens`);
 });
 ```
 
@@ -795,9 +779,6 @@ const ai = AI.with<AppContext, AppMetadata>()
     },
 
     beforeRequest: async (ctx, request, selected, estimatedTokens, estimatedCost) => {
-      const estimatedCost = estimatedTokens / 1_000_000 *
-        (selected.model.pricing.inputTokensPer1M + selected.model.pricing.outputTokensPer1M) / 2;
-
       // Check budget
       if (estimatedCost > ctx.user.remainingBudget) {
         throw new Error('Insufficient budget');
@@ -946,111 +927,7 @@ const models = ai.models.list();
 
 ### Custom Providers
 
-Create custom provider implementations:
-
-```typescript
-import { Provider } from '@aeye/ai';
-
-const customProvider: Provider<CustomConfig> = {
-  name: 'custom',
-  config: {
-    apiKey: process.env.CUSTOM_API_KEY,
-    baseURL: 'https://api.custom.ai'
-  },
-
-  async listModels() {
-    const response = await fetch(`${this.config.baseURL}/models`);
-    const data = await response.json();
-
-    return data.models.map(m => ({
-      id: m.id,
-      provider: 'custom',
-      name: m.name,
-      capabilities: new Set(['chat', 'streaming']),
-      tier: 'flagship',
-      pricing: {
-        inputTokensPer1M: m.pricing.input,
-        outputTokensPer1M: m.pricing.output
-      },
-      contextWindow: m.context_length
-    }));
-  },
-
-  async checkHealth() {
-    try {
-      await fetch(`${this.config.baseURL}/health`);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
-  createExecutor() {
-    return async (request, ctx, metadata) => {
-      const response = await fetch(`${this.config.baseURL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: metadata.model,
-          messages: request.messages,
-          max_tokens: request.maxTokens,
-          temperature: request.temperature
-        })
-      });
-
-      const data = await response.json();
-
-      return {
-        content: data.choices[0].message.content,
-        finishReason: data.choices[0].finish_reason,
-        usage: {
-          inputTokens: data.usage.prompt_tokens,
-          outputTokens: data.usage.completion_tokens,
-          totalTokens: data.usage.total_tokens
-        }
-      };
-    };
-  },
-
-  createStreamer() {
-    return async function* (request, ctx, metadata) {
-      const response = await fetch(`${this.config.baseURL}/chat/stream`, {
-        // ... similar setup with stream: true
-      });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            yield {
-              content: data.choices[0]?.delta?.content,
-              finishReason: data.choices[0]?.finish_reason,
-              usage: data.usage
-            };
-          }
-        }
-      }
-    };
-  }
-};
-
-// Use custom provider
-const ai = AI.with()
-  .providers({ custom: customProvider, openai })
-  .create({});
-```
+You can create custom provider implementations - just implement the Provider interface.
 
 ## TypeScript Guide
 

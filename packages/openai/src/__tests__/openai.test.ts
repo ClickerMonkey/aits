@@ -151,8 +151,8 @@ describe('OpenAIProvider', () => {
         expect(response).toBeDefined();
         expect(response.content).toBe('Hello, world!');
         expect(response.finishReason).toBe('stop');
-        expect(response.usage?.inputTokens).toBe(10);
-        expect(response.usage?.outputTokens).toBe(5);
+        expect(response.usage?.text?.input).toBe(10);
+        expect(response.usage?.text?.output).toBe(5);
         expect(mockOpenAI.chat.completions.create).toHaveBeenCalled();
       });
 
