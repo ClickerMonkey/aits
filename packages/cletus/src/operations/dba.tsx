@@ -552,8 +552,6 @@ export const query = operationOf<
   inputFormat: 'json',
   outputFormat: 'json',
   analyze: async ({ input: { query: queryInput } }, { config }) => {
-    const types = config.getData().types;
-
     const kind = getQueryKind(queryInput);
     const description = describeQuery(queryInput);
 

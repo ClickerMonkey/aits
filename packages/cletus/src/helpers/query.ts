@@ -2037,40 +2037,41 @@ export class SelectExpr extends Expr {
 
     // 4. Apply GROUP BY and compute values
     let rows: Record<string, unknown>[];
+    let rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecords: SelectRecord[] }> | undefined;
 
     if (this.groupBy?.length) {
       // Group records
       const groups = await this.groupRecords(selectRecords, this.groupBy, ctx);
-      const rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: SelectRecord[] }> = [];
+      rowsWithGroups = [];
 
-      for (const [, groupRecs] of groups) {
+      for (const [, groupRecords] of groups) {
         const row: Record<string, unknown> = {};
         for (const { alias, expr } of this.values) {
-          const evaluatedValue = await expr.eval(groupRecs[0], ctx, groupRecs);
+          const evaluatedValue = await expr.eval(groupRecords[0], ctx, groupRecords);
           Expr.handleWildcardExpansion(row, alias, evaluatedValue, expr);
         }
-        rowsWithGroups.push({ row, groupRecs });
+        rowsWithGroups.push({ row, groupRecords });
       }
 
       // Apply HAVING clause
       if (this.having?.length) {
-        const filteredRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecs: SelectRecord[] }> = [];
-        for (const { row, groupRecs } of rowsWithGroups) {
+        const filteredRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecords: SelectRecord[] }> = [];
+        for (const { row, groupRecords } of rowsWithGroups) {
           let matches = true;
           for (const cond of this.having) {
-            if (!(await cond.evalBoolean(groupRecs[0], ctx, groupRecs))) {
+            if (!(await cond.evalBoolean(groupRecords[0], ctx, groupRecords))) {
               matches = false;
               break;
             }
           }
           if (matches) {
-            filteredRowsWithGroups.push({ row, groupRecs });
+            filteredRowsWithGroups.push({ row, groupRecords });
           }
         }
-        rows = filteredRowsWithGroups.map(({ row }) => row);
-      } else {
-        rows = rowsWithGroups.map(({ row }) => row);
+        rowsWithGroups = filteredRowsWithGroups;
       }
+
+      rows = rowsWithGroups.map(({ row }) => row);
     } else {
       // No grouping - evaluate values for each record
       const hasAggregates = this.values.some(({ expr }) => expr.containsAggregate());
@@ -2111,17 +2112,36 @@ export class SelectExpr extends Expr {
     // 5. Apply DISTINCT
     if (this.distinct) {
       const seen = new Set<string>();
-      rows = rows.filter(row => {
+      const distinctRows: Record<string, unknown>[] = [];
+      const distinctRowsWithGroups: Array<{ row: Record<string, unknown>; groupRecords: SelectRecord[] }> = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const key = JSON.stringify(row);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+        if (!seen.has(key)) {
+          seen.add(key);
+          distinctRows.push(row);
+          if (rowsWithGroups) {
+            distinctRowsWithGroups.push(rowsWithGroups[i]);
+          }
+        }
+      }
+
+      rows = distinctRows;
+      if (rowsWithGroups) {
+        rowsWithGroups = distinctRowsWithGroups;
+      }
     }
 
     // 6. Apply ORDER BY
     if (this.orderBy?.length) {
-      rows = await this.sortRows(rows, this.orderBy, ctx);
+      if (rowsWithGroups) {
+        // If we have grouped data, sort with group records for aggregate evaluation
+        rowsWithGroups = await this.sortGroupedRows(rowsWithGroups, this.orderBy, ctx);
+        rows = rowsWithGroups.map(({ row }) => row);
+      } else {
+        rows = await this.sortRows(rows, this.orderBy, ctx);
+      }
     }
 
     // 7. Apply OFFSET and LIMIT
@@ -2169,6 +2189,12 @@ export class SelectExpr extends Expr {
       sortValues: Value[];
     }> = [];
 
+    // Collect all source names referenced in ORDER BY expressions
+    const referencedSources = new Set<string>();
+    for (const sort of orderBy) {
+      sort.expr.getReferencedTables(referencedSources);
+    }
+
     for (const row of rows) {
       // Create a temp DataRecord and wrap in SelectRecord
       const tempDataRecord: DataRecord = {
@@ -2177,7 +2203,13 @@ export class SelectExpr extends Expr {
         updated: 0,
         fields: row as Record<string, unknown>,
       };
-      const tempSelectRecord: SelectRecord = { __temp__: tempDataRecord };
+
+      // Map all referenced sources to the same temp DataRecord
+      // so that ORDER BY expressions can find their columns
+      const tempSelectRecord: SelectRecord = {};
+      for (const source of referencedSources) {
+        tempSelectRecord[source] = tempDataRecord;
+      }
 
       const sortValues: Value[] = [];
       for (const sort of orderBy) {
@@ -2199,6 +2231,42 @@ export class SelectExpr extends Expr {
     });
 
     return rowsWithValues.map(r => r.row);
+  }
+
+  private async sortGroupedRows(
+    rowsWithGroups: Array<{ row: Record<string, unknown>; groupRecords: SelectRecord[] }>,
+    orderBy: SortExpr[],
+    ctx: QueryContext
+  ): Promise<Array<{ row: Record<string, unknown>; groupRecords: SelectRecord[] }>> {
+    // Evaluate sort expressions for each grouped row
+    const rowsWithValues: Array<{
+      row: Record<string, unknown>;
+      groupRecords: SelectRecord[];
+      sortValues: Value[];
+    }> = [];
+
+    for (const { row, groupRecords } of rowsWithGroups) {
+      const sortValues: Value[] = [];
+      for (const sort of orderBy) {
+        // Evaluate with group records so aggregates can compute correctly
+        const val = await sort.expr.eval(groupRecords[0], ctx, groupRecords);
+        sortValues.push(val);
+      }
+      rowsWithValues.push({ row, groupRecords, sortValues });
+    }
+
+    // Sort using pre-evaluated values
+    rowsWithValues.sort((a, b) => {
+      for (let i = 0; i < orderBy.length; i++) {
+        const cmp = a.sortValues[i].compareTo(b.sortValues[i]);
+        if (cmp !== 0) {
+          return orderBy[i].dir === 'desc' ? -cmp : cmp;
+        }
+      }
+      return 0;
+    });
+
+    return rowsWithValues.map(r => ({ row: r.row, groupRecords: r.groupRecords }));
   }
 
   protected walkChildren(visitor: (expr: Expr) => boolean | void): void {
@@ -3708,6 +3776,9 @@ export async function executeQueryWithoutCommit(
   result.validationErrors = ctx.validationErrors.length > 0 ? ctx.validationErrors : undefined;
   result.canCommit = ctx.validationErrors.length === 0;
   result.tables = Array.from(tables);
+  result.affectedCount = Array.from(deltas.values()).reduce((sum, delta) => {
+    return sum + delta.inserts.length + delta.updates.length + delta.deletes.length;
+  }, 0);
 
   return {
     result,

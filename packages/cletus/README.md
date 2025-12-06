@@ -9,28 +9,74 @@ Cletus is a terminal-based AI assistant built with the @aeye library that demons
 
 ## Features
 
-### 🤖 Specialized AI Agents
+### Adaptive Tooling
 
-Cletus organizes its capabilities into specialized agents, each with domain-specific tools:
+Cletus uses an intelligent tool selection system that automatically picks the most relevant tools based on your conversation context. Instead of having access to all 50+ tools at once (which can overwhelm the AI), Cletus:
 
-- **Architect** - Type definition management for custom data structures
-- **Artist** - Image generation, editing, analysis, and semantic search
-- **Clerk** - File operations, searching, indexing, and summarization
-- **DBA** - Database-like operations on typed data with CRUD capabilities
-- **Internet** - Web search, page scraping, and REST API calls
-- **Librarian** - Knowledge base management with semantic search
-- **Planner** - Todo list management and task tracking
-- **Secretary** - Assistant persona management and user memory
+1. **Analyzes your recent messages** - Uses embeddings to understand what you're asking about
+2. **Selects relevant tools** - Picks the top 15-20 most semantically similar tools for the task
+3. **Adapts over time** - As your conversation evolves, the available tools adjust automatically
+
+You can also manually switch between specialized **toolsets** to focus on specific domains:
+
+- **planner** - Task management and todo operations
+- **librarian** - Knowledge base and semantic search
+- **clerk** - File system operations and shell commands
+- **secretary** - User memories and assistant management
+- **architect** - Custom data type definitions and schema management
+- **artist** - Image generation, editing, and analysis
+- **internet** - Web search and API operations
+- **dba** - Data record management and querying
+
+Use the `retool` tool to switch between adaptive mode and specific toolsets
+
+### Examples
+
+Here are some examples of what you can do with Cletus:
+
+**File Operations:**
+- "Search for all TypeScript files in the src directory"
+- "Read package.json and tell me what dependencies are outdated"
+- "Create a new file called README.md with a project description"
+- "Find all files containing the word 'TODO' and summarize them"
+
+**Data Management:**
+- "Create a 'Recipe' type with fields for ingredients, instructions, and cooking time"
+- "Add a new recipe for chocolate chip cookies"
+- "Find all recipes that contain chocolate"
+
+**Task Planning:**
+- "Add a todo to implement user authentication"
+- "Show me all my pending todos"
+- "Mark the first todo as done"
+
+**Image Operations:**
+- "Generate an image of a sunset over mountains"
+- "Find all images I've generated that contain trees"
+- "Analyze this screenshot and describe what you see"
+
+**Web Research:**
+- "Search the web for the latest TypeScript features"
+- "Get the content from https://example.com and summarize it"
+
+**Knowledge Base:**
+- "Remember that I prefer tabs over spaces"
+- "Index all files in my project for semantic search"
+- "Search my knowledge base for information about authentication"
+
+**Shell Commands:**
+- "Run npm test and show me the results"
+- "Execute git status and tell me what files have changed"
 
 ### 🎨 Interactive Terminal UI
 
 - Beautiful React/Ink-based interface
-- Automatic light/dark mode theme detection for optimal color visibility
 - Chat history management
 - Real-time streaming responses
-- Syntax-highlighted code blocks
+- Markdown rendering
 - Operation approval/rejection system
 - Settings configuration wizard
+- Automatic light/dark mode theme detection for optimal color visibility
 
 ### 💾 Persistent Storage
 
@@ -76,16 +122,6 @@ npm link
 cletus
 ```
 
-### Development Mode
-
-```bash
-# Watch mode with hot reload
-npm run dev
-
-# Or run directly with tsx
-npm start
-```
-
 ## Quick Start
 
 ### First Launch
@@ -104,9 +140,6 @@ The configuration is saved to `~/.cletus/config.json` and can be modified later 
 # Start Cletus
 cletus
 
-# Start Cletus with split view settings menu
-cletus --split-settings
-
 # The main menu provides options to:
 # - Start a new chat
 # - Continue existing chats
@@ -116,7 +149,6 @@ cletus --split-settings
 
 ### Command Line Arguments
 
-- `--split-settings` - Use split view settings interface instead of nested menu (keeps all settings on one screen)
 - `--profile=NAME` or `--profile NAME` - Use a specific configuration profile
 
 ### Creating a Chat
@@ -125,6 +157,93 @@ cletus --split-settings
 2. Optionally choose an assistant persona (or use default)
 3. Optionally provide a custom system prompt
 4. Start chatting!
+
+## Tools
+
+Cletus provides 50+ tools organized into specialized toolsets. Here's what each toolset offers:
+
+### 🗂️ Planner (`planner`)
+Task management and todo operations:
+- `todosList` - View all todos
+- `todosAdd` - Add a new todo
+- `todosDone` - Mark a todo as complete
+- `todosGet` - Get a specific todo by ID
+- `todosRemove` - Remove a todo
+- `todosReplace` - Replace/update a todo
+- `todosClear` - Clear all todos
+
+### 📚 Librarian (`librarian`)
+Knowledge base with semantic search:
+- `knowledgeSearch` - Search knowledge base semantically
+- `knowledgeSources` - List all knowledge sources
+- `knowledgeAdd` - Add user memories to knowledge base
+- `knowledgeDelete` - Delete knowledge source
+
+### 📁 Clerk (`clerk`)
+File system operations and shell commands:
+- `fileSearch` - Search files by glob pattern
+- `fileSummary` - Get AI summary of file content
+- `fileIndex` - Index files into knowledge base
+- `fileRead` - Read file contents
+- `fileEdit` - Edit file with find/replace
+- `fileCreate` - Create new file
+- `fileCopy` - Copy file
+- `fileMove` - Move/rename file
+- `fileDelete` - Delete file
+- `fileStats` - Get file metadata
+- `fileAttach` - Attach file to message
+- `textSearch` - Search file contents with regex
+- `dirCreate` - Create directory
+- `dirSummary` - Summarize directory contents
+- `shell` - Execute shell commands
+
+### 👤 Secretary (`secretary`)
+User preferences and assistant management:
+- `assistantSwitch` - Switch to different assistant
+- `assistantUpdate` - Update assistant prompt
+- `assistantAdd` - Create new assistant
+- `memoryList` - List user memories
+- `memoryUpdate` - Update user memories
+
+### 🏗️ Architect (`architect`)
+Custom data type system:
+- `typeList` - List all custom types
+- `typeInfo` - Get type definition
+- `typeCreate` - Define new data type
+- `typeUpdate` - Update type definition
+- `typeDelete` - Delete type
+- `typeImport` - Import type from JSON schema
+
+### 🎨 Artist (`artist`)
+Image generation and analysis:
+- `imageGenerate` - Generate images from text
+- `imageEdit` - Edit existing images
+- `imageAnalyze` - Analyze image with vision AI
+- `imageDescribe` - Get detailed image description
+- `imageFind` - Search generated images
+- `imageAttach` - Attach image to message
+
+### 🌐 Internet (`internet`)
+Web operations:
+- `webSearch` - Search the web (via Tavily)
+- `webGetPage` - Fetch and extract page content
+- `webApiCall` - Make HTTP API requests
+
+### 💾 DBA (`dba`)
+Data record management:
+- `dataIndex` - Index data records into knowledge base
+- `dataImport` - Import data from files
+- `dataSearch` - Semantic search over data records
+- `dataGet` - Get specific data record
+- `dbaQuery` - Query data with filters and sorting
+
+### 🔧 Utility (always available)
+Core system tools:
+- `getOperationOutput` - Retrieve truncated operation output
+- `about` - Information about Cletus
+- `retool` - Switch toolsets or enable adaptive mode
+- `hypothetical` - Switch to restrictive mode for exploration
+- `ask` - Ask user multiple-choice questions with special UI
 
 ## Configuration
 
@@ -146,277 +265,21 @@ Cletus stores its data in `~/.cletus/`:
 ### Provider Configuration
 
 Cletus supports multiple AI providers:
+- OpenAI (For all model types)
+- OpenRouter (For chat models)
+- Replicate (For image generation & editing primarily)
+- AWS (For chat models)
+- Tavily (For web search)
 
-#### OpenAI
-
-```json
-{
-  "providers": {
-    "openai": {
-      "apiKey": "sk-...",
-      "organization": "org-...",  // Optional
-      "project": "proj_...",      // Optional
-      "defaultModels": {
-        "chat": "gpt-4o",
-        "imageGenerate": "dall-e-3",
-        "transcription": "whisper-1",
-        "embedding": "text-embedding-3-large"
-      }
-    }
-  }
-}
-```
-
-#### OpenRouter
-
-```json
-{
-  "providers": {
-    "openrouter": {
-      "apiKey": "sk-or-...",
-      "defaultParams": {
-        "siteUrl": "https://yoursite.com",
-        "appName": "Cletus",
-        "providers": {
-          "order": ["openai", "anthropic"],
-          "allowFallbacks": true
-        }
-      }
-    }
-  }
-}
-```
-
-#### Replicate
-
-```json
-{
-  "providers": {
-    "replicate": {
-      "apiKey": "r8_..."
-    }
-  }
-}
-```
-
-#### AWS Bedrock
-
-Access to Claude, Llama, Mistral, and other models via AWS Bedrock. Supports credential auto-discovery from environment variables or IAM roles.
-
-```json
-{
-  "providers": {
-    "aws": {
-      "region": "us-east-1",
-      "credentials": {
-        "accessKeyId": "AKIA...",
-        "secretAccessKey": "..."
-      }
-    }
-  }
-}
-```
-
-Alternatively, set environment variables (recommended):
-```bash
-export AWS_REGION=us-east-1
-export AWS_ACCESS_KEY_ID=AKIA...
-export AWS_SECRET_ACCESS_KEY=...
-```
-
-#### Tavily (Web Search)
-
-```json
-{
-  "tavily": {
-    "apiKey": "tvly-..."
-  }
-}
-```
+Common environment variables & AWS profiles are auto-detected
 
 ### Model Selection
 
-Override default models in the user configuration:
-
-```json
-{
-  "user": {
-    "models": {
-      "chat": "gpt-4o-mini",
-      "imageGenerate": "dall-e-3",
-      "imageAnalyze": "gpt-4o",
-      "embedding": "text-embedding-3-small",
-      "summary": "gpt-4o-mini"
-    }
-  }
-}
-```
+In the settings you can configure what models you want to use for each behavior.
 
 ### Autonomous Mode
 
-Configure how the AI handles operations:
-
-```json
-{
-  "user": {
-    "autonomous": {
-      "maxIterations": 10,  // Max tool calls without approval
-      "timeout": 300000     // 5 minutes in milliseconds
-    }
-  }
-}
-```
-
-## Tool Categories
-
-### Architect Tools
-
-Manage custom data type definitions:
-
-- `type_info` - View type schema and fields
-- `type_create` - Create new type definitions
-- `type_update` - Update types (backwards compatible)
-
-### Artist Tools
-
-Image operations:
-
-- `image_generate` - Generate images from prompts
-- `image_edit` - Edit existing images
-- `image_analyze` - Ask questions about images
-- `image_describe` - Get detailed image descriptions
-- `image_find` - Semantic search over images
-
-### Clerk Tools
-
-File management:
-
-- `file_search` - Find files with glob patterns
-- `file_summary` - AI-generated file summaries
-- `file_index` - Index files for semantic search
-- `file_create` - Create new files
-- `file_read` - Read file contents
-- `file_edit` - Edit file contents
-- `file_copy` - Copy files
-- `file_move` - Move/rename files
-- `file_delete` - Delete files
-- `file_stats` - Get file metadata
-- `text_search` - Search text content with regex
-- `dir_create` - Create directories
-
-### DBA Tools
-
-Data operations (dynamically generated for each custom type):
-
-- `data_create` - Create new records
-- `data_update` - Update records by ID
-- `data_delete` - Delete records by ID
-- `data_select` - Query records with filters
-- `data_update_many` - Bulk update operations
-- `data_delete_many` - Bulk delete operations
-- `data_aggregate` - Count and aggregate data
-- `data_index` - Reindex knowledge base
-- `data_import` - Import from files (CSV, JSON, etc.)
-- `data_search` - Semantic search over records
-
-### Internet Tools
-
-Web operations:
-
-- `web_search` - Search the web (via Tavily)
-- `web_get_page` - Scrape web pages
-- `web_api_call` - Make REST API requests
-
-### Librarian Tools
-
-Knowledge base management:
-
-- `knowledge_search` - Semantic search
-- `knowledge_sources` - List knowledge sources
-- `knowledge_add` - Add user memories
-- `knowledge_delete` - Remove knowledge entries
-
-### Planner Tools
-
-Task management:
-
-- `todos_list` - List all todos
-- `todos_add` - Add new todo
-- `todos_done` - Mark todo complete
-- `todos_get` - Get todo details
-- `todos_remove` - Delete todo
-- `todos_clear` - Clear all todos
-- `todos_replace` - Replace entire todo list
-
-### Secretary Tools
-
-Assistant and memory management:
-
-- `assistant_switch` - Change assistant persona
-- `assistant_update` - Modify assistant prompt
-- `assistant_add` - Create new assistant
-- `memory_list` - View user memories
-- `memory_update` - Add/update memories
-
-## Examples
-
-### File Operations
-
-```
-You: Summarize all TypeScript files in the src directory
-
-Cletus: I'll search for TypeScript files and summarize them...
-[Uses file_search and file_summary tools]
-```
-
-### Data Management
-
-```
-You: Create a new type for tracking books with title, author, and year
-
-Cletus: I'll create a book type definition...
-[Uses type_create tool]
-
-You: Add "1984" by George Orwell published in 1949
-
-Cletus: I'll create a new book record...
-[Uses data_create tool with the book type]
-```
-
-### Image Generation
-
-```
-You: Generate an image of a sunset over mountains
-
-Cletus: I'll generate that image for you...
-[Uses image_generate tool, saves to .cletus/images/]
-[Generated image: sunset_mountains_abc123.png](~/.cletus/images/sunset_mountains_abc123.png)
-```
-
-### Web Research
-
-```
-You: Search for recent TypeScript 5.0 features and summarize them
-
-Cletus: Let me search for that information...
-[Uses web_search tool]
-[Summarizes findings from multiple sources]
-```
-
-### Knowledge Base
-
-```
-You: Remember that I prefer using async/await over promises
-
-Cletus: I'll add that to your memories...
-[Uses knowledge_add tool]
-
-You: What are my coding preferences?
-
-Cletus: Let me search your memories...
-[Uses knowledge_search tool]
-You prefer using async/await over promises...
-```
+You choose how autonomous Cletus is - either automatically performing certain operations or asking for approval.
 
 ## Custom Assistants
 
@@ -451,38 +314,6 @@ Cletus: Switching assistant...
 
 Define structured data with validation:
 
-```typescript
-// Example type definition
-{
-  name: "project",
-  friendlyName: "Project",
-  description: "Software project tracking",
-  knowledgeTemplate: "Project: {{name}}\nStatus: {{status}}\n{{#if description}}Description: {{description}}{{/if}}",
-  fields: [
-    {
-      name: "name",
-      friendlyName: "Name",
-      type: "string",
-      required: true
-    },
-    {
-      name: "status",
-      friendlyName: "Status",
-      type: "enum",
-      enumOptions: ["planning", "active", "completed"],
-      required: true,
-      default: "planning"
-    },
-    {
-      name: "description",
-      friendlyName: "Description",
-      type: "string",
-      required: false
-    }
-  ]
-}
-```
-
 ### Semantic Search
 
 Files, data records, and user memories are automatically embedded and searchable:
@@ -507,40 +338,6 @@ Operations:
 - Content extraction (text, images, tables)
 - OCR for images in documents
 - Image description and analysis
-
-## Settings Interface
-
-Cletus provides two interfaces for managing settings:
-
-### Traditional Settings Menu (default)
-- Navigate through nested menus with deep navigation
-- Each setting category is accessed by drilling down through screens
-- Good for focused, sequential configuration
-
-### Split View Settings (use `--split-settings` flag)
-- All settings accessible from a single screen
-- Left panel shows categories, right panel shows configuration
-- Reduced navigation and screen transitions
-- Ideal for quick settings adjustments
-
-Both interfaces provide the same functionality:
-- User profile (name, pronouns, global prompt)
-- Prompt file management
-- Memory management
-- Provider configuration (OpenAI, OpenRouter, Replicate, AWS)
-- Tavily web search setup
-- Model selection for different capabilities
-- Autonomous operation settings
-- Debug mode toggle
-
-## Keyboard Shortcuts
-
-- **Ctrl+C** - Exit current view (returns to main menu)
-- **Arrow Keys** - Navigate menus
-- **Enter** - Select menu item
-- **Type** - In chat view, type messages
-
-## Troubleshooting
 
 ### "No provider configured"
 
@@ -616,10 +413,28 @@ const myNewTool = ai.tool({
 });
 
 // 3. operations/clerk.tsx
-case 'my_new_tool': {
-  const result = await doSomething(operation.input);
-  return { output: result };
-}
+export const myNewTool = operationOf<
+  { input: string },
+  { result: string }
+>({
+  mode: 'read',
+  signature: 'my_new_tool(input: string)',
+  status: (input) => `Processing: ${input.input}`,
+  analyze: async ({ input }, { cwd }) => ({
+    analysis: `This will process: ${input.input}`,
+    doable: true,
+  }),
+  do: async ({ input }, ctx) => {
+    const result = await doSomething(input.input);
+    return { result };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `MyNewTool("${op.input.input}")`,
+    (op) => op.output ? `Result: ${op.output.result}` : null,
+    showInput, showOutput
+  ),
+});
 ```
 
 ### Building
