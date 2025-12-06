@@ -29,93 +29,205 @@ import type {
 // ============================================================================
 
 /**
- * Extracts a numeric value from a complex object for comparison.
- * Supports nested paths and averaging of multiple values.
- */
-function extractNumericValue(
-  value: number | ModelPricing | ModelMetrics | undefined,
-  path?: string
-): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value === 'number') return value;
-  
-  // For ModelPricing, average input/output text costs
-  if ('text' in value) {
-    const pricing = value as ModelPricing;
-    const input = pricing.text?.input;
-    const output = pricing.text?.output;
-    // If neither input nor output pricing is defined, return undefined
-    if (input === undefined && output === undefined) return undefined;
-    // Calculate average of available values
-    return ((input ?? 0) + (output ?? 0)) / 2;
-  }
-  
-  // For ModelMetrics, use tokensPerSecond as primary metric
-  if ('tokensPerSecond' in value) {
-    const metrics = value as ModelMetrics;
-    return metrics.tokensPerSecond;
-  }
-  
-  return undefined;
-}
-
-/**
- * Checks if a model value satisfies a range constraint.
+ * Recursively checks if a model value satisfies min/max constraints.
  * Returns true if the value is acceptable, false otherwise.
+ * 
+ * For primitive values (number, string, boolean), compares directly.
+ * For objects, recursively checks all properties that exist in both min/max and modelValue.
  */
 function satisfiesConstraint<T>(
   modelValue: T | undefined,
-  constraint: RangeConstraint<T> | undefined
+  min: T | undefined,
+  max: T | undefined
 ): boolean {
-  if (!constraint) return true;
-  
-  // Extract numeric values for comparison
-  const numericValue = extractNumericValue(modelValue as any);
-  const minValue = extractNumericValue(constraint.min as any);
-  const maxValue = extractNumericValue(constraint.max as any);
-  
-  // If model doesn't have this metric, check if constraint requires it
-  if (numericValue === undefined) {
-    // If min or max is specified, model must have the metric
-    return minValue === undefined && maxValue === undefined;
+  // If no constraints, always satisfied
+  if (min === undefined && max === undefined) {
+    return true;
   }
   
-  // Check min constraint
-  if (minValue !== undefined && numericValue < minValue) {
+  // If model doesn't have the value but constraints exist, it's not satisfied
+  if (modelValue === undefined) {
     return false;
   }
   
-  // Check max constraint
-  if (maxValue !== undefined && numericValue > maxValue) {
-    return false;
+  // Handle primitive types (numbers)
+  if (typeof modelValue === 'number') {
+    const minNum = min as number | undefined;
+    const maxNum = max as number | undefined;
+    
+    if (minNum !== undefined && modelValue < minNum) {
+      return false;
+    }
+    if (maxNum !== undefined && modelValue > maxNum) {
+      return false;
+    }
+    return true;
   }
   
+  // Handle objects recursively
+  if (typeof modelValue === 'object' && modelValue !== null) {
+    const minObj = min as any;
+    const maxObj = max as any;
+    
+    // Check all properties that exist in constraints
+    const propsToCheck = new Set<string>();
+    if (minObj && typeof minObj === 'object') {
+      Object.keys(minObj).forEach(key => propsToCheck.add(key));
+    }
+    if (maxObj && typeof maxObj === 'object') {
+      Object.keys(maxObj).forEach(key => propsToCheck.add(key));
+    }
+    
+    for (const key of propsToCheck) {
+      const modelProp = (modelValue as any)[key];
+      const minProp = minObj?.[key];
+      const maxProp = maxObj?.[key];
+      
+      if (!satisfiesConstraint(modelProp, minProp, maxProp)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  // For other types, just check existence
   return true;
 }
 
 /**
- * Calculates a target-based score for a model value.
- * Returns a score between 0 and 1, where 1 is closest to target.
+ * Recursively updates min/max range values based on a model value.
+ * Updates min to the minimum and max to the maximum across all models.
+ * Returns the updated min and max.
  */
-function calculateTargetScore(
-  modelValue: number | undefined,
-  target: number | undefined,
-  minValue: number,
-  maxValue: number
-): number {
-  if (target === undefined || modelValue === undefined) return 0.5;
+function calculateRange<T>(
+  modelValue: T | undefined,
+  currentMin: T | undefined,
+  currentMax: T | undefined
+): { min: T | undefined; max: T | undefined } {
+  // If model doesn't have the value, return current range
+  if (modelValue === undefined) {
+    return { min: currentMin, max: currentMax };
+  }
   
-  // Normalize the range to 0-1
-  const range = maxValue - minValue;
-  if (range === 0) return 1;
+  // Handle primitive types (numbers)
+  if (typeof modelValue === 'number') {
+    const minNum = currentMin as number | undefined;
+    const maxNum = currentMax as number | undefined;
+    
+    return {
+      min: (minNum === undefined ? modelValue : Math.min(minNum, modelValue)) as T,
+      max: (maxNum === undefined ? modelValue : Math.max(maxNum, modelValue)) as T
+    };
+  }
   
-  // Calculate distance from target as a proportion of the range
-  const distance = Math.abs(target - modelValue);
-  const normalizedDistance = distance / range;
+  // Handle objects recursively
+  if (typeof modelValue === 'object' && modelValue !== null) {
+    const minObj = (currentMin ?? {}) as any;
+    const maxObj = (currentMax ?? {}) as any;
+    const resultMin: any = { ...minObj };
+    const resultMax: any = { ...maxObj };
+    
+    // Process all properties in modelValue
+    for (const key in modelValue) {
+      const modelProp = (modelValue as any)[key];
+      const { min: newMin, max: newMax } = calculateRange(
+        modelProp,
+        minObj[key],
+        maxObj[key]
+      );
+      
+      if (newMin !== undefined) {
+        resultMin[key] = newMin;
+      }
+      if (newMax !== undefined) {
+        resultMax[key] = newMax;
+      }
+    }
+    
+    return {
+      min: (Object.keys(resultMin).length > 0 ? resultMin : undefined) as T | undefined,
+      max: (Object.keys(resultMax).length > 0 ? resultMax : undefined) as T | undefined
+    };
+  }
   
-  // Convert distance to score (1 = perfect match, 0 = furthest away)
-  // Use 1 - (distance / maxDistance) where maxDistance is the range
-  return Math.max(0, 1 - normalizedDistance);
+  // For other types, just return the value
+  return { min: modelValue, max: modelValue };
+}
+
+/**
+ * Recursively calculates a normalized score based on how close modelValue is to target.
+ * Returns a score between 0 and 1, where 1 is closest to target.
+ * 
+ * For primitive values, normalizes distance between min and max.
+ * For objects, calculates the average score across all defined numeric properties.
+ * Returns undefined if target is not specified or if no valid scores can be calculated.
+ */
+function calculateScore<T>(
+  modelValue: T | undefined,
+  target: T | undefined,
+  min: T | undefined,
+  max: T | undefined
+): number | undefined {
+  // If no target or no model value, can't calculate score
+  if (target === undefined || modelValue === undefined) {
+    return undefined;
+  }
+  
+  // Handle primitive types (numbers)
+  if (typeof modelValue === 'number' && typeof target === 'number') {
+    const minNum = min as number | undefined;
+    const maxNum = max as number | undefined;
+    
+    // Need both min and max to normalize
+    if (minNum === undefined || maxNum === undefined) {
+      return undefined;
+    }
+    
+    // If min and max are the same, perfect score if value matches
+    const range = maxNum - minNum;
+    if (range === 0) {
+      return modelValue === target ? 1 : 0;
+    }
+    
+    // Calculate normalized distance from target
+    const distance = Math.abs(target - modelValue);
+    const normalizedDistance = distance / range;
+    
+    // Score is 1 - normalizedDistance, clamped to [0, 1]
+    return Math.max(0, Math.min(1, 1 - normalizedDistance));
+  }
+  
+  // Handle objects recursively
+  if (typeof modelValue === 'object' && modelValue !== null && typeof target === 'object' && target !== null) {
+    const targetObj = target as any;
+    const minObj = min as any;
+    const maxObj = max as any;
+    
+    const scores: number[] = [];
+    
+    // Calculate scores for all properties in target
+    for (const key in targetObj) {
+      const modelProp = (modelValue as any)[key];
+      const targetProp = targetObj[key];
+      const minProp = minObj?.[key];
+      const maxProp = maxObj?.[key];
+      
+      const score = calculateScore(modelProp, targetProp, minProp, maxProp);
+      if (score !== undefined) {
+        scores.push(score);
+      }
+    }
+    
+    // Return average of all defined scores
+    if (scores.length === 0) {
+      return undefined;
+    }
+    
+    return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  }
+  
+  // For other types, can't calculate meaningful score
+  return undefined;
 }
 
 // ============================================================================
@@ -394,15 +506,86 @@ export class ModelRegistry<
    * Search and score models based on criteria
    */
   searchModels(metadata: AIBaseMetadata<TProviders>): ScoredModel<TProviderKey>[] {
-    const scored: ScoredModel<TProviderKey>[] = [];
-
     // Filter list by models we have providers for
     const providedModels = this.providedModels();
 
+    // Step 1: Filter to applicable models
+    const applicableModels: Array<{ model: ModelInfo<TProviderKey>; applicability: NonNullable<ReturnType<typeof this.isModelApplicable>> }> = [];
+    
     for (const model of providedModels) {
-      const score = this.scoreModel(model, metadata);
-      if (score.score > 0) {
-        scored.push(score);
+      const applicability = this.isModelApplicable(model, metadata);
+      if (applicability) {
+        applicableModels.push({ model, applicability });
+      }
+    }
+
+    // If no applicable models, return empty
+    if (applicableModels.length === 0) {
+      return [];
+    }
+
+    // Step 2: Calculate ranges across all applicable models
+    let rangeMin: Partial<ModelInfo<TProviderKey>> = {};
+    let rangeMax: Partial<ModelInfo<TProviderKey>> = {};
+
+    for (const { model } of applicableModels) {
+      // Calculate range for pricing
+      if (model.pricing) {
+        const { min, max } = calculateRange(model.pricing, rangeMin.pricing, rangeMax.pricing);
+        rangeMin.pricing = min;
+        rangeMax.pricing = max;
+      }
+
+      // Calculate range for contextWindow
+      if (model.contextWindow) {
+        const { min, max } = calculateRange(model.contextWindow, rangeMin.contextWindow, rangeMax.contextWindow);
+        rangeMin.contextWindow = min;
+        rangeMax.contextWindow = max;
+      }
+
+      // Calculate range for maxOutputTokens
+      if (model.maxOutputTokens) {
+        const { min, max } = calculateRange(model.maxOutputTokens, rangeMin.maxOutputTokens, rangeMax.maxOutputTokens);
+        rangeMin.maxOutputTokens = min;
+        rangeMax.maxOutputTokens = max;
+      }
+
+      // Calculate range for metrics
+      if (model.metrics) {
+        const { min, max } = calculateRange(model.metrics, rangeMin.metrics, rangeMax.metrics);
+        rangeMin.metrics = min;
+        rangeMax.metrics = max;
+      }
+    }
+
+    // Step 3: Score all applicable models with ranges
+    const scored: ScoredModel<TProviderKey>[] = [];
+
+    for (const { model, applicability } of applicableModels) {
+      const result: ScoredModel<TProviderKey> = {
+        model,
+        score: 0,
+        matchedRequired: applicability.matchedRequired,
+        matchedOptional: applicability.matchedOptional,
+        missingRequired: applicability.missingRequired,
+      };
+
+      // Determine weights
+      let weights: ModelSelectionWeights;
+      if (metadata.weights) {
+        weights = metadata.weights;
+      } else if (metadata.weightProfile && this.weightProfiles[metadata.weightProfile]) {
+        weights = this.weightProfiles[metadata.weightProfile];
+      } else if (this.defaultWeights) {
+        weights = this.defaultWeights;
+      } else {
+        weights = { cost: 0.5, speed: 0.3, accuracy: 0.2 };
+      }
+
+      result.score = this.calculateWeightedScore(model, weights, metadata, rangeMin, rangeMax);
+      
+      if (result.score > 0) {
+        scored.push(result);
       }
     }
 
@@ -431,39 +614,10 @@ export class ModelRegistry<
         return undefined;
       }
 
-      // Validate that provider supports required capabilities
-      if (criteria.required) {
-        const providerCaps = this.providerCapabilities.get(model.provider);
-
-        for (const cap of criteria.required) {
-          // Check if provider supports this capability
-          const providerSupportsCap = !providerCaps || providerCaps.has(cap);
-
-          if (!providerSupportsCap) {
-            // Provider doesn't support this capability, cannot use this model
-            return undefined;
-          }
-        }
-      }
-
-      // Validate that model supports required parameters
-      if (criteria.requiredParameters && criteria.requiredParameters.length > 0) {
-        const optionalParams = criteria.optionalParameters || [];
-
-        for (const param of criteria.requiredParameters) {
-          // If this param is marked as optional, skip the requirement check
-          if (optionalParams.includes(param)) {
-            continue;
-          }
-
-          // Check if model supports this parameter
-          const modelSupportsParam = model.supportedParameters?.has(param) ?? false;
-
-          if (!modelSupportsParam) {
-            // Required parameter not supported by model
-            return undefined;
-          }
-        }
+      // Check if model is applicable
+      const applicability = this.isModelApplicable(model, criteria);
+      if (!applicability) {
+        return undefined;
       }
 
       return {
@@ -525,26 +679,26 @@ export class ModelRegistry<
   }
 
   /**
-   * Score a model against criteria
+   * Check if a model is applicable given the criteria.
+   * Returns null if not applicable, or an object with matched capabilities if applicable.
    */
-  private scoreModel(model: ModelInfo<TProviderKey>, criteria: AIBaseMetadata<TProviders>): ScoredModel<TProviderKey> {
-    const result: ScoredModel<TProviderKey> = {
-      model,
-      score: 0,
-      matchedRequired: [],
-      matchedOptional: [],
-      missingRequired: [],
-    };
-
+  private isModelApplicable(
+    model: ModelInfo<TProviderKey>,
+    criteria: AIBaseMetadata<TProviders>
+  ): { matchedRequired: ModelCapability[]; matchedOptional: ModelCapability[]; missingRequired: ModelCapability[] } | null {
     // Check provider allowlist/blocklist
     if (criteria.providers) {
       if (criteria.providers.deny?.includes(model.provider)) {
-        return result; // score = 0
+        return null;
       }
       if (criteria.providers.allow && !criteria.providers.allow.includes(model.provider)) {
-        return result; // score = 0
+        return null;
       }
     }
+
+    const matchedRequired: ModelCapability[] = [];
+    const matchedOptional: ModelCapability[] = [];
+    const missingRequired: ModelCapability[] = [];
 
     // Check required capabilities against both model AND provider
     if (criteria.required) {
@@ -560,15 +714,15 @@ export class ModelRegistry<
 
         // Both model AND provider must support the capability
         if (modelHasCap && providerSupportsCap) {
-          result.matchedRequired.push(cap);
+          matchedRequired.push(cap);
         } else {
-          result.missingRequired.push(cap);
+          missingRequired.push(cap);
         }
       }
 
-      // If any required capabilities are missing, score = 0
-      if (result.missingRequired.length > 0) {
-        return result;
+      // If any required capabilities are missing, not applicable
+      if (missingRequired.length > 0) {
+        return null;
       }
     }
 
@@ -576,7 +730,7 @@ export class ModelRegistry<
     if (criteria.optional) {
       for (const cap of criteria.optional) {
         if (model.capabilities.has(cap)) {
-          result.matchedOptional.push(cap);
+          matchedOptional.push(cap);
         }
       }
     }
@@ -596,33 +750,68 @@ export class ModelRegistry<
 
         if (!modelSupportsParam) {
           // Required parameter not supported by model
-          return result; // score = 0
+          return null;
         }
       }
     }
 
     // Check pricing constraints
-    if (!satisfiesConstraint(model.pricing, criteria.pricing)) {
-      return result; // score = 0
+    if (!satisfiesConstraint(model.pricing, criteria.pricing?.min, criteria.pricing?.max)) {
+      return null;
     }
 
     // Check context window constraints
-    if (!satisfiesConstraint(model.contextWindow, criteria.contextWindow)) {
-      return result; // score = 0
+    if (!satisfiesConstraint(model.contextWindow, criteria.contextWindow?.min, criteria.contextWindow?.max)) {
+      return null;
     }
 
     // Check output tokens constraints
-    if (!satisfiesConstraint(model.maxOutputTokens, criteria.outputTokens)) {
-      return result; // score = 0
+    if (!satisfiesConstraint(model.maxOutputTokens, criteria.outputTokens?.min, criteria.outputTokens?.max)) {
+      return null;
     }
 
     // Check metrics constraints
-    if (!satisfiesConstraint(model.metrics, criteria.metrics)) {
-      return result; // score = 0
+    if (!satisfiesConstraint(model.metrics, criteria.metrics?.min, criteria.metrics?.max)) {
+      return null;
     }
 
     if (criteria.tier && model.tier !== criteria.tier) {
-      return result; // score = 0
+      return null;
+    }
+
+    return { matchedRequired, matchedOptional, missingRequired };
+  }
+
+  /**
+   * Score a model against criteria
+   * @param skipApplicabilityCheck - If true, skips the applicability check (used when already filtered)
+   * @param rangeMin - Minimum values across all applicable models (for target scoring)
+   * @param rangeMax - Maximum values across all applicable models (for target scoring)
+   */
+  private scoreModel(
+    model: ModelInfo<TProviderKey>,
+    criteria: AIBaseMetadata<TProviders>,
+    skipApplicabilityCheck: boolean = false,
+    rangeMin?: Partial<ModelInfo<TProviderKey>>,
+    rangeMax?: Partial<ModelInfo<TProviderKey>>
+  ): ScoredModel<TProviderKey> {
+    const result: ScoredModel<TProviderKey> = {
+      model,
+      score: 0,
+      matchedRequired: [],
+      matchedOptional: [],
+      missingRequired: [],
+    };
+
+    // Check if model is applicable (unless already checked)
+    if (!skipApplicabilityCheck) {
+      const applicability = this.isModelApplicable(model, criteria);
+      if (!applicability) {
+        return result; // score = 0
+      }
+      result.matchedRequired = applicability.matchedRequired;
+      result.matchedOptional = applicability.matchedOptional;
+      result.missingRequired = applicability.missingRequired;
     }
 
     // Determine weights with priority: metadata.weights > weightProfile > defaultWeights
@@ -637,40 +826,54 @@ export class ModelRegistry<
       weights = { cost: 0.5, speed: 0.3, accuracy: 0.2 };
     }
 
-    result.score = this.calculateWeightedScore(model, weights, criteria);
+    result.score = this.calculateWeightedScore(model, weights, criteria, rangeMin, rangeMax);
 
     return result;
   }
 
   /**
    * Calculate weighted score for a model
+   * @param rangeMin - Minimum values across all applicable models (for target scoring)
+   * @param rangeMax - Maximum values across all applicable models (for target scoring)
    */
   private calculateWeightedScore(
     model: ModelInfo,
     weights: ModelSelectionWeights,
-    metadata: AIBaseMetadata<TProviders>
+    metadata: AIBaseMetadata<TProviders>,
+    rangeMin?: Partial<ModelInfo<TProviderKey>>,
+    rangeMax?: Partial<ModelInfo<TProviderKey>>
   ): number {
     let score = 0;
     let weighted = 0;
 
     // Cost score with optional target-based scoring
     if (weights.cost) {
-      const avgCost = extractNumericValue(model.pricing);
-      if (avgCost !== undefined && avgCost > 0) {
-        let costScore: number;
+      let costScore: number | undefined;
+      
+      // If target pricing specified and we have range, use target-based scoring
+      if (metadata.pricing?.target && rangeMin && rangeMax) {
+        costScore = calculateScore(
+          model.pricing,
+          metadata.pricing.target,
+          rangeMin.pricing,
+          rangeMax.pricing
+        );
+      }
+      
+      // Fallback to default scoring if no target or no range
+      if (costScore === undefined) {
+        // Extract average cost for simple scoring
+        const inputCost = model.pricing?.text?.input ?? 0;
+        const outputCost = model.pricing?.text?.output ?? 0;
+        const avgCost = (inputCost + outputCost) / 2;
         
-        // If target pricing specified, use target-based scoring
-        if (metadata.pricing?.target) {
-          const targetCost = extractNumericValue(metadata.pricing.target) ?? avgCost;
-          // For target scoring, we need to know the range - use reasonable defaults
-          const minCost = extractNumericValue(metadata.pricing.min) ?? 0;
-          const maxCost = extractNumericValue(metadata.pricing.max) ?? targetCost * 2;
-          costScore = calculateTargetScore(avgCost, targetCost, minCost, maxCost);
-        } else {
+        if (avgCost > 0) {
           // Default: lower cost is better
           costScore = 1 / (1 + avgCost / 10);
         }
-        
+      }
+      
+      if (costScore !== undefined) {
         score += weights.cost * costScore;
         weighted++;
       }
@@ -678,21 +881,25 @@ export class ModelRegistry<
 
     // Speed score with optional target-based scoring
     if (weights.speed) {
-      const speed = model.metrics?.tokensPerSecond;
-      if (speed !== undefined) {
-        let speedScore: number;
-        
-        // If target metrics specified with tokensPerSecond, use target-based scoring
-        if (metadata.metrics?.target?.tokensPerSecond) {
-          const targetSpeed = metadata.metrics.target.tokensPerSecond;
-          const minSpeed = metadata.metrics.min?.tokensPerSecond ?? 0;
-          const maxSpeed = metadata.metrics.max?.tokensPerSecond ?? targetSpeed * 2;
-          speedScore = calculateTargetScore(speed, targetSpeed, minSpeed, maxSpeed);
-        } else {
-          // Default: higher speed is better (normalize to 0-1)
-          speedScore = Math.min(speed / 100, 1);
-        }
-        
+      let speedScore: number | undefined;
+      
+      // If target metrics specified and we have range, use target-based scoring
+      if (metadata.metrics?.target && rangeMin && rangeMax) {
+        speedScore = calculateScore(
+          model.metrics,
+          metadata.metrics.target,
+          rangeMin.metrics,
+          rangeMax.metrics
+        );
+      }
+      
+      // Fallback to default scoring if no target or no range
+      if (speedScore === undefined && model.metrics?.tokensPerSecond !== undefined) {
+        // Default: higher speed is better (normalize to 0-1)
+        speedScore = Math.min(model.metrics.tokensPerSecond / 100, 1);
+      }
+      
+      if (speedScore !== undefined) {
         score += weights.speed * speedScore;
         weighted++;
       }
@@ -713,21 +920,25 @@ export class ModelRegistry<
 
     // Context window score with optional target-based scoring
     if (weights.contextWindow) {
-      const contextWindow = model.contextWindow;
-      if (contextWindow > 0) {
-        let contextScore: number;
-        
-        // If target context window specified, use target-based scoring
-        if (metadata.contextWindow?.target) {
-          const targetWindow = metadata.contextWindow.target;
-          const minWindow = metadata.contextWindow.min ?? 0;
-          const maxWindow = metadata.contextWindow.max ?? targetWindow * 2;
-          contextScore = calculateTargetScore(contextWindow, targetWindow, minWindow, maxWindow);
-        } else {
-          // Default: larger context window is better (normalize to 0-1)
-          contextScore = Math.min(contextWindow / 100000, 1);
-        }
-        
+      let contextScore: number | undefined;
+      
+      // If target context window specified and we have range, use target-based scoring
+      if (metadata.contextWindow?.target && rangeMin && rangeMax) {
+        contextScore = calculateScore(
+          model.contextWindow,
+          metadata.contextWindow.target,
+          rangeMin.contextWindow,
+          rangeMax.contextWindow
+        );
+      }
+      
+      // Fallback to default scoring if no target or no range
+      if (contextScore === undefined && model.contextWindow > 0) {
+        // Default: larger context window is better (normalize to 0-1)
+        contextScore = Math.min(model.contextWindow / 100000, 1);
+      }
+      
+      if (contextScore !== undefined) {
         score += weights.contextWindow * contextScore;
         weighted++;
       }
