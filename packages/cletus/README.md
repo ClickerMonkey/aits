@@ -2,16 +2,13 @@
 
 > **Interactive CLI demo showcasing @aeye capabilities - an AI-powered assistant with file management, data operations, and autonomous task execution.**
 
-Cletus is a terminal-based AI assistant built with the @aeye library that demonstrates the power of multi-provider AI integration, tool calling, and context management. It features a beautiful TUI (Terminal User Interface) powered by React/Ink and provides specialized AI agents for different domains like file operations, data management, image generation, and web searching.
-
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)](https://www.typescriptlang.org/)
-
-## Installation
 
 ```bash
 npm install -g @aeye/cletus
 ```
+
+For the best experience, configure what models are used for each use case. Use openai/gpt-4o for chat, google/nano-banana for image generation and editing, anthropic/claude-sonnet-4 for file editing, etc! If you don't specify then a model will be dynamically chosen based on configured weights and what can handle the request.
 
 ## Features
 
