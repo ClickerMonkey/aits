@@ -42,10 +42,12 @@ function extractNumericValue(
   // For ModelPricing, average input/output text costs
   if ('text' in value) {
     const pricing = value as ModelPricing;
-    const input = pricing.text?.input ?? 0;
-    const output = pricing.text?.output ?? 0;
-    if (input === 0 && output === 0) return undefined;
-    return (input + output) / 2;
+    const input = pricing.text?.input;
+    const output = pricing.text?.output;
+    // If neither input nor output pricing is defined, return undefined
+    if (input === undefined && output === undefined) return undefined;
+    // Calculate average of available values
+    return ((input ?? 0) + (output ?? 0)) / 2;
   }
   
   // For ModelMetrics, use tokensPerSecond as primary metric
