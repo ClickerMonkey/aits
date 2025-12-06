@@ -72,9 +72,10 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
   // Select tools based on semantic similarity
   // Always include utility tools
   const utilityTools = toolRegistry.getToolset('utility');
+  const adaptiveToolsCount = ctx.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
   const selectedTools = await toolRegistry.selectTools(
     query,
-    ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT - utilityTools.length,
+    adaptiveToolsCount - utilityTools.length,
     ['utility'], // Exclude utility since we add it separately
     ctx,
   );

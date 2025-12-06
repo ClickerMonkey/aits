@@ -106,6 +106,7 @@ export class ConfigFile extends JsonFile<Config> {
           maxIterations: AUTONOMOUS.DEFAULT_MAX_ITERATIONS,
           timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS,
         },
+        adaptiveTools: 14,
         showInput: false,
         showOutput: false,
         showSystemMessages: true,
