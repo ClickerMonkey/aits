@@ -374,6 +374,22 @@ function convert(schema: z.ZodType | z.core.$ZodType, context: ConversionContext
 
   // Check if this is a lazy schema and extract metadata early
   if (schema instanceof z.ZodLazy) {
+    // Check cache FIRST before evaluating getter to prevent infinite recursion
+    const [cachedJs, cachedId] = context.definitions.get(schema) || [];
+    if (cachedJs && cachedId) {
+      if (schema === context.root) {
+        return { $ref: `#` };
+      }
+      if (!context.definitionSchemas.has(cachedId)) {
+        context.definitionSchemas.set(cachedId, { ...cachedJs });
+        for (const prop in cachedJs) {
+          delete cachedJs[prop as keyof JSONSchema];
+        }
+        cachedJs.$ref = `#/$defs/${cachedId}`;
+      }
+      return { $ref: `#/$defs/${cachedId}` };
+    }
+
     const metadata = (schema instanceof z.ZodType) ? schema.meta() : null;
     const aid = metadata?.aid;
 
