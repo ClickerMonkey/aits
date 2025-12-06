@@ -162,10 +162,12 @@ export class ToolRegistry {
    */
   async selectTools(
     query: string,
-    topN: number = ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT,
+    topN?: number,
     excludeToolsets?: string[],
     ctx?: CletusAIContext
   ): Promise<RegisteredTool[]> {
+    // Use config value if available, otherwise fall back to constant
+    const effectiveTopN = topN ?? ctx?.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
 
     if (ctx?.chatStatus) {
       const embedTools = this.getToolsToEmbed();
@@ -184,7 +186,7 @@ export class ToolRegistry {
     const queryVectors = await embed([query]);
     if (!queryVectors || queryVectors.length === 0) {
       // Fallback: return tools from all toolsets if embedding fails
-      return this.getAllTools().slice(0, topN);
+      return this.getAllTools().slice(0, effectiveTopN);
     }
 
     const queryVector = queryVectors[0];
@@ -201,7 +203,7 @@ export class ToolRegistry {
         similarity: cosineSimilarity(queryVector, t.vector),
       }))
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topN);
+      .slice(0, effectiveTopN);
 
     return toolsWithSimilarity.map(t => t.tool);
   }

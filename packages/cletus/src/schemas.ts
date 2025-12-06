@@ -35,6 +35,7 @@ export const UserSchema = z.object({
     maxIterations: z.number().min(AUTONOMOUS.MIN_ITERATIONS).default(AUTONOMOUS.DEFAULT_MAX_ITERATIONS),
     timeout: z.number().min(AUTONOMOUS.MIN_TIMEOUT_MS).default(AUTONOMOUS.DEFAULT_TIMEOUT_MS),
   }).optional(),
+  adaptiveTools: z.number().min(1).default(14),
   showInput: z.boolean().default(false),
   showOutput: z.boolean().default(false),
   showSystemMessages: z.boolean().default(true),
