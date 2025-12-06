@@ -116,6 +116,7 @@ async function main() {
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
 
+  // Initialize embed worker (don't await - let it init in background)
   initWorker();
 
   const { waitUntilExit } = render(React.createElement(App), {

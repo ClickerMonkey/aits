@@ -590,6 +590,48 @@ export class SourceColumnExpr extends Expr {
         return this.extractColumnValue(aliasRecords[0]);
       }
 
+      // Validate: Check if source is a table name that has an alias
+      const typeDef = ctx.types.get(this.source);
+      if (typeDef) {
+        // This is a valid table name, but it's not in the SelectRecord
+        // Check if there's an alias for this table in the current query context
+        const availableSources = Object.keys(record);
+
+        // Check if any available source references this table type
+        const possibleAlias = availableSources.find(src => {
+          const srcRecord = record[src];
+          if (!srcRecord) return false;
+          // Check if this record is from the same table by looking at type definitions
+          // We can check if the record structure matches
+          const srcType = ctx.types.get(src);
+          // If the source in the record is not a type, it might be an alias
+          if (!srcType && ctx.aliases.has(src)) {
+            // Get the records from the alias and check their structure
+            const aliasedRecords = ctx.aliases.get(src);
+            if (aliasedRecords && aliasedRecords.length > 0) {
+              // We can't easily determine the type from the record,
+              // but we can suggest using available aliases
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (availableSources.length > 0) {
+          ctx.validationErrors.push({
+            path: this.path,
+            message: `Source '${this.source}' not found in query scope. Available sources: ${availableSources.join(', ')}. If '${this.source}' has an alias, use the alias instead of the table name.`,
+            metadata: { source: this.source, availableSources }
+          });
+        } else {
+          ctx.validationErrors.push({
+            path: this.path,
+            message: `Source '${this.source}' not found in query scope.`,
+            metadata: { source: this.source }
+          });
+        }
+      }
+
       // Source doesn't exist in SelectRecord (e.g., unmatched side of outer join)
       return undefined;
     }
@@ -619,6 +661,28 @@ export class SourceColumnExpr extends Expr {
           updated: targetRecord.updated,
           ...targetRecord.fields,
         };
+      }
+
+      // Validate: Check if source is a table name that has an alias
+      const typeDef = ctx.types.get(this.source);
+      if (typeDef) {
+        // This is a valid table name, but it's not in the SelectRecord
+        // Check if there's an alias for this table in the current query context
+        const availableSources = Object.keys(record);
+
+        if (availableSources.length > 0) {
+          ctx.validationErrors.push({
+            path: this.path,
+            message: `Source '${this.source}' not found in query scope. Available sources: ${availableSources.join(', ')}. If '${this.source}' has an alias, use the alias instead of the table name.`,
+            metadata: { source: this.source, availableSources }
+          });
+        } else {
+          ctx.validationErrors.push({
+            path: this.path,
+            message: `Source '${this.source}' not found in query scope.`,
+            metadata: { source: this.source }
+          });
+        }
       }
 
       return {};

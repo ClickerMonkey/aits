@@ -156,6 +156,13 @@ export function getKnowledgePath(): string {
 }
 
 /**
+ * Get path to cache file
+ */
+export function getCachePath(): string {
+  return path.join(getCletusHome(), 'cache.json');
+}
+
+/**
  * Get path to chat messages file
  */
 export function getChatPath(chatId: string): string {

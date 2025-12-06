@@ -3,6 +3,7 @@ import { cosineSimilarity, pluralize } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
 import { CletusAIContext } from './ai';
+import { getCachedVector, setCachedVector } from './embedding-cache';
 
 /**
  * Registered tool with embedded instructions for semantic search
@@ -30,7 +31,7 @@ export class ToolRegistry {
   /**
    * Register a tool with its toolset
    */
-  register(toolset: string, tool: AnyTool, instructions: string): void {
+  async register(toolset: string, tool: AnyTool, instructions: string): Promise<void> {
     const name = tool.name;
 
     const existing = this.tools.get(name);
@@ -39,11 +40,14 @@ export class ToolRegistry {
       return;
     }
 
+    // Try to load from cache using instructions as key
+    const cachedVector = await getCachedVector(instructions);
+
     this.tools.set(name, {
       name,
       toolset,
       tool,
-      vector: null,
+      vector: cachedVector,
       instructions,
     });
   }
@@ -53,7 +57,7 @@ export class ToolRegistry {
    */
   async registerToolset(toolset: string, tools: AnyTool[], getInstructions: (tool: AnyTool) => Promise<string>): Promise<void> {
     for (const tool of tools) {
-      this.register(toolset, tool, await getInstructions(tool));
+      await this.register(toolset, tool, await getInstructions(tool));
     }
   }
 
@@ -130,13 +134,15 @@ export class ToolRegistry {
 
     const instructions = toolsToEmbed.map(t => t.instructions);
     const vectors = await embed(instructions);
-    
+
     if (!vectors) {
       return;
     }
 
     for (let i = 0; i < toolsToEmbed.length; i++) {
       toolsToEmbed[i].vector = vectors[i];
+      // Save to cache for next time using instructions as key
+      await setCachedVector(toolsToEmbed[i].instructions, vectors[i]);
     }
   }
 
