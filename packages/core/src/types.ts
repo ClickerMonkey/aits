@@ -124,6 +124,21 @@ export interface Component<
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
   >(...[ctx]: OptionalParams<[TCoreContext]>): Promise<boolean>;
+
+  /**
+   * Returns metadata for the component based on the input and context.
+   * Metadata is typically used during execution/streaming to provide additional context.
+   * 
+   * @param input - The input for the component.
+   * @param ctx - The context for the component's operation.
+   * @returns The metadata for the component.
+   */
+  metadata(): TMetadata;
+  metadata<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(input?: TInput, ctx?: TCoreContext): TMetadata | Promise<TMetadata>;
 }
 
 /**

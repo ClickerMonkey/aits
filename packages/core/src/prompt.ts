@@ -294,7 +294,7 @@ export class Prompt<
     private config = resolveFn(input.config),
     private translate = resolveFn(input.input),
     private content = Prompt.compileContent(input.content, !!input.tools?.length),
-    private metadata = resolveFn(input.metadataFn),
+    private metadataFn = resolveFn(input.metadataFn),
   ) {
   }
 
@@ -466,6 +466,39 @@ export class Prompt<
   }
 
   /**
+   * Returns metadata for the prompt based on the input and context.
+   * Combines static metadata with dynamically generated metadata from metadataFn.
+   *
+   * @param input - The input for the prompt.
+   * @param ctx - The context for the prompt's operation.
+   * @returns The metadata for the prompt.
+   */
+  metadata(): TMetadata;
+  metadata<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(input?: TInput, ctx?: TCoreContext): Promise<TMetadata>;
+  metadata<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(input?: TInput, ctx?: TCoreContext): TMetadata | Promise<TMetadata> {
+    // If both input and context are not specified, just return static metadata
+    if (input === undefined && ctx === undefined) {
+      return (this.input.metadata || {}) as TMetadata;
+    }
+
+    const actualInput = (input || {}) as TInput;
+    const actualCtx = (ctx || {}) as Context<TContext, TMetadata>;
+
+    return this.metadataFn(actualInput, actualCtx).then(dynamicMetadata => ({
+      ...(this.input.metadata || {} as TMetadata),
+      ...(dynamicMetadata || {}),
+    } as TMetadata));
+  }
+
+  /**
    * Streams the prompt execution, yielding events as they occur.
    * This is the core execution method that handles AI interaction, tool calling, and response parsing.
    *
@@ -592,7 +625,7 @@ export class Prompt<
 
       const metadata: TMetadata = {
         ...(this.input.metadata || {} as TMetadata),
-        ...(await this.metadata(input, ctx) || {}),
+        ...(await this.metadataFn(input, ctx) || {}),
       };
 
       const stream = streamer(request, ctx, metadata, streamController.signal);
