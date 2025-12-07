@@ -31,6 +31,32 @@ function generateAllFieldDescriptions(type: TypeDefinition, context: 'select' | 
   return [...systemFields, ...type.fields.map(generateFieldDescription)].join('; ');
 }
 
+/**
+ * Generate a comprehensive description of a type including all its metadata.
+ * Used for prompts that need full type information.
+ */
+export function describeType(type: TypeDefinition): string {
+  const parts: string[] = [];
+  
+  parts.push(`Name: ${type.name}`);
+  parts.push(`Friendly Name: ${type.friendlyName}`);
+  
+  if (type.description) {
+    parts.push(`Description: ${type.description}`);
+  }
+  
+  parts.push(`Fields: ${generateAllFieldDescriptions(type, 'select')}`);
+  
+  return parts.join(' | ');
+}
+
+/**
+ * Generate comprehensive descriptions for all types.
+ */
+export function describeTypes(types: TypeDefinition[]): string {
+  return types.map(describeType).join('\n');
+}
+
 export type Source = string; // table or alias or with statement name
 export type Table = string; // table that can be read from
 export type Column = string; // column name, used for insert/update (lvalues)

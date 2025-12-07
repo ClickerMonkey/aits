@@ -17,6 +17,7 @@ import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
 import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/query';
 import type { Query } from '../helpers/dba';
+import { createDBASchemas, describeTypes } from '../helpers/dba';
 
 
 const getKnowledge = async () => {
@@ -538,20 +539,32 @@ function describeQuery(query: Query): string {
 export interface QueryOperationCache {
   payload?: QueryExecutionPayload;
   canCommit?: CanCommitResult;
+  builtQuery?: Query; // Store the built query when input is a string
+  queryString?: string; // Store the original query string for rendering
 }
 
 export const query = operationOf<
-  { query: Query; commit?: boolean },
+  { query: Query | string; commit?: boolean },
   QueryResult,
   {},
   QueryOperationCache
 >({
   mode: 'update', // Can modify data, so requires update mode
-  signature: 'query(query: Query, commit?: boolean = true)',
-  status: ({ query }) => `Executing ${getQueryKind(query)} query`,
+  signature: 'query(query: Query | string, commit?: boolean = true)',
+  status: ({ query }) => typeof query === 'string' ? `Executing query: ${abbreviate(query, 50)}` : `Executing ${getQueryKind(query)} query`,
   inputFormat: 'json',
   outputFormat: 'json',
   analyze: async ({ input: { query: queryInput } }, { config }) => {
+    // If query is a string, we cannot analyze it in the analyze phase
+    // Analysis requires executing prompts which is not allowed in analyze phase
+    if (typeof queryInput === 'string') {
+      return {
+        analysis: `This will execute a query based on the description: "${abbreviate(queryInput, 100)}". The query will be built and validated during execution.`,
+        doable: true,
+        cache: { queryString: queryInput },
+      };
+    }
+
     const kind = getQueryKind(queryInput);
     const description = describeQuery(queryInput);
 
@@ -614,8 +627,107 @@ export const query = operationOf<
     };
   },
   do: async ({ input: { query: queryInput, commit = true }, cache }, ctx) => {
-    const { config, log } = ctx;
+    const { config, log, ai, chatStatus } = ctx;
     const getManager = (typeName: string) => new DataManager(typeName);
+
+    // Store the original query string for cache
+    const originalQueryString = typeof queryInput === 'string' ? queryInput : undefined;
+    
+    // If query is a string, we need to build it first
+    let parsedQuery: Query;
+    if (typeof queryInput === 'string') {
+      chatStatus('Analyzing query requirements...');
+      
+      // Step 1: Get list of types needed for the query
+      const types = config.getData().types;
+      const typeNames = types.map(t => t.name);
+      const typeDescriptions = describeTypes(types);
+      
+      // Guard against empty type names array
+      if (typeNames.length === 0) {
+        throw new Error('No data types available to build query');
+      }
+      
+      const typeSelector = ai.prompt({
+        name: 'query_type_selector',
+        description: 'Determine which data types are needed for a query',
+        content: `You are a database query analyzer. Given a natural language query description and a list of available data types, determine which types are needed to execute the query.
+
+Available types:
+{{typeDescriptions}}
+
+Query description:
+{{queryDescription}}
+
+Return a JSON object with an array of type names that are needed to execute this query. Only include types that are absolutely necessary.`,
+        schema: z.object({
+          types: z.array(z.enum(typeNames as [string, ...string[]])).describe('Array of type names needed for the query'),
+        }),
+        input: ({ queryDescription }: { queryDescription: string }) => ({ typeDescriptions, queryDescription }),
+        metadataFn: () => ({
+          model: config.getData().user.models?.chat,
+        }),
+      });
+
+      const { types: neededTypeNames } = await typeSelector.get('result', { queryDescription: queryInput }, ctx);
+      
+      // Validate that all needed types exist
+      const neededTypes = neededTypeNames
+        .map(name => types.find(t => t.name === name))
+        .filter((t): t is TypeDefinition => t !== undefined);
+      
+      if (neededTypes.length === 0) {
+        throw new Error('Could not determine which data types are needed for this query');
+      }
+
+      chatStatus(`Building query for types: ${neededTypes.map(t => t.friendlyName).join(', ')}...`);
+
+      // Step 2: Build the query using the selected types
+      const schemas = createDBASchemas(neededTypes);
+      
+      const queryBuilder = ai.prompt({
+        name: 'query_builder',
+        description: 'Build a structured query from a natural language description',
+        content: `You are a database query builder. Given a natural language query description and the schema for relevant data types, build a structured query object that accomplishes the desired operation.
+
+Query description:
+{{queryDescription}}
+
+Build a query object that satisfies this description. The query must be valid according to the schema and should precisely match the intent of the description.`,
+        schema: z.object({
+          query: schemas.QuerySchema,
+        }),
+        input: ({ queryDescription }: { queryDescription: string }) => ({ queryDescription }),
+        metadataFn: () => ({
+          model: config.getData().user.models?.chat,
+        }),
+        validate: async ({ query }: { query: Query }, validationCtx) => {
+          // Validate the query by executing it without committing
+          const payload = await executeQueryWithoutCommit(
+            query,
+            () => config.getData().types,
+            getManager,
+            getKnowledge,
+            embedQuery,
+          );
+          
+          if (!payload.result.canCommit && payload.result.validationErrors && payload.result.validationErrors.length > 0) {
+            const errors = payload.result.validationErrors
+              .map(err => `${err.path}: ${err.message}${err.suggestion ? ` (${err.suggestion})` : ''}`)
+              .join('\n');
+            throw new Error(`Query validation failed:\n${errors}`);
+          }
+        },
+      });
+
+      const { query: builtQuery } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx);
+      
+      // Store the built query in cache
+      parsedQuery = builtQuery;
+      cache = { ...cache, builtQuery, queryString: originalQueryString };
+    } else {
+      parsedQuery = queryInput;
+    }
 
     // If we have a cached payload and commit is true, try to use it
     if (cache?.payload && commit) {
@@ -638,7 +750,7 @@ export const query = operationOf<
         // Try to re-execute the query
         try {
           const { result: output } = await executeQuery(
-            queryInput,
+            parsedQuery,
             () => config.getData().types,
             getManager,
             getKnowledge,
@@ -662,7 +774,7 @@ export const query = operationOf<
     // Execute the query fresh
     if (commit) {
       const payload = await executeQuery(
-        queryInput,
+        parsedQuery,
         () => config.getData().types,
         getManager,
         getKnowledge,
@@ -679,7 +791,7 @@ export const query = operationOf<
     } else {
       // Execute without committing (for testing)
       const payload = await executeQueryWithoutCommit(
-        queryInput,
+        parsedQuery,
         () => config.getData().types,
         getManager,
         getKnowledge,
@@ -693,8 +805,24 @@ export const query = operationOf<
     }
   },
   render: (op, ai, showInput, showOutput) => {
-    const kind = getQueryKind(op.input.query);
-    const description = describeQuery(op.input.query);
+    // Check if the query was originally a string
+    const isStringQuery = typeof op.input.query === 'string';
+    const queryToUse = op.cache?.builtQuery || (typeof op.input.query === 'string' ? null : op.input.query);
+    
+    let kind: string;
+    let description: string;
+    
+    if (isStringQuery && op.cache?.queryString) {
+      // For string queries, use abbreviated string in render
+      kind = 'STRING';
+      description = abbreviate(op.cache.queryString, 100);
+    } else if (queryToUse) {
+      kind = getQueryKind(queryToUse);
+      description = describeQuery(queryToUse);
+    } else {
+      kind = 'QUERY';
+      description = '';
+    }
     
     // Determine render name based on referenced tables
     const referencedTables = op.cache?.payload?.result?.tables || [];

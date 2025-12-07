@@ -2,6 +2,15 @@ import { z } from 'zod';
 import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
 import { getOperationInput } from '../operations/types';
 import { createDBASchemas } from '../helpers/dba';
+import { CONSTS } from '../constants';
+import { TypeDefinition } from '../schemas';
+
+/**
+ * Determine if string schema should be used based on number of types
+ */
+function shouldUseStringSchema(types: TypeDefinition[]): boolean {
+  return types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+}
 
 /**
  * Create static DBA tools.
@@ -112,7 +121,7 @@ Example: Get records 20-30:
 - UNION, INTERSECT, EXCEPT set operations
 - WITH (CTE) statements including recursive CTEs
 
-The query is a structured JSON object representing SQL operations.
+{{queryFormat}}
 
 Example 1: Simple SELECT with filter:
 {
@@ -222,11 +231,30 @@ Example 10: SELECT with * and additional specific columns:
 }
 
 {{modeInstructions}}`,
-    schema: ({ config }) => z.object({
-      query: createDBASchemas(config.getData().types).QuerySchema.describe('The query to execute'),
-      ...globalToolProperties,
-    }),
-    input: getOperationInput('query'),
+    schema: ({ config }) => {
+      const types = config.getData().types;
+      const useStringSchema = shouldUseStringSchema(types);
+      
+      return z.object({
+        ...(useStringSchema ? {
+          query: z.string().describe('A detailed description of the query to execute. Must include: the operation (SELECT/INSERT/UPDATE/DELETE), which types/tables are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and comprehensive.'),
+        } : {
+          query: createDBASchemas(types).QuerySchema.describe('The query to execute as a structured Query object'),
+        }),
+        ...globalToolProperties,
+      });
+    },
+    input: ({ config }) => {
+      const types = config.getData().types;
+      const useStringSchema = shouldUseStringSchema(types);
+      
+      return {
+        queryFormat: useStringSchema
+          ? 'The query must be a string description that includes all necessary details: the operation to perform (SELECT/INSERT/UPDATE/DELETE), which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired.'
+          : 'The query must be a structured JSON object representing SQL operations.',
+        ...getOperationInput('query')(config),
+      };
+    },
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx as unknown as CletusAIContext),
   });
