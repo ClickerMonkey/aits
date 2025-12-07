@@ -643,6 +643,11 @@ export const query = operationOf<
       const typeNames = types.map(t => t.name);
       const typeDescriptions = describeTypes(types);
       
+      // Guard against empty type names array
+      if (typeNames.length === 0) {
+        throw new Error('No data types available to build query');
+      }
+      
       const typeSelector = ai.prompt({
         name: 'query_type_selector',
         description: 'Determine which data types are needed for a query',

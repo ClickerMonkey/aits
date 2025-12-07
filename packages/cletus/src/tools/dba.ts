@@ -3,6 +3,14 @@ import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai
 import { getOperationInput } from '../operations/types';
 import { createDBASchemas } from '../helpers/dba';
 import { CONSTS } from '../constants';
+import { TypeDefinition } from '../schemas';
+
+/**
+ * Determine if string schema should be used based on number of types
+ */
+function shouldUseStringSchema(types: TypeDefinition[]): boolean {
+  return types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+}
 
 /**
  * Create static DBA tools.
@@ -225,7 +233,7 @@ Example 10: SELECT with * and additional specific columns:
 {{modeInstructions}}`,
     schema: ({ config }) => {
       const types = config.getData().types;
-      const useStringSchema = types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+      const useStringSchema = shouldUseStringSchema(types);
       
       return z.object({
         ...(useStringSchema ? {
@@ -241,7 +249,7 @@ Example 10: SELECT with * and additional specific columns:
     },
     input: ({ config }) => {
       const types = config.getData().types;
-      const useStringSchema = types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+      const useStringSchema = shouldUseStringSchema(types);
       
       return {
         queryFormat: useStringSchema
