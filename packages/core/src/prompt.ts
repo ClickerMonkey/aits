@@ -617,8 +617,7 @@ export class Prompt<
 
       ctx.signal?.addEventListener('abort', streamAbort);
 
-      // @ts-ignore - input and ctx are already defined as required types
-      const metadata = await this.metadata(input, ctx);
+      const metadata = await (this.metadata as any)(input, ctx) as TMetadata;
 
       const stream = streamer(request, ctx, metadata, streamController.signal);
 
