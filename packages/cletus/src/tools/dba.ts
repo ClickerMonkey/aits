@@ -239,10 +239,7 @@ Example 10: SELECT with * and additional specific columns:
         ...(useStringSchema ? {
           query: z.string().describe('A detailed description of the query to execute. Must include: the operation (SELECT/INSERT/UPDATE/DELETE), which types/tables are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and comprehensive.'),
         } : {
-          query: z.union([
-            createDBASchemas(types).QuerySchema,
-            z.string().describe('A detailed description of the query to execute')
-          ]).describe('The query to execute - either a structured Query object or a string description'),
+          query: createDBASchemas(types).QuerySchema.describe('The query to execute as a structured Query object'),
         }),
         ...globalToolProperties,
       });
@@ -254,7 +251,7 @@ Example 10: SELECT with * and additional specific columns:
       return {
         queryFormat: useStringSchema
           ? 'The query must be a string description that includes all necessary details: the operation to perform (SELECT/INSERT/UPDATE/DELETE), which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired.'
-          : 'The query can be either:\n1. A structured JSON object representing SQL operations\n2. A string description of the query - must include all necessary details: the operation to perform, which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired',
+          : 'The query must be a structured JSON object representing SQL operations.',
         ...getOperationInput('query')(config),
       };
     },
