@@ -2,10 +2,10 @@ import puppeteer from 'puppeteer';
 import { tavily } from '@tavily/core';
 import fs from 'fs';
 import path from 'path';
-import { abbreviate } from '../common';
+import { abbreviate, linkFile } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
-import { detectExtension } from '../helpers/files';
+import { detectExtension, fileExists, fileIsDirectory, fileIsWritable } from '../helpers/files';
 
 // ============================================================================
 // Web Search
@@ -409,26 +409,37 @@ export const web_download = operationOf<
     // Check if target path is absolute or relative
     const targetPath = path.isAbsolute(input.target) ? input.target : path.resolve(input.target);
     
-    // Check if parent directory exists
+    // Check if parent directory exists and is writable
     const parentDir = path.dirname(targetPath);
-    try {
-      await fs.promises.access(parentDir, fs.constants.W_OK);
-    } catch {
+    const dirInfo = await fileIsDirectory(parentDir);
+    
+    if (!dirInfo.exists) {
       return {
-        analysis: `This would fail - parent directory "${parentDir}" does not exist or is not writable.`,
+        analysis: `This would fail - parent directory "${parentDir}" does not exist.`,
+        doable: false,
+      };
+    }
+    
+    if (!dirInfo.isDirectory) {
+      return {
+        analysis: `This would fail - "${parentDir}" is not a directory.`,
+        doable: false,
+      };
+    }
+    
+    if (!(await fileIsWritable(parentDir))) {
+      return {
+        analysis: `This would fail - parent directory "${parentDir}" is not writable.`,
         doable: false,
       };
     }
 
     // Check if file already exists at the target path
-    try {
-      await fs.promises.access(targetPath, fs.constants.F_OK);
+    if (await fileExists(targetPath)) {
       return {
         analysis: `This would fail - file already exists at "${targetPath}". Please specify a different target path.`,
         doable: false,
       };
-    } catch {
-      // File doesn't exist, which is what we want
     }
 
     return {
@@ -457,19 +468,51 @@ export const web_download = operationOf<
       throw new Error('Operation cancelled');
     }
 
-    // Get the response body as array buffer
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Check signal before writing
-    if (signal?.aborted) {
-      throw new Error('Operation cancelled');
+    // Check if response has a body
+    if (!response.body) {
+      throw new Error('Response body is null');
     }
 
-    // Write to a temporary file first
+    // Write to a temporary file first using streaming to avoid memory issues
     const tempPath = `${targetPath}.tmp`;
     try {
-      await fs.promises.writeFile(tempPath, buffer);
+      // Stream the response body to the file
+      const fileStream = fs.createWriteStream(tempPath);
+      
+      // Convert web ReadableStream to Node.js stream and pipe to file
+      const reader = response.body.getReader();
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          // Check signal during streaming
+          if (signal?.aborted) {
+            fileStream.destroy();
+            throw new Error('Operation cancelled');
+          }
+          
+          if (done) break;
+          
+          // Write chunk to file
+          await new Promise<void>((resolve, reject) => {
+            fileStream.write(value, (error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          });
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      
+      // Close the file stream
+      await new Promise<void>((resolve, reject) => {
+        fileStream.end((error?: Error | null) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
 
       // Parse URL once for reuse
       const parsedUrl = new URL(input.url);
@@ -493,18 +536,8 @@ export const web_download = operationOf<
         finalPath = `${targetPath}.${extension}`;
         
         // Check if the file with extension already exists
-        try {
-          await fs.promises.access(finalPath, fs.constants.F_OK);
-          // File exists, throw error
+        if (await fileExists(finalPath)) {
           throw new Error(`File already exists at "${finalPath}". Please specify a different target path or include the extension.`);
-        } catch (error: any) {
-          // If error is ENOENT, file doesn't exist (what we want)
-          if (error.code === 'ENOENT') {
-            // File doesn't exist, continue
-          } else {
-            // Re-throw any other error (including our custom error)
-            throw error;
-          }
         }
       }
 
@@ -535,7 +568,7 @@ export const web_download = operationOf<
     (op) => {
       if (op.output) {
         const sizeKB = (op.output.size / 1024).toFixed(2);
-        return `${sizeKB} KB saved to ${path.basename(op.output.path)}`;
+        return `${sizeKB} KB saved to ${linkFile(op.output.path)}`;
       }
       return null;
     },
