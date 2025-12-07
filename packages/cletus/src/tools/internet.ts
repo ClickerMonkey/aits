@@ -86,13 +86,46 @@ Request/Response Types:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_api_call', input }, ctx),
   });
 
+  const webDownload = ai.tool({
+    name: 'web_download',
+    description: 'Download a file from a URL to a local path',
+    instructions: `Use this to download files from the internet and save them to the local filesystem.
+
+Example 1: Download an image:
+{ "url": "https://example.com/image.jpg", "target": "/tmp/downloaded_image.jpg" }
+
+Example 2: Download a file without extension (extension will be auto-detected):
+{ "url": "https://example.com/somefile", "target": "/tmp/myfile" }
+
+Example 3: Download to relative path:
+{ "url": "https://example.com/document.pdf", "target": "./downloads/document.pdf" }
+
+The operation will:
+- Validate the URL is accessible
+- Download the file content
+- Auto-detect the file extension if not present in the URL or target path
+- Save the file to the specified target path
+- Return the final path, size, and detected extension
+
+{{modeInstructions}}`,
+    schema: z.object({
+      url: z.string().describe('URL of the file to download'),
+      target: z.string().describe('Target file path where the file should be saved (can be relative or absolute)'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('web_download'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'web_download', input }, ctx),
+  });
+
   return [
     webSearch,
     webGetPage,
     webApiCall,
+    webDownload,
   ] as [
     typeof webSearch,
     typeof webGetPage,
     typeof webApiCall,
+    typeof webDownload,
   ];
 }

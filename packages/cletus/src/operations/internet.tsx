@@ -1,8 +1,11 @@
 import puppeteer from 'puppeteer';
 import { tavily } from '@tavily/core';
+import fs from 'fs';
+import path from 'path';
 import { abbreviate } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
+import { detectExtension } from '../helpers/files';
 
 // ============================================================================
 // Web Search
@@ -366,6 +369,173 @@ export const web_api_call = operationOf<
     (op) => {
       if (op.output) {
         return `${op.output.status} ${op.output.statusText} (${op.output.body.length} bytes)`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
+// ============================================================================
+// Web Download
+// ============================================================================
+
+export const web_download = operationOf<
+  { url: string; target: string },
+  { path: string; size: number; extension: string }
+>({
+  mode: 'create',
+  signature: 'web_download(url: string, target: string)',
+  status: (input) => `Downloading: ${abbreviate(input.url, 35)}`,
+  analyze: async ({ input }) => {
+    // Validate URL
+    try {
+      new URL(input.url);
+    } catch {
+      return {
+        analysis: `This would fail - "${input.url}" is not a valid URL.`,
+        doable: false,
+      };
+    }
+
+    // Validate target path
+    if (!input.target || input.target.trim() === '') {
+      return {
+        analysis: 'This would fail - target path cannot be empty.',
+        doable: false,
+      };
+    }
+
+    // Check if target path is absolute or relative
+    const targetPath = path.isAbsolute(input.target) ? input.target : path.resolve(input.target);
+    
+    // Check if parent directory exists
+    const parentDir = path.dirname(targetPath);
+    try {
+      await fs.promises.access(parentDir, fs.constants.W_OK);
+    } catch {
+      return {
+        analysis: `This would fail - parent directory "${parentDir}" does not exist or is not writable.`,
+        doable: false,
+      };
+    }
+
+    // Check if file already exists at the target path
+    try {
+      await fs.promises.access(targetPath, fs.constants.F_OK);
+      return {
+        analysis: `This would fail - file already exists at "${targetPath}". Please specify a different target path.`,
+        doable: false,
+      };
+    } catch {
+      // File doesn't exist, which is what we want
+    }
+
+    return {
+      analysis: `This will download the file from "${input.url}" and save it to "${targetPath}"${!path.extname(targetPath) ? ' (extension will be auto-detected if needed)' : ''}.`,
+      doable: true,
+    };
+  },
+  do: async ({ input }, { signal }) => {
+    // Check if operation was cancelled
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
+    // Resolve target path
+    const targetPath = path.isAbsolute(input.target) ? input.target : path.resolve(input.target);
+
+    // Download the file
+    const response = await fetch(input.url, { signal });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+    }
+
+    // Check signal after fetch
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
+    // Get the response body as array buffer
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Check signal before writing
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
+    // Write to a temporary file first
+    const tempPath = `${targetPath}.tmp`;
+    try {
+      await fs.promises.writeFile(tempPath, buffer);
+
+      // Parse URL once for reuse
+      const parsedUrl = new URL(input.url);
+      
+      // Detect extension from the downloaded content
+      let extension = '';
+      try {
+        // Use the URL's pathname as the filename hint for extension detection
+        const urlFilename = path.basename(parsedUrl.pathname);
+        extension = await detectExtension(tempPath, urlFilename);
+      } catch (error) {
+        // If detection fails, try to get extension from URL or target path
+        const urlExt = path.extname(parsedUrl.pathname).slice(1).toLowerCase();
+        const targetExt = path.extname(targetPath).slice(1).toLowerCase();
+        extension = urlExt || targetExt || 'bin';
+      }
+
+      // If the target path doesn't have an extension, add the detected one
+      let finalPath = targetPath;
+      if (!path.extname(targetPath) && extension) {
+        finalPath = `${targetPath}.${extension}`;
+        
+        // Check if the file with extension already exists
+        try {
+          await fs.promises.access(finalPath, fs.constants.F_OK);
+          // File exists, throw error
+          throw new Error(`File already exists at "${finalPath}". Please specify a different target path or include the extension.`);
+        } catch (error: any) {
+          // If error is ENOENT, file doesn't exist (what we want)
+          if (error.code === 'ENOENT') {
+            // File doesn't exist, continue
+          } else {
+            // Re-throw any other error (including our custom error)
+            throw error;
+          }
+        }
+      }
+
+      // Move temp file to final location
+      await fs.promises.rename(tempPath, finalPath);
+
+      // Get file size
+      const stats = await fs.promises.stat(finalPath);
+
+      return {
+        path: finalPath,
+        size: stats.size,
+        extension,
+      };
+    } catch (error) {
+      // Clean up temporary file on error
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `WebDownload("${abbreviate(op.input.url, 30)}")`,
+    (op) => {
+      if (op.output) {
+        const sizeKB = (op.output.size / 1024).toFixed(2);
+        return `${sizeKB} KB saved to ${path.basename(op.output.path)}`;
       }
       return null;
     },
