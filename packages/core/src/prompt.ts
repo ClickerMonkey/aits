@@ -492,12 +492,10 @@ export class Prompt<
     const actualInput = (input || {}) as TInput;
     const actualCtx = (ctx || {}) as Context<TContext, TMetadata>;
 
-    return (async () => {
-      return {
-        ...(this.input.metadata || {} as TMetadata),
-        ...(await this.metadataFn(actualInput, actualCtx) || {}),
-      } as TMetadata;
-    })();
+    return this.metadataFn(actualInput, actualCtx).then(dynamicMetadata => ({
+      ...(this.input.metadata || {} as TMetadata),
+      ...(dynamicMetadata || {}),
+    } as TMetadata));
   }
 
   /**

@@ -138,7 +138,7 @@ export interface Component<
     TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(input?: TInput, ctx?: TCoreContext): Promise<TMetadata>;
+  >(input?: TInput, ctx?: TCoreContext): TMetadata | Promise<TMetadata>;
 }
 
 /**
