@@ -630,7 +630,11 @@ export const query = operationOf<
     const { config, log, ai, chatStatus } = ctx;
     const getManager = (typeName: string) => new DataManager(typeName);
 
+    // Store the original query string for cache
+    const originalQueryString = typeof queryInput === 'string' ? queryInput : undefined;
+    
     // If query is a string, we need to build it first
+    let parsedQuery: Query;
     if (typeof queryInput === 'string') {
       chatStatus('Analyzing query requirements...');
       
@@ -723,9 +727,11 @@ Build a query object that satisfies this description. The query must be valid ac
 
       const { query: builtQuery } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx);
       
-      // Store the built query in cache and use it
-      queryInput = builtQuery;
-      cache = { ...cache, builtQuery, queryString: cache?.queryString || queryInput.toString() };
+      // Store the built query in cache
+      parsedQuery = builtQuery;
+      cache = { ...cache, builtQuery, queryString: originalQueryString };
+    } else {
+      parsedQuery = queryInput;
     }
 
     // If we have a cached payload and commit is true, try to use it
@@ -749,7 +755,7 @@ Build a query object that satisfies this description. The query must be valid ac
         // Try to re-execute the query
         try {
           const { result: output } = await executeQuery(
-            queryInput,
+            parsedQuery,
             () => config.getData().types,
             getManager,
             getKnowledge,
@@ -773,7 +779,7 @@ Build a query object that satisfies this description. The query must be valid ac
     // Execute the query fresh
     if (commit) {
       const payload = await executeQuery(
-        queryInput,
+        parsedQuery,
         () => config.getData().types,
         getManager,
         getKnowledge,
@@ -790,7 +796,7 @@ Build a query object that satisfies this description. The query must be valid ac
     } else {
       // Execute without committing (for testing)
       const payload = await executeQueryWithoutCommit(
-        queryInput,
+        parsedQuery,
         () => config.getData().types,
         getManager,
         getKnowledge,
