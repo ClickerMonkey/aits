@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import { tavily } from '@tavily/core';
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
+import { finished } from 'stream/promises';
 import { abbreviate, linkFile } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
@@ -477,42 +479,11 @@ export const web_download = operationOf<
     const tempPath = `${targetPath}.tmp`;
     try {
       // Stream the response body to the file
-      const fileStream = fs.createWriteStream(tempPath);
-      
-      // Convert web ReadableStream to Node.js stream and pipe to file
-      const reader = response.body.getReader();
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          // Check signal during streaming
-          if (signal?.aborted) {
-            fileStream.destroy();
-            throw new Error('Operation cancelled');
-          }
-          
-          if (done) break;
-          
-          // Write chunk to file
-          await new Promise<void>((resolve, reject) => {
-            fileStream.write(value, (error) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          });
-        }
-      } finally {
-        reader.releaseLock();
-      }
-      
-      // Close the file stream
-      await new Promise<void>((resolve, reject) => {
-        fileStream.end((error?: Error | null) => {
-          if (error) reject(error);
-          else resolve();
-        });
-      });
+      const fileWriteStream = fs.createWriteStream(tempPath);
+      const nodeReadableStream = Readable.fromWeb(response.body);
+
+      // Pass the signal to the finished utility to monitor the piping process
+      await finished(nodeReadableStream.pipe(fileWriteStream), { signal });
 
       // Parse URL once for reuse
       const parsedUrl = new URL(input.url);
