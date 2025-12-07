@@ -99,6 +99,47 @@ Here are some examples of what you can do with Cletus:
 - **Image Operations** - Generate, edit, analyze, and find images
 - **Web Integration** - Search the web, scrape pages, make API calls
 
+### 📝 Prompt File Support
+
+Cletus supports custom prompt files to enhance the AI's context and behavior:
+
+- **User Prompts** - Configure via `config.user.globalPrompt` for persistent instructions across all chats
+- **Chat Prompts** - Set per-chat custom prompts when creating or updating a chat
+- **Prompt Files** - Automatically load contextual instructions from files in your current working directory
+
+#### Prompt File Loading
+
+When starting a chat, Cletus searches for prompt files in your current working directory (case-insensitive):
+
+1. **Default Files Checked** (in order):
+   - `cletus.md`
+   - `agents.md`
+   - `claude.md`
+
+2. **Custom Files** - Configure via `config.user.promptFiles` to specify your own list
+
+3. **Loading Behavior**:
+   - Files are searched in the order specified
+   - The **first file found** is loaded and used
+   - Content is wrapped in `<prompt-file name="filename">` tags
+   - The content is incorporated into the system prompt for every AI request
+
+**Example Usage:**
+
+Create a `cletus.md` file in your project directory:
+
+```markdown
+# Project Context
+
+This is a TypeScript project using React and Node.js.
+Follow these coding standards:
+- Use functional components
+- Prefer async/await over promises
+- Use descriptive variable names
+```
+
+When you run `cletus` from that directory, these instructions will automatically be included in the AI's context.
+
 ## Building from Source
 
 ```bash
