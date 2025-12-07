@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
 import { getOperationInput } from '../operations/types';
 import { createDBASchemas } from '../helpers/dba';
+import { CONSTS } from '../constants';
 
 /**
  * Create static DBA tools.
@@ -112,7 +113,9 @@ Example: Get records 20-30:
 - UNION, INTERSECT, EXCEPT set operations
 - WITH (CTE) statements including recursive CTEs
 
-The query is a structured JSON object representing SQL operations.
+The query can be either:
+1. A structured JSON object representing SQL operations (when types <= 10)
+2. A string description of the query (when types > 10) - must include all necessary details: the operation to perform, which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired
 
 Example 1: Simple SELECT with filter:
 {
@@ -222,10 +225,25 @@ Example 10: SELECT with * and additional specific columns:
 }
 
 {{modeInstructions}}`,
-    schema: ({ config }) => z.object({
-      query: createDBASchemas(config.getData().types).QuerySchema.describe('The query to execute'),
-      ...globalToolProperties,
-    }),
+    schema: ({ config }) => {
+      const types = config.getData().types;
+      const useStringSchema = types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+      
+      if (useStringSchema) {
+        return z.object({
+          query: z.string().describe('A detailed description of the query to execute. Must include: the operation (SELECT/INSERT/UPDATE/DELETE), which types/tables are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and comprehensive.'),
+          ...globalToolProperties,
+        });
+      } else {
+        return z.object({
+          query: z.union([
+            createDBASchemas(types).QuerySchema,
+            z.string().describe('A detailed description of the query to execute')
+          ]).describe('The query to execute - either a structured Query object or a string description'),
+          ...globalToolProperties,
+        });
+      }
+    },
     input: getOperationInput('query'),
     applicable: ({ config }) => config.getData().types.length > 0,
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'query', input }, ctx as unknown as CletusAIContext),
