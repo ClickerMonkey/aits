@@ -532,7 +532,7 @@ describe('OpenAIProvider', () => {
       });
 
       class CustomProvider extends OpenAIProvider {
-        override customizeImageParams(params: any): any {
+        override augmentImageGenerateRequest(params: any): any {
           return {
             ...params,
             user: 'test-user',  
@@ -767,7 +767,7 @@ describe('OpenAIProvider', () => {
       const executor = provider.createExecutor();
       const request: Request = {
         messages: [{ role: 'user', content: 'Return JSON' }],
-        responseFormat: z.object({ result: z.string() })
+        responseFormat: { type: z.object({ result: z.string() }), strict: true }
       };
 
       const response = await executor(request, ctxDefault, { model: 'gpt-4' });

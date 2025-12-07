@@ -669,7 +669,7 @@ Return a JSON object with an array of type names that are needed to execute this
         }),
       });
 
-      const { types: neededTypeNames } = await typeSelector.get('result', { queryDescription: queryInput }, ctx);
+      const { types: neededTypeNames } = await typeSelector.get('result', { queryDescription: queryInput }, ctx) as { types: string[] };
       
       // Validate that all needed types exist
       const neededTypes = neededTypeNames
@@ -684,11 +684,15 @@ Return a JSON object with an array of type names that are needed to execute this
 
       // Step 2: Build the query using the selected types
       const schemas = createDBASchemas(neededTypes);
+      const neededTypeDescriptions = describeTypes(neededTypes);
       
       const queryBuilder = ai.prompt({
         name: 'query_builder',
         description: 'Build a structured query from a natural language description',
         content: `You are a database query builder. Given a natural language query description and the schema for relevant data types, build a structured query object that accomplishes the desired operation.
+        
+Available types:
+{{neededTypeDescriptions}}
 
 Query description:
 {{queryDescription}}
@@ -697,7 +701,7 @@ Build a query object that satisfies this description. The query must be valid ac
         schema: z.object({
           query: schemas.QuerySchema,
         }),
-        input: ({ queryDescription }: { queryDescription: string }) => ({ queryDescription }),
+        input: ({ queryDescription }: { queryDescription: string }) => ({ neededTypeDescriptions, queryDescription }),
         metadataFn: () => ({
           model: config.getData().user.models?.chat,
         }),
@@ -720,7 +724,7 @@ Build a query object that satisfies this description. The query must be valid ac
         },
       });
 
-      const { query: builtQuery } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx);
+      const { query: builtQuery } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx) as { query: Query };
       
       // Store the built query in cache
       parsedQuery = builtQuery;

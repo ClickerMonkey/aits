@@ -1,3 +1,4 @@
+import { AWSBedrockProvider } from '@aeye/aws';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
@@ -16,9 +17,9 @@ type WizardStep =
   | 'replicate-env'
   | 'replicate-confirm'
   | 'replicate-input'
-  | 'aws-env'
+  | 'aws-test'
+  | 'aws-configure'
   | 'aws-confirm'
-  | 'aws-input'
   | 'tavily-env'
   | 'tavily-confirm'
   | 'tavily-input'
@@ -48,6 +49,10 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // AWS test state
+  const [awsTestStatus, setAwsTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [awsTestMessage, setAwsTestMessage] = useState<string>('');
+
   // Set terminal title
   useEffect(() => {
     process.stdout.write('\x1b]0;Cletus: Setup\x07');
@@ -70,6 +75,40 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     setApiKey('');
     setError(null);
   }, [step]);
+
+  // Test AWS credentials
+  const testAWSCredentials = async (): Promise<boolean> => {
+    setAwsTestStatus('testing');
+    setAwsTestMessage('Testing AWS credentials...');
+
+    try {
+      const awsProvider = new AWSBedrockProvider({
+        region: process.env.AWS_REGION || 'us-east-1',
+      });
+
+      const isHealthy = await awsProvider.checkHealth();
+
+      if (isHealthy) {
+        setAwsTestStatus('success');
+        setAwsTestMessage('✓ AWS credentials detected and working!');
+        return true;
+      } else {
+        setAwsTestStatus('error');
+        setAwsTestMessage('⚠️ AWS credentials test failed.');
+        return false;
+      }
+    } catch (error: any) {
+      setAwsTestStatus('error');
+      if (error.name === 'CredentialsProviderError' || error.name === 'UnrecognizedClientException') {
+        setAwsTestMessage('⚠️ No AWS credentials found. Please configure manually.');
+      } else if (error.name === 'AccessDeniedException') {
+        setAwsTestMessage('✓ AWS credentials found but no Bedrock access. Check IAM permissions.');
+      } else {
+        setAwsTestMessage(`⚠️ AWS test failed: ${error.message || 'Unknown error'}`);
+      }
+      return false;
+    }
+  };
 
   // Handle Ctrl+C to exit wizard at any step
   useInput((input, key) => {
@@ -303,7 +342,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setProviders({ ...providers, replicate: { apiKey: replicateKey } });
             }
-            setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
+            setStep('aws-test');
           }}
         />
       </Box>
@@ -330,7 +369,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setStep('replicate-input');
             } else {
-              setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
+              setStep('aws-test');
             }
           }}
         />
@@ -366,7 +405,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
                 return;
               }
               setProviders({ ...providers, replicate: { apiKey } });
-              setStep(awsAccessKeyId && awsSecretAccessKey ? 'aws-env' : 'aws-confirm');
+              setStep('aws-test');
             }}
           />
         </Box>
@@ -382,43 +421,121 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     );
   }
 
-  // AWS - Environment Key Detected
-  if (step === 'aws-env' && awsAccessKeyId && awsSecretAccessKey) {
+  // AWS - Test credentials
+  if (step === 'aws-test') {
+    // Initialize AWS test on first render
+    React.useEffect(() => {
+      if (awsTestStatus === 'idle') {
+        testAWSCredentials();
+      }
+    }, []);
+
+    if (awsTestStatus === 'testing') {
+      return (
+        <Box flexDirection="column" padding={1}>
+          <Box marginBottom={1}>
+            <Text bold color="cyan">
+              AWS Bedrock Configuration
+            </Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text color="yellow">{awsTestMessage}</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // Move to configure step once test is done
+    if (awsTestStatus !== 'idle') {
+      setStep('aws-configure');
+      return null;
+    }
+
+    return null;
+  }
+
+  // AWS - Configure based on test results
+  if (step === 'aws-configure') {
     return (
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
-          <Text>AWS credentials detected in environment. Use them?</Text>
+          <Text bold color="cyan">AWS Bedrock Configuration</Text>
         </Box>
+        <Box marginBottom={1} flexDirection='column'>
+          <Text dimColor>AWS Bedrock can use credentials from multiple sources:</Text>
+          <Text dimColor>  - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)</Text>
+          <Text dimColor>  - Shared credentials file (~/.aws/credentials)</Text>
+          <Text dimColor>  - IAM roles (when running on EC2, ECS, Lambda)</Text>
+        </Box>
+        {awsTestStatus === 'success' && (
+          <Box marginBottom={1}>
+            <Text color="green">{awsTestMessage}</Text>
+          </Box>
+        )}
+        {awsTestStatus === 'error' && (
+          <Box marginBottom={1}>
+            <Text color="yellow">{awsTestMessage}</Text>
+          </Box>
+        )}
         <SelectInput
           items={[
-            { label: 'Yes', value: 'yes' },
-            { label: 'No', value: 'no' },
+            ...(awsTestStatus === 'success' || awsTestStatus === 'error'
+              ? [{ label: 'Enable with auto-detected credentials', value: 'auto' }]
+              : []
+            ),
+            { label: 'Configure with explicit environment variables', value: 'env' },
+            { label: 'Test credentials again', value: 'test' },
+            { label: 'Skip for now', value: 'skip' },
           ]}
-          onSelect={(item) => {
-            if (item.value === 'yes') {
+          onSelect={async (item) => {
+            if (item.value === 'skip') {
+              setAwsTestStatus('idle');
+              setAwsTestMessage('');
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              return;
+            }
+            if (item.value === 'test') {
+              setStep('aws-test');
+              setAwsTestStatus('idle');
+              setAwsTestMessage('');
+              return;
+            }
+            if (item.value === 'auto') {
               setProviders({
                 ...providers,
                 aws: {
-                  region: awsRegion,
-                  credentials: {
-                    accessKeyId: awsAccessKeyId,
-                    secretAccessKey: awsSecretAccessKey,
-                  },
+                  region: process.env.AWS_REGION,
                 },
               });
+              setAwsTestStatus('idle');
+              setAwsTestMessage('');
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              return;
             }
-            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            if (item.value === 'env') {
+              if (awsAccessKeyId && awsSecretAccessKey) {
+                setProviders({
+                  ...providers,
+                  aws: {
+                    region: awsRegion,
+                    credentials: {
+                      accessKeyId: awsAccessKeyId,
+                      secretAccessKey: awsSecretAccessKey,
+                    },
+                  },
+                });
+              }
+              setAwsTestStatus('idle');
+              setAwsTestMessage('');
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            }
           }}
         />
       </Box>
     );
   }
 
-  // AWS - Ask to Configure
-  if (step === 'aws-env' && !awsAccessKeyId) {
-    setStep('aws-confirm');
-  }
-
+  // AWS - Ask to Configure (fallback if needed)
   if (step === 'aws-confirm') {
     return (
       <Box flexDirection="column" padding={1}>
@@ -432,42 +549,10 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
           ]}
           onSelect={(item) => {
             if (item.value === 'yes') {
-              setStep('aws-input');
+              setStep('aws-test');
             } else {
               setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
             }
-          }}
-        />
-      </Box>
-    );
-  }
-
-  // AWS - Input Credentials (using environment variables approach for simplicity)
-  if (step === 'aws-input') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Box marginBottom={1}>
-          <Text bold color="cyan">
-            AWS Bedrock Setup
-          </Text>
-        </Box>
-        <Box marginBottom={1}>
-          <Text dimColor>AWS Bedrock uses credentials from your environment or IAM roles.</Text>
-          <Text dimColor>Set the following environment variables:</Text>
-          <Text dimColor>  - AWS_REGION (e.g., us-east-1)</Text>
-          <Text dimColor>  - AWS_ACCESS_KEY_ID</Text>
-          <Text dimColor>  - AWS_SECRET_ACCESS_KEY</Text>
-          <Text dimColor>Or use IAM roles when running on AWS (EC2, ECS, Lambda).</Text>
-        </Box>
-        <Box marginBottom={1}>
-          <Text>Press Enter to skip AWS configuration for now.</Text>
-        </Box>
-        <SelectInput
-          items={[
-            { label: 'Skip for now', value: 'skip' },
-          ]}
-          onSelect={() => {
-            setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
           }}
         />
       </Box>

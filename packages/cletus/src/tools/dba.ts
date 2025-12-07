@@ -121,8 +121,39 @@ Example: Get records 20-30:
 - UNION, INTERSECT, EXCEPT set operations
 - WITH (CTE) statements including recursive CTEs
 
+This should be used when the user needs precise control over data retrieval or manipulation that goes beyond simple search or pagination.
+Examples
+- "Find the top 5 users who have completed the most tasks in the last month."
+- "Insert a new task for user ID 123, but if a task with the same title exists, update its due date instead."
+- "Update all documents tagged as 'draft' to 'final' if they were created more than 30 days ago."
+- "Delete all tasks that are marked as 'completed' and were finished over 60 days ago."
+- "Generate a report of total tasks completed per user, including users with zero completed tasks."
+
 {{queryFormat}}
 
+{{modeInstructions}}`,
+    schema: ({ config }) => {
+      const types = config.getData().types;
+      const useStringSchema = shouldUseStringSchema(types);
+      
+      return z.object({
+        ...(useStringSchema ? {
+          query: z.string().describe('A detailed description of the query to execute. Must be a comprehensive description of the query to perform (selects, inserts, updates, deletes, and ctes are supported - all major Postgres expressions). Must include which types are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and details. Do not provide a SQL looking query - you do not have enough type information to do so. You can include SQL like logic at the end if its the best way to describe complex logic that is needed.'),
+        } : {
+          query: createDBASchemas(types).QuerySchema.describe('The query to execute as a structured Query object'),
+        }),
+        ...globalToolProperties,
+      });
+    },
+    input: (ctx) => {
+      const types = ctx.config.getData().types;
+      const useStringSchema = shouldUseStringSchema(types);
+      
+      return {
+        queryFormat: useStringSchema
+          ? 'The query must be a string description that includes all necessary details: the operation to perform (SELECT/INSERT/UPDATE/DELETE), which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired. Do not provide a specific query - just a detailed description. You do not have enough information on each type to build a properly formed query.'
+          : `The query must be a structured JSON object representing SQL operations.
+          
 Example 1: Simple SELECT with filter:
 {
   "kind": "select",
@@ -228,31 +259,8 @@ Example 10: SELECT with * and additional specific columns:
     { "alias": "fullName", "value": { "kind": "binary", "left": { "source": "users", "column": "firstName" }, "op": "+", "right": { "source": "users", "column": "lastName" } } }
   ],
   "from": { "kind": "table", "table": "users" }
-}
-
-{{modeInstructions}}`,
-    schema: ({ config }) => {
-      const types = config.getData().types;
-      const useStringSchema = shouldUseStringSchema(types);
-      
-      return z.object({
-        ...(useStringSchema ? {
-          query: z.string().describe('A detailed description of the query to execute. Must include: the operation (SELECT/INSERT/UPDATE/DELETE), which types/tables are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and comprehensive.'),
-        } : {
-          query: createDBASchemas(types).QuerySchema.describe('The query to execute as a structured Query object'),
-        }),
-        ...globalToolProperties,
-      });
-    },
-    input: ({ config }) => {
-      const types = config.getData().types;
-      const useStringSchema = shouldUseStringSchema(types);
-      
-      return {
-        queryFormat: useStringSchema
-          ? 'The query must be a string description that includes all necessary details: the operation to perform (SELECT/INSERT/UPDATE/DELETE), which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired.'
-          : 'The query must be a structured JSON object representing SQL operations.',
-        ...getOperationInput('query')(config),
+}`,
+        ...getOperationInput('query')(ctx),
       };
     },
     applicable: ({ config }) => config.getData().types.length > 0,

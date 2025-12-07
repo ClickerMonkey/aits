@@ -185,6 +185,9 @@ This is useful when the user wants to:
 - "discover data types in my CSV files"
 - "analyze my JSON files and create type definitions"
 
+This tool should be used when the user wants to discover new types from existing data files. It should NOT be used to create types that the user explicitly defines or describes.
+This does not import data records, only type definitions. After types are created the data_import tool can be used to load data.
+
 The discovered types are presented with field definitions and instance counts. The user can then review and selectively add types using type_create.
 
 IMPORTANT:
