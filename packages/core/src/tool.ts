@@ -282,6 +282,11 @@ export class Tool<
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
   >(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, TCoreContext]>): Promise<TMetadata> {
+    // If both input and context are not specified, just return static metadata
+    if (inputMaybe === undefined && contextMaybe === undefined) {
+      return (this.input.metadata || {}) as TMetadata;
+    }
+
     const input = (inputMaybe || {}) as TParams;
     const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
 

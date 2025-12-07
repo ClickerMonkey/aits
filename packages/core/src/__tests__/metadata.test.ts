@@ -81,6 +81,20 @@ describe('Metadata', () => {
 
       expect(metadata).toEqual({});
     });
+
+    it('should return only static metadata when called with no arguments', async () => {
+      const agent = new Agent<{}, TestMetadata>({
+        name: 'static-only-agent',
+        description: 'Agent with static metadata only',
+        refs: [],
+        metadata: { model: 'gpt-4', temperature: 0.7 },
+        call: () => 'result'
+      });
+
+      const metadata = await agent.metadata();
+
+      expect(metadata).toEqual({ model: 'gpt-4', temperature: 0.7 });
+    });
   });
 
   describe('Tool', () => {
@@ -151,6 +165,21 @@ describe('Metadata', () => {
 
       expect(metadata).toEqual({});
     });
+
+    it('should return only static metadata when called with no arguments', async () => {
+      const tool = new Tool<{}, TestMetadata>({
+        name: 'static-only-tool',
+        description: 'Tool with static metadata only',
+        instructions: 'Instructions',
+        schema: z.object({ x: z.number() }),
+        metadata: { model: 'claude-3', temperature: 0.5 },
+        call: (input) => input.x
+      });
+
+      const metadata = await tool.metadata();
+
+      expect(metadata).toEqual({ model: 'claude-3', temperature: 0.5 });
+    });
   });
 
   describe('Prompt', () => {
@@ -212,6 +241,19 @@ describe('Metadata', () => {
       const metadata = await prompt.metadata({}, ctx);
 
       expect(metadata).toEqual({});
+    });
+
+    it('should return only static metadata when called with no arguments', async () => {
+      const prompt = new Prompt<{}, TestMetadata>({
+        name: 'static-only-prompt',
+        description: 'Prompt with static metadata only',
+        content: 'Hello world',
+        metadata: { model: 'gpt-4o', temperature: 0.9 }
+      });
+
+      const metadata = await prompt.metadata();
+
+      expect(metadata).toEqual({ model: 'gpt-4o', temperature: 0.9 });
     });
   });
 
