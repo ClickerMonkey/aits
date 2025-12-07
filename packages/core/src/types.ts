@@ -133,11 +133,12 @@ export interface Component<
    * @param ctx - The context for the component's operation.
    * @returns The metadata for the component.
    */
+  metadata(): TMetadata;
   metadata<
     TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(...[input, ctx]: OptionalParams<[TInput, TCoreContext]>): Promise<TMetadata>;
+  >(input?: TInput, ctx?: TCoreContext): Promise<TMetadata>;
 }
 
 /**

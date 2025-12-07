@@ -82,7 +82,7 @@ describe('Metadata', () => {
       expect(metadata).toEqual({});
     });
 
-    it('should return only static metadata when called with no arguments', async () => {
+    it('should return only static metadata when called with no arguments', () => {
       const agent = new Agent<{}, TestMetadata>({
         name: 'static-only-agent',
         description: 'Agent with static metadata only',
@@ -91,9 +91,11 @@ describe('Metadata', () => {
         call: () => 'result'
       });
 
-      const metadata = await agent.metadata();
+      const metadata = agent.metadata();
 
+      // Should return synchronously, not a Promise
       expect(metadata).toEqual({ model: 'gpt-4', temperature: 0.7 });
+      expect(metadata).not.toBeInstanceOf(Promise);
     });
   });
 
@@ -166,7 +168,7 @@ describe('Metadata', () => {
       expect(metadata).toEqual({});
     });
 
-    it('should return only static metadata when called with no arguments', async () => {
+    it('should return only static metadata when called with no arguments', () => {
       const tool = new Tool<{}, TestMetadata>({
         name: 'static-only-tool',
         description: 'Tool with static metadata only',
@@ -176,9 +178,11 @@ describe('Metadata', () => {
         call: (input) => input.x
       });
 
-      const metadata = await tool.metadata();
+      const metadata = tool.metadata();
 
+      // Should return synchronously, not a Promise
       expect(metadata).toEqual({ model: 'claude-3', temperature: 0.5 });
+      expect(metadata).not.toBeInstanceOf(Promise);
     });
   });
 
@@ -243,7 +247,7 @@ describe('Metadata', () => {
       expect(metadata).toEqual({});
     });
 
-    it('should return only static metadata when called with no arguments', async () => {
+    it('should return only static metadata when called with no arguments', () => {
       const prompt = new Prompt<{}, TestMetadata>({
         name: 'static-only-prompt',
         description: 'Prompt with static metadata only',
@@ -251,9 +255,11 @@ describe('Metadata', () => {
         metadata: { model: 'gpt-4o', temperature: 0.9 }
       });
 
-      const metadata = await prompt.metadata();
+      const metadata = prompt.metadata();
 
+      // Should return synchronously, not a Promise
       expect(metadata).toEqual({ model: 'gpt-4o', temperature: 0.9 });
+      expect(metadata).not.toBeInstanceOf(Promise);
     });
   });
 

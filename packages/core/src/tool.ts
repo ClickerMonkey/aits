@@ -277,23 +277,31 @@ export class Tool<
    * @param ctx - The context for the tool's operation.
    * @returns The metadata for the tool.
    */
-  async metadata<
+  metadata(): TMetadata;
+  metadata<
     TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(...[inputMaybe, contextMaybe]: OptionalParams<[TParams, TCoreContext]>): Promise<TMetadata> {
+  >(input?: TParams, ctx?: TCoreContext): Promise<TMetadata>;
+  metadata<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(input?: TParams, ctx?: TCoreContext): TMetadata | Promise<TMetadata> {
     // If both input and context are not specified, just return static metadata
-    if (inputMaybe === undefined && contextMaybe === undefined) {
+    if (input === undefined && ctx === undefined) {
       return (this.input.metadata || {}) as TMetadata;
     }
 
-    const input = (inputMaybe || {}) as TParams;
-    const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
+    const actualInput = (input || {}) as TParams;
+    const actualCtx = (ctx || {}) as Context<TContext, TMetadata>;
 
-    return {
-      ...(this.input.metadata || {} as TMetadata),
-      ...(await this.metadataFn(input, ctx) || {}),
-    } as TMetadata;
+    return (async () => {
+      return {
+        ...(this.input.metadata || {} as TMetadata),
+        ...(await this.metadataFn(actualInput, actualCtx) || {}),
+      } as TMetadata;
+    })();
   }
 
 }

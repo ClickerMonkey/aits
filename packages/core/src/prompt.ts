@@ -473,23 +473,31 @@ export class Prompt<
    * @param ctx - The context for the prompt's operation.
    * @returns The metadata for the prompt.
    */
-  async metadata<
+  metadata(): TMetadata;
+  metadata<
     TRuntimeContext extends TContext,
     TRuntimeMetadata extends TMetadata,
     TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
-  >(...[inputMaybe, contextMaybe]: OptionalParams<[TInput, TCoreContext]>): Promise<TMetadata> {
+  >(input?: TInput, ctx?: TCoreContext): Promise<TMetadata>;
+  metadata<
+    TRuntimeContext extends TContext,
+    TRuntimeMetadata extends TMetadata,
+    TCoreContext extends Context<TRuntimeContext, TRuntimeMetadata>,
+  >(input?: TInput, ctx?: TCoreContext): TMetadata | Promise<TMetadata> {
     // If both input and context are not specified, just return static metadata
-    if (inputMaybe === undefined && contextMaybe === undefined) {
+    if (input === undefined && ctx === undefined) {
       return (this.input.metadata || {}) as TMetadata;
     }
 
-    const input = (inputMaybe || {}) as TInput;
-    const ctx = (contextMaybe || {}) as Context<TContext, TMetadata>;
+    const actualInput = (input || {}) as TInput;
+    const actualCtx = (ctx || {}) as Context<TContext, TMetadata>;
 
-    return {
-      ...(this.input.metadata || {} as TMetadata),
-      ...(await this.metadataFn(input, ctx) || {}),
-    } as TMetadata;
+    return (async () => {
+      return {
+        ...(this.input.metadata || {} as TMetadata),
+        ...(await this.metadataFn(actualInput, actualCtx) || {}),
+      } as TMetadata;
+    })();
   }
 
   /**
