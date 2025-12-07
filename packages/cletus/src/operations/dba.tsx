@@ -17,7 +17,7 @@ import { KnowledgeEntry, TypeDefinition, TypeField } from "../schemas";
 import { operationOf } from "./types";
 import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/query';
 import type { Query } from '../helpers/dba';
-import { createDBASchemas } from '../helpers/dba';
+import { createDBASchemas, describeTypes } from '../helpers/dba';
 
 
 const getKnowledge = async () => {
@@ -641,22 +641,24 @@ export const query = operationOf<
       // Step 1: Get list of types needed for the query
       const types = config.getData().types;
       const typeNames = types.map(t => t.name);
+      const typeDescriptions = describeTypes(types);
       
       const typeSelector = ai.prompt({
         name: 'query_type_selector',
         description: 'Determine which data types are needed for a query',
         content: `You are a database query analyzer. Given a natural language query description and a list of available data types, determine which types are needed to execute the query.
 
-Available types: {{typeNames}}
+Available types:
+{{typeDescriptions}}
 
 Query description:
 {{queryDescription}}
 
 Return a JSON object with an array of type names that are needed to execute this query. Only include types that are absolutely necessary.`,
         schema: z.object({
-          types: z.array(z.string()).describe('Array of type names needed for the query'),
+          types: z.array(z.enum(typeNames as [string, ...string[]])).describe('Array of type names needed for the query'),
         }),
-        input: ({ queryDescription }: { queryDescription: string }) => ({ typeNames: typeNames.join(', '), queryDescription }),
+        input: ({ queryDescription }: { queryDescription: string }) => ({ typeDescriptions, queryDescription }),
         metadataFn: () => ({
           model: config.getData().user.models?.chat,
         }),
@@ -694,33 +696,21 @@ Build a query object that satisfies this description. The query must be valid ac
         metadataFn: () => ({
           model: config.getData().user.models?.chat,
         }),
-        validationFn: async ({ query }: { query: Query }) => {
+        validate: async ({ query }: { query: Query }, validationCtx) => {
           // Validate the query by executing it without committing
-          try {
-            const payload = await executeQueryWithoutCommit(
-              query,
-              () => config.getData().types,
-              getManager,
-              getKnowledge,
-              embedQuery,
-            );
-            
-            if (!payload.result.canCommit && payload.result.validationErrors && payload.result.validationErrors.length > 0) {
-              const errors = payload.result.validationErrors
-                .map(err => `${err.path}: ${err.message}${err.suggestion ? ` (${err.suggestion})` : ''}`)
-                .join('\n');
-              return {
-                valid: false,
-                reason: `Query validation failed:\n${errors}`,
-              };
-            }
-            
-            return { valid: true };
-          } catch (error: any) {
-            return {
-              valid: false,
-              reason: `Query execution failed: ${error.message}`,
-            };
+          const payload = await executeQueryWithoutCommit(
+            query,
+            () => config.getData().types,
+            getManager,
+            getKnowledge,
+            embedQuery,
+          );
+          
+          if (!payload.result.canCommit && payload.result.validationErrors && payload.result.validationErrors.length > 0) {
+            const errors = payload.result.validationErrors
+              .map(err => `${err.path}: ${err.message}${err.suggestion ? ` (${err.suggestion})` : ''}`)
+              .join('\n');
+            throw new Error(`Query validation failed:\n${errors}`);
           }
         },
       });
