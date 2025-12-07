@@ -1,8 +1,13 @@
 import puppeteer from 'puppeteer';
 import { tavily } from '@tavily/core';
-import { abbreviate } from '../common';
+import fs from 'fs';
+import path from 'path';
+import { Readable } from 'stream';
+import { finished } from 'stream/promises';
+import { abbreviate, linkFile } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
+import { detectExtension, fileExists, fileIsDirectory, fileIsWritable } from '../helpers/files';
 
 // ============================================================================
 // Web Search
@@ -366,6 +371,175 @@ export const web_api_call = operationOf<
     (op) => {
       if (op.output) {
         return `${op.output.status} ${op.output.statusText} (${op.output.body.length} bytes)`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
+// ============================================================================
+// Web Download
+// ============================================================================
+
+export const web_download = operationOf<
+  { url: string; target: string },
+  { path: string; size: number; extension: string }
+>({
+  mode: 'create',
+  signature: 'web_download(url: string, target: string)',
+  status: (input) => `Downloading: ${abbreviate(input.url, 35)}`,
+  analyze: async ({ input }) => {
+    // Validate URL
+    try {
+      new URL(input.url);
+    } catch {
+      return {
+        analysis: `This would fail - "${input.url}" is not a valid URL.`,
+        doable: false,
+      };
+    }
+
+    // Validate target path
+    if (!input.target || input.target.trim() === '') {
+      return {
+        analysis: 'This would fail - target path cannot be empty.',
+        doable: false,
+      };
+    }
+
+    // Check if target path is absolute or relative
+    const targetPath = path.isAbsolute(input.target) ? input.target : path.resolve(input.target);
+    
+    // Check if parent directory exists and is writable
+    const parentDir = path.dirname(targetPath);
+    const dirInfo = await fileIsDirectory(parentDir);
+    
+    if (!dirInfo.exists) {
+      return {
+        analysis: `This would fail - parent directory "${parentDir}" does not exist.`,
+        doable: false,
+      };
+    }
+    
+    if (!dirInfo.isDirectory) {
+      return {
+        analysis: `This would fail - "${parentDir}" is not a directory.`,
+        doable: false,
+      };
+    }
+    
+    if (!(await fileIsWritable(parentDir))) {
+      return {
+        analysis: `This would fail - parent directory "${parentDir}" is not writable.`,
+        doable: false,
+      };
+    }
+
+    // Check if file already exists at the target path
+    if (await fileExists(targetPath)) {
+      return {
+        analysis: `This would fail - file already exists at "${targetPath}". Please specify a different target path.`,
+        doable: false,
+      };
+    }
+
+    return {
+      analysis: `This will download the file from "${input.url}" and save it to "${targetPath}"${!path.extname(targetPath) ? ' (extension will be auto-detected if needed)' : ''}.`,
+      doable: true,
+    };
+  },
+  do: async ({ input }, { signal }) => {
+    // Check if operation was cancelled
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
+    // Resolve target path
+    const targetPath = path.isAbsolute(input.target) ? input.target : path.resolve(input.target);
+
+    // Download the file
+    const response = await fetch(input.url, { signal });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+    }
+
+    // Check signal after fetch
+    if (signal?.aborted) {
+      throw new Error('Operation cancelled');
+    }
+
+    // Check if response has a body
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+
+    // Write to a temporary file first using streaming to avoid memory issues
+    const tempPath = `${targetPath}.tmp`;
+    try {
+      // Stream the response body to the file
+      const fileWriteStream = fs.createWriteStream(tempPath);
+      const nodeReadableStream = Readable.fromWeb(response.body);
+
+      // Pass the signal to the finished utility to monitor the piping process
+      await finished(nodeReadableStream.pipe(fileWriteStream), { signal });
+
+      // Parse URL once for reuse
+      const parsedUrl = new URL(input.url);
+      
+      // Detect extension from the downloaded content
+      let extension = '';
+      try {
+        // Use the URL's pathname as the filename hint for extension detection
+        const urlFilename = path.basename(parsedUrl.pathname);
+        extension = await detectExtension(tempPath, urlFilename);
+      } catch (error) {
+        // If detection fails, try to get extension from URL or target path
+        const urlExt = path.extname(parsedUrl.pathname).slice(1).toLowerCase();
+        const targetExt = path.extname(targetPath).slice(1).toLowerCase();
+        extension = urlExt || targetExt || 'bin';
+      }
+
+      // If the target path doesn't have an extension, add the detected one
+      let finalPath = targetPath;
+      if (!path.extname(targetPath) && extension) {
+        finalPath = `${targetPath}.${extension}`;
+        
+        // Check if the file with extension already exists
+        if (await fileExists(finalPath)) {
+          throw new Error(`File already exists at "${finalPath}". Please specify a different target path or include the extension.`);
+        }
+      }
+
+      // Move temp file to final location
+      await fs.promises.rename(tempPath, finalPath);
+
+      // Get file size
+      const stats = await fs.promises.stat(finalPath);
+
+      return {
+        path: finalPath,
+        size: stats.size,
+        extension,
+      };
+    } catch (error) {
+      // Clean up temporary file on error
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `WebDownload("${abbreviate(op.input.url, 30)}")`,
+    (op) => {
+      if (op.output) {
+        const sizeKB = (op.output.size / 1024).toFixed(2);
+        return `${sizeKB} KB saved to ${linkFile(op.output.path)}`;
       }
       return null;
     },
