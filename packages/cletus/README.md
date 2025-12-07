@@ -142,8 +142,6 @@ Follow these coding standards:
 
 When you run `cletus` from that directory, these instructions will automatically be included in the AI's context.
 
-**Note:** If you have multiple prompt files (e.g., both `cletus.md` and `agents.md`), only the first one found will be loaded.
-
 ## Building from Source
 
 ```bash
