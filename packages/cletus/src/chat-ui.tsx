@@ -127,6 +127,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const [currentOptionIndex, setCurrentOptionIndex] = useState(0); // currently highlighted option
   const [questionAnswers, setQuestionAnswers] = useState<Record<number, Set<number>>>({}); // question index -> set of selected option indices
   const [questionCustomAnswers, setQuestionCustomAnswers] = useState<Record<number, string>>({}); // question index -> custom answer text
+  const [isEditingCustomAnswer, setIsEditingCustomAnswer] = useState(false);
+  const [customAnswerInput, setCustomAnswerInput] = useState('');
   const interceptingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
   const requestStartTimeRef = useRef<number>(0);
@@ -221,7 +223,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const customAnswer = questionCustomAnswers[i];
       
       answerText += `**${question.name}:**\n`;
-      questionText += `- ${question.name}\n`;
+      questionText += `**${question.name}:** ${question.min === question.max ? `(choose ${question.min})` : `(choose ${question.min}-${question.max})`}\n`;
+
+      for (const option of question.options) {
+        questionText += `- ${option.label}?\n`;
+      }
       
       if (selections.size > 0) {
         Array.from(selections).forEach((optionIndex) => {
@@ -238,8 +244,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       if (selections.size === 0 && !customAnswer) {
         answerText += `- (no answer provided)\n`;
       }
+
+      if (question.custom) {
+        questionText += `- *${question.customLabel}?*\n`;
+      }
       
       answerText += '\n';
+      questionText += '\n';
     }
     
     // Clear questions from chat meta
@@ -249,6 +260,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     setCurrentOptionIndex(0);
     setQuestionAnswers({});
     setQuestionCustomAnswers({});
+    setIsEditingCustomAnswer(false);
+    setCustomAnswerInput('');
 
     // Add the formatted questions as a system message
     addMessage({
@@ -314,7 +327,19 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const currentSelections = questionAnswers[currentQuestionIndex] || new Set<number>();
       const isRadio = currentQuestion.min === 1 && currentQuestion.max === 1;
       const maxOptionIndex = currentQuestion.options.length - 1;
-      
+
+      // If editing custom answer, don't handle other shortcuts
+      if (isEditingCustomAnswer) {
+        // ESC to cancel custom answer editing
+        if (key.escape) {
+          setIsEditingCustomAnswer(false);
+          setCustomAnswerInput('');
+          return interceptInput();
+        }
+        // Don't intercept other input - let TextInput handle it
+        return;
+      }
+
       // Ctrl+C to cancel questions
       if (key.ctrl && input === 'c') {
         // Clear questions from chat meta
@@ -324,6 +349,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         setCurrentOptionIndex(0);
         setQuestionAnswers({});
         setQuestionCustomAnswers({});
+        setIsEditingCustomAnswer(false);
+        setCustomAnswerInput('');
         return interceptInput();
       }
       
@@ -374,14 +401,24 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
         return interceptInput();
       }
       
+      // 'c' or 'C' to enter custom answer (if custom is enabled)
+      if ((input === 'c' || input === 'C') && currentQuestion.custom) {
+        setIsEditingCustomAnswer(true);
+        setCustomAnswerInput(questionCustomAnswers[currentQuestionIndex] || '');
+        return interceptInput();
+      }
+
       // Enter to go to next question or submit
       if (key.return) {
-        // Check if we have minimum selections
-        if (currentSelections.size < currentQuestion.min) {
+        // Check if we have minimum selections or custom answer
+        const hasCustomAnswer = questionCustomAnswers[currentQuestionIndex]?.trim();
+        const totalAnswers = currentSelections.size + (hasCustomAnswer ? 1 : 0);
+
+        if (totalAnswers < currentQuestion.min) {
           // Don't proceed if minimum not met
           return interceptInput();
         }
-        
+
         // Check if this is the last question
         if (currentQuestionIndex === chatMeta.questions.length - 1) {
           // Submit all answers
@@ -394,7 +431,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
           return interceptInput();
         }
       }
-      
+
       return interceptInput();
     }
     
@@ -1419,15 +1456,23 @@ After installation and the SoX executable is in the path, restart Cletus and try
                 })}
                 
                 {question.custom && (
-                  <Box marginTop={1}>
-                    <Text dimColor>
-                      Custom answer: {questionCustomAnswers[currentQuestionIndex] || '(none)'}
-                    </Text>
+                  <Box marginTop={1} flexDirection="column">
+                    <Box>
+                      <Text bold>
+                        {question.customLabel || 'Other'}:
+                      </Text>
+                      <Text dimColor> (Press 'c' to {questionCustomAnswers[currentQuestionIndex] ? 'edit' : 'enter'})</Text>
+                    </Box>
+                    {questionCustomAnswers[currentQuestionIndex] && (
+                      <Box marginLeft={2}>
+                        <Text color="green">✓ {questionCustomAnswers[currentQuestionIndex]}</Text>
+                      </Box>
+                    )}
                   </Box>
                 )}
                 
                 <Box marginTop={1} flexDirection="column">
-                  <Text dimColor>Use ↑↓ to navigate options, Space to select/deselect</Text>
+                  <Text dimColor>Use ↑↓ to navigate options, Space to select/deselect{question.custom ? ', c for custom' : ''}</Text>
                   <Box>
                     {currentQuestionIndex > 0 && (
                       <Text dimColor>← Back</Text>
@@ -1435,17 +1480,51 @@ After installation and the SoX executable is in the path, restart Cletus and try
                     {currentQuestionIndex < chatMeta.questions.length - 1 && (
                       <Text dimColor>{'  → Next'}</Text>
                     )}
-                    {currentQuestionIndex === chatMeta.questions.length - 1 && selections.size >= question.min && (
-                      <Text color="green">{'  Enter to Submit'}</Text>
-                    )}
-                    {selections.size < question.min && (
-                      <Text color="yellow">{'  Select at least '}{question.min} option(s)</Text>
-                    )}
+                    {(() => {
+                      const hasCustomAnswer = questionCustomAnswers[currentQuestionIndex]?.trim();
+                      const totalAnswers = selections.size + (hasCustomAnswer ? 1 : 0);
+
+                      if (currentQuestionIndex === chatMeta.questions.length - 1 && totalAnswers >= question.min) {
+                        return <Text color="green">{'  Enter to Submit'}</Text>;
+                      } else if (totalAnswers < question.min) {
+                        return <Text color="yellow">{'  Select at least '}{question.min} option(s)</Text>;
+                      }
+                      return null;
+                    })()}
                   </Box>
                 </Box>
               </Box>
             );
           })()}
+        </Box>
+      )}
+
+      {/* Custom Answer Input */}
+      {showQuestions && isEditingCustomAnswer && chatMeta.questions && chatMeta.questions.length > 0 && (
+        <Box
+          borderStyle="round"
+          borderColor="cyan"
+          paddingX={1}
+          marginBottom={1}
+          flexDirection="column"
+        >
+          <Text bold color="cyan">
+            Enter Custom Answer (ESC to cancel):
+          </Text>
+          <Box marginTop={1}>
+            <Text>{'> '}</Text>
+            <TextInput
+              value={customAnswerInput}
+              onChange={setCustomAnswerInput}
+              onSubmit={() => {
+                setQuestionCustomAnswers({ ...questionCustomAnswers, [currentQuestionIndex]: customAnswerInput.trim() });
+                setIsEditingCustomAnswer(false);
+                setCustomAnswerInput('');
+              }}
+              placeholder="Type your answer..."
+              focus={true}
+            />
+          </Box>
         </Box>
       )}
 

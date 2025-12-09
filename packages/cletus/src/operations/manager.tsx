@@ -174,7 +174,7 @@ export class OperationManager {
         : op.status === 'done'
           ? `Operation ${op.type} completed successfully:`
           : op.status === 'analyzed'
-            ? `Operation ${op.type} requires approval:`
+            ? `Operation ${op.type} requires approval, the actual operation will be performed upon approval. No response after this is necessary, once approved it will be executed automatically and you will get the results then.`
             : op.status === 'rejected'
               ? `Operation ${op.type} was rejected by the user.`
               : `Operation ${op.type} cannot be performed:`;

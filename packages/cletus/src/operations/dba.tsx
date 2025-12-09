@@ -482,11 +482,11 @@ export const data_get = operationOf<
 function getQueryKind(query: Query): string {
   if ('kind' in query) {
     if (query.kind === 'withs') {
-      return 'CTE';
+      return 'cte';
     }
-    return query.kind.toUpperCase();
+    return query.kind.toLowerCase();
   }
-  return 'QUERY';
+  return 'query';
 }
 
 /**
@@ -818,13 +818,13 @@ Build a query object that satisfies this description. The query must be valid ac
     
     if (isStringQuery && op.cache?.queryString) {
       // For string queries, use abbreviated string in render
-      kind = 'STRING';
+      kind = 'query';
       description = abbreviate(op.cache.queryString, 100);
     } else if (queryToUse) {
       kind = getQueryKind(queryToUse);
       description = describeQuery(queryToUse);
     } else {
-      kind = 'QUERY';
+      kind = 'query';
       description = '';
     }
     
