@@ -105,7 +105,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
       <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
           <Text bold color="cyan">
-            Custom system prompt? (optional)
+            Custom chat prompt? (optional)
           </Text>
         </Box>
         <Box>

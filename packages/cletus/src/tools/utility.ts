@@ -4,6 +4,7 @@ import { formatName, pluralize } from '../common';
 import { AgentMode, ChatMode } from '../schemas';
 import { buildToolSelectionQuery, STATIC_TOOLSETS, toolRegistry } from '../tool-registry';
 import ABOUT_CONTENT from './ABOUT.md';
+import { ToolInterrupt } from '@aeye/core';
 
 /**
  * Create utility tools for Cletus operations
@@ -293,7 +294,7 @@ This tool creates a special UI that:
 - Can optionally allow custom answers if custom=true
 
 Each question must have:
-- name: A short name/identifier for the question
+- name: A short name for the question - 2 to 4 words
 - min: Minimum number of selections required
 - max: Maximum number of selections allowed
 - custom: Whether custom answers are allowed
@@ -332,7 +333,7 @@ Example usage for gathering project preferences:
 The user's answers will be formatted and submitted as a message, triggering the chat orchestrator to continue.`,
     schema: z.object({
       questions: z.array(z.object({
-        name: z.string().describe('Short name/identifier for the question'),
+        name: z.string().describe('Short name for the question'),
         min: z.number().describe('Minimum number of selections required'),
         max: z.number().describe('Maximum number of selections allowed'),
         custom: z.boolean().describe('Whether custom answers are allowed'),
@@ -358,12 +359,17 @@ The user's answers will be formatted and submitted as a message, triggering the 
         }
       });
 
+      // Notify status
       ctx.chatStatus(`Asking ${questions.length} question${questions.length !== 1 ? 's' : ''}...`);
 
       // Notify chat-ui to refresh and show the questions
       ctx.events?.onRefreshChat?.();
 
-      return `DO NOT respond after this tool. The user will be presented with ${pluralize(questions.length, 'question')} to answer before continuing the conversation. If you need to respond with no text and with a STOP token.`;
+      // Set interrupt flag to pause further tool usage until user responds
+      ctx.chatInterrupt?.();
+
+      // Throw ToolInterrupt to halt further tool execution
+      throw new ToolInterrupt();
     },
   });
 

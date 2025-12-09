@@ -29,6 +29,7 @@ export interface CletusContext {
   cache: Record<string, any>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
+  chatInterrupt?: () => void;
   events?: {
     onRefreshPending?: () => void;
     onRefreshChat?: () => void;

@@ -73,6 +73,15 @@ export type AnyTool = Tool<any, any, any, any, any, any>;
  */
 export type ToolCompatible<TContext, TMetadata> = Tool<TContext, TMetadata, any, any, any, any>;
 
+/**
+ * Error class used to indicate that a prompt should be interrupted and control returned to the caller.
+ */
+export class ToolInterrupt extends Error {
+  constructor(message: string = 'Tool execution interrupted') {
+    super(message);
+    this.name = 'ToolInterrupt';
+  }
+}
 
 /**
  * A Tool component that performs specific functions, often interacting with external systems or APIs.

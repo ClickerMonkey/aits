@@ -164,7 +164,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const lastAssistantMessage = chatMessages.findLast((msg) => msg.role === 'assistant');
   const operationApprovalPending = showApprovalMenu && !pendingMessage && !!lastAssistantMessage?.operations?.some((op) => op.status === 'analyzed');
   const hasQuestions = chatMeta.questions && chatMeta.questions.length > 0;
-  const showQuestions = hasQuestions && !isWaitingForResponse && !showApprovalMenu;
+  const showQuestions = hasQuestions && !isWaitingForResponse && !operationApprovalPending;
   
   // Calculate total cost of all messages in chat
   const totalMessageCost = chatMessages.reduce((sum, msg) => sum + (msg.cost || 0), 0);
@@ -212,7 +212,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     }
     
     // Format answers as markdown
-    let answerText = '## Question Answers\n\n';
+    let questionText = '## Questions\n';
+    let answerText = '## Answers\n';
     
     for (let i = 0; i < chatMeta.questions.length; i++) {
       const question = chatMeta.questions[i];
@@ -220,6 +221,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       const customAnswer = questionCustomAnswers[i];
       
       answerText += `**${question.name}:**\n`;
+      questionText += `- ${question.name}\n`;
       
       if (selections.size > 0) {
         Array.from(selections).forEach((optionIndex) => {
@@ -247,12 +249,21 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     setCurrentOptionIndex(0);
     setQuestionAnswers({});
     setQuestionCustomAnswers({});
+
+    // Add the formatted questions as a system message
+    addMessage({
+      role: 'assistant',
+      name: chatMeta.assistant,
+      content: [{ type: 'text', content: questionText.trim() }],
+      created: Date.now(),
+      operations: [],
+    });
     
     // Add the formatted answer as a user message
     addMessage({
       role: 'user',
       name: config.getData().user.name,
-      content: [{ type: 'text', content: answerText }],
+      content: [{ type: 'text', content: answerText.trim() }],
       created: Date.now(),
     });
     
@@ -1131,7 +1142,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
               // Reload chat meta from config to pick up questions
               const updatedChatMeta = config.getData().chats.find(c => c.id === chatMeta.id);
               if (updatedChatMeta) {
-                setChatMeta(updatedChatMeta);
+                setChatMeta({ ...updatedChatMeta });
               }
             },
           },
@@ -1709,8 +1720,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       {/* Footer */}
       <Box>
         <Text dimColor>
-          {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
-          {chatMeta.model && chatMeta.model !== config.getData().user.models?.chat ? ` ${chatMeta.model} │ ` : ''}
+          {chatMeta.model || config.getData().user.models?.chat || 'no model'} │ {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
           {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
           {totalMessageCost > 0 && (

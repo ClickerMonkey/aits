@@ -7,6 +7,7 @@ import { logger } from '../logger';
 import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, Operation } from '../schemas';
 import { createChatAgent } from './chat-agent';
+import { CletusAIContext } from '../ai';
 
 /**
  * Options for running the chat orchestrator
@@ -113,6 +114,7 @@ export async function runChatOrchestrator(
       .map(convertMessage));
 
     let loopIteration = 0;
+    let chatInterrupted = false;
 
     // Orchestration loop
     while (loopIteration < loopMax) {
@@ -210,7 +212,7 @@ export async function runChatOrchestrator(
       let stackTrace: any;
 
       // Run chat agent
-      const chatResponse = chatAgent.run({}, {
+      const chatContext = {
         ops,
         chat: chatMeta,
         chatData,
@@ -219,6 +221,9 @@ export async function runChatOrchestrator(
         signal,
         messages: currentMessages,
         chatStatus: (status: string) => onEvent({ type: 'status', status }),
+        chatInterrupt: () => {
+          chatInterrupted = true;
+        },
         events,
         /*
         // @ts-ignore
@@ -250,7 +255,9 @@ export async function runChatOrchestrator(
           }
         })
           */
-      });
+      } as const;
+
+      const chatResponse = chatAgent.run({}, chatContext);
 
       logger.log('orchestrator: processing response');
 
@@ -286,24 +293,6 @@ export async function runChatOrchestrator(
                 
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
-              }
-              break;
-
-            case 'textReset':
-              {
-                /*
-                // Clear all non-operation text 
-                const last = pending.content[pending.content.length - 1];
-                if (last.operationIndex === undefined && last.type === 'text') {
-                  last.content = '';
-                }
-                // Reset only text output tokens
-                if (currentUsage.text) {
-                  currentUsage.text.output = 0;
-                }
-                onEvent({ type: 'pendingUpdate', pending });
-                updateUsageEvent();
-                */
               }
               break;
 
@@ -343,6 +332,13 @@ export async function runChatOrchestrator(
               toolTokens += Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4);
               // Update estimated text output to include tool tokens
               updateEstimatedTextOutputTokens();
+              updateUsageEvent();
+              break;
+
+            case 'toolInterrupt':
+              chatInterrupted = true;
+              onEvent({ type: 'pendingUpdate', pending });
+              onEvent({ type: 'status', status: '' });
               updateUsageEvent();
               break;
 
@@ -428,7 +424,7 @@ export async function runChatOrchestrator(
       const needsApproval = ops.operations.some((op) => op.status === 'analyzed');
       const noOperations = ops.operations.length === 0;
       const noTodos = chatMeta.todos.length === 0;
-      if (needsApproval || noOperations || noTodos) {
+      if (needsApproval || noOperations || noTodos || chatInterrupted) {
         break;
       }
 
@@ -439,6 +435,10 @@ export async function runChatOrchestrator(
     }
 
     logger.log('orchestrator: completing');
+
+    if (chatInterrupted) {
+      options?.events?.onRefreshChat?.();
+    }
 
   } catch (error: any) {
     if (error.message !== 'Aborted') {

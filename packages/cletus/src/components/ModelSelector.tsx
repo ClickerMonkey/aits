@@ -389,7 +389,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     if (model.pricing.image) {
       const { input , output  } = model.pricing.image;
       if (input !== undefined) {
-        costs.push(`$${input.toFixed(2)}/M 👁 in`);
+        costs.push(`$${(input / 1_000_000 * 2_000).toFixed(2)} 👁 in`);
       } else if (output !== undefined) {
         for (const out of output) {
           const { quality, sizes } = out;

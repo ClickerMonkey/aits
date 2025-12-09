@@ -1207,10 +1207,10 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
               if (toolCall.arguments) {
                 if (!toolCall.named) {
-                  yieldChunk.toolCallNamed = existing;
+                  yieldChunk.toolCallNamed = toolCall;
                   toolCall.named = true;
                 } else {
-                  yieldChunk.toolCallArguments = existing;
+                  yieldChunk.toolCallArguments = toolCall;
                 }
               }
             }

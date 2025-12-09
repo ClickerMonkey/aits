@@ -502,7 +502,19 @@ export class ModelRegistry<
    * List models for which we have providers
    */
   providedModels(): ModelInfo<TProviderKey>[] {
-    return this.listModels().filter(model => this.providers.has(model.provider as TProviderKey));
+    const seen = new Set<string>();
+    return this.listModels().filter(model => {
+      if (!this.providers.has(model.provider as TProviderKey)) {
+        return false;
+      }
+      // Create unique key based on provider and model ID
+      const uniqueKey = `${model.provider}/${model.id}`;
+      if (seen.has(uniqueKey)) {
+        return false;
+      }
+      seen.add(uniqueKey);
+      return true;
+    });
   }
 
   /**
