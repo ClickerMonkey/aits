@@ -107,6 +107,7 @@ export class ConfigFile extends JsonFile<Config> {
           timeout: AUTONOMOUS.DEFAULT_TIMEOUT_MS,
         },
         adaptiveTools: 14,
+        maxQuerySchemaTypes: 5,
         showInput: false,
         showOutput: false,
         showSystemMessages: true,

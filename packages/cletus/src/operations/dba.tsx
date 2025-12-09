@@ -559,7 +559,7 @@ export const query = operationOf<
     // Analysis requires executing prompts which is not allowed in analyze phase
     if (typeof queryInput === 'string') {
       return {
-        analysis: `This will execute a query based on the description: "${abbreviate(queryInput, 100)}". The query will be built and validated during execution.`,
+        analysis: `The query will be built and validated during execution.`,
         doable: true,
         cache: { queryString: queryInput },
       };

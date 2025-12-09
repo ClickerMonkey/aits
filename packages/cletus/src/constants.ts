@@ -105,7 +105,6 @@ export const CONSTS = {
   MAX_EXTRACTION_CHUNK_SIZE: 64_000, // Maximum size for data extraction to minimize LLM calls
   OPERATION_MESSAGE_TRUNCATE_LIMIT: 2000, // Maximum size for operation messages before truncation
   OPERATION_MESSAGE_TRUNCATE_BUFFER: 200, // Buffer to ensure we don't exceed the truncate limit
-  MAX_QUERY_SCHEMA_TYPES: 0, // Maximum number of types before switching to string-based query schema
 } as const;
 
 /**

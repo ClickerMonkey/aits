@@ -14,7 +14,7 @@ import { logger } from '../logger';
 import type { Providers } from '../schemas';
 import { ModelSelector } from './ModelSelector';
 
-type Tab = 'user' | 'prompts' | 'memory' | 'deletions' | 'providers' | 'tavily' | 'models' | 'autonomous' | 'debug';
+type Tab = 'user' | 'prompts' | 'memory' | 'deletions' | 'providers' | 'tavily' | 'models' | 'autonomous' | 'advanced' | 'debug';
 type ModelType = 'chat' | 'imageGenerate' | 'imageEdit' | 'imageAnalyze' | 'imageEmbed' | 'transcription' | 'speech' | 'summary' | 'describe' | 'transcribe' | 'edit';
 
 interface InkSettingsTabViewProps {
@@ -91,7 +91,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
     }
 
     if (focusMode === 'tabs' && !editing && !subView) {
-      const tabs: Tab[] = ['user', 'prompts', 'memory', 'deletions', 'providers', 'tavily', 'models', 'autonomous', 'debug'];
+      const tabs: Tab[] = ['user', 'prompts', 'memory', 'deletions', 'providers', 'tavily', 'models', 'autonomous', 'advanced', 'debug'];
       const currentIndex = tabs.indexOf(activeTab);
 
       if (key.leftArrow && currentIndex > 0) {
@@ -179,6 +179,26 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         setMessage(`✓ Timeout updated to: ${minutes} minute${minutes !== 1 ? 's' : ''}`);
       } else {
         setMessage(`⚠ Please enter a number >= ${minMinutes}`);
+      }
+    } else if (editField === 'adaptiveTools') {
+      const value = parseInt(editValue);
+      if (!isNaN(value) && value >= 1) {
+        await config.save((data) => {
+          data.user.adaptiveTools = value;
+        });
+        setMessage(`✓ Adaptive tools count updated to: ${value}`);
+      } else {
+        setMessage('⚠ Please enter a number >= 1');
+      }
+    } else if (editField === 'maxQuerySchemaTypes') {
+      const value = parseInt(editValue);
+      if (!isNaN(value) && value >= 0) {
+        await config.save((data) => {
+          data.user.maxQuerySchemaTypes = value;
+        });
+        setMessage(`✓ Max query schema types updated to: ${value}`);
+      } else {
+        setMessage('⚠ Please enter a number >= 0');
       }
     } else if (editField === 'addPromptFile') {
       if (editValue.trim()) {
@@ -339,6 +359,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       { key: 'tavily', label: '🌐 Tavily' },
       { key: 'models', label: '🤖 Models' },
       { key: 'autonomous', label: '🔄 Auto' },
+      { key: 'advanced', label: '⚙️ Advanced' },
       { key: 'debug', label: '🐛 Debug' },
     ];
 
@@ -1330,6 +1351,44 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       );
     }
 
+    // ADVANCED TAB
+    if (activeTab === 'advanced') {
+      const adaptiveTools = config.getData().user.adaptiveTools ?? 14;
+      const maxQuerySchemaTypes = config.getData().user.maxQuerySchemaTypes ?? 5;
+
+      const items = [
+        { label: `Adaptive tools count: ${adaptiveTools}`, value: 'adaptiveTools' },
+        { label: `Query type threshold (once you have more than this number of types - querying is done async to reduce context): ${maxQuerySchemaTypes}`, value: 'maxQuerySchemaTypes' },
+      ];
+
+      return (
+        <Box flexDirection="column">
+          {message && (
+            <Box marginBottom={1}>
+              <Text color="green">{message}</Text>
+            </Box>
+          )}
+          <Box marginBottom={1}>
+            <Text dimColor>Number of tools selected for adaptive tooling</Text>
+          </Box>
+          <Box marginBottom={1}>
+            <Text dimColor>Max types before query tool switches to string-based schema</Text>
+          </Box>
+          <SelectInput
+            items={items}
+            isFocused={focusMode === 'content'}
+            onSelect={(item) => {
+              if (item.value === 'adaptiveTools') {
+                startEdit('adaptiveTools', adaptiveTools.toString());
+              } else if (item.value === 'maxQuerySchemaTypes') {
+                startEdit('maxQuerySchemaTypes', maxQuerySchemaTypes.toString());
+              }
+            }}
+          />
+        </Box>
+      );
+    }
+
     // DEBUG TAB
     if (activeTab === 'debug') {
       const debugEnabled = config.getData().user.debug;
@@ -1385,6 +1444,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
            activeTab === 'tavily' ? 'Tavily Web Search' :
            activeTab === 'models' ? 'Models' :
            activeTab === 'autonomous' ? 'Autonomous Settings' :
+           activeTab === 'advanced' ? 'Advanced Settings' :
            'Debug Settings'}
         </Text>
       </Box>

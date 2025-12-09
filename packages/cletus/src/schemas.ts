@@ -36,6 +36,7 @@ export const UserSchema = z.object({
     timeout: z.number().min(AUTONOMOUS.MIN_TIMEOUT_MS).default(AUTONOMOUS.DEFAULT_TIMEOUT_MS),
   }).optional(),
   adaptiveTools: z.number().min(1).default(14),
+  maxQuerySchemaTypes: z.number().min(0).default(5),
   showInput: z.boolean().default(false),
   showOutput: z.boolean().default(false),
   showSystemMessages: z.boolean().default(true),

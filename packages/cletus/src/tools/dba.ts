@@ -2,14 +2,13 @@ import { z } from 'zod';
 import { globalToolProperties, type CletusAI, type CletusAIContext } from '../ai';
 import { getOperationInput } from '../operations/types';
 import { createDBASchemas } from '../helpers/dba';
-import { CONSTS } from '../constants';
 import { TypeDefinition } from '../schemas';
 
 /**
  * Determine if string schema should be used based on number of types
  */
-function shouldUseStringSchema(types: TypeDefinition[]): boolean {
-  return types.length > CONSTS.MAX_QUERY_SCHEMA_TYPES;
+function shouldUseStringSchema(types: TypeDefinition[], maxQuerySchemaTypes: number): boolean {
+  return types.length > maxQuerySchemaTypes;
 }
 
 /**
@@ -134,8 +133,9 @@ Examples
 {{modeInstructions}}`,
     schema: ({ config }) => {
       const types = config.getData().types;
-      const useStringSchema = shouldUseStringSchema(types);
-      
+      const maxQuerySchemaTypes = config.getData().user.maxQuerySchemaTypes ?? 5;
+      const useStringSchema = shouldUseStringSchema(types, maxQuerySchemaTypes);
+
       return z.object({
         ...(useStringSchema ? {
           query: z.string().describe('A detailed description of the query to execute. Must be a comprehensive description of the query to perform (selects, inserts, updates, deletes, and ctes are supported - all major Postgres expressions). Must include which types are involved, any filter conditions, known record IDs if applicable, and the precise outcome desired. Be specific and details. Do not provide a SQL looking query - you do not have enough type information to do so. You can include SQL like logic at the end if its the best way to describe complex logic that is needed.'),
@@ -147,8 +147,9 @@ Examples
     },
     input: (ctx) => {
       const types = ctx.config.getData().types;
-      const useStringSchema = shouldUseStringSchema(types);
-      
+      const maxQuerySchemaTypes = ctx.config.getData().user.maxQuerySchemaTypes ?? 5;
+      const useStringSchema = shouldUseStringSchema(types, maxQuerySchemaTypes);
+
       return {
         queryFormat: useStringSchema
           ? 'The query must be a string description that includes all necessary details: the operation to perform (SELECT/INSERT/UPDATE/DELETE), which types/tables to query, filter conditions, known record IDs if applicable, and the precise outcome desired. Do not provide a specific query - just a detailed description. You do not have enough information on each type to build a properly formed query.'
