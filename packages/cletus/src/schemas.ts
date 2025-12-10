@@ -1,6 +1,5 @@
 import { any, z } from 'zod';
 import { AUTONOMOUS } from './constants';
-import { cache } from 'sharp';
 
 // ============================================================================
 // User Schema
