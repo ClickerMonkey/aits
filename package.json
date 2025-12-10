@@ -24,6 +24,7 @@
     "clean": "npm run clean --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "update:versions": "node scripts/update-versions.js",
+    "update:versions:patch": "node scripts/update-versions-patch.js",
     "release": "npm publish --workspaces --access public"
   },
   "keywords": [

@@ -18,6 +18,7 @@ import { operationOf } from "./types";
 import { executeQuery, executeQueryWithoutCommit, commitQueryChanges, canCommitQueryResult, QueryResult, QueryExecutionPayload, CanCommitResult } from '../helpers/query';
 import type { Query } from '../helpers/dba';
 import { createDBASchemas, describeTypes } from '../helpers/dba';
+import { QUERY_EXAMPLES } from '../helpers/dba-examples';
 
 
 const getKnowledge = async () => {
@@ -543,6 +544,227 @@ export interface QueryOperationCache {
   queryString?: string; // Store the original query string for rendering
 }
 
+/**
+ * Maximum number of retry attempts for query validation
+ */
+const MAX_QUERY_RETRY_ATTEMPTS = 5;
+
+/**
+ * Validates a Query object and retries with corrections if validation fails.
+ *
+ * @param query - The Query object to validate
+ * @param ctx - The Cletus AI context
+ * @param getManager - Function to get a data manager for a type
+ * @param schemas - The DBA schemas for the query types
+ * @param queryDescription - Optional original query description (for context when fixing)
+ * @returns A valid QueryExecutionPayload
+ * @throws Error if validation fails after all retry attempts
+ */
+async function validateQueryWithRetry(
+  query: Query,
+  ctx: CletusAIContext,
+  getManager: (typeName: string) => DataManager,
+  schemas: ReturnType<typeof createDBASchemas>,
+  queryDescription?: string
+): Promise<QueryExecutionPayload> {
+  const { config, ai, chatStatus } = ctx;
+
+  let currentQuery = query;
+  let lastErrors: Array<{ path: string; message: string; suggestion?: string }> = [];
+
+  for (let attempt = 1; attempt <= MAX_QUERY_RETRY_ATTEMPTS; attempt++) {
+    // Execute query without committing to validate
+    const payload = await executeQueryWithoutCommit(
+      currentQuery,
+      () => config.getData().types,
+      getManager,
+      getKnowledge,
+      embedQuery,
+    );
+
+    // If validation succeeded, return the payload
+    if (payload.result.canCommit || !payload.result.validationErrors || payload.result.validationErrors.length === 0) {
+      return payload;
+    }
+
+    // Store the errors for this attempt
+    lastErrors = payload.result.validationErrors;
+
+    // If this was the last attempt, throw an error
+    if (attempt === MAX_QUERY_RETRY_ATTEMPTS) {
+      const errorSummary = lastErrors
+        .map(err => `${err.path}: ${err.message}${err.suggestion ? ` (${err.suggestion})` : ''}`)
+        .join('\n');
+      throw new Error(`Query validation failed after ${MAX_QUERY_RETRY_ATTEMPTS} attempts:\n${errorSummary}`);
+    }
+
+    // Ask AI to fix the query based on validation errors
+    chatStatus(`Validation failed (attempt ${attempt}/${MAX_QUERY_RETRY_ATTEMPTS}), requesting correction...`);
+
+    const errorDetails = lastErrors
+      .map(err => `- ${err.path}: ${err.message}${err.suggestion ? ` (Suggestion: ${err.suggestion})` : ''}`)
+      .join('\n');
+
+    const queryFixer = ai.prompt({
+      name: 'query_fixer',
+      description: 'Fix a query based on validation errors',
+      content: `You are a database query fixer. You will be given a query that failed validation and the validation errors.
+Your task is to correct the query to resolve all validation errors.
+
+{{#if queryDescription}}Original user request:
+{{queryDescription}}{{/if}}
+
+Original query:
+{{queryJson}}
+
+Validation errors:
+{{errorDetails}}
+
+Analyze the errors and provide a corrected query that resolves all validation issues. Make minimal changes necessary to fix the errors${queryDescription ? ', while ensuring the query still satisfies the original user request' : ''}.`,
+      schema: z.object({
+        query: schemas.QuerySchema,
+      }),
+      metadataFn: () => ({
+        model: config.getData().user.models?.chat,
+      }),
+    });
+
+    const { query: correctedQuery } = await queryFixer.get('result', {
+      queryJson: JSON.stringify(currentQuery, null, 2),
+      errorDetails,
+      queryDescription,
+    }, ctx) as { query: Query };
+
+    currentQuery = correctedQuery;
+  }
+
+  // This should never be reached due to the throw in the loop, but TypeScript needs it
+  throw new Error('Unexpected: validation retry loop ended without result');
+}
+
+/**
+ * Validates and executes a query, retrying on validation errors up to MAX_QUERY_RETRY_ATTEMPTS times.
+ *
+ * @param queryInput - The query to validate and execute (can be a string description or Query object)
+ * @param ctx - The Cletus AI context
+ * @param getManager - Function to get a data manager for a type
+ * @returns A valid QueryExecutionPayload
+ * @throws Error if validation fails after all retries or if the query cannot be built
+ */
+async function validateAndExecuteQuery(
+  queryInput: Query | string,
+  ctx: CletusAIContext,
+  getManager: (typeName: string) => DataManager
+): Promise<{ payload: QueryExecutionPayload; builtQuery?: Query; queryString?: string }> {
+  const { config, ai, chatStatus } = ctx;
+
+  // Store the original query string for cache
+  const queryDescription = typeof queryInput === 'string' ? queryInput : undefined;
+
+  // The schemas to use for validation
+  let schemas: ReturnType<typeof createDBASchemas>;
+
+  // If query is a string, we need to build it first
+  let parsedQuery: Query;
+
+  if (typeof queryInput === 'string') {
+    chatStatus('Analyzing query requirements...');
+
+    // Step 1: Get list of types needed for the query
+    const types = config.getData().types;
+    const typeNames = types.map(t => t.name);
+    const typeDescriptions = describeTypes(types);
+
+    // Guard against empty type names array
+    if (typeNames.length === 0) {
+      throw new Error('No data types available to build query');
+    }
+
+    const typeSelector = ai.prompt({
+      name: 'query_type_selector',
+      description: 'Determine which data types are needed for a query',
+      content: `You are a database query analyzer. Given a natural language query description and a list of available data types, determine which types are needed to execute the query.
+
+Available types:
+{{typeDescriptions}}
+
+Query description:
+{{queryDescription}}
+
+Return a JSON object with an array of type names that are needed to execute this query. Only include types that are absolutely necessary.`,
+      schema: z.object({
+        types: z.array(z.enum(typeNames as [string, ...string[]])).describe('Array of type names needed for the query'),
+      }),
+      input: ({ queryDescription }: { queryDescription: string }) => ({ typeDescriptions, queryDescription }),
+      metadataFn: () => ({
+        model: config.getData().user.models?.chat,
+      }),
+    });
+
+    const { types: neededTypeNames } = await typeSelector.get('result', { queryDescription: queryInput }, ctx) as { types: string[] };
+
+    // Validate that all needed types exist
+    const neededTypes = neededTypeNames
+      .map(name => types.find(t => t.name === name))
+      .filter((t): t is TypeDefinition => t !== undefined);
+
+    if (neededTypes.length === 0) {
+      throw new Error('Could not determine which data types are needed for this query');
+    }
+
+    chatStatus(`Building query for types: ${neededTypes.map(t => t.friendlyName).join(', ')}...`);
+
+    // Step 2: Build the query using the selected types
+    schemas = createDBASchemas(neededTypes);
+    const neededTypeDescriptions = describeTypes(neededTypes);
+
+    const queryBuilder = ai.prompt({
+      name: 'query_builder',
+      description: 'Build a structured query from a natural language description',
+      content: `You are a database query builder. Given a natural language query description and the schema for relevant data types, build a structured query object that accomplishes the desired operation.
+
+Available types:
+{{neededTypeDescriptions}}
+
+Query description:
+{{queryDescription}}
+
+Build a query object that satisfies this description. The query must be valid according to the schema and should precisely match the intent of the description.
+
+Here are some examples of valid query structures:
+
+{{queryExamples}}`,
+      schema: z.object({
+        query: schemas.QuerySchema,
+      }),
+      input: ({ queryDescription }: { queryDescription: string }) => ({ 
+        neededTypeDescriptions, 
+        queryDescription,
+        queryExamples: QUERY_EXAMPLES,
+      }),
+      metadataFn: () => ({
+        model: config.getData().user.models?.chat,
+      }),
+    });
+
+    const { query } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx) as { query: Query };
+
+    parsedQuery = query;
+  } else {
+    parsedQuery = queryInput;
+    schemas = createDBASchemas(config.getData().types);
+  }
+
+  // Validate the query with retry logic
+  const payload = await validateQueryWithRetry(parsedQuery, ctx, getManager, schemas, queryDescription);
+
+  return {
+    payload,
+    builtQuery: typeof queryInput === 'string' ? parsedQuery : undefined,
+    queryString: queryDescription,
+  };
+}
+
 export const query = operationOf<
   { query: Query | string; commit?: boolean },
   QueryResult,
@@ -627,186 +849,49 @@ export const query = operationOf<
     };
   },
   do: async ({ input: { query: queryInput, commit = true }, cache }, ctx) => {
-    const { config, log, ai, chatStatus } = ctx;
     const getManager = (typeName: string) => new DataManager(typeName);
 
-    // Store the original query string for cache
-    const originalQueryString = typeof queryInput === 'string' ? queryInput : undefined;
-    
-    // If query is a string, we need to build it first
-    let parsedQuery: Query;
-    if (typeof queryInput === 'string') {
-      chatStatus('Analyzing query requirements...');
-      
-      // Step 1: Get list of types needed for the query
-      const types = config.getData().types;
-      const typeNames = types.map(t => t.name);
-      const typeDescriptions = describeTypes(types);
-      
-      // Guard against empty type names array
-      if (typeNames.length === 0) {
-        throw new Error('No data types available to build query');
-      }
-      
-      const typeSelector = ai.prompt({
-        name: 'query_type_selector',
-        description: 'Determine which data types are needed for a query',
-        content: `You are a database query analyzer. Given a natural language query description and a list of available data types, determine which types are needed to execute the query.
+    // Create a copy of the cache to update
+    const updatedCache: QueryOperationCache = {
+      ...cache,
+    };
 
-Available types:
-{{typeDescriptions}}
+    // The execution payload (from cache or newly executed)
+    let payload = cache?.payload;
 
-Query description:
-{{queryDescription}}
+    // If no cached payload, we need to validate and execute the query
+    if (!payload) {
+      // Validate and execute the query (handles string queries with retries)
+      const { payload: validatedPayload, builtQuery, queryString } = await validateAndExecuteQuery(queryInput, ctx, getManager);
 
-Return a JSON object with an array of type names that are needed to execute this query. Only include types that are absolutely necessary.`,
-        schema: z.object({
-          types: z.array(z.enum(typeNames as [string, ...string[]])).describe('Array of type names needed for the query'),
-        }),
-        input: ({ queryDescription }: { queryDescription: string }) => ({ typeDescriptions, queryDescription }),
-        metadataFn: () => ({
-          model: config.getData().user.models?.chat,
-        }),
-      });
+      // Update cache with new payload and built query info
+      updatedCache.builtQuery = builtQuery;
+      updatedCache.queryString = queryString;
+      updatedCache.canCommit = { canCommit: validatedPayload.result.canCommit };
+      updatedCache.payload = payload = validatedPayload;
+    } else if (commit) {
+      // If we have a cached payload but no canCommit status, check if we can commit now
+      const canCommitResult = await canCommitQueryResult(payload, getManager);
 
-      const { types: neededTypeNames } = await typeSelector.get('result', { queryDescription: queryInput }, ctx) as { types: string[] };
-      
-      // Validate that all needed types exist
-      const neededTypes = neededTypeNames
-        .map(name => types.find(t => t.name === name))
-        .filter((t): t is TypeDefinition => t !== undefined);
-      
-      if (neededTypes.length === 0) {
-        throw new Error('Could not determine which data types are needed for this query');
-      }
-
-      chatStatus(`Building query for types: ${neededTypes.map(t => t.friendlyName).join(', ')}...`);
-
-      // Step 2: Build the query using the selected types
-      const schemas = createDBASchemas(neededTypes);
-      const neededTypeDescriptions = describeTypes(neededTypes);
-      
-      const queryBuilder = ai.prompt({
-        name: 'query_builder',
-        description: 'Build a structured query from a natural language description',
-        content: `You are a database query builder. Given a natural language query description and the schema for relevant data types, build a structured query object that accomplishes the desired operation.
-        
-Available types:
-{{neededTypeDescriptions}}
-
-Query description:
-{{queryDescription}}
-
-Build a query object that satisfies this description. The query must be valid according to the schema and should precisely match the intent of the description.`,
-        schema: z.object({
-          query: schemas.QuerySchema,
-        }),
-        input: ({ queryDescription }: { queryDescription: string }) => ({ neededTypeDescriptions, queryDescription }),
-        metadataFn: () => ({
-          model: config.getData().user.models?.chat,
-        }),
-        validate: async ({ query }: { query: Query }, validationCtx) => {
-          // Validate the query by executing it without committing
-          const payload = await executeQueryWithoutCommit(
-            query,
-            () => config.getData().types,
-            getManager,
-            getKnowledge,
-            embedQuery,
-          );
-          
-          if (!payload.result.canCommit && payload.result.validationErrors && payload.result.validationErrors.length > 0) {
-            const errors = payload.result.validationErrors
-              .map(err => `${err.path}: ${err.message}${err.suggestion ? ` (${err.suggestion})` : ''}`)
-              .join('\n');
-            throw new Error(`Query validation failed:\n${errors}`);
-          }
-        },
-      });
-
-      const { query: builtQuery } = await queryBuilder.get('result', { queryDescription: queryInput }, ctx) as { query: Query };
-      
-      // Store the built query in cache
-      parsedQuery = builtQuery;
-      cache = { ...cache, builtQuery, queryString: originalQueryString };
-    } else {
-      parsedQuery = queryInput;
+      updatedCache.canCommit = canCommitResult;
     }
 
-    // If we have a cached payload and commit is true, try to use it
-    if (cache?.payload && commit) {
-      // Check if the cached payload can still be committed
-      const canCommitResult = await canCommitQueryResult(cache.payload, getManager);
-      if (canCommitResult.canCommit) {
-        // Commit the cached payload
-        const output = await commitQueryChanges(cache.payload, getManager);
+    // If we are committing and can commit, do so
+    if (commit && updatedCache.canCommit?.canCommit) {
+      // Commit the changes (single call)
+      const output = await commitQueryChanges(payload, getManager);
 
-        // Update knowledge base for affected records
-        await updateKnowledgeFromQueryResult(ctx, output);
+      // Update knowledge base for affected records (single call)
+      await updateKnowledgeFromQueryResult(ctx, output);
 
-        return {
-          output,
-          cache: { ...cache, canCommit: canCommitResult },
-        };
-      } else {
-        // Store the canCommit result in cache so render can show why it failed
-        const newCache = { ...cache, canCommit: canCommitResult };
-        // Try to re-execute the query
-        try {
-          const { result: output } = await executeQuery(
-            parsedQuery,
-            () => config.getData().types,
-            getManager,
-            getKnowledge,
-            embedQuery,
-          );
-          
-          // Update knowledge base for affected records
-          await updateKnowledgeFromQueryResult(ctx, output);
-          
-          return {
-            output,
-            cache: newCache,
-          };
-        } catch (error: any) {
-          // If re-execution also fails, throw with the canCommit reason
-          throw new Error(`Cannot commit query: ${canCommitResult.reason}`);
-        }
-      }
+      // Update cache payload result to reflect committed changes
+      payload.result = output;
     }
 
-    // Execute the query fresh
-    if (commit) {
-      const payload = await executeQuery(
-        parsedQuery,
-        () => config.getData().types,
-        getManager,
-        getKnowledge,
-        embedQuery,
-      );
-      
-      // Update knowledge base for affected records
-      await updateKnowledgeFromQueryResult(ctx, payload.result);
-      
-      return {
-        output: payload.result,
-        cache: { payload },
-      };
-    } else {
-      // Execute without committing (for testing)
-      const payload = await executeQueryWithoutCommit(
-        parsedQuery,
-        () => config.getData().types,
-        getManager,
-        getKnowledge,
-        embedQuery,
-      );
-      
-      return {
-        output: payload.result,
-        cache: { payload },
-      };
-    }
+    return {
+      output: payload.result,
+      cache: updatedCache,
+    };
   },
   render: (op, ai, showInput, showOutput) => {
     // Check if the query was originally a string
