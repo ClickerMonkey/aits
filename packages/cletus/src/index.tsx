@@ -87,9 +87,11 @@ const App: React.FC = () => {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { profile?: string } {
+function parseArgs(): { profile?: string; browser?: boolean; port?: number } {
   const args = process.argv.slice(2);
   let profile: string | undefined;
+  let browser = false;
+  let port: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -103,15 +105,35 @@ function parseArgs(): { profile?: string } {
       profile = args[i + 1];
       i++; // Skip next argument
     }
+    // Handle --browser flag
+    else if (arg === '--browser') {
+      browser = true;
+    }
+    // Handle --port=number format
+    else if (arg.startsWith('--port=')) {
+      port = parseInt(arg.substring('--port='.length), 10);
+    }
+    // Handle --port number format
+    else if (arg === '--port' && i + 1 < args.length) {
+      port = parseInt(args[i + 1], 10);
+      i++; // Skip next argument
+    }
   }
 
-  return { profile };
+  return { profile, browser, port };
 }
 
 async function main() {
   // Parse command line arguments and set global profile
-  const { profile } = parseArgs();
+  const { profile, browser, port } = parseArgs();
   setProfile(profile);
+
+  // If browser mode, start HTTP server instead of CLI
+  if (browser) {
+    const { startBrowserServer } = await import('./browser/server');
+    await startBrowserServer(port);
+    return;
+  }
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
