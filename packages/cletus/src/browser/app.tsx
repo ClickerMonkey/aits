@@ -1,32 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConfigFile, configExists } from '../file-manager';
-import { InkInitWizard } from '../components/InkInitWizard';
 import { MainPage } from './pages/MainPage';
 import { ChatPage } from './pages/ChatPage';
+import { InitPage } from './pages/InitPage';
 import './styles.css';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
+interface ConfigData {
+  user: {
+    name: string;
+    pronouns?: string;
+    showInput?: boolean;
+    showOutput?: boolean;
+  };
+  assistants: Array<{
+    name: string;
+    description?: string;
+  }>;
+  chats: Array<{
+    id: string;
+    name: string;
+    mode: string;
+    assistant?: string;
+    created: number;
+    updated: number;
+  }>;
+  types: Array<{
+    name: string;
+    friendlyName: string;
+    description?: string;
+  }>;
+}
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('loading');
-  const [config, setConfig] = useState<ConfigFile | null>(null);
+  const [config, setConfig] = useState<ConfigData | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function checkConfig() {
-      const exists = await configExists();
-      if (exists) {
-        const cfg = new ConfigFile();
-        await cfg.load();
-        setConfig(cfg);
-        setView('main');
-      } else {
+    async function loadConfig() {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const data = await response.json();
+          setConfig(data.data);
+          setView('main');
+        } else {
+          setView('init');
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
         setView('init');
       }
     }
-    checkConfig();
+    loadConfig();
   }, []);
+
+  const reloadConfig = async () => {
+    try {
+      const response = await fetch('/api/config');
+      if (response.ok) {
+        const data = await response.json();
+        setConfig(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to reload config:', error);
+    }
+  };
 
   if (view === 'loading') {
     return (
@@ -39,10 +80,9 @@ const App: React.FC = () => {
 
   if (view === 'init') {
     return (
-      <InkInitWizard
-        onComplete={(cfg) => {
-          setConfig(cfg);
-          setView('main');
+      <InitPage
+        onComplete={() => {
+          reloadConfig().then(() => setView('main'));
         }}
       />
     );
@@ -54,6 +94,7 @@ const App: React.FC = () => {
         chatId={selectedChatId}
         config={config}
         onBack={() => setView('main')}
+        onConfigChange={reloadConfig}
       />
     );
   }
@@ -66,11 +107,7 @@ const App: React.FC = () => {
           setSelectedChatId(chatId);
           setView('chat');
         }}
-        onExit={() => {
-          if (typeof window !== 'undefined') {
-            window.close();
-          }
-        }}
+        onConfigChange={reloadConfig}
       />
     );
   }

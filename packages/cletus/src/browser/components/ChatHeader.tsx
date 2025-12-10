@@ -1,5 +1,11 @@
 import React from 'react';
-import type { ChatMeta } from '../../schemas';
+
+interface ChatMeta {
+  id: string;
+  name: string;
+  mode: string;
+  assistant?: string;
+}
 
 interface ChatHeaderProps {
   chat: ChatMeta;

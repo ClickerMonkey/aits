@@ -1,27 +1,50 @@
 import React, { useState } from 'react';
-import type { ConfigFile } from '../../config';
-import type { ChatMeta } from '../../schemas';
 
-interface ChatListProps {
-  config: ConfigFile;
-  onChatSelect: (chatId: string) => void;
+interface ChatMeta {
+  id: string;
+  name: string;
+  mode: string;
+  created: number;
+  updated: number;
 }
 
-export const ChatList: React.FC<ChatListProps> = ({ config, onChatSelect }) => {
+interface ConfigData {
+  chats: ChatMeta[];
+}
+
+interface ChatListProps {
+  config: ConfigData;
+  onChatSelect: (chatId: string) => void;
+  onConfigChange: () => Promise<void>;
+}
+
+export const ChatList: React.FC<ChatListProps> = ({ config, onChatSelect, onConfigChange }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newChatName, setNewChatName] = useState('');
 
-  const chats = config.getChats();
+  const chats = config.chats;
   const sortedChats = [...chats].sort((a, b) => b.updated - a.updated);
 
   const handleCreateChat = async () => {
     if (!newChatName.trim()) return;
 
-    const chatId = await config.createChat(newChatName.trim());
-    await config.load();
-    setIsCreating(false);
-    setNewChatName('');
-    onChatSelect(chatId);
+    try {
+      const response = await fetch('/api/chat/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newChatName.trim() }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await onConfigChange();
+        setIsCreating(false);
+        setNewChatName('');
+        onChatSelect(data.data.chatId);
+      }
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+    }
   };
 
   return (
