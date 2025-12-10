@@ -319,13 +319,12 @@ async function serveStaticFile(url: string, res: http.ServerResponse): Promise<v
   }
 
   // Security: prevent directory traversal
-  const safePath = path.normalize(url).replace(/^(\.\.[\/\\])+/, '');
   // When bundled, this code is in dist/index.js, so dist-browser is ../dist-browser
-  const distDir = path.join(__serverDirname, '../dist-browser');
-  const filePath = path.join(distDir, safePath);
+  const distDir = path.resolve(__serverDirname, '../dist-browser');
+  const filePath = path.resolve(distDir, url.slice(1)); // Remove leading slash
 
-  // Ensure file is within dist directory
-  if (!filePath.startsWith(distDir)) {
+  // Ensure file is within dist directory using resolved paths
+  if (!filePath.startsWith(distDir + path.sep) && filePath !== distDir) {
     res.writeHead(403);
     res.end('Forbidden');
     return;
