@@ -139,6 +139,7 @@ async function main() {
   process.stdout.write('\x1Bc');
 
   // Initialize embed worker (don't await - let it init in background)
+  // Only initialize worker for CLI mode
   initWorker();
 
   const { waitUntilExit } = render(React.createElement(App), {

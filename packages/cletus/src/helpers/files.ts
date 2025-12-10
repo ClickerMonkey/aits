@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import sharp from "sharp";
 import pdfParse from "pdf-parse";
 import XLSX from "xlsx";
 import * as mammoth from "mammoth";
@@ -948,6 +947,9 @@ async function processZipFile(
  */
 async function validateImage(imagePath: string): Promise<{ size: number, width: number, height: number } | false> {
   try {
+    // Lazy-load sharp to avoid loading it on startup
+    const sharp = (await import("sharp")).default;
+    
     // Get image dimensions using sharp
     const metadata = await sharp(imagePath).metadata();
     

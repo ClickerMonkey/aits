@@ -6,13 +6,10 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { configExists } from '../file-manager';
 import { ConfigFile } from '../config';
 import { ChatFile } from '../chat';
-import { createCletusAI } from '../ai';
-import { createChatAgent } from '../agents/chat-agent';
-import { runChatOrchestrator } from '../agents/chat-orchestrator';
 import type { Message, ChatMeta } from '../schemas';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __serverFilename = fileURLToPath(import.meta.url);
+const __serverDirname = path.dirname(__serverFilename);
 
 interface ApiResponse {
   success: boolean;
@@ -60,7 +57,7 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
   const wss = new WebSocketServer({ server });
   wss.on('connection', (ws) => handleWebSocketConnection(ws));
 
-  server.listen(port, () => {
+  server.listen(port, '127.0.0.1', () => {
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║   Cletus Browser Mode                  ║');
     console.log('╚════════════════════════════════════════╝\n');
@@ -137,6 +134,12 @@ function handleWebSocketConnection(ws: WebSocket): void {
 
           // Process AI response
           abortController = new AbortController();
+          
+          // Lazy-load AI components
+          const { createCletusAI } = await import('../ai');
+          const { createChatAgent } = await import('../agents/chat-agent');
+          const { runChatOrchestrator } = await import('../agents/chat-orchestrator');
+          
           const ai = createCletusAI(config);
           const chatAgent = createChatAgent(ai);
 
@@ -317,7 +320,7 @@ async function serveStaticFile(url: string, res: http.ServerResponse): Promise<v
 
   // Security: prevent directory traversal
   const safePath = path.normalize(url).replace(/^(\.\.[\/\\])+/, '');
-  const distDir = path.join(__dirname, '../../../dist-browser');
+  const distDir = path.join(__serverDirname, '../../../dist-browser');
   const filePath = path.join(distDir, safePath);
 
   // Ensure file is within dist directory
