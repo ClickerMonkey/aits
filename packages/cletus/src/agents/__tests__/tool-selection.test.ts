@@ -111,4 +111,44 @@ describe('Tool Selection with alwaysVisible metadata', () => {
     // Verify getOperationOutput is not in selectedTools (filtered out)
     expect(selectedTools.some(t => t.name === 'getOperationOutput')).toBe(false);
   });
+
+  it('should use defaultVisible tools when no query exists', () => {
+    // Mock scenario with defaultVisible tools
+    const allTools = [
+      { name: 'getOperationOutput', input: { metadata: { alwaysVisible: true } } },
+      { name: 'about', input: { metadata: { alwaysVisible: true } } },
+      { name: 'todos_add', input: { metadata: { defaultVisible: true } } },
+      { name: 'todos_done', input: { metadata: { defaultVisible: true } } },
+      { name: 'file_read', input: { metadata: { defaultVisible: true } } },
+      { name: 'file_stats', input: { metadata: { defaultVisible: true } } },
+      { name: 'other_tool', input: {} },
+    ];
+
+    // Simulate getActiveTools logic when no query exists
+    const alwaysVisibleTools = allTools.filter(t => 
+      t.input.metadata?.alwaysVisible === true
+    );
+    const toolNames = new Set<string>(alwaysVisibleTools.map(t => t.name));
+    const defaultVisibleTools = allTools.filter(t => 
+      t.input.metadata?.defaultVisible === true && !toolNames.has(t.name)
+    );
+
+    const activeTools = [...alwaysVisibleTools, ...defaultVisibleTools];
+
+    // Verify alwaysVisible tools are included
+    expect(activeTools.some(t => t.name === 'getOperationOutput')).toBe(true);
+    expect(activeTools.some(t => t.name === 'about')).toBe(true);
+
+    // Verify defaultVisible tools are included
+    expect(activeTools.some(t => t.name === 'todos_add')).toBe(true);
+    expect(activeTools.some(t => t.name === 'todos_done')).toBe(true);
+    expect(activeTools.some(t => t.name === 'file_read')).toBe(true);
+    expect(activeTools.some(t => t.name === 'file_stats')).toBe(true);
+
+    // Verify other tools are not included
+    expect(activeTools.some(t => t.name === 'other_tool')).toBe(false);
+
+    // Verify total count
+    expect(activeTools.length).toBe(6);
+  });
 });

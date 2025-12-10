@@ -67,25 +67,24 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
     // Adaptive selection: use embeddings of recent user messages
     const query = buildToolSelectionQuery(ctx.messages || []);
     if (!query) {
-      // No user messages yet, return a default set of tools
-      const defaultTools = [
-        ...toolRegistry.getToolset('planner').slice(0, 2),
-        ...toolRegistry.getToolset('clerk').slice(0, 3),
-      ].filter(t => !toolNames.has(t.name));
+      // No user messages yet, return default visible tools
+      const defaultVisibleTools = toolRegistry.getAllTools().filter(t => 
+        t.tool.input.metadata?.defaultVisible === true && !toolNames.has(t.name)
+      );
       
-      return [...alwaysVisibleTools, ...defaultTools];
+      return [...alwaysVisibleTools, ...defaultVisibleTools];
     }
 
-    // Select tools based on semantic similarity
+    // Select tools based on semantic similarity, excluding alwaysVisible tools
     const adaptiveToolsCount = ctx.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
     const allSelectedTools = await toolRegistry.selectTools(
       query,
       adaptiveToolsCount,
-      [],
+      alwaysVisibleTools.map(t => t.name),
       ctx,
     );
     
-    // Filter out tools that are already in alwaysVisible
+    // Filter out tools that are already in alwaysVisible (redundant but safe)
     selectedTools = allSelectedTools.filter(t => !toolNames.has(t.name));
     
     // Trim to ensure we don't exceed the total count

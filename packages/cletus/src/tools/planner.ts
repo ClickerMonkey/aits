@@ -51,6 +51,7 @@ Example: Add a task to implement a feature:
       name: z.string().describe('The todo name/description'),
       ...globalToolProperties,
     }),
+    metadata: { defaultVisible: true },
     input: getOperationInput('todos_add'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_add', input }, ctx),
   });
@@ -68,6 +69,7 @@ Example: Mark a todo as done:
       id: z.string().describe('The todo ID to mark as done'),
       ...globalToolProperties,
     }),
+    metadata: { defaultVisible: true },
     input: getOperationInput('todos_done'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'todos_done', input }, ctx),
   });
@@ -109,6 +111,7 @@ Example: Remove a todo:
   const todosReplace = ai.tool({
     name: 'todos_replace',
     description: 'Replaces all todos with a new set',
+    metadata: { defaultVisible: true },
     instructions: `Use this to completely reorganize the todo list with a new plan. All existing todos will be replaced.
 
 Example: Replace with a new project plan:

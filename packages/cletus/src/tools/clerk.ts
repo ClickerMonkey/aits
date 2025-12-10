@@ -179,6 +179,7 @@ Example: Get stats for a source file:
       path: z.string().describe('Relative file path'),
       ...globalToolProperties,
     }),
+    metadata: { defaultVisible: true },
     input: getOperationInput('file_stats'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'file_stats', input }, ctx),
   });
@@ -203,6 +204,7 @@ Example: Delete a temporary file:
   const fileRead = ai.tool({
     name: 'file_read',
     description: 'Read file content',
+    metadata: { defaultVisible: true },
     instructions: `Use this to read and understand file contents. This is the PRIMARY tool for examining files. Supports text files, PDFs, Office docs, and images (with description/transcription).
 
 When to use:
@@ -261,6 +263,7 @@ Example 2: Edit a specific section of a large file (by line numbers):
   const textSearch = ai.tool({
     name: 'text_search',
     description: 'Search for regex pattern in files',
+    metadata: { defaultVisible: true },
     instructions: `Use this to find text patterns across multiple files. Returns matches with surrounding context lines. Supports OCR for images.
 
 The output can be customized to return different formats:
@@ -320,6 +323,7 @@ Example: Create a new feature directory:
   const dirSummary = ai.tool({
     name: 'dir_summary',
     description: 'Get a summary of files in a directory to understand its structure',
+    metadata: { defaultVisible: true },
     instructions: `Use this to understand the files in the current working directory or a subdirectory. Returns at most ~50 lines describing the directory structure including files, subdirectories, and file extensions.
 
 Example 1: Get summary of current directory:
