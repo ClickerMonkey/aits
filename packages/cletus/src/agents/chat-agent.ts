@@ -88,13 +88,10 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
     // Filter out tools that are already in alwaysVisible
     selectedTools = allSelectedTools.filter(t => !toolNames.has(t.name));
     
-    // If we filtered out some tools, adjust the count
-    if (selectedTools.length < adaptiveToolsCount - alwaysVisibleTools.length) {
-      // We have room for more tools, but we already selected the top ones
-      // Just use what we have
-    } else if (selectedTools.length > adaptiveToolsCount - alwaysVisibleTools.length) {
-      // Trim to ensure we don't exceed the total count
-      selectedTools = selectedTools.slice(0, adaptiveToolsCount - alwaysVisibleTools.length);
+    // Trim to ensure we don't exceed the total count
+    const maxSelectedTools = adaptiveToolsCount - alwaysVisibleTools.length;
+    if (selectedTools.length > maxSelectedTools) {
+      selectedTools = selectedTools.slice(0, maxSelectedTools);
     }
   }
 
