@@ -163,7 +163,7 @@ export class ToolRegistry {
   async selectTools(
     query: string,
     topN?: number,
-    excludeToolsets?: string[],
+    excludeToolNames?: string[],
     ctx?: CletusAIContext
   ): Promise<RegisteredTool[]> {
     // Use config value if available, otherwise fall back to constant
@@ -194,7 +194,7 @@ export class ToolRegistry {
     // Calculate similarity for all tools with valid vectors
     const toolsWithVectors = Array.from(this.tools.values())
       .filter((t): t is RegisteredTool & { vector: number[] } => 
-        t.vector !== null && (!excludeToolsets || !excludeToolsets.includes(t.toolset))
+        t.vector !== null && (!excludeToolNames || !excludeToolNames.includes(t.name))
       );
 
     const toolsWithSimilarity = toolsWithVectors

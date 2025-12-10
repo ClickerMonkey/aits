@@ -20,6 +20,7 @@ export function createUtilityTools(ai: CletusAI) {
       operation: z.number().describe('The operation index within the message provided in the truncation notice'),
       ...globalToolProperties,
     }),
+    metadata: { alwaysVisible: true },
     call: async ({ id: created, operation: operationIndex }, _, { chatData, chatStatus }) => {
       // Verify chat is in context
       if (!chatData) {
@@ -65,6 +66,7 @@ export function createUtilityTools(ai: CletusAI) {
     schema: z.object({
       ...globalToolProperties,
     }),
+    metadata: { alwaysVisible: true },
     call: async (_, __, { chatStatus }) => {
       chatStatus('Retrieving about information...');
       return ABOUT_CONTENT;
@@ -74,6 +76,7 @@ export function createUtilityTools(ai: CletusAI) {
   const retool = ai.tool({
     name: 'retool',
     description: 'Switch between toolsets or enable adaptive tool selection',
+    metadata: { alwaysVisible: true },
     instructionsFn: () => {
       const allToolsets = [...STATIC_TOOLSETS];
 
@@ -159,6 +162,7 @@ Example 3: Focus on data operations:
   const hypothetical = ai.tool({
     name: 'hypothetical',
     description: 'Switch to a more restrictive mode to explore what would happen hypothetically without actually performing operations',
+    metadata: { alwaysVisible: true },
     instructions: `Use this tool ONLY when the user explicitly wants to understand what WOULD happen for a request without actually doing it.
 
 This tool allows switching to more restrictive modes temporarily to see what operations would be proposed:
@@ -281,6 +285,7 @@ After using this tool, inform the user they will need to manually change back to
   const ask = ai.tool({
     name: 'ask',
     description: 'Ask the user multiple questions with a special UI interface. DO NOT use any other tools after this one until the user responds.',
+    metadata: { alwaysVisible: true },
     instructions: `Use this tool when you need to gather multiple pieces of information from the user in a structured way.
     
 <critical>

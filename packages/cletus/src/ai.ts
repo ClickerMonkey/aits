@@ -45,6 +45,10 @@ export interface CletusContext {
  */
 export interface CletusMetadata {
   // Model selection metadata can go here
+  /** Whether this tool should always be visible/available regardless of toolset or adaptive selection */
+  alwaysVisible?: boolean;
+  /** Whether this tool should be included in the default tool selection when no user messages exist yet */
+  defaultVisible?: boolean;
 }
 
 /**
