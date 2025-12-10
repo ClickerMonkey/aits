@@ -1,12 +1,27 @@
 import React from 'react';
-import type { ConfigFile } from '../../config';
+
+interface ConfigData {
+  user: {
+    name: string;
+    pronouns?: string;
+  };
+  assistants: Array<{
+    name: string;
+    description?: string;
+  }>;
+  types: Array<{
+    name: string;
+    friendlyName: string;
+    description?: string;
+  }>;
+}
 
 interface SettingsViewProps {
-  config: ConfigFile;
+  config: ConfigData;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ config }) => {
-  const data = config.getData();
+  const data = config;
 
   return (
     <div style={{ maxWidth: '800px' }}>

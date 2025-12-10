@@ -1,17 +1,27 @@
 import React, { useEffect, useRef } from 'react';
-import type { ConfigFile } from '../../config';
-import type { Message } from '../../schemas';
 import { MessageItem } from './MessageItem';
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content?: string;
+  created: number;
+  operations?: Array<{
+    type: string;
+    status: string;
+    input: any;
+    output?: any;
+  }>;
+}
 
 interface MessageListProps {
   messages: Message[];
-  config: ConfigFile;
+  showInput: boolean;
+  showOutput: boolean;
+  onMessagesUpdate: (messages: Message[]) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ messages, config }) => {
+export const MessageList: React.FC<MessageListProps> = ({ messages, showInput, showOutput, onMessagesUpdate }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const showInput = config.getData().user.showInput ?? false;
-  const showOutput = config.getData().user.showOutput ?? false;
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -29,7 +39,6 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, config }) =>
           <MessageItem
             key={index}
             message={message}
-            config={config}
             showInput={showInput}
             showOutput={showOutput}
           />

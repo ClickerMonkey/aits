@@ -1,16 +1,27 @@
 import React from 'react';
-import type { ConfigFile } from '../../config';
-import type { Message } from '../../schemas';
 import { OperationDisplay } from './OperationDisplay';
+
+interface Operation {
+  type: string;
+  status: string;
+  input: any;
+  output?: any;
+}
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content?: string;
+  created: number;
+  operations?: Operation[];
+}
 
 interface MessageItemProps {
   message: Message;
-  config: ConfigFile;
   showInput: boolean;
   showOutput: boolean;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message, config, showInput, showOutput }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({ message, showInput, showOutput }) => {
   const { role, content, operations } = message;
 
   return (
@@ -31,7 +42,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, config, showI
             <OperationDisplay
               key={index}
               operation={operation}
-              config={config}
               showInput={showInput}
               showOutput={showOutput}
             />

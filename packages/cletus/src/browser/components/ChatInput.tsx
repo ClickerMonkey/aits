@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ConfigFile } from '../../config';
-import type { ChatMeta } from '../../schemas';
+
+interface ChatMeta {
+  id: string;
+  name: string;
+  mode: string;
+  assistant?: string;
+}
 
 interface ChatInputProps {
   chatId: string;
   chatMeta: ChatMeta;
-  config: ConfigFile;
   onMessageSent: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, onMessageSent }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, onMessageSent }) => {
   const [input, setInput] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);

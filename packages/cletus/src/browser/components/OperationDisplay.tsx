@@ -1,27 +1,25 @@
-import React, { useState } from 'react';
-import type { ConfigFile } from '../../config';
-import type { Operation } from '../../schemas';
+import React from 'react';
 import { Collapsible } from './Collapsible';
-import { createCletusAI } from '../../ai';
-import { Operations } from '../../operations/types';
+
+interface Operation {
+  type: string;
+  status: string;
+  input: any;
+  output?: any;
+}
 
 interface OperationDisplayProps {
   operation: Operation;
-  config: ConfigFile;
   showInput: boolean;
   showOutput: boolean;
 }
 
 export const OperationDisplay: React.FC<OperationDisplayProps> = ({
   operation,
-  config,
   showInput,
   showOutput,
 }) => {
   const { type, status, input, output } = operation;
-  
-  // Get operation definition to check for custom render
-  const opDef = Operations[type];
   
   // Status color
   const statusColor = 
