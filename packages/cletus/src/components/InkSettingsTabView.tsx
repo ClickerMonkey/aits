@@ -1100,22 +1100,212 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       }
 
       if (subView === 'manage-custom-models') {
-        // TODO: Implement model selection UI
-        // For now, just show a placeholder
+        const customConfig = config.getData().providers.custom;
+        const selectedModels = customConfig?.selectedModels || [];
+        
+        // Import models to show available options
+        const { models } = require('@aeye/models');
+        
+        // Show current selection and allow adding/removing
+        if (subView === 'manage-custom-models' && !editing) {
+          const items = [
+            { label: `Currently selected: ${selectedModels.length} model(s)`, value: '__info__' },
+            { label: '', value: '__separator__' },
+            { label: 'View selected models', value: 'view' },
+            { label: 'Add a model', value: 'add' },
+            ...(selectedModels.length > 0 ? [{ label: 'Remove a model', value: 'remove' }] : []),
+            ...(selectedModels.length > 0 ? [{ label: 'Clear all models', value: 'clear' }] : []),
+            { label: '← Back', value: '__back__' },
+          ];
+          
+          return (
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text bold color="cyan">Custom Provider Models</Text>
+              </Box>
+              <Box marginBottom={1}>
+                <Text dimColor>Select which models are available on your custom provider</Text>
+                <Text dimColor>Models will use the same capabilities as the source model</Text>
+              </Box>
+              {selectedModels.length > 0 && (
+                <Box flexDirection="column" marginBottom={1}>
+                  <Text dimColor>Selected models:</Text>
+                  {selectedModels.slice(0, 5).map((modelId: string, idx: number) => (
+                    <Text key={idx}>  • {modelId}</Text>
+                  ))}
+                  {selectedModels.length > 5 && (
+                    <Text dimColor>  ... and {selectedModels.length - 5} more</Text>
+                  )}
+                </Box>
+              )}
+              <SelectInput
+                items={items}
+                isFocused={focusMode === 'content'}
+                onSelect={async (item) => {
+                  if (item.value === '__back__') {
+                    setSubView('manage-custom-settings');
+                    return;
+                  }
+                  if (item.value === '__info__' || item.value === '__separator__') {
+                    return;
+                  }
+                  if (item.value === 'view') {
+                    setSubView('view-custom-models');
+                  } else if (item.value === 'add') {
+                    setSubView('add-custom-model');
+                  } else if (item.value === 'remove') {
+                    setSubView('remove-custom-model');
+                  } else if (item.value === 'clear') {
+                    showConfirm('Clear all selected models?', async () => {
+                      await config.save((data) => {
+                        if (data.providers.custom) {
+                          data.providers.custom.selectedModels = [];
+                        }
+                      });
+                      setMessage('✓ All models cleared');
+                      setSubView('manage-custom-models');
+                    });
+                  }
+                }}
+              />
+            </Box>
+          );
+        }
+      }
+      
+      if (subView === 'view-custom-models') {
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
         return (
           <Box flexDirection="column">
             <Box marginBottom={1}>
-              <Text bold color="cyan">Custom Provider Models</Text>
+              <Text bold color="cyan">Selected Models</Text>
             </Box>
-            <Box marginBottom={1}>
-              <Text dimColor>Model selection will be implemented in settings</Text>
-              <Text dimColor>You can manually configure models after setup</Text>
-            </Box>
+            {selectedModels.length === 0 ? (
+              <Box marginBottom={1}>
+                <Text dimColor>No models selected</Text>
+              </Box>
+            ) : (
+              <Box flexDirection="column" marginBottom={1}>
+                {selectedModels.map((modelId: string, idx: number) => (
+                  <Text key={idx}>{idx + 1}. {modelId}</Text>
+                ))}
+              </Box>
+            )}
             <SelectInput
               items={[{ label: '← Back', value: '__back__' }]}
               isFocused={focusMode === 'content'}
-              onSelect={() => {
-                setSubView('manage-custom-settings');
+              onSelect={() => setSubView('manage-custom-models')}
+            />
+          </Box>
+        );
+      }
+      
+      if (subView === 'add-custom-model') {
+        const { models } = require('@aeye/models');
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
+        // Filter out already selected models
+        const availableModels = models
+          .filter((m: any) => !selectedModels.includes(m.id))
+          .slice(0, 20); // Show first 20 to keep it manageable
+        
+        if (availableModels.length === 0) {
+          return (
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text bold color="cyan">Add Model</Text>
+              </Box>
+              <Box marginBottom={1}>
+                <Text color="yellow">All available models are already selected</Text>
+              </Box>
+              <SelectInput
+                items={[{ label: '← Back', value: '__back__' }]}
+                isFocused={focusMode === 'content'}
+                onSelect={() => setSubView('manage-custom-models')}
+              />
+            </Box>
+          );
+        }
+        
+        const items = [
+          ...availableModels.map((model: any) => ({
+            label: `${model.id} (${model.provider})`,
+            value: model.id,
+          })),
+          { label: '← Back', value: '__back__' },
+        ];
+        
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Add Model</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Select a model to add (showing first 20)</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView('manage-custom-models');
+                  return;
+                }
+                
+                await config.save((data) => {
+                  if (data.providers.custom) {
+                    if (!data.providers.custom.selectedModels.includes(item.value)) {
+                      data.providers.custom.selectedModels.push(item.value);
+                    }
+                  }
+                });
+                setMessage(`✓ Added model: ${item.value}`);
+                setSubView('manage-custom-models');
+              }}
+            />
+          </Box>
+        );
+      }
+      
+      if (subView === 'remove-custom-model') {
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
+        if (selectedModels.length === 0) {
+          setSubView('manage-custom-models');
+          return null;
+        }
+        
+        const items = [
+          ...selectedModels.map((modelId: string) => ({
+            label: modelId,
+            value: modelId,
+          })),
+          { label: '← Back', value: '__back__' },
+        ];
+        
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Remove Model</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView('manage-custom-models');
+                  return;
+                }
+                
+                await config.save((data) => {
+                  if (data.providers.custom) {
+                    data.providers.custom.selectedModels = 
+                      data.providers.custom.selectedModels.filter((id: string) => id !== item.value);
+                  }
+                });
+                setMessage(`✓ Removed model: ${item.value}`);
+                setSubView('manage-custom-models');
               }}
             />
           </Box>
