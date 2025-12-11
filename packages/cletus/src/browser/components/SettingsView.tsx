@@ -1,23 +1,8 @@
 import React from 'react';
-
-interface ConfigData {
-  user: {
-    name: string;
-    pronouns?: string;
-  };
-  assistants: Array<{
-    name: string;
-    description?: string;
-  }>;
-  types: Array<{
-    name: string;
-    friendlyName: string;
-    description?: string;
-  }>;
-}
+import type { Config } from '../../schemas';
 
 interface SettingsViewProps {
-  config: ConfigData;
+  config: Config;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ config }) => {

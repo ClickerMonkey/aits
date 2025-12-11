@@ -1,79 +1,121 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MainPage } from './pages/MainPage';
 import { ChatPage } from './pages/ChatPage';
 import { InitPage } from './pages/InitPage';
-import './styles.css';
+import type { ChatMeta, Config } from '../schemas';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
-interface ConfigData {
-  user: {
-    name: string;
-    pronouns?: string;
-    showInput?: boolean;
-    showOutput?: boolean;
-  };
-  assistants: Array<{
-    name: string;
-    description?: string;
-  }>;
-  chats: Array<{
-    id: string;
-    name: string;
-    mode: string;
-    assistant?: string;
-    created: number;
-    updated: number;
-  }>;
-  types: Array<{
-    name: string;
-    friendlyName: string;
-    description?: string;
-  }>;
-}
-
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('loading');
-  const [config, setConfig] = useState<ConfigData | null>(null);
+  const [config, setConfig] = useState<Config | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/' || path === '/settings') {
+        setView('main');
+        setSelectedChatId(null);
+      } else if (path.startsWith('/chat/')) {
+        const chatId = path.split('/')[2];
+        setSelectedChatId(chatId);
+        setView('chat');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
-    async function loadConfig() {
-      try {
-        const response = await fetch('/api/config');
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data.data);
-          setView('main');
-        } else {
+    // Connect to WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      // Request config
+      ws.send(JSON.stringify({ type: 'get_config' }));
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      switch (message.type) {
+        case 'config':
+          setConfig(message.data);
+
+          // Check URL to determine initial view
+          const path = window.location.pathname;
+          if (path.startsWith('/chat/')) {
+            const chatId = path.split('/')[2];
+            // Verify the chat exists in the config
+            const chatExists = message.data.chats.some((c: ChatMeta) => c.id === chatId);
+            if (chatExists) {
+              setSelectedChatId(chatId);
+              setView('chat');
+            } else {
+              // Chat doesn't exist, redirect to main
+              window.history.replaceState({}, '', '/');
+              setView('main');
+            }
+          } else if (path === '/settings') {
+            setView('main'); // MainPage handles settings view internally
+          } else {
+            setView('main');
+          }
+          break;
+
+        case 'config_not_found':
           setView('init');
-        }
-      } catch (error) {
-        console.error('Failed to load config:', error);
-        setView('init');
+          break;
+
+        case 'chat_created':
+          // Reload config after chat creation
+          ws.send(JSON.stringify({ type: 'get_config' }));
+          if (message.data.chatId) {
+            setSelectedChatId(message.data.chatId);
+            setView('chat');
+          }
+          break;
+
+        case 'error':
+          console.error('WebSocket error:', message.data.message);
+          break;
       }
-    }
-    loadConfig();
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket connection error:', error);
+      setView('init');
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    wsRef.current = ws;
+
+    return () => {
+      ws.close();
+    };
   }, []);
 
   const reloadConfig = async () => {
-    try {
-      const response = await fetch('/api/config');
-      if (response.ok) {
-        const data = await response.json();
-        setConfig(data.data);
-      }
-    } catch (error) {
-      console.error('Failed to reload config:', error);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'get_config' }));
     }
   };
 
   if (view === 'loading') {
     return (
-      <div className="loading-container">
+      <div className="flex h-screen items-center justify-center flex-col gap-4">
         <div className="spinner"></div>
-        <p>Loading...</p>
+        <p className="neon-text-cyan">Loading...</p>
       </div>
     );
   }
@@ -82,7 +124,7 @@ const App: React.FC = () => {
     return (
       <InitPage
         onComplete={() => {
-          reloadConfig().then(() => setView('main'));
+          reloadConfig();
         }}
       />
     );
@@ -93,7 +135,11 @@ const App: React.FC = () => {
       <ChatPage
         chatId={selectedChatId}
         config={config}
-        onBack={() => setView('main')}
+        onBack={() => {
+          setView('main');
+          setSelectedChatId(null);
+          window.history.pushState({}, '', '/');
+        }}
         onConfigChange={reloadConfig}
       />
     );
@@ -113,9 +159,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="loading-container">
+    <div className="flex h-screen items-center justify-center flex-col gap-4">
       <div className="spinner"></div>
-      <p>Loading...</p>
+      <p className="neon-text-cyan">Loading...</p>
     </div>
   );
 };
