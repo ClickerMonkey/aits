@@ -175,9 +175,12 @@ export function createCletusAI(configFile: ConfigFile) {
 
   // Create custom models for the custom provider
   // These are copies of existing models but marked with the 'custom' provider
+  // Create a Map for O(1) lookup performance
+  const modelsMap = new Map(models.map(m => [m.id, m]));
+  
   const customModels: typeof models = config.providers.custom?.selectedModels
     ?.map((modelId) => {
-      const sourceModel = models.find((m) => m.id === modelId);
+      const sourceModel = modelsMap.get(modelId);
       if (!sourceModel) {
         logger.log(`Warning: Custom provider model '${modelId}' not found in available models`);
         return null;

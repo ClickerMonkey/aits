@@ -1,5 +1,6 @@
 import { ModelCapability } from '@aeye/ai';
 import { AWSBedrockProvider } from '@aeye/aws';
+import { models } from '@aeye/models';
 import fs from 'fs/promises';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
@@ -1103,11 +1104,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         const customConfig = config.getData().providers.custom;
         const selectedModels = customConfig?.selectedModels || [];
         
-        // Import models to show available options
-        const { models } = require('@aeye/models');
-        
         // Show current selection and allow adding/removing
-        if (subView === 'manage-custom-models' && !editing) {
+        if (!editing) {
           const items = [
             { label: `Currently selected: ${selectedModels.length} model(s)`, value: '__info__' },
             { label: '', value: '__separator__' },
@@ -1202,7 +1200,6 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       }
       
       if (subView === 'add-custom-model') {
-        const { models } = require('@aeye/models');
         const selectedModels = config.getData().providers.custom?.selectedModels || [];
         
         // Filter out already selected models
