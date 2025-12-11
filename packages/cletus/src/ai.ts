@@ -175,7 +175,7 @@ export function createCletusAI(configFile: ConfigFile) {
 
   // Create custom models for the custom provider
   // These are copies of existing models but marked with the 'custom' provider
-  const customModels = config.providers.custom?.selectedModels
+  const customModels: typeof models = config.providers.custom?.selectedModels
     ?.map((modelId) => {
       const sourceModel = models.find((m) => m.id === modelId);
       if (!sourceModel) {
@@ -186,12 +186,12 @@ export function createCletusAI(configFile: ConfigFile) {
       // Create a copy of the model with the 'custom' provider
       return {
         ...sourceModel,
-        provider: 'custom',
+        provider: 'custom' as const,
         // Keep original ID for compatibility
         id: modelId,
       };
     })
-    .filter((m) => m !== null) || [];
+    .filter((m): m is NonNullable<typeof m> => m !== null) || [];
 
   // Combine all models including custom ones
   const allModels = [...models, ...customModels];
