@@ -43,6 +43,10 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
   const [awsTestStatus, setAwsTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [awsTestMessage, setAwsTestMessage] = useState<string>('');
 
+  // Custom provider state
+  const [customName, setCustomName] = useState('');
+  const [customBaseUrl, setCustomBaseUrl] = useState('');
+
   useEffect(() => {
     process.stdout.write('\x1b]0;Cletus: Settings (Tab View)\x07');
     return () => {
@@ -253,6 +257,38 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       const displayValue = editValue.trim() || '(none)';
       setMessage(`✓ Model prefix set to: ${displayValue}`);
       setSubView(null);
+    } else if (editField === 'customName') {
+      await config.save((data) => {
+        if (data.providers.custom) {
+          data.providers.custom.name = editValue.trim() || undefined;
+        }
+      });
+      setMessage(`✓ Custom provider name updated`);
+      setSubView(null);
+    } else if (editField === 'customBaseUrl') {
+      if (!editValue.trim()) {
+        setMessage('⚠ Base URL is required');
+      } else if (!editValue.startsWith('http://') && !editValue.startsWith('https://')) {
+        setMessage('⚠ Base URL must start with http:// or https://');
+      } else {
+        await config.save((data) => {
+          if (data.providers.custom) {
+            data.providers.custom.baseUrl = editValue.trim();
+          }
+        });
+        setMessage(`✓ Custom provider base URL updated`);
+        setSubView(null);
+      }
+    } else if (editField === 'customApiKey') {
+      if (editValue.trim()) {
+        await config.save((data) => {
+          if (data.providers.custom) {
+            data.providers.custom.apiKey = editValue.trim();
+          }
+        });
+        setMessage(`✓ Custom provider API key updated`);
+        setSubView(null);
+      }
     }
     setEditing(false);
     setEditField('');
@@ -1016,6 +1052,118 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         );
       }
 
+      if (subView === 'manage-custom-settings') {
+        const custom = config.getData().providers.custom;
+        const customNameDisplay = custom?.name || '(none)';
+        const baseUrl = custom?.baseUrl || '(none)';
+
+        const items = [
+          { label: `Name: ${customNameDisplay}`, value: 'name' },
+          { label: `Base URL: ${baseUrl}`, value: 'base-url' },
+          { label: 'Update API Key', value: 'api-key' },
+          { label: 'Manage Models', value: 'models' },
+          { label: '← Back', value: '__back__' },
+        ];
+
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Custom Provider Settings</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Configure your OpenAI-compatible API provider</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView(null);
+                  setProviderKey(null);
+                  return;
+                }
+                if (item.value === 'name') {
+                  const current = config.getData().providers.custom?.name || '';
+                  startEdit('customName', current);
+                } else if (item.value === 'base-url') {
+                  const current = config.getData().providers.custom?.baseUrl || '';
+                  startEdit('customBaseUrl', current);
+                } else if (item.value === 'api-key') {
+                  startEdit('customApiKey', '');
+                } else if (item.value === 'models') {
+                  setSubView('manage-custom-models');
+                }
+              }}
+            />
+          </Box>
+        );
+      }
+
+      if (subView === 'manage-custom-models') {
+        // TODO: Implement model selection UI
+        // For now, just show a placeholder
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Custom Provider Models</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Model selection will be implemented in settings</Text>
+              <Text dimColor>You can manually configure models after setup</Text>
+            </Box>
+            <SelectInput
+              items={[{ label: '← Back', value: '__back__' }]}
+              isFocused={focusMode === 'content'}
+              onSelect={() => {
+                setSubView('manage-custom-settings');
+              }}
+            />
+          </Box>
+        );
+      }
+
+      if (subView === 'configure-custom' && providerKey === 'custom') {
+        // Input form for configuring custom provider
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Custom Provider Configuration</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Configure an OpenAI-compatible API endpoint</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text>Currently configured: {config.getData().providers.custom ? 'Yes' : 'No'}</Text>
+            </Box>
+            {!editing && (
+              <SelectInput
+                items={[
+                  { label: 'Enter provider name', value: 'name' },
+                  { label: 'Enter base URL', value: 'base-url' },
+                  { label: 'Enter API key', value: 'api-key' },
+                  { label: '← Back', value: '__back__' },
+                ]}
+                isFocused={focusMode === 'content'}
+                onSelect={(item) => {
+                  if (item.value === '__back__') {
+                    setSubView(null);
+                    setProviderKey(null);
+                    return;
+                  }
+                  if (item.value === 'name') {
+                    startEdit('customName', customName);
+                  } else if (item.value === 'base-url') {
+                    startEdit('customBaseUrl', customBaseUrl);
+                  } else if (item.value === 'api-key') {
+                    startEdit('addApiKey', '');
+                  }
+                }}
+              />
+            )}
+          </Box>
+        );
+      }
+
       if (subView === 'configure-aws' && providerKey === 'aws') {
         // Initialize AWS test on first render
         React.useEffect(() => {
@@ -1132,6 +1280,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
               { label: 'Update API key', value: 'update' },
               ...(providerKey === 'openrouter' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
               ...(providerKey === 'aws' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
+              ...(providerKey === 'custom' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
               { label: 'Remove provider', value: 'remove' },
               { label: '← Back', value: '__back__' },
             ]
@@ -1172,6 +1321,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                     setSubView('manage-openrouter-settings');
                   } else if (providerKey === 'aws') {
                     setSubView('manage-aws-settings');
+                  } else if (providerKey === 'custom') {
+                    setSubView('manage-custom-settings');
                   }
                   return;
                 }
@@ -1180,6 +1331,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                     setAwsTestStatus('idle');
                     setAwsTestMessage('');
                     setSubView('configure-aws');
+                  } else if (providerKey === 'custom') {
+                    setSubView('configure-custom');
                   } else {
                     startEdit('addApiKey', '');
                   }
@@ -1207,6 +1360,10 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         {
           label: `AWS Bedrock ${providers.aws ? '✅' : '❌'}`,
           value: 'aws',
+        },
+        {
+          label: `Custom ${providers.custom ? '✅' : '❌'}`,
+          value: 'custom',
         },
       ];
 

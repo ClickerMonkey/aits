@@ -150,7 +150,51 @@ export function createCletusAI(configFile: ConfigFile) {
         }
       }
     })} : {}),
+
+    // Custom Provider (OpenAI-compatible)
+    ...(config.providers.custom ? { custom: new OpenAIProvider({
+      apiKey: config.providers.custom.apiKey,
+      baseURL: config.providers.custom.baseUrl,
+      retry: config.providers.custom.retry,
+      retryEvents,
+      hooks: {
+        chat: {
+          beforeRequest: (request, params, ctx, metadata) => {
+            logger.log(`Custom Provider Chat beforeRequest:\n${JSON.stringify(params, null, 2)}`);
+          },
+          afterRequest: (request, response, responseComplete, ctx, metadata) => {
+            logger.log(`Custom Provider Chat afterRequest:\n${JSON.stringify(responseComplete, null, 2)}`);
+          },
+          onError: (request, params, error, ctx, metadata) => {
+            logger.log(`Custom Provider Chat onError:\n${JSON.stringify(error)}`);
+          },
+        }
+      }
+    })} : {}),
   } as const;
+
+  // Create custom models for the custom provider
+  // These are copies of existing models but marked with the 'custom' provider
+  const customModels = config.providers.custom?.selectedModels
+    ?.map((modelId) => {
+      const sourceModel = models.find((m) => m.id === modelId);
+      if (!sourceModel) {
+        logger.log(`Warning: Custom provider model '${modelId}' not found in available models`);
+        return null;
+      }
+      
+      // Create a copy of the model with the 'custom' provider
+      return {
+        ...sourceModel,
+        provider: 'custom',
+        // Keep original ID for compatibility
+        id: modelId,
+      };
+    })
+    .filter((m) => m !== null) || [];
+
+  // Combine all models including custom ones
+  const allModels = [...models, ...customModels];
 
   const jsonReplacer = (_key: string, value: any) => {
     if (value instanceof z.ZodType) {
@@ -210,7 +254,7 @@ export function createCletusAI(configFile: ConfigFile) {
         
         return { ...ctx, userPrompt, cache: {} };
       },
-      models,
+      models: allModels,
     }).withHooks({
       beforeRequest: async (ctx, request, selected, usage, cost) => {
         logger.log(`Cletus beforeRequest model=${selected.model.id}, usage=~${JSON.stringify(usage)}, cost=~${cost}:\n${JSON.stringify(request, jsonReplacer, 2)}`);

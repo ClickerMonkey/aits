@@ -20,6 +20,10 @@ type WizardStep =
   | 'aws-test'
   | 'aws-configure'
   | 'aws-confirm'
+  | 'custom-confirm'
+  | 'custom-name'
+  | 'custom-base-url'
+  | 'custom-api-key'
   | 'tavily-env'
   | 'tavily-confirm'
   | 'tavily-input'
@@ -39,6 +43,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
     openrouter: null,
     replicate: null,
     aws: null,
+    custom: null,
   });
   const [tavilyConfig, setTavilyConfig] = useState<{ apiKey: string } | null>(null);
   const [name, setName] = useState('');
@@ -48,6 +53,10 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
   // Input states for all steps (moved to top level to avoid hooks violations)
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<string | null>(null);
+  
+  // Custom provider states
+  const [customName, setCustomName] = useState('');
+  const [customBaseUrl, setCustomBaseUrl] = useState('');
 
   // AWS test state
   const [awsTestStatus, setAwsTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -491,7 +500,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'skip') {
               setAwsTestStatus('idle');
               setAwsTestMessage('');
-              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              setStep('custom-confirm');
               return;
             }
             if (item.value === 'test') {
@@ -509,7 +518,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
               });
               setAwsTestStatus('idle');
               setAwsTestMessage('');
-              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              setStep('custom-confirm');
               return;
             }
             if (item.value === 'env') {
@@ -527,7 +536,7 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
               }
               setAwsTestStatus('idle');
               setAwsTestMessage('');
-              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+              setStep('custom-confirm');
             }
           }}
         />
@@ -551,10 +560,165 @@ export const InkInitWizard: React.FC<InkInitWizardProps> = ({ onComplete }) => {
             if (item.value === 'yes') {
               setStep('aws-test');
             } else {
+              setStep('custom-confirm');
+            }
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Custom Provider - Ask to Configure
+  if (step === 'custom-confirm') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text>Would you like to configure a Custom Provider? (OpenAI-compatible API)</Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Yes', value: 'yes' },
+            { label: 'No', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              setStep('custom-name');
+            } else {
               setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
             }
           }}
         />
+      </Box>
+    );
+  }
+
+  // Custom Provider - Input Name
+  if (step === 'custom-name') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Custom Provider Setup
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Enter a name for this provider (optional, e.g., "My Local LLM")</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={customName}
+            onChange={(value) => {
+              setCustomName(value);
+              setError(null);
+            }}
+            placeholder="Custom Provider"
+            onSubmit={() => {
+              setStep('custom-base-url');
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter to continue, ESC to skip</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Custom Provider - Input Base URL
+  if (step === 'custom-base-url') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Custom Provider Base URL
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Enter the base URL for the OpenAI-compatible API</Text>
+          <Text dimColor>Example: https://api.example.com/v1</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={customBaseUrl}
+            onChange={(value) => {
+              setCustomBaseUrl(value);
+              setError(null);
+            }}
+            placeholder="https://..."
+            onSubmit={() => {
+              if (!customBaseUrl.trim()) {
+                setError('Base URL is required');
+                return;
+              }
+              if (!customBaseUrl.startsWith('http://') && !customBaseUrl.startsWith('https://')) {
+                setError('Base URL must start with http:// or https://');
+                return;
+              }
+              setStep('custom-api-key');
+            }}
+          />
+        </Box>
+        {error && (
+          <Box marginTop={1}>
+            <Text color="red">{error}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Enter to continue, ESC to skip</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Custom Provider - Input API Key
+  if (step === 'custom-api-key') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold color="cyan">
+            Custom Provider API Key
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>Enter your API key for this provider</Text>
+        </Box>
+        <Box>
+          <Text color="cyan">▶ </Text>
+          <TextInput
+            value={apiKey}
+            onChange={(value) => {
+              setApiKey(value);
+              setError(null);
+            }}
+            placeholder="your-api-key"
+            onSubmit={() => {
+              if (!apiKey.trim()) {
+                setError('API key is required');
+                return;
+              }
+              setProviders({
+                ...providers,
+                custom: {
+                  apiKey,
+                  baseUrl: customBaseUrl,
+                  name: customName || undefined,
+                  selectedModels: [],
+                },
+              });
+              setStep(tavilyKey ? 'tavily-env' : 'tavily-confirm');
+            }}
+          />
+        </Box>
+        {error && (
+          <Box marginTop={1}>
+            <Text color="red">{error}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>Enter to continue, ESC to skip</Text>
+        </Box>
       </Box>
     );
   }
