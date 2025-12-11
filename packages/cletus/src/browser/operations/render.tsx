@@ -1,0 +1,56 @@
+import React from 'react';
+import { Operation } from '../../schemas';
+import { BaseOperationDisplay } from './BaseOperationDisplay';
+
+/**
+ * Get status color and label for an operation status
+ */
+export function getStatusInfo(status: Operation['status']): { color: string; label: string } {
+  switch (status) {
+    case 'done':
+      return { color: 'text-green-400', label: 'completed' };
+    case 'doing':
+      return { color: 'text-orange-400', label: 'in progress' };
+    case 'analyzed':
+      return { color: 'text-yellow-400', label: 'pending approval' };
+    case 'doneError':
+      return { color: 'text-red-400', label: 'error' };
+    case 'analyzeError':
+      return { color: 'text-red-400', label: 'analysis error' };
+    case 'analyzedBlocked':
+      return { color: 'text-red-400', label: 'blocked' };
+    case 'rejected':
+      return { color: 'text-red-400', label: 'rejected' };
+    default:
+      return { color: 'text-muted-foreground', label: status };
+  }
+}
+
+/**
+ * Calculate elapsed time for an operation
+ */
+export function getElapsedTime(op: Operation): string {
+  if (!op.start) return '';
+  const duration = op.end ? op.end - op.start : Date.now() - op.start;
+
+  if (duration < 1000) return `${Math.round(duration)}ms`;
+  if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
+  return `${Math.floor(duration / 60000)}m ${Math.round((duration % 60000) / 1000)}s`;
+}
+
+interface OperationDisplayProps {
+  operation: Operation;
+  showInput?: boolean;
+  showOutput?: boolean;
+}
+
+/**
+ * Default operation renderer - delegates to BaseOperationDisplay
+ */
+export const OperationDisplay: React.FC<OperationDisplayProps> = ({ operation }) => (
+  <BaseOperationDisplay
+    operation={operation}
+    label={operation.type}
+    summary={operation.analysis}
+  />
+);

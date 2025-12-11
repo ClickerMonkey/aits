@@ -1,11 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-
-interface ChatMeta {
-  id: string;
-  name: string;
-  mode: string;
-  assistant?: string;
-}
+import { Send, Loader2 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
+import type { ChatMeta } from '../../schemas';
 
 interface ChatInputProps {
   chatId: string;
@@ -37,12 +34,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, onMessag
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      
+
       switch (message.type) {
         case 'chat_initialized':
           console.log('Chat initialized');
           break;
-        
+
         case 'message_added':
           onMessageSent();
           break;
@@ -87,7 +84,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, onMessag
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!input.trim() || isProcessing || !wsRef.current) {
       return;
     }
@@ -110,40 +107,57 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, onMessag
   };
 
   return (
-    <div style={{ borderTop: '1px solid var(--border)', padding: '1rem' }}>
+    <div className="p-4">
       {status && (
-        <div style={{
-          fontSize: '0.85rem',
-          color: 'var(--text-secondary)',
-          marginBottom: '0.5rem',
-          fontStyle: 'italic',
-        }}>
-          {status}
+        <div className="mb-3 flex items-center gap-2 text-sm text-neon-cyan animate-pulse">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>{status}</span>
         </div>
       )}
-      
-      <form onSubmit={handleSubmit}>
-        <textarea
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Textarea
           ref={textareaRef}
-          className="input textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isConnecting ? 'Connecting...' : isProcessing ? 'Processing...' : 'Type your message... (Enter to send, Shift+Enter for new line)'}
+          placeholder={
+            isConnecting
+              ? 'Connecting...'
+              : isProcessing
+              ? 'Processing...'
+              : 'Type your message... (Enter to send, Shift+Enter for new line)'
+          }
           disabled={isConnecting || isProcessing}
-          style={{ minHeight: '80px', marginBottom: '0.5rem' }}
+          className="min-h-[100px] resize-none"
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Mode: {chatMeta.mode}
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <span className="px-2 py-1 rounded bg-muted text-muted-foreground">
+              {chatMeta.mode}
+            </span>
+            {chatMeta.assistant && (
+              <span className="text-neon-purple">{chatMeta.assistant}</span>
+            )}
           </div>
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
+            variant="neon"
             disabled={!input.trim() || isProcessing || isConnecting}
+            className="gap-2"
           >
-            {isProcessing ? 'Processing...' : 'Send'}
-          </button>
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send
+              </>
+            )}
+          </Button>
         </div>
       </form>
     </div>

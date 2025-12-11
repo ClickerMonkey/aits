@@ -11,6 +11,7 @@ import { InkMainMenu } from './components/InkMainMenu';
 import { ConfigFile } from './config';
 import { configExists, setProfile } from './file-manager';
 import { initWorker } from './embed';
+import { interceptConsoleLogs } from './logger';
 
 type AppView = 'loading' | 'init' | 'main' | 'chat';
 
@@ -134,6 +135,8 @@ async function main() {
     await startBrowserServer(port);
     return;
   }
+
+  interceptConsoleLogs();
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');

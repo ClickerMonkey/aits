@@ -29,20 +29,22 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, showInput, s
   }, [messages.length]);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
+    <div className="flex-1 overflow-auto">
       {messages.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '2rem' }}>
+        <div className="text-center text-muted-foreground mt-8">
           <p>No messages yet. Start a conversation!</p>
         </div>
       ) : (
-        messages.map((message, index) => (
-          <MessageItem
-            key={index}
-            message={message}
-            showInput={showInput}
-            showOutput={showOutput}
-          />
-        ))
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <MessageItem
+              key={index}
+              message={message}
+              showInput={showInput}
+              showOutput={showOutput}
+            />
+          ))}
+        </div>
       )}
       <div ref={bottomRef} />
     </div>
