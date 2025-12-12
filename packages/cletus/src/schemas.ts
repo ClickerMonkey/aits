@@ -124,11 +124,28 @@ export const TavilyConfigSchema = z.object({
   apiKey: z.string(),
 });
 
+export const CustomProviderConfigSchema = z.object({
+  apiKey: z.string(),
+  baseUrl: z.string(),
+  name: z.string().optional(),
+  selectedModels: z.array(z.string()).default([]),
+  retry: z.object({
+    maxRetries: z.number().optional(),
+    initialDelay: z.number().optional(),
+    maxDelay: z.number().optional(),
+    backoffMultiplier: z.number().optional(),
+    jitter: z.boolean().optional(),
+    retryableStatuses: z.array(z.number()).optional(),
+    timeout: z.number().optional(),
+  }).optional(),
+});
+
 export const ProvidersSchema = z.object({
   openai: OpenAIConfigSchema.nullable(),
   openrouter: OpenRouterConfigSchema.nullable(),
   replicate: ReplicateConfigSchema.nullable(),
   aws: AWSBedrockConfigSchema.nullable(),
+  custom: CustomProviderConfigSchema.nullable(),
 });
 
 // ============================================================================
@@ -423,6 +440,7 @@ export type OpenAIConfig = z.infer<typeof OpenAIConfigSchema>;
 export type OpenRouterConfig = z.infer<typeof OpenRouterConfigSchema>;
 export type ReplicateConfig = z.infer<typeof ReplicateConfigSchema>;
 export type AWSBedrockConfig = z.infer<typeof AWSBedrockConfigSchema>;
+export type CustomProviderConfig = z.infer<typeof CustomProviderConfigSchema>;
 export type Providers = z.infer<typeof ProvidersSchema>;
 export type Assistant = z.infer<typeof AssistantSchema>;
 export type TodoItem = z.infer<typeof TodoItemSchema>;

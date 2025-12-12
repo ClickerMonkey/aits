@@ -117,6 +117,7 @@ export class ConfigFile extends JsonFile<Config> {
         openrouter: null,
         replicate: null,
         aws: null,
+        custom: null,
       },
       tavily: null,
       assistants: DEFAULT_ASSISTANTS,

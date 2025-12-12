@@ -1,5 +1,6 @@
 import { ModelCapability } from '@aeye/ai';
 import { AWSBedrockProvider } from '@aeye/aws';
+import { models } from '@aeye/models';
 import fs from 'fs/promises';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
@@ -42,6 +43,10 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
   // AWS test state
   const [awsTestStatus, setAwsTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [awsTestMessage, setAwsTestMessage] = useState<string>('');
+
+  // Custom provider state
+  const [customName, setCustomName] = useState('');
+  const [customBaseUrl, setCustomBaseUrl] = useState('');
 
   useEffect(() => {
     process.stdout.write('\x1b]0;Cletus: Settings (Tab View)\x07');
@@ -253,6 +258,38 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
       const displayValue = editValue.trim() || '(none)';
       setMessage(`✓ Model prefix set to: ${displayValue}`);
       setSubView(null);
+    } else if (editField === 'customName') {
+      await config.save((data) => {
+        if (data.providers.custom) {
+          data.providers.custom.name = editValue.trim() || undefined;
+        }
+      });
+      setMessage(`✓ Custom provider name updated`);
+      setSubView(null);
+    } else if (editField === 'customBaseUrl') {
+      if (!editValue.trim()) {
+        setMessage('⚠ Base URL is required');
+      } else if (!editValue.startsWith('http://') && !editValue.startsWith('https://')) {
+        setMessage('⚠ Base URL must start with http:// or https://');
+      } else {
+        await config.save((data) => {
+          if (data.providers.custom) {
+            data.providers.custom.baseUrl = editValue.trim();
+          }
+        });
+        setMessage(`✓ Custom provider base URL updated`);
+        setSubView(null);
+      }
+    } else if (editField === 'customApiKey') {
+      if (editValue.trim()) {
+        await config.save((data) => {
+          if (data.providers.custom) {
+            data.providers.custom.apiKey = editValue.trim();
+          }
+        });
+        setMessage(`✓ Custom provider API key updated`);
+        setSubView(null);
+      }
     }
     setEditing(false);
     setEditField('');
@@ -1016,6 +1053,304 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         );
       }
 
+      if (subView === 'manage-custom-settings') {
+        const custom = config.getData().providers.custom;
+        const customNameDisplay = custom?.name || '(none)';
+        const baseUrl = custom?.baseUrl || '(none)';
+
+        const items = [
+          { label: `Name: ${customNameDisplay}`, value: 'name' },
+          { label: `Base URL: ${baseUrl}`, value: 'base-url' },
+          { label: 'Update API Key', value: 'api-key' },
+          { label: 'Manage Models', value: 'models' },
+          { label: '← Back', value: '__back__' },
+        ];
+
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Custom Provider Settings</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Configure your OpenAI-compatible API provider</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView(null);
+                  setProviderKey(null);
+                  return;
+                }
+                if (item.value === 'name') {
+                  const current = config.getData().providers.custom?.name || '';
+                  startEdit('customName', current);
+                } else if (item.value === 'base-url') {
+                  const current = config.getData().providers.custom?.baseUrl || '';
+                  startEdit('customBaseUrl', current);
+                } else if (item.value === 'api-key') {
+                  startEdit('customApiKey', '');
+                } else if (item.value === 'models') {
+                  setSubView('manage-custom-models');
+                }
+              }}
+            />
+          </Box>
+        );
+      }
+
+      if (subView === 'manage-custom-models') {
+        const customConfig = config.getData().providers.custom;
+        const selectedModels = customConfig?.selectedModels || [];
+        
+        // Show current selection and allow adding/removing
+        if (!editing) {
+          const items = [
+            { label: `Currently selected: ${selectedModels.length} model(s)`, value: '__info__' },
+            { label: '', value: '__separator__' },
+            { label: 'View selected models', value: 'view' },
+            { label: 'Add a model', value: 'add' },
+            ...(selectedModels.length > 0 ? [{ label: 'Remove a model', value: 'remove' }] : []),
+            ...(selectedModels.length > 0 ? [{ label: 'Clear all models', value: 'clear' }] : []),
+            { label: '← Back', value: '__back__' },
+          ];
+          
+          return (
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text bold color="cyan">Custom Provider Models</Text>
+              </Box>
+              <Box marginBottom={1}>
+                <Text dimColor>Select which models are available on your custom provider</Text>
+                <Text dimColor>Models will use the same capabilities as the source model</Text>
+              </Box>
+              {selectedModels.length > 0 && (
+                <Box flexDirection="column" marginBottom={1}>
+                  <Text dimColor>Selected models:</Text>
+                  {selectedModels.slice(0, 5).map((modelId: string, idx: number) => (
+                    <Text key={idx}>  • {modelId}</Text>
+                  ))}
+                  {selectedModels.length > 5 && (
+                    <Text dimColor>  ... and {selectedModels.length - 5} more</Text>
+                  )}
+                </Box>
+              )}
+              <SelectInput
+                items={items}
+                isFocused={focusMode === 'content'}
+                onSelect={async (item) => {
+                  if (item.value === '__back__') {
+                    setSubView('manage-custom-settings');
+                    return;
+                  }
+                  if (item.value === '__info__' || item.value === '__separator__') {
+                    return;
+                  }
+                  if (item.value === 'view') {
+                    setSubView('view-custom-models');
+                  } else if (item.value === 'add') {
+                    setSubView('add-custom-model');
+                  } else if (item.value === 'remove') {
+                    setSubView('remove-custom-model');
+                  } else if (item.value === 'clear') {
+                    showConfirm('Clear all selected models?', async () => {
+                      await config.save((data) => {
+                        if (data.providers.custom) {
+                          data.providers.custom.selectedModels = [];
+                        }
+                      });
+                      setMessage('✓ All models cleared');
+                      setSubView('manage-custom-models');
+                    });
+                  }
+                }}
+              />
+            </Box>
+          );
+        }
+      }
+      
+      if (subView === 'view-custom-models') {
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Selected Models</Text>
+            </Box>
+            {selectedModels.length === 0 ? (
+              <Box marginBottom={1}>
+                <Text dimColor>No models selected</Text>
+              </Box>
+            ) : (
+              <Box flexDirection="column" marginBottom={1}>
+                {selectedModels.map((modelId: string, idx: number) => (
+                  <Text key={idx}>{idx + 1}. {modelId}</Text>
+                ))}
+              </Box>
+            )}
+            <SelectInput
+              items={[{ label: '← Back', value: '__back__' }]}
+              isFocused={focusMode === 'content'}
+              onSelect={() => setSubView('manage-custom-models')}
+            />
+          </Box>
+        );
+      }
+      
+      if (subView === 'add-custom-model') {
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
+        // Filter out already selected models
+        const availableModels = models
+          .filter((m: any) => !selectedModels.includes(m.id))
+          .slice(0, 20); // Show first 20 to keep it manageable
+        
+        if (availableModels.length === 0) {
+          return (
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text bold color="cyan">Add Model</Text>
+              </Box>
+              <Box marginBottom={1}>
+                <Text color="yellow">All available models are already selected</Text>
+              </Box>
+              <SelectInput
+                items={[{ label: '← Back', value: '__back__' }]}
+                isFocused={focusMode === 'content'}
+                onSelect={() => setSubView('manage-custom-models')}
+              />
+            </Box>
+          );
+        }
+        
+        const items = [
+          ...availableModels.map((model: any) => ({
+            label: `${model.id} (${model.provider})`,
+            value: model.id,
+          })),
+          { label: '← Back', value: '__back__' },
+        ];
+        
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Add Model</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Select a model to add (showing first 20)</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView('manage-custom-models');
+                  return;
+                }
+                
+                await config.save((data) => {
+                  if (data.providers.custom) {
+                    if (!data.providers.custom.selectedModels.includes(item.value)) {
+                      data.providers.custom.selectedModels.push(item.value);
+                    }
+                  }
+                });
+                setMessage(`✓ Added model: ${item.value}`);
+                setSubView('manage-custom-models');
+              }}
+            />
+          </Box>
+        );
+      }
+      
+      if (subView === 'remove-custom-model') {
+        const selectedModels = config.getData().providers.custom?.selectedModels || [];
+        
+        if (selectedModels.length === 0) {
+          setSubView('manage-custom-models');
+          return null;
+        }
+        
+        const items = [
+          ...selectedModels.map((modelId: string) => ({
+            label: modelId,
+            value: modelId,
+          })),
+          { label: '← Back', value: '__back__' },
+        ];
+        
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Remove Model</Text>
+            </Box>
+            <SelectInput
+              items={items}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__back__') {
+                  setSubView('manage-custom-models');
+                  return;
+                }
+                
+                await config.save((data) => {
+                  if (data.providers.custom) {
+                    data.providers.custom.selectedModels = 
+                      data.providers.custom.selectedModels.filter((id: string) => id !== item.value);
+                  }
+                });
+                setMessage(`✓ Removed model: ${item.value}`);
+                setSubView('manage-custom-models');
+              }}
+            />
+          </Box>
+        );
+      }
+
+      if (subView === 'configure-custom' && providerKey === 'custom') {
+        // Input form for configuring custom provider
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Custom Provider Configuration</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Configure an OpenAI-compatible API endpoint</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text>Currently configured: {config.getData().providers.custom ? 'Yes' : 'No'}</Text>
+            </Box>
+            {!editing && (
+              <SelectInput
+                items={[
+                  { label: 'Enter provider name', value: 'name' },
+                  { label: 'Enter base URL', value: 'base-url' },
+                  { label: 'Enter API key', value: 'api-key' },
+                  { label: '← Back', value: '__back__' },
+                ]}
+                isFocused={focusMode === 'content'}
+                onSelect={(item) => {
+                  if (item.value === '__back__') {
+                    setSubView(null);
+                    setProviderKey(null);
+                    return;
+                  }
+                  if (item.value === 'name') {
+                    startEdit('customName', customName);
+                  } else if (item.value === 'base-url') {
+                    startEdit('customBaseUrl', customBaseUrl);
+                  } else if (item.value === 'api-key') {
+                    startEdit('addApiKey', '');
+                  }
+                }}
+              />
+            )}
+          </Box>
+        );
+      }
+
       if (subView === 'configure-aws' && providerKey === 'aws') {
         // Initialize AWS test on first render
         React.useEffect(() => {
@@ -1132,6 +1467,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
               { label: 'Update API key', value: 'update' },
               ...(providerKey === 'openrouter' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
               ...(providerKey === 'aws' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
+              ...(providerKey === 'custom' ? [{ label: '⚙️ Configure settings', value: 'configure' }] : []),
               { label: 'Remove provider', value: 'remove' },
               { label: '← Back', value: '__back__' },
             ]
@@ -1172,6 +1508,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                     setSubView('manage-openrouter-settings');
                   } else if (providerKey === 'aws') {
                     setSubView('manage-aws-settings');
+                  } else if (providerKey === 'custom') {
+                    setSubView('manage-custom-settings');
                   }
                   return;
                 }
@@ -1180,6 +1518,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                     setAwsTestStatus('idle');
                     setAwsTestMessage('');
                     setSubView('configure-aws');
+                  } else if (providerKey === 'custom') {
+                    setSubView('configure-custom');
                   } else {
                     startEdit('addApiKey', '');
                   }
@@ -1207,6 +1547,10 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
         {
           label: `AWS Bedrock ${providers.aws ? '✅' : '❌'}`,
           value: 'aws',
+        },
+        {
+          label: `Custom ${providers.custom ? '✅' : '❌'}`,
+          value: 'custom',
         },
       ];
 
