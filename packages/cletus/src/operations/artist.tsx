@@ -1,7 +1,6 @@
 import { ImageGenerationResponse } from "@aeye/ai";
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from "sharp";
 import url from 'url';
 import { abbreviate, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
 import { canEmbed, embed } from "../embed";
@@ -25,6 +24,9 @@ function linkImage(imagePath: string): string {
 async function loadImageAsDataUrl(cwd: string, imagePath: string): Promise<string> {
   const fullPath = resolveImage(cwd, imagePath);
 
+  // Lazy-load sharp
+  const sharp = (await import("sharp")).default;
+  
   const metadata = await sharp(fullPath).metadata();
   const width = metadata.width || 0;
   const height = metadata.height || 0;

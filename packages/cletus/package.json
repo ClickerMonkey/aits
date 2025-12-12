@@ -9,10 +9,10 @@
     "cletus": "dist/index.js"
   },
   "scripts": {
-    "build": "npm run clean && node esbuild.config.cjs",
+    "build": "npm run clean && node esbuild.config.cjs && node esbuild.browser.cjs",
     "dev": "tsx watch src/index.tsx",
     "start": "tsx --conditions=source src/index.tsx",
-    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "clean": "rimraf dist dist-browser tsconfig.tsbuildinfo",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "profile": "node --inspect dist/index.js",
@@ -49,7 +49,12 @@
     "ink-text-input": "^6.0.0",
     "mic": "^2.1.2",
     "react": "^19.2.0",
-    "sharp": "^0.34.3"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
+    "sharp": "^0.34.3",
+    "ws": "^8.18.0"
   },
   "optionalDependencies": {
     "puppeteer": "^24.31.0"
@@ -66,6 +71,7 @@
     "@jest/globals": "^29.7.0",
     "@langchain/core": "^0.3.79",
     "@langchain/textsplitters": "^0.1.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@tavily/core": "^0.5.13",
     "@types/diff": "^7.0.2",
     "@types/file-type": "^10.6.0",
@@ -73,8 +79,10 @@
     "@types/node": "^24.9.1",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.0",
     "@types/uuid": "^10.0.0",
     "@types/wav": "^1.0.4",
+    "@types/ws": "^8.5.13",
     "babel-jest": "^29.7.0",
     "diff": "^8.0.2",
     "esbuild": "^0.26.0",
