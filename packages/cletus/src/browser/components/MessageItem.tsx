@@ -13,7 +13,7 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, showInput, showOutput }) => {
-  const { role, content, operations = [] } = message;
+  const { role, name, content, operations = [] } = message;
 
   const isUser = role === 'user';
   const isAssistant = role === 'assistant';
@@ -62,7 +62,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, showInput, sh
             isSystem && 'text-muted-foreground'
           )}
         >
-          {isUser ? 'You' : isAssistant ? 'Assistant' : 'System'}
+          {isUser ? (name || 'You') : isAssistant ? (name || 'Assistant') : 'System'}
         </div>
 
         {/* Content and Operations in order */}

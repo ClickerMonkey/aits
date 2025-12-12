@@ -172,7 +172,7 @@ export class ToolRegistry {
     if (ctx?.chatStatus) {
       const embedTools = this.getToolsToEmbed();
       const allTools = this.tools.size;
-      if (embedTools.length === allTools) {
+      if (embedTools.length === allTools && allTools > 0) {
         ctx.chatStatus(`Initializing adaptive tools (${allTools} tools)...`);
       } else if (embedTools.length > 0) {
         ctx.chatStatus(`Updating adaptive tools (${pluralize(embedTools.length, 'tool')})...`);

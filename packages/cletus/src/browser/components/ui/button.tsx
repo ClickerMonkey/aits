@@ -9,9 +9,9 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90 neon-glow-purple',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground neon-border',
+        outline: 'border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground neon-border',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        ghost: 'text-foreground hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
         neon: 'bg-card border-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan hover:text-background neon-glow transition-all duration-300',
       },
