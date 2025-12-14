@@ -1,26 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { MessageItem } from './MessageItem';
-
-interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content?: string;
-  created: number;
-  operations?: Array<{
-    type: string;
-    status: string;
-    input: any;
-    output?: any;
-  }>;
-}
+import type { Message } from '../../schemas';
 
 interface MessageListProps {
   messages: Message[];
-  showInput: boolean;
-  showOutput: boolean;
-  onMessagesUpdate: (messages: Message[]) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ messages, showInput, showOutput, onMessagesUpdate }) => {
+export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,8 +26,6 @@ export const MessageList: React.FC<MessageListProps> = ({ messages, showInput, s
             <MessageItem
               key={index}
               message={message}
-              showInput={showInput}
-              showOutput={showOutput}
             />
           ))}
         </div>

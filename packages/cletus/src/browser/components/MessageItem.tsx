@@ -4,15 +4,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { OperationDisplay } from '../operations';
 import { cn } from '../lib/utils';
-import type { Message, MessageContent } from '../../schemas';
+import type { Message } from '../../schemas';
 
 interface MessageItemProps {
   message: Message;
-  showInput: boolean;
-  showOutput: boolean;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message, showInput, showOutput }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   const { role, name, content, operations = [] } = message;
 
   const isUser = role === 'user';
@@ -74,8 +72,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, showInput, sh
                 <OperationDisplay
                   key={index}
                   operation={item.operation}
-                  showInput={showInput}
-                  showOutput={showOutput}
                 />
               );
             }

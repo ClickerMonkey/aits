@@ -17,8 +17,6 @@ import * as secretary from './secretary';
  */
 const OperationRenderers: Partial<Record<OperationKind, React.FC<{
   operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
 }>>> = {
   // Clerk operations
   ...clerk,
@@ -47,8 +45,6 @@ const OperationRenderers: Partial<Record<OperationKind, React.FC<{
 
 interface OperationDisplayProps {
   operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
 }
 
 /**

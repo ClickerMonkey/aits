@@ -254,6 +254,8 @@ Tools:
   return chatPrompt;
 }
 
+export type CletusChatAgent = ReturnType<typeof createChatAgent>;
+
 /**
  * Get a human-readable description for a toolset
  */

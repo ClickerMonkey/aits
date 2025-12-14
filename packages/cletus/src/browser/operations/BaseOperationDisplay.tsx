@@ -148,13 +148,12 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="inline"
                 components={{
                   p: ({ children }) => <span>{children}</span>,
                 }}

@@ -1,13 +1,14 @@
 import React from 'react';
 import { Select, SelectOption } from './ui/select';
+import { AgentMode } from '../../schemas';
 
 interface AgentModeSelectorProps {
-  agentMode: string;
-  onChange: (agentMode: string) => void;
+  agentMode: AgentMode;
+  onChange: (agentMode: AgentMode) => void;
   disabled?: boolean;
 }
 
-const AGENT_MODE_OPTIONS: SelectOption[] = [
+const AGENT_MODE_OPTIONS: SelectOption<AgentMode>[] = [
   {
     value: 'default',
     label: 'Run Mode',
@@ -27,7 +28,7 @@ export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({ agentMode,
       <Select
         value={agentMode || 'default'}
         options={AGENT_MODE_OPTIONS}
-        onChange={onChange}
+        onChange={value => onChange(value as AgentMode)}
         disabled={disabled}
         className="min-w-[140px]"
       />

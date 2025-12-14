@@ -1,13 +1,14 @@
 import React from 'react';
 import { Select, SelectOption } from './ui/select';
+import { ChatMode } from '../../schemas';
 
 interface ModeSelectorProps {
-  mode: string;
-  onChange: (mode: string) => void;
+  mode: ChatMode;
+  onChange: (mode: ChatMode) => void;
   disabled?: boolean;
 }
 
-const MODE_OPTIONS: SelectOption[] = [
+const MODE_OPTIONS: SelectOption<ChatMode>[] = [
   {
     value: 'none',
     label: 'None',
@@ -42,7 +43,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onChange, disa
       <Select
         value={mode}
         options={MODE_OPTIONS}
-        onChange={onChange}
+        onChange={value => onChange(value as ChatMode)}
         disabled={disabled}
         className="min-w-[140px]"
       />

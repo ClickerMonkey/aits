@@ -39,6 +39,18 @@ export class ChatFile extends JsonFile<ChatMessages> {
   }
 
   /**
+   * Update a message in the chat
+   */
+  async updateMessage(message: Message): Promise<void> {
+    await this.save((chat) => {
+      const index = chat.messages.findIndex((m) => m.created === message.created);
+      if (index !== -1) {
+        chat.messages[index] = message;
+      }
+    });
+  }
+
+  /**
    * Get all messages
    */
   getMessages(): Message[] {

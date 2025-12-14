@@ -40,8 +40,6 @@ export function getElapsedTime(op: Operation): string {
 
 interface OperationDisplayProps {
   operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
 }
 
 /**

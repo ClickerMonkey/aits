@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { ChevronDown, Check } from 'lucide-react';
 
-export interface SelectOption {
-  value: string;
+export interface SelectOption<V extends string = string> {
+  value: V;
   label: string;
   description?: string;
   disabled?: boolean;

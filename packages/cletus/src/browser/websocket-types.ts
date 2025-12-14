@@ -19,7 +19,8 @@ export type ClientMessage =
   | { type: 'clear_todos'; data: { chatId: string } }
   | { type: 'clear_messages'; data: { chatId: string } }
   | { type: 'delete_chat'; data: { chatId: string } }
-  | { type: 'get_models'; data?: { baseMetadata?: any } };
+  | { type: 'get_models'; data?: { baseMetadata?: any } }
+  | { type: 'handle_operations'; data: { chatId: string; messageCreated: number; approved: number[]; rejected: number[] } };
 
 // Server -> Client Messages
 export type ServerMessage =

@@ -8,6 +8,10 @@ import { ConfigFile } from '../config';
 import { ChatFile } from '../chat';
 import type { Message, ChatMeta, MessageContent } from '../schemas';
 import type { ClientMessage, ServerMessage } from './websocket-types';
+import { OperationManager } from '../operations/manager';
+import { CletusAI, createCletusAI } from '../ai';
+import { CletusChatAgent, createChatAgent } from '../agents/chat-agent';
+import { runChatOrchestrator } from '../agents/chat-orchestrator';
 
 const __serverFilename = fileURLToPath(import.meta.url);
 const __serverDirname = path.dirname(__serverFilename);
@@ -82,7 +86,10 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
     ws.on('close', () => {
       clients.delete(ws);
     });
-    handleWebSocketConnection(ws);
+    handleWebSocketConnection(ws).catch(error => {
+      console.error('WebSocket connection error:', error);
+      ws.close();
+    });
   });
 
   server.listen(port, '127.0.0.1', () => {
@@ -116,13 +123,109 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
   });
 }
 
-function handleWebSocketConnection(ws: WebSocket): void {
+async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
   let config: ConfigFile | null = null;
+  let configPromise: Promise<boolean> | null = null;
+  let ai: CletusAI | null = null;
+  let chatAgent: CletusChatAgent | null = null;
   let abortController: AbortController | null = null;
 
   // Type-safe message sender
   const sendMessage = (message: ServerMessage) => {
     ws.send(JSON.stringify(message));
+  };
+
+  // Helper to send errors
+  const sendError = (e: any, message: string = typeof e === 'string' ? e : e.message) => {
+    sendMessage({
+      type: 'error',
+      data: { message },
+    });
+
+    console.error(e);
+  };
+
+  // Load config once at connection time
+  const ensureConfig = async () => {
+    if (!configPromise) {
+      configPromise = (async () => {
+        const exists = await configExists();
+        if (!exists) {
+          return false;
+        }
+        config = new ConfigFile();
+        await config.load();
+        return true;
+      })();
+    }
+    return await configPromise;
+  };
+
+  // Lazy-load AI and chat agent once
+  const ensureAI = async () => {
+    if (!ai || !chatAgent) {
+      await ensureConfig();
+      if (!config) {
+        throw new Error('Config not available');
+      }
+      ai = createCletusAI(config);
+      chatAgent = createChatAgent(ai);
+    }
+    return { ai, chatAgent };
+  };
+
+  const withConfig = async <T>(fn: (config: ConfigFile) => T) => {
+    try {
+      if (!await ensureConfig()) {
+        sendMessage({
+          type: 'config_not_found',
+          data: {},
+        });
+        return;
+      }
+    } catch (e: any) {
+      sendError(e);
+      return;
+    }
+
+    // Ensure config is loaded
+    if (config) {
+      try {
+        return await fn(config);
+      } catch (e: any) {
+        sendError(e);
+      }
+    } else {
+      sendMessage({
+        type: 'config_not_found',
+        data: {},
+      });
+    }
+  };
+
+  const withChatFile = async <T>(chatId: string, fn: (chatFile: ChatFile, chat: ChatMeta, config: ConfigFile) => T) => {
+    return await withConfig(async (config) => {
+      let chatFile: ChatFile;
+      try {
+        chatFile = await getChat(chatId);
+      } catch (e: any) {
+        sendError(e, 'Failed to load chat file');
+        return;
+      }
+
+      const chat = config.getChats().find(c => c.id === chatId);
+      if (!chat) {
+        sendError('Chat not found');
+
+        return;
+      }
+
+      try {
+        return await fn(chatFile, chat, config);
+      } catch (e: any) {
+        sendError(e, 'Failed to process chat file');
+      }
+    });
   };
 
   ws.on('message', async (data) => {
@@ -131,37 +234,19 @@ function handleWebSocketConnection(ws: WebSocket): void {
 
       switch (message.type) {
         case 'get_config':
-          try {
-            const exists = await configExists();
-            if (!exists) {
-              sendMessage({
-                type: 'config_not_found',
-                data: {},
-              });
-              return;
-            }
-
-            const configFile = new ConfigFile();
-            await configFile.load();
-            const configData = configFile.getData();
+          withConfig((config) => {
+            const configData = config.getData();
 
             sendMessage({
               type: 'config',
               data: configData,
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to load config' },
-            });
-          }
+          });
           break;
 
-        case 'create_chat':
-          try {
-            const { name } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
+        case 'create_chat': {
+          const { name } = message.data;
+          await withConfig(async (config) => {
 
             // Generate chat ID and create new chat
             const now = Date.now();
@@ -181,7 +266,7 @@ function handleWebSocketConnection(ws: WebSocket): void {
               model: undefined,
             };
 
-            await configFile.addChat(newChat);
+            await config.addChat(newChat);
 
             // Create the chat messages file
             const chatFile = new ChatFile(chatId);
@@ -193,21 +278,12 @@ function handleWebSocketConnection(ws: WebSocket): void {
               type: 'chat_created',
               data: { chatId },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to create chat' },
-            });
-          }
+          });
           break;
-
-        case 'init_chat':
-          try {
-            const { chatId } = message.data;
-            config = new ConfigFile();
-            await config.load();
-            const chatFile = await getChat(chatId);
-
+        }
+        case 'init_chat': {
+          const { chatId } = message.data;
+          await withChatFile(chatId, async (chatFile, _, config) => {
             sendMessage({
               type: 'chat_initialized',
               data: {
@@ -215,59 +291,30 @@ function handleWebSocketConnection(ws: WebSocket): void {
                 chat: config.getChats().find(c => c.id === chatId),
               },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to initialize chat' },
-            });
-          }
+          });
           break;
-
-        case 'get_messages':
-          try {
-            const { chatId } = message.data;
-            const chatFile = await getChat(chatId);
+        }
+        case 'get_messages': {
+          const { chatId } = message.data;
+          await withChatFile(chatId, async (chatFile) => {
             const messages = chatFile.getMessages();
 
             sendMessage({
               type: 'messages',
               data: { messages },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to load messages' },
-            });
-          }
+          });
           break;
-
-        case 'send_message':
-          if (!config) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Config not loaded' },
-            });
-            return;
-          }
-
-          try {
-            const { chatId, content } = message.data;
-            const chatFile = await getChat(chatId);
-
+        }
+        case 'send_message': {
+          const { chatId, content } = message.data;
+          await withChatFile(chatId, async (chatFile, chat, config) => {
+              
             // Validate content is an array of MessageContent
             if (!Array.isArray(content)) {
               sendMessage({
                 type: 'error',
                 data: { message: 'Invalid message content: must be an array' },
-              });
-              return;
-            }
-
-            const chat = config.getChats().find(c => c.id === chatFile!.id);
-            if (!chat) {
-              sendMessage({
-                type: 'error',
-                data: { message: 'Chat not found' },
               });
               return;
             }
@@ -287,13 +334,8 @@ function handleWebSocketConnection(ws: WebSocket): void {
             // Process AI response
             abortController = new AbortController();
 
-            // Lazy-load AI components
-            const { createCletusAI } = await import('../ai');
-            const { createChatAgent } = await import('../agents/chat-agent');
-            const { runChatOrchestrator } = await import('../agents/chat-orchestrator');
-
-            const ai = createCletusAI(config);
-            const chatAgent = createChatAgent(ai);
+            // Ensure AI and chat agent are loaded
+            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
 
             const chatStatus = (status: string) => {
               sendMessage({
@@ -302,15 +344,8 @@ function handleWebSocketConnection(ws: WebSocket): void {
               });
             };
 
-            const onRefreshChat = () => {
-              sendMessage({
-                type: 'messages_updated',
-                data: { messages: chatFile!.getMessages() },
-              });
-            };
-
             const clearUsage = () => {
-              const defaultContext = ai.config.defaultContext;
+              const defaultContext = aiInstance.config.defaultContext;
               if (defaultContext && defaultContext.usage) {
                 defaultContext.usage.accumulated = {};
                 defaultContext.usage.accumulatedCost = 0;
@@ -318,7 +353,7 @@ function handleWebSocketConnection(ws: WebSocket): void {
             };
 
             const getUsage = () => {
-              const defaultContext = ai.config.defaultContext;
+              const defaultContext = aiInstance.config.defaultContext;
               if (defaultContext && defaultContext.usage) {
                 return {
                   accumulated: defaultContext.usage.accumulated,
@@ -329,7 +364,7 @@ function handleWebSocketConnection(ws: WebSocket): void {
             };
 
             await runChatOrchestrator({
-              chatAgent,
+              chatAgent: chatAgentInstance,
               messages: chatFile.getMessages(),
               chatMeta: chat,
               config,
@@ -337,10 +372,6 @@ function handleWebSocketConnection(ws: WebSocket): void {
               signal: abortController.signal,
               clearUsage,
               getUsage,
-              events: {
-                onRefreshChat,
-                onRefreshPending: onRefreshChat,
-              },
             }, (event) => {
               // Handle orchestrator events
               switch (event.type) {
@@ -351,6 +382,7 @@ function handleWebSocketConnection(ws: WebSocket): void {
                   });
                   break;
                 case 'update':
+                  fireAndForget(chatFile.updateMessage(event.message));
                   sendMessage({
                     type: 'message_updated',
                     data: { message: event.message },
@@ -377,10 +409,8 @@ function handleWebSocketConnection(ws: WebSocket): void {
                   break;
                 case 'complete':
                   // Add the complete message to chat file (like CLI does)
-                  if (event.message.content.length > 0 && chatFile) {
-                    chatFile.addMessage(event.message).catch((err) => {
-                      console.error('Failed to save complete message:', err);
-                    });
+                  if (event.message.content.length > 0) {
+                    fireAndForget(chatFile.addMessage(event.message))
                   }
                   // Send the complete message
                   sendMessage({
@@ -396,16 +426,12 @@ function handleWebSocketConnection(ws: WebSocket): void {
                   break;
               }
             });
-          } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-              sendMessage({
-                type: 'error',
-                data: { message: error.message },
-              });
-            }
-          }
-          break;
 
+            // Clear abort controller
+            abortController = null;
+          });
+          break;
+        }
         case 'cancel':
           if (abortController) {
             abortController.abort();
@@ -416,12 +442,8 @@ function handleWebSocketConnection(ws: WebSocket): void {
         case 'get_models':
           try {
             const { baseMetadata } = message.data || {};
-            // Lazy-load AI registry
-            const { createCletusAI } = await import('../ai');
-            const configFile = new ConfigFile();
-            await configFile.load();
-            const ai = createCletusAI(configFile);
-            const models = ai.registry.searchModels(baseMetadata || {});
+            const { ai: aiInstance } = await ensureAI();
+            const models = aiInstance.registry.searchModels(baseMetadata || {});
 
             sendMessage({
               type: 'models',
@@ -435,118 +457,83 @@ function handleWebSocketConnection(ws: WebSocket): void {
           }
           break;
 
-        case 'update_chat_meta':
-          try {
-            const { chatId, updates } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            await configFile.updateChat(chatId, updates);
-            const updatedChat = configFile.getChats().find(c => c.id === chatId);
+        case 'update_chat_meta': {
+          const { chatId, updates } = message.data;
+          withConfig(async (config) => {
+              
+            await config.updateChat(chatId, updates);
+            const updatedChat = config.getChats().find(c => c.id === chatId);
 
             sendMessage({
               type: 'chat_updated',
               data: { chat: updatedChat },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to update chat metadata' },
-            });
-          }
+          });
           break;
-
-        case 'add_todo':
-          try {
-            const { chatId, todo } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            const chat = configFile.getChats().find(c => c.id === chatId);
+        }
+        case 'add_todo': {
+          const { chatId, todo } = message.data;
+          withConfig(async (config) => {
+            const chat = config.getChats().find(c => c.id === chatId);
             if (chat) {
               chat.todos.push({ id: Math.random().toString(36).substring(7), name: todo, done: false });
-              await configFile.updateChat(chatId, { todos: chat.todos });
-              const updatedChat = configFile.getChats().find(c => c.id === chatId);
+              await config.updateChat(chatId, { todos: chat.todos });
+              const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
                 data: { chat: updatedChat },
               });
             }
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to add todo' },
-            });
-          }
+          });
           break;
-
-        case 'toggle_todo':
-          try {
-            const { chatId, index } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            const chat = configFile.getChats().find(c => c.id === chatId);
+        }
+        case 'toggle_todo': {
+          const { chatId, index } = message.data;
+          withConfig(async (config) => {
+            const chat = config.getChats().find(c => c.id === chatId);
             if (chat && chat.todos[index]) {
               chat.todos[index].done = !chat.todos[index].done;
-              await configFile.updateChat(chatId, { todos: chat.todos });
-              const updatedChat = configFile.getChats().find(c => c.id === chatId);
+              await config.updateChat(chatId, { todos: chat.todos });
+              const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
                 data: { chat: updatedChat },
               });
             }
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to toggle todo' },
-            });
-          }
+          });
           break;
-
-        case 'remove_todo':
-          try {
-            const { chatId, index } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            const chat = configFile.getChats().find(c => c.id === chatId);
+        }
+        case 'remove_todo': {
+          const { chatId, index } = message.data;
+          withConfig(async (config) => {
+            const chat = config.getChats().find(c => c.id === chatId);
             if (chat && chat.todos[index] !== undefined) {
               chat.todos.splice(index, 1);
-              await configFile.updateChat(chatId, { todos: chat.todos });
-              const updatedChat = configFile.getChats().find(c => c.id === chatId);
+              await config.updateChat(chatId, { todos: chat.todos });
+              const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
                 data: { chat: updatedChat },
               });
             }
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to remove todo' },
-            });
-          }
+          });
           break;
-
-        case 'clear_todos':
-          try {
-            const { chatId } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            await configFile.updateChat(chatId, { todos: [] });
-            const updatedChat = configFile.getChats().find(c => c.id === chatId);
+        }
+        case 'clear_todos': {
+          const { chatId } = message.data;
+          withConfig(async (config) => {
+            await config.updateChat(chatId, { todos: [] });
+            const updatedChat = config.getChats().find(c => c.id === chatId);
             sendMessage({
               type: 'chat_updated',
               data: { chat: updatedChat },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to clear todos' },
-            });
-          }
+          });
           break;
-
-        case 'clear_messages':
-          try {
-            const { chatId } = message.data;
-            const chatFile = await getChat(chatId);
+        }
+        case 'clear_messages': {
+          const { chatId } = message.data;
+          withChatFile(chatId, async (chatFile) => {
             await chatFile.save((data) => {
               data.messages = [];
             });
@@ -554,33 +541,75 @@ function handleWebSocketConnection(ws: WebSocket): void {
               type: 'messages_updated',
               data: { messages: [] },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to clear messages' },
-            });
-          }
+          });
           break;
-
-        case 'delete_chat':
-          try {
-            const { chatId } = message.data;
-            const configFile = new ConfigFile();
-            await configFile.load();
-            await configFile.deleteChat(chatId);
+        }
+        case 'delete_chat': {
+          const { chatId } = message.data;
+          withConfig(async (config) => {
+            await config.deleteChat(chatId);
             removeChat(chatId); // Remove from cache
             sendMessage({
               type: 'chat_deleted',
               data: { chatId },
             });
-          } catch (error) {
-            sendMessage({
-              type: 'error',
-              data: { message: 'Failed to delete chat' },
-            });
-          }
+          });
           break;
+        }
+        case 'handle_operations': {
+          const { chatId, messageCreated, approved, rejected } = message.data;
+          withChatFile(chatId, async (chatFile, chatMeta) => {
+            const messages = chatFile.getMessages();
+            const targetMessage = messages.find(m => m.created === messageCreated);
+          
+            if (!targetMessage || !targetMessage.operations) {
+              sendMessage({
+                type: 'error',
+                data: { message: 'Message or operations not found' },
+              });
+              return;
+            }
 
+            const operations = targetMessage.operations;
+            const manager = new OperationManager('none', operations);
+
+            // Mark rejected operations
+            for (const idx of rejected) {
+              if (operations[idx]) {
+                operations[idx].status = 'rejected';
+                manager.updateMessage(operations[idx]);
+              }
+            }
+
+            // Execute approved operations
+            if (approved.length > 0) {
+              const { ai } = await ensureAI();
+              const ctx = await ai.buildContext({
+                chat: chatMeta,
+                chatData: chatFile,
+                chatMessage: targetMessage,
+              });
+
+              for (const idx of approved) {
+                if (operations[idx]) {
+                  await manager.execute(operations[idx], true, ctx);
+                }
+              }
+            }
+
+            // Save updated message
+            await chatFile.save(d => {
+              d.messages = messages.map(m => m.created === messageCreated ? targetMessage : m);
+            });
+
+            // Send updated message back to client
+            sendMessage({
+              type: 'message_updated',
+              data: { message: targetMessage },
+            });
+          });
+          break;
+        }
         default:
           sendMessage({
             type: 'error',
@@ -648,4 +677,10 @@ async function serveStaticFile(url: string, res: http.ServerResponse): Promise<v
       throw error;
     }
   }
+}
+
+function fireAndForget<T>(promise: Promise<T>): void {
+  promise.catch((error) => {
+    console.error('Uncaught error:', error);
+  });
 }

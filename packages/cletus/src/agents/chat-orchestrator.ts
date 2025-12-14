@@ -96,6 +96,7 @@ export async function runChatOrchestrator(
   let messageUsage: Usage = {};
   let messageCost = 0;
   let toolTokens = 0;
+  let lastTextIndex = -1; // Track which content entry has the accumulated text
 
   const updateUsageEvent = () => {
     const accumulated = getUsage();
@@ -147,15 +148,26 @@ export async function runChatOrchestrator(
       };
 
       // Helper to get or create the last text content entry (not tied to an operation)
-      const getLastTextContent = () => {
+      const getLastTextContent = (forceNew = false) => {
+        // If forceNew, create a new entry
+        if (forceNew) {
+          const newContent = { type: 'text' as const, content: '' };
+          pending.content.push(newContent);
+          lastTextIndex = pending.content.length - 1;
+          return newContent;
+        }
+
         // Get the last entry - if it's text and not an operation, return it
         const last = pending.content[pending.content.length - 1];
         if (last && last.type === 'text' && last.operationIndex === undefined) {
+          lastTextIndex = pending.content.length - 1;
           return last;
         }
+
         // Create a new text content entry if none exists
         const newContent = { type: 'text' as const, content: '' };
         pending.content.push(newContent);
+        lastTextIndex = pending.content.length - 1;
         return newContent;
       };
 
@@ -273,10 +285,10 @@ export async function runChatOrchestrator(
               {
                 const lastContent = getLastTextContent();
                 lastContent.content += chunk.content;
-                
+
                 // Estimate text output tokens
                 updateEstimatedTextOutputTokens();
-                
+
                 onEvent({ type: 'pendingUpdate', pending });
                 onEvent({ type: 'status', status: '' });
                 updateUsageEvent();
@@ -285,14 +297,33 @@ export async function runChatOrchestrator(
 
             case 'text':
               {
+                // text event contains complete content for this iteration
+                // If we haven't accumulated via textPartial, use it directly
+                // Otherwise, textPartial has already accumulated it, so skip
                 const lastContent = getLastTextContent();
-                lastContent.content = chunk.content;
-                
+                if (lastContent.content === '') {
+                  // No textPartial events (non-streaming mode), use text content
+                  lastContent.content = chunk.content;
+                } else {
+                  // textPartial already accumulated, verify it matches
+                  // In streaming mode, text is redundant with textPartial accumulation
+                }
+
                 // Estimate text output tokens
                 updateEstimatedTextOutputTokens();
-                
+
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
+              }
+              break;
+
+            case 'toolOutput':
+              {
+                // After a tool completes, the next text should go into a new content entry
+                // This ensures content from different tool iterations doesn't get mixed
+                // Force creation of new text entry on next text event
+                getLastTextContent(true);
+                onEvent({ type: 'pendingUpdate', pending });
               }
               break;
 
