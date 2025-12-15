@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Settings, CheckSquare, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { MessageList } from '../components/MessageList';
 import { ChatInput } from '../components/ChatInput';
@@ -32,8 +33,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [showTodos, setShowTodos] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
   const [totalCost, setTotalCost] = useState(0);
   const [chatMetaState, setChatMetaState] = useState<ChatMeta | null>(null);
+  const [cwd, setCwd] = useState<string | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
@@ -124,6 +129,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
           setChatMetaState(message.data.chat);
           onConfigChange();
         }
+        if (message.data.cwd !== undefined) {
+          setCwd(message.data.cwd);
+        }
         break;
 
       case 'status_update':
@@ -210,7 +218,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   };
 
   const handleChatSettingsSave = (updates: { title?: string; prompt?: string; cwd?: string }) => {
-    send({ type: 'update_chat_meta', data: { chatId, updates } });
+    const { cwd: newCwd, ...metaUpdates } = updates;
+    send({
+      type: 'update_chat_meta',
+      data: { chatId, updates: metaUpdates, cwd: newCwd },
+    });
   };
 
   const handleAddTodo = (todo: string) => {
@@ -232,13 +244,33 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   };
 
   const handleClearMessages = () => {
-    if (showClearConfirm) {
+    setShowClearConfirm(true);
+  };
+
+  const handleConfirmClear = () => {
+    if (clearConfirmText === 'CLEAR') {
       send({ type: 'clear_messages', data: { chatId } });
       setMessages([]);
       setShowClearConfirm(false);
-    } else {
-      setShowClearConfirm(true);
+      setClearConfirmText('');
     }
+  };
+
+  const handleStartEditTitle = () => {
+    setEditedTitle(chatMeta?.title || '');
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitle = () => {
+    if (editedTitle.trim() && editedTitle !== chatMeta?.title) {
+      send({ type: 'update_chat_meta', data: { chatId, updates: { title: editedTitle.trim() } } });
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleCancelEditTitle = () => {
+    setIsEditingTitle(false);
+    setEditedTitle('');
   };
 
   const handleDeleteChat = () => {
@@ -297,16 +329,49 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="flex-1 flex items-center gap-2">
-              <h2 className="text-xl font-bold neon-text-cyan">{chatMeta.title}</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleDeleteChat}
-                title="Delete chat"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              {isEditingTitle ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveTitle();
+                      } else if (e.key === 'Escape') {
+                        handleCancelEditTitle();
+                      }
+                    }}
+                    className="flex-1 max-w-md"
+                    autoFocus
+                  />
+                  <Button variant="ghost" size="sm" onClick={handleSaveTitle}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleCancelEditTitle}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <h2
+                    className="text-xl font-bold neon-text-cyan cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={handleStartEditTitle}
+                    title="Click to edit title"
+                  >
+                    {chatMeta.title}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDeleteChat}
+                    title="Delete chat"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <AssistantSelector
@@ -336,10 +401,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
                 <Settings className="w-5 h-5" />
               </Button>
               <Button
-                variant={showClearConfirm ? 'destructive' : 'ghost'}
+                variant="ghost"
                 size="icon"
                 onClick={handleClearMessages}
-                title={showClearConfirm ? 'Click again to confirm' : 'Clear messages'}
+                title="Clear messages"
               >
                 <Trash2 className="w-5 h-5" />
               </Button>
@@ -411,7 +476,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
         <ChatSettingsDialog
           title={chatMeta.title}
           prompt={chatMeta.prompt}
-          cwd={undefined}
+          cwd={cwd}
           onSave={handleChatSettingsSave}
           onClose={() => setShowChatSettings(false)}
         />
@@ -426,6 +491,64 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
           onClearTodos={handleClearTodos}
           onClose={() => setShowTodos(false)}
         />
+      )}
+
+      {/* Clear Messages Confirmation Dialog */}
+      {showClearConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => {
+            setShowClearConfirm(false);
+            setClearConfirmText('');
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-card rounded-lg border border-border shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-destructive mb-4">Clear All Messages</h2>
+            <p className="text-foreground mb-4">
+              This will permanently delete all messages in this chat. This action cannot be undone.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              Type <span className="font-mono font-bold text-foreground">CLEAR</span> to confirm:
+            </p>
+            <Input
+              type="text"
+              value={clearConfirmText}
+              onChange={(e) => setClearConfirmText(e.target.value)}
+              placeholder="Type CLEAR"
+              className="mb-4 font-mono"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmClear();
+                } else if (e.key === 'Escape') {
+                  setShowClearConfirm(false);
+                  setClearConfirmText('');
+                }
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowClearConfirm(false);
+                  setClearConfirmText('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmClear}
+                disabled={clearConfirmText !== 'CLEAR'}
+              >
+                Clear Messages
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

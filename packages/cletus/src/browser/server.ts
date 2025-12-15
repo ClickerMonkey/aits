@@ -284,11 +284,22 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         case 'init_chat': {
           const { chatId } = message.data;
           await withChatFile(chatId, async (chatFile, _, config) => {
+            // Initialize AI to get default cwd
+            await ensureAI();
+
             sendMessage({
               type: 'chat_initialized',
               data: {
                 messages: chatFile.getMessages(),
                 chat: config.getChats().find(c => c.id === chatId),
+              },
+            });
+
+            // Send current cwd
+            sendMessage({
+              type: 'chat_updated',
+              data: {
+                cwd: ai?.config.defaultContext?.cwd
               },
             });
           });
@@ -458,15 +469,26 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           break;
 
         case 'update_chat_meta': {
-          const { chatId, updates } = message.data;
+          const { chatId, updates, cwd } = message.data;
           withConfig(async (config) => {
-              
+
             await config.updateChat(chatId, updates);
             const updatedChat = config.getChats().find(c => c.id === chatId);
 
+            // Update AI cwd if provided
+            if (cwd !== undefined && ai) {
+              if (!ai.config.defaultContext) {
+                ai.config.defaultContext = {};
+              }
+              ai.config.defaultContext.cwd = cwd;
+            }
+
             sendMessage({
               type: 'chat_updated',
-              data: { chat: updatedChat },
+              data: {
+                chat: updatedChat,
+                cwd: ai?.config.defaultContext?.cwd
+              },
             });
           });
           break;

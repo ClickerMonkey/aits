@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Settings } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, Settings, FolderOpen } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -112,13 +112,35 @@ export const ChatSettingsDialog: React.FC<ChatSettingsDialogProps> = ({
               <label className="block text-sm font-medium text-foreground mb-2">
                 Working Directory
               </label>
-              <Input
-                type="text"
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-                placeholder="Enter working directory path (optional)"
-                className="w-full font-mono text-sm"
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  placeholder="Enter working directory path (optional)"
+                  className="flex-1 font-mono text-sm"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.webkitdirectory = true;
+                    input.onchange = (e: any) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) {
+                        const path = files[0].path || files[0].webkitRelativePath.split('/')[0];
+                        setCwd(path);
+                      }
+                    };
+                    input.click();
+                  }}
+                  title="Select folder"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Set the current working directory for file operations
               </p>

@@ -6,10 +6,176 @@ import { cn } from '../lib/utils';
 import { getStatusInfo, getElapsedTime } from './render';
 
 /**
+ * Checks if an array can be rendered as a table
+ */
+const canRenderAsTable = (data: any[]): boolean => {
+  if (data.length === 0) return false;
+
+  // All items must be objects
+  if (!data.every(item => item && typeof item === 'object' && !Array.isArray(item))) {
+    return false;
+  }
+
+  // Collect all unique keys
+  const allKeys = new Set<string>();
+  for (const item of data) {
+    Object.keys(item).forEach(key => allKeys.add(key));
+  }
+
+  // Must have <= 20 columns
+  if (allKeys.size > 20) return false;
+
+  // All values must be primitives (string, number, boolean, null, undefined)
+  for (const item of data) {
+    for (const value of Object.values(item)) {
+      if (value !== null && value !== undefined && typeof value === 'object') {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+/**
+ * Renders a primitive value for table cells
+ */
+const renderPrimitiveValue = (value: any): React.ReactNode => {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground italic">null</span>;
+  }
+  if (typeof value === 'string') {
+    // Handle newlines in strings for table cells
+    const lines = value.split('\n');
+    return (
+      <span className="text-green-400">
+        {lines.map((line, i) => (
+          <React.Fragment key={i}>
+            {line}
+            {i < lines.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </span>
+    );
+  }
+  if (typeof value === 'number') {
+    return <span className="text-blue-400">{value}</span>;
+  }
+  if (typeof value === 'boolean') {
+    return <span className="text-purple-400">{value.toString()}</span>;
+  }
+  return <span>{String(value)}</span>;
+};
+
+/**
+ * Renders JSON data in a friendly HTML format
+ */
+const renderJsonAsHtml = (data: any, depth: number = 0): React.ReactNode => {
+  if (data === null || data === undefined) {
+    return <span className="text-muted-foreground italic">null</span>;
+  }
+
+  if (typeof data === 'string') {
+    // Split by newlines and render each line
+    const lines = data.split('\n');
+    return (
+      <span className="text-green-400">
+        {lines.map((line, i) => (
+          <React.Fragment key={i}>
+            {line}
+            {i < lines.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </span>
+    );
+  }
+
+  if (typeof data === 'number') {
+    return <span className="text-blue-400">{data}</span>;
+  }
+
+  if (typeof data === 'boolean') {
+    return <span className="text-purple-400">{data.toString()}</span>;
+  }
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return <span className="text-muted-foreground">[]</span>;
+    }
+
+    // Check if we can render as a table
+    if (canRenderAsTable(data)) {
+      // Collect all unique keys across all objects
+      const allKeys = new Set<string>();
+      data.forEach(item => {
+        Object.keys(item).forEach(key => allKeys.add(key));
+      });
+      const columns = Array.from(allKeys);
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                {columns.map(col => (
+                  <th key={col} className="text-left p-2 text-cyan-400 font-semibold">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, i) => (
+                <tr key={i} className="border-b border-border/50">
+                  {columns.map(col => (
+                    <td key={col} className="p-2">
+                      {renderPrimitiveValue(row[col])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Default array rendering
+    return (
+      <div className="ml-4">
+        {data.map((item, i) => (
+          <div key={i} className="border-l border-border pl-2 my-1">
+            <span className="text-yellow-400">[{i}]:</span> {renderJsonAsHtml(item, depth + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof data === 'object') {
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      return <span className="text-muted-foreground">{'{}'}</span>;
+    }
+    return (
+      <div className="ml-4">
+        {entries.map(([key, value]) => (
+          <div key={key} className="border-l border-border pl-2 my-1">
+            <span className="text-cyan-400">{key}:</span> {renderJsonAsHtml(value, depth + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <span>{String(data)}</span>;
+};
+
+/**
  * Expandable details component with tabs
  */
 const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => {
-  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'analysis'>('input');
+  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'inputJson' | 'outputJson' | 'analysis'>('input');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const hasInput = operation.input !== undefined && operation.input !== null;
@@ -24,6 +190,8 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
   const effectiveTab =
     (activeTab === 'input' && hasInput) ||
     (activeTab === 'output' && hasOutput) ||
+    (activeTab === 'inputJson' && hasInput) ||
+    (activeTab === 'outputJson' && hasOutput) ||
     (activeTab === 'analysis' && hasAnalysis)
       ? activeTab
       : hasInput
@@ -35,12 +203,12 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
   return (
     <div className="ml-6 mt-2 border border-border rounded-lg overflow-hidden bg-muted/30">
       {/* Tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border overflow-x-auto">
         {hasInput && (
           <button
             onClick={() => setActiveTab('input')}
             className={cn(
-              'px-3 py-1.5 text-xs font-semibold transition-colors',
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
               effectiveTab === 'input'
                 ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -53,7 +221,7 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
           <button
             onClick={() => setActiveTab('output')}
             className={cn(
-              'px-3 py-1.5 text-xs font-semibold transition-colors',
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
               effectiveTab === 'output'
                 ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -62,11 +230,37 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
             Output
           </button>
         )}
+        {hasInput && (
+          <button
+            onClick={() => setActiveTab('inputJson')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
+              effectiveTab === 'inputJson'
+                ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            Input (JSON)
+          </button>
+        )}
+        {hasOutput && (
+          <button
+            onClick={() => setActiveTab('outputJson')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
+              effectiveTab === 'outputJson'
+                ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            Output (JSON)
+          </button>
+        )}
         {hasAnalysis && (
           <button
             onClick={() => setActiveTab('analysis')}
             className={cn(
-              'px-3 py-1.5 text-xs font-semibold transition-colors',
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
               effectiveTab === 'analysis'
                 ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -77,29 +271,40 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
         )}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="ml-auto px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+          className="ml-auto px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground whitespace-nowrap"
         >
           {isExpanded ? 'Collapse' : 'Expand'}
         </button>
       </div>
 
       {/* Content */}
-      <textarea
-        readOnly
-        value={
-          effectiveTab === 'input'
-            ? JSON.stringify(operation.input, null, 2)
-            : effectiveTab === 'output'
-            ? JSON.stringify(operation.output, null, 2)
-            : operation.analysis || ''
-        }
-        className={cn(
-          'w-full p-3 text-xs font-mono bg-black text-white border-0 resize-y overflow-auto',
-          'focus:outline-none focus:ring-2 focus:ring-neon-cyan/50',
-          isExpanded ? 'h-auto' : 'max-h-[12rem]'
-        )}
-        style={isExpanded ? { height: 'auto', minHeight: '12rem' } : { height: '12rem' }}
-      />
+      {effectiveTab === 'input' || effectiveTab === 'output' ? (
+        <div
+          className={cn(
+            'w-full p-3 text-xs font-mono bg-black text-white overflow-auto',
+            isExpanded ? 'min-h-[12rem]' : 'max-h-[12rem] h-[12rem]'
+          )}
+        >
+          {renderJsonAsHtml(effectiveTab === 'input' ? operation.input : operation.output)}
+        </div>
+      ) : (
+        <textarea
+          readOnly
+          value={
+            effectiveTab === 'inputJson'
+              ? JSON.stringify(operation.input, null, 2)
+              : effectiveTab === 'outputJson'
+              ? JSON.stringify(operation.output, null, 2)
+              : operation.analysis || ''
+          }
+          className={cn(
+            'w-full p-3 text-xs font-mono bg-black text-white border-0 resize-y overflow-auto',
+            'focus:outline-none focus:ring-2 focus:ring-neon-cyan/50',
+            isExpanded ? 'h-auto' : 'max-h-[12rem]'
+          )}
+          style={isExpanded ? { height: 'auto', minHeight: '12rem' } : { height: '12rem' }}
+        />
+      )}
     </div>
   );
 };
@@ -148,7 +353,7 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap max-h-[5rem] overflow-y-auto', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>

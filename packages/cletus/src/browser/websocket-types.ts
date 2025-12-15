@@ -12,7 +12,7 @@ export type ClientMessage =
   | { type: 'init_chat'; data: { chatId: string } }
   | { type: 'send_message'; data: { chatId: string; content: Message['content'] } }
   | { type: 'cancel'; data?: never }
-  | { type: 'update_chat_meta'; data: { chatId: string; updates: Partial<ChatMeta> } }
+  | { type: 'update_chat_meta'; data: { chatId: string; updates: Partial<ChatMeta>; cwd?: string } }
   | { type: 'add_todo'; data: { chatId: string; todo: string } }
   | { type: 'toggle_todo'; data: { chatId: string; index: number } }
   | { type: 'remove_todo'; data: { chatId: string; index: number } }
@@ -34,7 +34,7 @@ export type ServerMessage =
   | { type: 'pending_update'; data: { pending: Message } }
   | { type: 'messages_updated'; data: { messages: Message[] } }
   | { type: 'response_complete'; data: { message: Message } }
-  | { type: 'chat_updated'; data: { chat?: ChatMeta } }
+  | { type: 'chat_updated'; data: { chat?: ChatMeta; cwd?: string } }
   | { type: 'models'; data: { models: any[] } }
   | { type: 'status_update'; data: { status: string } }
   | { type: 'usage_update'; data: { accumulated: any; accumulatedCost: number; current: any } }
