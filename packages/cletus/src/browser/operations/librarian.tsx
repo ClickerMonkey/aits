@@ -1,51 +1,61 @@
 import React from 'react';
 import { Operation } from '../../schemas';
-import { getStatusInfo, getElapsedTime } from './render';
-import { cn } from '../lib/utils';
-
-interface OperationRendererProps {
-  operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
-}
+import { abbreviate } from '../../shared';
+import { BaseOperationDisplay } from './BaseOperationDisplay';
+import { OperationRendererProps } from './types';
 
 function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | null) {
-  return ({ operation }: OperationRendererProps) => {
-    const { color: statusColor, label: statusLabel } = getStatusInfo(operation.status);
-    const elapsed = getElapsedTime(operation);
+  return (props: OperationRendererProps) => {
+    const { operation } = props;
+    const label = getLabel(operation);
     const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
 
     return (
-      <div className="mb-3 border border-purple-400/30 rounded-lg p-3 bg-purple-400/5">
-        <div className="flex items-center gap-2 mb-2">
-          <span className={cn('text-lg', statusColor)}>●</span>
-          <span className="font-mono text-sm text-purple-400">{getLabel(operation)}</span>
-          <span className="text-xs text-muted-foreground">[{statusLabel}]</span>
-          {elapsed && <span className="text-xs text-muted-foreground">({elapsed})</span>}
-        </div>
-        {summary && (
-          <div className={cn('ml-6 text-sm', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
-            → {summary}
-          </div>
-        )}
-      </div>
+      <BaseOperationDisplay
+        {...props}
+        label={label}
+        summary={summary}
+        borderColor="border-purple-400/30"
+        bgColor="bg-purple-400/5"
+        labelColor="text-purple-400"
+      />
     );
   };
 }
 
 export const knowledge_search = createRenderer(
-  (op) => `KnowledgeSearch("${op.input.query}")`,
-  (op) => op.output?.results?.length ? `Found ${op.output.results.length} result${op.output.results.length !== 1 ? 's' : ''}` : null
+  (op) => `KnowledgeSearch("${abbreviate(op.input.query, 25)}")`,
+  (op) => {
+    if (op.output) {
+      const count = op.output.results.length;
+      return `Found ${count} result${count !== 1 ? 's' : ''}`;
+    }
+    return null;
+  }
 );
 
-export const knowledge_sources = createRenderer((op) => 'KnowledgeSources()');
+export const knowledge_sources = createRenderer(
+  (op) => 'KnowledgeSources()',
+  (op) => {
+    if (op.output) {
+      const count = op.output.sources.length;
+      return `Listed ${count} source${count !== 1 ? 's' : ''}`;
+    }
+    return null;
+  }
+);
 
 export const knowledge_add = createRenderer(
-  (op) => `KnowledgeAdd("${op.input.source}")`,
-  (op) => op.output?.added ? `Added ${op.output.added} entr${op.output.added !== 1 ? 'ies' : 'y'}` : null
+  (op) => `KnowledgeAdd("${abbreviate(op.input.text, 30)}")`,
+  (op) => op.output?.added ? `Added: "${abbreviate(op.input.text, 50)}"` : null
 );
 
 export const knowledge_delete = createRenderer(
-  (op) => `KnowledgeDelete("${op.input.source}")`,
-  (op) => op.output?.deleted ? `Deleted ${op.output.deleted} entr${op.output.deleted !== 1 ? 'ies' : 'y'}` : null
+  (op) => `KnowledgeDelete("${op.input.sourcePattern}")`,
+  (op) => {
+    if (op.output) {
+      return `Deleted ${op.output.deletedCount} entr${op.output.deletedCount !== 1 ? 'ies' : 'y'}`;
+    }
+    return null;
+  }
 );

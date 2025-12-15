@@ -8,9 +8,21 @@ import type { Message } from '../../schemas';
 
 interface MessageItemProps {
   message: Message;
+  operationDecisions?: Map<number, 'approve' | 'reject'>;
+  onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
+  onApproveOperation?: (message: Message, idx: number) => void;
+  onRejectOperation?: (message: Message, idx: number) => void;
+  hasMultiplePendingOps?: boolean;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({
+  message,
+  operationDecisions,
+  onToggleOperationDecision,
+  onApproveOperation,
+  onRejectOperation,
+  hasMultiplePendingOps = false,
+}) => {
   const { role, name, content, operations = [] } = message;
 
   const isUser = role === 'user';
@@ -67,11 +79,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
         <div className={cn('flex-1 space-y-2', isUser && 'flex flex-col items-end')}>
           {visibleContent.map((item, index) => {
             // Render operation if this content item has an operation
-            if (item.operation) {
+            if (item.operation && item.operationIndex !== undefined) {
+              const opIdx = item.operationIndex;
+              const needsApproval = item.operation.status === 'analyzed';
+
               return (
                 <OperationDisplay
                   key={index}
                   operation={item.operation}
+                  operationIndex={opIdx}
+                  approvalDecision={operationDecisions?.get(opIdx)}
+                  onToggleDecision={needsApproval && hasMultiplePendingOps ? onToggleOperationDecision : undefined}
+                  onApprove={needsApproval && !hasMultiplePendingOps && onApproveOperation ? (idx) => onApproveOperation(message, idx) : undefined}
+                  onReject={needsApproval && !hasMultiplePendingOps && onRejectOperation ? (idx) => onRejectOperation(message, idx) : undefined}
+                  hasMultipleOperations={hasMultiplePendingOps}
                 />
               );
             }

@@ -45,13 +45,19 @@ const OperationRenderers: Partial<Record<OperationKind, React.FC<{
 
 interface OperationDisplayProps {
   operation: Operation;
+  operationIndex?: number;
+  onApprove?: (index: number) => void;
+  onReject?: (index: number) => void;
+  approvalDecision?: 'approve' | 'reject';
+  onToggleDecision?: (index: number, decision: 'approve' | 'reject') => void;
+  hasMultipleOperations?: boolean;
 }
 
 /**
  * Main operation display component that delegates to specific renderers
  */
 export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => {
-  const Renderer = OperationRenderers[props.operation.type as OperationKind];
+  const Renderer = OperationRenderers[props.operation.type as OperationKind] as any;
 
   if (Renderer) {
     return <Renderer {...props} />;

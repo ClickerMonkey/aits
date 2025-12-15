@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { Operation } from '../../schemas';
 import { cn } from '../lib/utils';
 import { getStatusInfo, getElapsedTime } from './render';
+import { Button } from '../components/ui/button';
 
 /**
  * Checks if an array can be rendered as a table
  */
 const canRenderAsTable = (data: any[]): boolean => {
-  if (data.length === 0) return false;
+  if (data.length <= 1) return false;
 
   // All items must be objects
   if (!data.every(item => item && typeof item === 'object' && !Array.isArray(item))) {
@@ -317,6 +319,12 @@ interface BaseOperationDisplayProps {
   bgColor?: string;
   labelColor?: string;
   message?: { cost?: number; usage?: any };
+  operationIndex?: number;
+  onApprove?: (index: number) => void;
+  onReject?: (index: number) => void;
+  approvalDecision?: 'approve' | 'reject';
+  onToggleDecision?: (index: number, decision: 'approve' | 'reject') => void;
+  hasMultipleOperations?: boolean;
 }
 
 /**
@@ -330,6 +338,12 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
   bgColor = 'bg-card/50',
   labelColor = 'text-foreground',
   message,
+  operationIndex,
+  onApprove,
+  onReject,
+  approvalDecision,
+  onToggleDecision,
+  hasMultipleOperations = false,
 }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { color: statusColor, label: statusLabel } = getStatusInfo(operation.status);
@@ -338,8 +352,23 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
   // Determine summary to display
   const displaySummary = operation.error ? operation.error : summary;
 
+  const needsApproval = operation.status === 'analyzed';
+
+  // Debug logging
+  if (needsApproval) {
+    console.log('Operation needs approval:', {
+      label,
+      operationIndex,
+      hasMultipleOperations,
+      hasOnApprove: !!onApprove,
+      hasOnReject: !!onReject,
+      hasOnToggle: !!onToggleDecision,
+      status: operation.status,
+    });
+  }
+
   return (
-    <div className={cn('mb-3 rounded-lg p-3', bgColor)}>
+    <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border border-yellow-500/30' : bgColor)}>
       {/* Header - Clickable */}
       <div
         className="flex items-center gap-2 mb-2 cursor-pointer hover:opacity-80 transition-opacity"
@@ -368,6 +397,67 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
             </>
           ) : (
             displaySummary
+          )}
+        </div>
+      )}
+
+      {/* Approval Buttons */}
+      {needsApproval && operationIndex !== undefined && (
+        <div className="ml-6 mb-2">
+          {!hasMultipleOperations && onApprove && onReject ? (
+            // Single operation: immediate approve/reject
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onApprove(operationIndex)}
+                className="bg-green-500/10 text-green-400 border-green-400/30 hover:bg-green-400/20"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Approve
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onReject(operationIndex)}
+                className="bg-red-500/10 text-red-400 border-red-400/30 hover:bg-red-400/20"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Reject
+              </Button>
+            </div>
+          ) : (
+            // Multiple operations: toggle buttons
+            onToggleDecision && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleDecision(operationIndex, 'approve')}
+                  className={cn(
+                    approvalDecision === 'approve'
+                      ? 'bg-green-500/20 text-green-400 border-green-400 hover:bg-green-500/30'
+                      : 'text-green-400/50 border-green-400/30 hover:bg-green-400/10'
+                  )}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Approve
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleDecision(operationIndex, 'reject')}
+                  className={cn(
+                    approvalDecision === 'reject'
+                      ? 'bg-red-500/20 text-red-400 border-red-400 hover:bg-red-500/30'
+                      : 'text-red-400/50 border-red-400/30 hover:bg-red-400/10'
+                  )}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              </div>
+            )
           )}
         </div>
       )}

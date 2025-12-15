@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X } from 'lucide-react';
+import { Send, Loader2, X, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import type { ChatMeta, MessageContent, Config } from '../../schemas';
@@ -25,16 +25,36 @@ interface ChatInputProps {
   config: Config;
   messageCount: number;
   totalCost: number;
-  onMessageSent: () => void;
-  onWebSocketMessage?: (message: ServerMessage) => void;
+  status: string;
+  isProcessing: boolean;
+  onSendMessage: (content: MessageContent[]) => void;
+  onCancel: () => void;
+  onModelClick?: () => void;
+  hasMultiplePendingOperations?: boolean;
+  allOperationsDecided?: boolean;
+  onApproveAll?: () => void;
+  onRejectAll?: () => void;
+  onSubmitDecisions?: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, messageCount, totalCost, onMessageSent, onWebSocketMessage }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  chatId,
+  chatMeta,
+  config,
+  messageCount,
+  totalCost,
+  status,
+  isProcessing,
+  onSendMessage,
+  onCancel,
+  onModelClick,
+  hasMultiplePendingOperations = false,
+  allOperationsDecided = false,
+  onApproveAll,
+  onRejectAll,
+  onSubmitDecisions,
+}) => {
   const [input, setInput] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [status, setStatus] = useState('');
-  const wsRef = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea as content changes
@@ -46,73 +66,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
     }
   }, [input]);
 
-  useEffect(() => {
-    // Connect WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
-
-    ws.onopen = () => {
-      setIsConnecting(false);
-      // Initialize chat
-      sendClientMessage(ws, {
-        type: 'init_chat',
-        data: { chatId },
-      });
-    };
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data) as ServerMessage;
-
-      // Forward all messages to parent for handling
-      if (onWebSocketMessage) {
-        onWebSocketMessage(message);
-      }
-
-      switch (message.type) {
-        case 'chat_initialized':
-          console.log('Chat initialized');
-          break;
-
-        case 'status_update':
-          setStatus(message.data.status);
-          break;
-
-        case 'response_complete':
-          setIsProcessing(false);
-          setStatus('');
-          break;
-
-        case 'error':
-          console.error('WebSocket error:', message.data.message);
-          setIsProcessing(false);
-          setStatus('Error: ' + message.data.message);
-          break;
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setIsConnecting(false);
-      setIsProcessing(false);
-    };
-
-    ws.onclose = () => {
-      setIsConnecting(false);
-      setIsProcessing(false);
-    };
-
-    wsRef.current = ws;
-    setIsConnecting(true);
-
-    return () => {
-      ws.close();
-    };
-  }, [chatId]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() || isProcessing || !wsRef.current) {
+    if (!input.trim() || isProcessing) {
       return;
     }
 
@@ -122,30 +79,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
       content: input.trim(),
     }];
 
-    sendClientMessage(wsRef.current, {
-      type: 'send_message',
-      data: { chatId, content },
-    });
-
+    onSendMessage(content);
     setInput('');
-    setIsProcessing(true);
-    setStatus('Processing...');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
-    }
-  };
-
-  const handleCancel = () => {
-    if (wsRef.current && isProcessing) {
-      sendClientMessage(wsRef.current, {
-        type: 'cancel',
-      });
-      setIsProcessing(false);
-      setStatus('');
     }
   };
 
@@ -165,13 +106,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            isConnecting
-              ? 'Connecting...'
-              : isProcessing
+            isProcessing
               ? 'Processing...'
               : 'Type your message... (Enter to send, Shift+Enter for new line)'
           }
-          disabled={isConnecting || isProcessing}
+          disabled={isProcessing}
           className="min-h-[100px] max-h-[50vh] resize-none overflow-y-auto"
           style={{ height: 'auto' }}
         />
@@ -181,7 +120,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
               {chatMeta.mode}
             </span>
             <span className="text-muted-foreground">│</span>
-            <span className="text-foreground">{chatMeta.model || config.user.models?.chat || 'no model'}</span>
+            <span
+              className="text-foreground cursor-pointer hover:text-neon-cyan transition-colors"
+              onClick={onModelClick}
+              title="Click to change model"
+            >
+              {chatMeta.model || config.user.models?.chat || 'no model'}
+            </span>
             {chatMeta.assistant && (
               <>
                 <span className="text-muted-foreground">│</span>
@@ -206,11 +151,46 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
             )}
           </div>
           <div className="flex items-center gap-2 ml-2">
+            {/* Operation Approval Buttons */}
+            {hasMultiplePendingOperations && onApproveAll && onRejectAll && onSubmitDecisions && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onApproveAll}
+                  className="text-green-400 border-green-400/30 hover:bg-green-400/10"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                  Approve All
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onRejectAll}
+                  className="text-red-400 border-red-400/30 hover:bg-red-400/10"
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Reject All
+                </Button>
+                <Button
+                  type="button"
+                  variant="neon"
+                  size="sm"
+                  onClick={onSubmitDecisions}
+                  disabled={!allOperationsDecided}
+                >
+                  Submit
+                </Button>
+              </>
+            )}
+
             {isProcessing && (
               <Button
                 type="button"
                 variant="destructive"
-                onClick={handleCancel}
+                onClick={onCancel}
                 className="gap-2"
               >
                 <X className="w-4 h-4" />
@@ -220,7 +200,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatId, chatMeta, config, 
             <Button
               type="submit"
               variant="neon"
-              disabled={!input.trim() || isProcessing || isConnecting}
+              disabled={!input.trim() || isProcessing}
               className="gap-2"
             >
               {isProcessing ? (

@@ -40,15 +40,21 @@ export function getElapsedTime(op: Operation): string {
 
 interface OperationDisplayProps {
   operation: Operation;
+  operationIndex?: number;
+  onApprove?: (index: number) => void;
+  onReject?: (index: number) => void;
+  approvalDecision?: 'approve' | 'reject';
+  onToggleDecision?: (index: number, decision: 'approve' | 'reject') => void;
+  hasMultipleOperations?: boolean;
 }
 
 /**
  * Default operation renderer - delegates to BaseOperationDisplay
  */
-export const OperationDisplay: React.FC<OperationDisplayProps> = ({ operation }) => (
+export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => (
   <BaseOperationDisplay
-    operation={operation}
-    label={operation.type}
-    summary={operation.analysis}
+    {...props}
+    label={props.operation.type}
+    summary={props.operation.analysis}
   />
 );

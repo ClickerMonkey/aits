@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Settings, CheckSquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Settings, Trash2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { ChatMeta, ChatMode, Config, Message, MessageContent } from '../../schemas';
+import { AgentModeSelector } from '../components/AgentModeSelector';
+import { AssistantSelector } from '../components/AssistantSelector';
+import { ChatInput } from '../components/ChatInput';
+import { ChatSettingsDialog } from '../components/ChatSettingsDialog';
+import { CommandsPanel } from '../components/CommandsPanel';
+import { MessageList } from '../components/MessageList';
+import { ModelSelector } from '../components/ModelSelector';
+import { ModeSelector } from '../components/ModeSelector';
+import { TodosModal } from '../components/TodosModal';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
-import { MessageList } from '../components/MessageList';
-import { ChatInput } from '../components/ChatInput';
-import { ModeSelector } from '../components/ModeSelector';
-import { AgentModeSelector } from '../components/AgentModeSelector';
-import { AssistantSelector } from '../components/AssistantSelector';
-import { ModelSelector } from '../components/ModelSelector';
-import { CommandsPanel } from '../components/CommandsPanel';
-import { ChatSettingsDialog } from '../components/ChatSettingsDialog';
-import { TodosModal } from '../components/TodosModal';
-import { OperationApprovalPanel } from '../components/OperationApprovalPanel';
-import type { Message, Config, ChatMeta, ChatMode } from '../../schemas';
 import type { ClientMessage, ServerMessage } from '../websocket-types';
 import { sendClientMessage } from '../websocket-types';
 
@@ -37,8 +36,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [totalCost, setTotalCost] = useState(0);
+  const [operationDecisions, setOperationDecisions] = useState<Map<number, 'approve' | 'reject'>>(new Map());
   const [chatMetaState, setChatMetaState] = useState<ChatMeta | null>(null);
   const [cwd, setCwd] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
@@ -113,6 +115,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
 
       case 'response_complete':
         setPendingMessage(null);
+        setIsProcessing(false);
+        setStatus('');
         if (message.data.message) {
           setMessages(prev => [...prev, message.data.message]);
         }
@@ -135,7 +139,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
         break;
 
       case 'status_update':
-        // Status updates can be handled here if needed
+        setStatus(message.data.status);
         break;
 
       case 'elapsed_update':
@@ -156,6 +160,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
 
       case 'error':
         console.error('Server error:', message.data.message);
+        setIsProcessing(false);
+        setStatus('Error: ' + message.data.message);
         // Reject the pending models promise if one exists
         if (modelsResolverRef.current) {
           modelsResolverRef.current.reject(new Error(message.data.message));
@@ -175,6 +181,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
     } else {
       console.error('WebSocket not connected');
     }
+  };
+
+  const handleSendMessage = (content: MessageContent[]) => {
+    send({
+      type: 'send_message',
+      data: { chatId, content },
+    });
+    setIsProcessing(true);
+    setStatus('Processing...');
+  };
+
+  const handleCancel = () => {
+    send({ type: 'cancel' });
+    setIsProcessing(false);
+    setStatus('');
   };
 
   const handleModeChange = (mode: ChatMode) => {
@@ -297,11 +318,70 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
         rejected,
       },
     });
+    setOperationDecisions(new Map()); // Clear decisions after submission
+  };
+
+  const handleToggleOperationDecision = (idx: number, decision: 'approve' | 'reject') => {
+    const newDecisions = new Map(operationDecisions);
+    newDecisions.set(idx, decision);
+    setOperationDecisions(newDecisions);
+  };
+
+  const handleApproveAllOperations = () => {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.role !== 'assistant') return;
+
+    const approvableOps = (lastMessage.operations || [])
+      .map((op, idx) => ({ op, idx }))
+      .filter(({ op }) => op.status === 'analyzed');
+
+    const approved = approvableOps.map(({ idx }) => idx);
+    handleOperationApproval(lastMessage, approved, []);
+  };
+
+  const handleRejectAllOperations = () => {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.role !== 'assistant') return;
+
+    const approvableOps = (lastMessage.operations || [])
+      .map((op, idx) => ({ op, idx }))
+      .filter(({ op }) => op.status === 'analyzed');
+
+    const rejected = approvableOps.map(({ idx }) => idx);
+    handleOperationApproval(lastMessage, [], rejected);
+  };
+
+  const handleSubmitOperationDecisions = () => {
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.role !== 'assistant') return;
+
+    const approvableOps = (lastMessage.operations || [])
+      .map((op, idx) => ({ op, idx }))
+      .filter(({ op }) => op.status === 'analyzed');
+
+    const approved: number[] = [];
+    const rejected: number[] = [];
+
+    approvableOps.forEach(({ idx }) => {
+      const decision = operationDecisions.get(idx);
+      if (decision === 'approve') {
+        approved.push(idx);
+      } else if (decision === 'reject') {
+        rejected.push(idx);
+      }
+    });
+
+    handleOperationApproval(lastMessage, approved, rejected);
   };
 
   // Check if there are any messages with operations needing approval
-  const hasOperationsNeedingApproval = messages.some(msg =>
-    msg.operations?.some(op => op.status === 'analyzed')
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const lastMessagePendingOps = lastMessage?.role === 'assistant'
+    ? (lastMessage.operations || []).filter(op => op.status === 'analyzed')
+    : [];
+  const hasMultiplePendingOps = lastMessagePendingOps.length > 1;
+  const allOperationsDecided = lastMessagePendingOps.every((_op, idx) =>
+    operationDecisions.has(idx)
   );
 
   if (!chatMeta) {
@@ -425,21 +505,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
             <ScrollArea className="flex-1 p-6">
               <MessageList
                 messages={pendingMessage ? [...messages, pendingMessage] : messages}
+                operationDecisions={operationDecisions}
+                onToggleOperationDecision={handleToggleOperationDecision}
+                onApproveOperation={(msg, idx) => handleOperationApproval(msg, [idx], [])}
+                onRejectOperation={(msg, idx) => handleOperationApproval(msg, [], [idx])}
               />
-
-              {/* Show approval panels for messages with operations needing approval */}
-              {messages.map(msg => {
-                const needsApproval = msg.operations?.some(op => op.status === 'analyzed');
-                if (!needsApproval) return null;
-
-                return (
-                  <OperationApprovalPanel
-                    key={msg.created}
-                    message={msg}
-                    onApproveReject={(approved, rejected) => handleOperationApproval(msg, approved, rejected)}
-                  />
-                );
-              })}
             </ScrollArea>
 
             {/* Input Area */}
@@ -450,8 +520,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
                 config={config}
                 messageCount={messages.length}
                 totalCost={totalCost}
-                onMessageSent={handleMessagesUpdate}
-                onWebSocketMessage={handleServerMessage}
+                status={status}
+                isProcessing={isProcessing}
+                onSendMessage={handleSendMessage}
+                onCancel={handleCancel}
+                onModelClick={() => setShowModelSelector(true)}
+                hasMultiplePendingOperations={hasMultiplePendingOps}
+                allOperationsDecided={allOperationsDecided}
+                onApproveAll={handleApproveAllOperations}
+                onRejectAll={handleRejectAllOperations}
+                onSubmitDecisions={handleSubmitOperationDecisions}
               />
             </div>
           </>

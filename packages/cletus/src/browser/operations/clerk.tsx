@@ -1,42 +1,39 @@
 import React from 'react';
 import { Operation } from '../../schemas';
 import { BaseOperationDisplay } from './BaseOperationDisplay';
+import { OperationRendererProps } from './types';
 import { cn } from '../lib/utils';
 
-interface OperationRendererProps {
-  operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
-}
-
-export const file_search: React.FC<OperationRendererProps> = ({ operation }) => {
+export const file_search: React.FC<OperationRendererProps> = (props) => {
+  const { operation } = props;
   const summary = operation.output?.count !== undefined
     ? `Found ${operation.output.count} file${operation.output.count !== 1 ? 's' : ''}`
     : operation.analysis;
-  return <BaseOperationDisplay operation={operation} label={`Files("${operation.input.glob}")`} summary={summary} />;
+  return <BaseOperationDisplay {...props} label={`Files("${operation.input.glob}")`} summary={summary} />;
 };
 
-export const file_summary: React.FC<OperationRendererProps> = ({ operation }) => (
-  <BaseOperationDisplay operation={operation} label={`Summary("${operation.input.path}")`} summary={operation.output?.summary || operation.analysis} />
+export const file_summary: React.FC<OperationRendererProps> = (props) => (
+  <BaseOperationDisplay {...props} label={`Summary("${props.operation.input.path}")`} summary={props.operation.output?.summary || props.operation.analysis} />
 );
 
-export const file_index: React.FC<OperationRendererProps> = ({ operation }) => {
+export const file_index: React.FC<OperationRendererProps> = (props) => {
+  const { operation } = props;
   const summary = operation.output?.indexed !== undefined
     ? `Indexed ${operation.output.indexed} file${operation.output.indexed !== 1 ? 's' : ''}`
     : operation.analysis;
-  return <BaseOperationDisplay operation={operation} label={`Index("${operation.input.glob}")`} summary={summary} />;
+  return <BaseOperationDisplay {...props} label={`Index("${operation.input.glob}")`} summary={summary} />;
 };
 
-export const file_create: React.FC<OperationRendererProps> = ({ operation }) => (
-  <BaseOperationDisplay operation={operation} label={`Create("${operation.input.path}")`} summary={operation.output?.fullPath ? `Created ${operation.output.fullPath}` : operation.analysis} />
+export const file_create: React.FC<OperationRendererProps> = (props) => (
+  <BaseOperationDisplay {...props} label={`Create("${props.operation.input.path}")`} summary={props.operation.output?.fullPath ? `Created ${props.operation.output.fullPath}` : props.operation.analysis} />
 );
 
-export const file_copy: React.FC<OperationRendererProps> = ({ operation }) => (
-  <BaseOperationDisplay operation={operation} label={`Copy("${operation.input.from}" → "${operation.input.to}")`} summary={operation.output?.fullPath ? `Copied to ${operation.output.fullPath}` : operation.analysis} />
+export const file_copy: React.FC<OperationRendererProps> = (props) => (
+  <BaseOperationDisplay {...props} label={`Copy("${props.operation.input.from}" → "${props.operation.input.to}")`} summary={props.operation.output?.fullPath ? `Copied to ${props.operation.output.fullPath}` : props.operation.analysis} />
 );
 
-export const file_move: React.FC<OperationRendererProps> = ({ operation }) => (
-  <BaseOperationDisplay operation={operation} label={`Move("${operation.input.from}" → "${operation.input.to}")`} summary={operation.output?.fullPath ? `Moved to ${operation.output.fullPath}` : operation.analysis} />
+export const file_move: React.FC<OperationRendererProps> = (props) => (
+  <BaseOperationDisplay {...props} label={`Move("${props.operation.input.from}" → "${props.operation.input.to}")`} summary={props.operation.output?.fullPath ? `Moved to ${props.operation.output.fullPath}` : props.operation.analysis} />
 );
 
 export const file_stats: React.FC<OperationRendererProps> = ({ operation }) => {

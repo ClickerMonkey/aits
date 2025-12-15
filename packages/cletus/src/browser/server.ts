@@ -11,7 +11,7 @@ import type { ClientMessage, ServerMessage } from './websocket-types';
 import { OperationManager } from '../operations/manager';
 import { CletusAI, createCletusAI } from '../ai';
 import { CletusChatAgent, createChatAgent } from '../agents/chat-agent';
-import { runChatOrchestrator } from '../agents/chat-orchestrator';
+import { OrchestratorEvent, runChatOrchestrator } from '../agents/chat-orchestrator';
 
 const __serverFilename = fileURLToPath(import.meta.url);
 const __serverDirname = path.dirname(__serverFilename);
@@ -129,6 +129,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
   let ai: CletusAI | null = null;
   let chatAgent: CletusChatAgent | null = null;
   let abortController: AbortController | null = null;
+  let configUpdateQueue: Promise<void> = Promise.resolve();
 
   // Type-safe message sender
   const sendMessage = (message: ServerMessage) => {
@@ -203,6 +204,33 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     }
   };
 
+  // Helper to serialize config update operations
+  const withConfigUpdate = async <T>(fn: (config: ConfigFile) => Promise<T>) => {
+    // Queue this update to run after previous updates complete
+    const previousQueue = configUpdateQueue;
+
+    let resolveUpdate: () => void;
+    configUpdateQueue = new Promise<void>(resolve => {
+      resolveUpdate = resolve;
+    });
+
+    try {
+      // Wait for previous updates to complete
+      await previousQueue;
+
+      // Reload config to get latest state
+      if (config) {
+        await config.load();
+      }
+
+      // Run the update
+      return await withConfig(fn);
+    } finally {
+      // Mark this update as complete
+      resolveUpdate!();
+    }
+  };
+
   const withChatFile = async <T>(chatId: string, fn: (chatFile: ChatFile, chat: ChatMeta, config: ConfigFile) => T) => {
     return await withConfig(async (config) => {
       let chatFile: ChatFile;
@@ -228,6 +256,64 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     });
   };
 
+  const handleOrchestratorEvent = (event: OrchestratorEvent, chatFile: ChatFile) => {
+    // Handle orchestrator events
+    switch (event.type) {
+      case 'pendingUpdate':
+        sendMessage({
+          type: 'pending_update',
+          data: { pending: event.pending },
+        });
+        break;
+      case 'update':
+        fireAndForget(chatFile.updateMessage(event.message));
+        sendMessage({
+          type: 'message_updated',
+          data: { message: event.message },
+        });
+        break;
+      case 'status':
+        sendMessage({
+          type: 'status_update',
+          data: { status: event.status },
+        });
+        break;
+      case 'usage':
+        sendMessage({
+          type: 'usage_update',
+          data: {
+            accumulated: event.accumulated,
+            accumulatedCost: event.accumulatedCost,
+            current: event.current,
+          },
+        });
+        break;
+      case 'elapsed':
+        sendMessage({
+          type: 'elapsed_update',
+          data: { ms: event.ms },
+        });
+        break;
+      case 'complete':
+        // Add the complete message to chat file (like CLI does)
+        if (event.message.content.length > 0) {
+          fireAndForget(chatFile.addMessage(event.message))
+        }
+        // Send the complete message
+        sendMessage({
+          type: 'response_complete',
+          data: { message: event.message },
+        });
+        break;
+      case 'error':
+        sendMessage({
+          type: 'error',
+          data: { message: event.error },
+        });
+        break;
+    }
+  };
+
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString()) as ClientMessage;
@@ -246,7 +332,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
         case 'create_chat': {
           const { name } = message.data;
-          await withConfig(async (config) => {
+          await withConfigUpdate(async (config) => {
 
             // Generate chat ID and create new chat
             const now = Date.now();
@@ -348,13 +434,6 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             // Ensure AI and chat agent are loaded
             const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
 
-            const chatStatus = (status: string) => {
-              sendMessage({
-                type: 'status_update',
-                data: { status },
-              });
-            };
-
             const clearUsage = () => {
               const defaultContext = aiInstance.config.defaultContext;
               if (defaultContext && defaultContext.usage) {
@@ -384,62 +463,11 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               clearUsage,
               getUsage,
             }, (event) => {
-              // Handle orchestrator events
-              switch (event.type) {
-                case 'pendingUpdate':
-                  sendMessage({
-                    type: 'pending_update',
-                    data: { pending: event.pending },
-                  });
-                  break;
-                case 'update':
-                  fireAndForget(chatFile.updateMessage(event.message));
-                  sendMessage({
-                    type: 'message_updated',
-                    data: { message: event.message },
-                  });
-                  break;
-                case 'status':
-                  chatStatus(event.status);
-                  break;
-                case 'usage':
-                  sendMessage({
-                    type: 'usage_update',
-                    data: {
-                      accumulated: event.accumulated,
-                      accumulatedCost: event.accumulatedCost,
-                      current: event.current,
-                    },
-                  });
-                  break;
-                case 'elapsed':
-                  sendMessage({
-                    type: 'elapsed_update',
-                    data: { ms: event.ms },
-                  });
-                  break;
-                case 'complete':
-                  // Add the complete message to chat file (like CLI does)
-                  if (event.message.content.length > 0) {
-                    fireAndForget(chatFile.addMessage(event.message))
-                  }
-                  // Send the complete message
-                  sendMessage({
-                    type: 'response_complete',
-                    data: { message: event.message },
-                  });
-                  break;
-                case 'error':
-                  sendMessage({
-                    type: 'error',
-                    data: { message: event.error },
-                  });
-                  break;
-              }
+              handleOrchestratorEvent(event, chatFile);
+            }).then(() => {
+              // Clear abort controller
+              abortController = null;
             });
-
-            // Clear abort controller
-            abortController = null;
           });
           break;
         }
@@ -470,7 +498,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
         case 'update_chat_meta': {
           const { chatId, updates, cwd } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
 
             await config.updateChat(chatId, updates);
             const updatedChat = config.getChats().find(c => c.id === chatId);
@@ -495,7 +523,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'add_todo': {
           const { chatId, todo } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
             const chat = config.getChats().find(c => c.id === chatId);
             if (chat) {
               chat.todos.push({ id: Math.random().toString(36).substring(7), name: todo, done: false });
@@ -511,7 +539,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'toggle_todo': {
           const { chatId, index } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
             const chat = config.getChats().find(c => c.id === chatId);
             if (chat && chat.todos[index]) {
               chat.todos[index].done = !chat.todos[index].done;
@@ -527,7 +555,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'remove_todo': {
           const { chatId, index } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
             const chat = config.getChats().find(c => c.id === chatId);
             if (chat && chat.todos[index] !== undefined) {
               chat.todos.splice(index, 1);
@@ -543,7 +571,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'clear_todos': {
           const { chatId } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
             await config.updateChat(chatId, { todos: [] });
             const updatedChat = config.getChats().find(c => c.id === chatId);
             sendMessage({
@@ -568,7 +596,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'delete_chat': {
           const { chatId } = message.data;
-          withConfig(async (config) => {
+          withConfigUpdate(async (config) => {
             await config.deleteChat(chatId);
             removeChat(chatId); // Remove from cache
             sendMessage({
@@ -580,10 +608,10 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         }
         case 'handle_operations': {
           const { chatId, messageCreated, approved, rejected } = message.data;
-          withChatFile(chatId, async (chatFile, chatMeta) => {
+          withChatFile(chatId, async (chatFile, chatMeta, config) => {
             const messages = chatFile.getMessages();
             const targetMessage = messages.find(m => m.created === messageCreated);
-          
+
             if (!targetMessage || !targetMessage.operations) {
               sendMessage({
                 type: 'error',
@@ -603,10 +631,13 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               }
             }
 
+            // Ensure AI and chat agent are loaded
+            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
+
             // Execute approved operations
+            let hasExecutedOperations = false;
             if (approved.length > 0) {
-              const { ai } = await ensureAI();
-              const ctx = await ai.buildContext({
+              const ctx = await aiInstance.buildContext({
                 chat: chatMeta,
                 chatData: chatFile,
                 chatMessage: targetMessage,
@@ -615,6 +646,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               for (const idx of approved) {
                 if (operations[idx]) {
                   await manager.execute(operations[idx], true, ctx);
+                  hasExecutedOperations = true;
                 }
               }
             }
@@ -629,6 +661,50 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               type: 'message_updated',
               data: { message: targetMessage },
             });
+
+            // If operations were executed, continue with the orchestrator
+            if (hasExecutedOperations) {
+              // Process AI response
+              abortController = new AbortController();
+
+              // Clear usage before running orchestrator
+              const clearUsage = () => {
+                const defaultContext = aiInstance.config.defaultContext;
+                if (defaultContext && defaultContext.usage) {
+                  defaultContext.usage.accumulated = {};
+                  defaultContext.usage.accumulatedCost = 0;
+                }
+              };
+
+              // Get current usage
+              const getUsage = () => {
+                const defaultContext = aiInstance.config.defaultContext;
+                if (defaultContext && defaultContext.usage) {
+                  return {
+                    accumulated: defaultContext.usage.accumulated,
+                    accumulatedCost: defaultContext.usage.accumulatedCost,
+                  };
+                }
+                return { accumulated: {}, accumulatedCost: 0 };
+              };
+
+              // Run orchestrator with updated chat file
+              await runChatOrchestrator({
+                chatAgent: chatAgentInstance,
+                messages: chatFile.getMessages(),
+                chatMeta: chatMeta,
+                config,
+                chatData: chatFile,
+                signal: abortController?.signal,
+                clearUsage,
+                getUsage,
+              }, (event) => {
+                handleOrchestratorEvent(event, chatFile);
+              }).then(() => {
+                // Clear abort controller
+                abortController = null;
+              });
+            }
           });
           break;
         }

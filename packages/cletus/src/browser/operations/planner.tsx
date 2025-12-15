@@ -1,43 +1,112 @@
 import React from 'react';
 import { Operation } from '../../schemas';
-import { getStatusInfo, getElapsedTime } from './render';
-import { cn } from '../lib/utils';
-
-interface OperationRendererProps {
-  operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
-}
+import { abbreviate } from '../../shared';
+import { BaseOperationDisplay } from './BaseOperationDisplay';
+import { OperationRendererProps } from './types';
 
 function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | null) {
-  return ({ operation, showInput = false, showOutput = false }: OperationRendererProps) => {
-    const { color: statusColor, label: statusLabel } = getStatusInfo(operation.status);
-    const elapsed = getElapsedTime(operation);
+  return (props: OperationRendererProps) => {
+    const { operation } = props;
     const label = getLabel(operation);
     const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
 
     return (
-      <div className="mb-3 border border-neon-purple/30 rounded-lg p-3 bg-neon-purple/5">
-        <div className="flex items-center gap-2 mb-2">
-          <span className={cn('text-lg', statusColor)}>●</span>
-          <span className="font-mono text-sm text-neon-purple">{label}</span>
-          <span className="text-xs text-muted-foreground">[{statusLabel}]</span>
-          {elapsed && <span className="text-xs text-muted-foreground">({elapsed})</span>}
-        </div>
-        {summary && (
-          <div className={cn('ml-6 text-sm', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
-            → {summary}
-          </div>
-        )}
-      </div>
+      <BaseOperationDisplay
+        {...props}
+        label={label}
+        summary={summary}
+        borderColor="border-neon-purple/30"
+        bgColor="bg-neon-purple/5"
+        labelColor="text-neon-purple"
+      />
     );
   };
 }
 
-export const todos_list = createRenderer((op) => 'TodosList()');
-export const todos_add = createRenderer((op) => `TodosAdd("${op.input.name}")`);
-export const todos_done = createRenderer((op) => `TodosDone("${op.input.id}")`);
-export const todos_get = createRenderer((op) => `TodosGet("${op.input.id}")`);
-export const todos_remove = createRenderer((op) => `TodosRemove("${op.input.id}")`);
-export const todos_replace = createRenderer((op) => 'TodosReplace()');
-export const todos_clear = createRenderer((op) => 'TodosClear()');
+// Helper to extract todo name from analysis
+function getTodoName(op: Operation): string | null {
+  if (!op.analysis) return null;
+  // Analysis format: 'This will mark todo "name" as done.'
+  const match = op.analysis.match(/todo "([^"]+)"/);
+  return match ? match[1] : null;
+}
+
+export const todos_list = createRenderer(
+  (op) => 'TodosList()',
+  (op) => {
+    if (op.output) {
+      const count = op.output.todos.length;
+      return `${count} todo${count !== 1 ? 's' : ''}`;
+    }
+    return null;
+  }
+);
+
+export const todos_add = createRenderer(
+  (op) => `TodosAdd("${abbreviate(op.input.name, 64)}")`,
+  (op) => {
+    if (op.output) {
+      return `Added: "${op.output.name}"`;
+    }
+    return null;
+  }
+);
+
+export const todos_done = createRenderer(
+  (op) => {
+    const todoName = getTodoName(op);
+    return todoName ? `TodosDone("${abbreviate(todoName, 64)}")` : `TodosDone("${abbreviate(op.input.id, 64)}")`;
+  },
+  (op) => {
+    if (op.output) {
+      return 'Marked todo as done';
+    }
+    return null;
+  }
+);
+
+export const todos_get = createRenderer(
+  (op) => {
+    const todoName = getTodoName(op);
+    return todoName ? `TodosGet("${abbreviate(todoName, 64)}")` : `TodosGet("${abbreviate(op.input.id, 64)}")`;
+  },
+  (op) => {
+    if (op.output) {
+      return op.output.todo ? `Found: "${op.output.todo.name}"` : 'Todo not found';
+    }
+    return null;
+  }
+);
+
+export const todos_remove = createRenderer(
+  (op) => {
+    const todoName = getTodoName(op);
+    return todoName ? `TodosRemove("${abbreviate(todoName, 64)}")` : `TodosRemove("${abbreviate(op.input.id, 64)}")`;
+  },
+  (op) => {
+    if (op.output) {
+      return 'Removed todo';
+    }
+    return null;
+  }
+);
+
+export const todos_replace = createRenderer(
+  (op) => `TodosReplace(${op.input.todos.length} todos)`,
+  (op) => {
+    if (op.output) {
+      return `Replaced with ${op.output.count} todo${op.output.count !== 1 ? 's' : ''}`;
+    }
+    return null;
+  }
+);
+
+export const todos_clear = createRenderer(
+  (op) => 'TodosClear()',
+  (op) => {
+    if (op.output) {
+      return 'All todos cleared';
+    }
+    return null;
+  }
+);

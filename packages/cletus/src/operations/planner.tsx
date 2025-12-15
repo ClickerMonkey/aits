@@ -106,7 +106,7 @@ export const todos_add = operationOf<{ name: string }, { id: string; name: strin
   ),
 });
 
-export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }>({
+export const todos_done = operationOf<{ id: string }, { id: string; done: boolean }, {}, { todoName: string }>({
   mode: 'update',
   signature: 'todos_done(id: string)',
   status: () => 'Marking todo as done',
@@ -124,6 +124,7 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
     return {
       analysis: `This will mark todo "${todo.name}" as done.`,
       doable: true,
+      cache: { todoName: todo.name },
     };
   },
   do: async ({ input }, { chat, config }) => {
@@ -145,28 +146,33 @@ export const todos_done = operationOf<{ id: string }, { id: string; done: boolea
 
     return { id: input.id, done: true };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `TodosDone(id: ${abbreviate(op.input.id, 8)})`,
-    (op) => {
-      if (op.output) {
-        return 'Marked todo as done';
-      }
-      return null;
-    },
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    const todoName = op.cache?.todoName || op.input.id;
+    return renderOperation(
+      op,
+      `TodosDone("${abbreviate(todoName, 64)}")`,
+      (op) => {
+        if (op.output) {
+          return 'Marked todo as done';
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
 });
 
-export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>({
+export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }, {}, { todoName: string }>({
   mode: 'local',
   signature: 'todos_get(id: string)',
   status: () => 'Getting todo details',
   analyze: async ({ input }, { chat, config }) => {
     const chatObject = config.getChats().find((c) => c.id === chat?.id);
+    const todo = chatObject?.todos.find((t) => t.id === input.id);
     return {
       analysis: `This will get details for todo with id "${input.id}"`,
       doable: !!chatObject,
+      cache: todo ? { todoName: todo.name } : undefined,
     };
   },
   do: async ({ input }, { chat, config }) => {
@@ -174,20 +180,23 @@ export const todos_get = operationOf<{ id: string }, { todo: TodoItem | null }>(
     const todo = chatObject?.todos.find((t) => t.id === input.id);
     return { todo: todo || null };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `TodosGet(id: ${abbreviate(op.input.id, 8)})`,
-    (op) => {
-      if (op.output) {
-        return op.output.todo ? `Found: "${op.output.todo.name}"` : 'Todo not found';
-      }
-      return null;
-    },
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    const todoName = op.cache?.todoName || op.input.id;
+    return renderOperation(
+      op,
+      `TodosGet("${abbreviate(todoName, 64)}")`,
+      (op) => {
+        if (op.output) {
+          return op.output.todo ? `Found: "${abbreviate(op.output.todo.name, 64)}"` : 'Todo not found';
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
 });
 
-export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }>({
+export const todos_remove = operationOf<{ id: string }, { id: string; removed: boolean }, {}, { todoName: string }>({
   mode: 'delete',
   signature: 'todos_remove(id: string)',
   status: () => 'Removing todo',
@@ -205,6 +214,7 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
     return {
       analysis: `This will remove todo "${todo.name}"`,
       doable: true,
+      cache: { todoName: todo.name },
     };
   },
   do: async ({ input }, { chat, config }) => {
@@ -218,17 +228,20 @@ export const todos_remove = operationOf<{ id: string }, { id: string; removed: b
 
     return { id: input.id, removed: true };
   },
-  render: (op, ai, showInput, showOutput) => renderOperation(
-    op,
-    `TodosRemove(id: ${abbreviate(op.input.id, 8)})`,
-    (op) => {
-      if (op.output) {
-        return 'Removed todo';
-      }
-      return null;
-    },
-    showInput, showOutput
-  ),
+  render: (op, ai, showInput, showOutput) => {
+    const todoName = op.cache?.todoName || op.input.id;
+    return renderOperation(
+      op,
+      `TodosRemove("${abbreviate(todoName, 64)}")`,
+      (op) => {
+        if (op.output) {
+          return 'Removed todo';
+        }
+        return null;
+      },
+      showInput, showOutput
+    );
+  },
 });
 
 export const todos_replace = operationOf<{ todos: TodoItem[] }, { count: number }>({
