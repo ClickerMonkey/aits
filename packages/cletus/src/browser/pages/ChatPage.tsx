@@ -9,6 +9,7 @@ import { CommandsPanel } from '../components/CommandsPanel';
 import { MessageList } from '../components/MessageList';
 import { ModelSelector } from '../components/ModelSelector';
 import { ModeSelector } from '../components/ModeSelector';
+import { QuestionsModal } from '../components/QuestionsModal';
 import { TodosModal } from '../components/TodosModal';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -196,6 +197,38 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
     send({ type: 'cancel' });
     setIsProcessing(false);
     setStatus('');
+  };
+
+  const handleQuestionsSubmit = async (content: MessageContent[]) => {
+    // Clear questions from chat meta
+    send({
+      type: 'update_chat_meta',
+      data: { chatId, updates: { questions: [] } },
+    });
+
+    // Add the questions and answers as messages
+    // First message: assistant message with questions
+    send({
+      type: 'send_message',
+      data: {
+        chatId,
+        content: [content[0]], // questions
+      },
+    });
+
+    // Wait a bit for the first message to be processed
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Second message: user message with answers, which will trigger the orchestrator
+    handleSendMessage([content[1]]); // answers
+  };
+
+  const handleQuestionsCancel = () => {
+    // Clear questions from chat meta
+    send({
+      type: 'update_chat_meta',
+      data: { chatId, updates: { questions: [] } },
+    });
   };
 
   const handleModeChange = (mode: ChatMode) => {
@@ -568,6 +601,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
           onRemoveTodo={handleRemoveTodo}
           onClearTodos={handleClearTodos}
           onClose={() => setShowTodos(false)}
+        />
+      )}
+
+      {/* Questions Modal */}
+      {chatMeta.questions && chatMeta.questions.length > 0 && !isProcessing && (
+        <QuestionsModal
+          questions={chatMeta.questions}
+          onSubmit={handleQuestionsSubmit}
+          onCancel={handleQuestionsCancel}
         />
       )}
 
