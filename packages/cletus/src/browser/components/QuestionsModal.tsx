@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 
 interface QuestionsModalProps {
   questions: Question[];
-  onSubmit: (content: MessageContent[]) => void;
+  onSubmit: (questionAnswers: Record<number, Set<number>>, questionCustomAnswers: Record<number, string>) => void;
   onCancel: () => void;
 }
 
@@ -80,54 +80,7 @@ export const QuestionsModal: React.FC<QuestionsModalProps> = ({
 
   const handleSubmit = () => {
     if (!canProceed) return;
-
-    // Format answers as markdown
-    let questionText = '## Questions\n';
-    let answerText = '## Answers\n';
-
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-      const selections = questionAnswers[i] || new Set<number>();
-      const customAnswer = questionCustomAnswers[i];
-
-      answerText += `**${question.name}:**\n`;
-      questionText += `**${question.name}:** ${question.min === question.max ? `(choose ${question.min})` : `(choose ${question.min}-${question.max})`}\n`;
-
-      for (const option of question.options) {
-        questionText += `- ${option.label}?\n`;
-      }
-
-      if (selections.size > 0) {
-        Array.from(selections).forEach((optionIndex) => {
-          if (optionIndex < question.options.length) {
-            answerText += `- ${question.options[optionIndex].label}\n`;
-          }
-        });
-      }
-
-      if (customAnswer) {
-        answerText += `- ${customAnswer}\n`;
-      }
-
-      if (selections.size === 0 && !customAnswer) {
-        answerText += `- (no answer provided)\n`;
-      }
-
-      if (question.custom) {
-        questionText += `- *${question.customLabel || 'Other'}?*\n`;
-      }
-
-      answerText += '\n';
-      questionText += '\n';
-    }
-
-    // Create content array with questions and answers
-    const content: MessageContent[] = [
-      { type: 'text', content: questionText.trim() },
-      { type: 'text', content: answerText.trim() },
-    ];
-
-    onSubmit(content);
+    onSubmit(questionAnswers, questionCustomAnswers);
   };
 
   return (

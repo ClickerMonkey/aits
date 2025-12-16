@@ -11,6 +11,7 @@ import { ModelSelector } from '../components/ModelSelector';
 import { ModeSelector } from '../components/ModeSelector';
 import { QuestionsModal } from '../components/QuestionsModal';
 import { TodosModal } from '../components/TodosModal';
+import { ToolsetSelector } from '../components/ToolsetSelector';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
@@ -199,32 +200,24 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
     setStatus('');
   };
 
-  const handleQuestionsSubmit = async (content: MessageContent[]) => {
-    // Clear questions from chat meta
+  const handleQuestionsSubmit = (questionAnswers: Record<number, Set<number>>, questionCustomAnswers: Record<number, string>) => {
+    // Convert Sets to arrays for JSON serialization
+    const answersArray: Record<number, number[]> = {};
+    for (const [key, value] of Object.entries(questionAnswers)) {
+      answersArray[Number(key)] = Array.from(value);
+    }
+
+    // Send to server to format, add messages, and run orchestrator
     send({
-      type: 'update_chat_meta',
-      data: { chatId, updates: { questions: [] } },
+      type: 'submit_question_answers',
+      data: { chatId, questionAnswers: answersArray, questionCustomAnswers },
     });
-
-    // Add the questions and answers as messages
-    // First message: assistant message with questions
-    send({
-      type: 'send_message',
-      data: {
-        chatId,
-        content: [content[0]], // questions
-      },
-    });
-
-    // Wait a bit for the first message to be processed
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Second message: user message with answers, which will trigger the orchestrator
-    handleSendMessage([content[1]]); // answers
+    setIsProcessing(true);
+    setStatus('Processing answers...');
   };
 
   const handleQuestionsCancel = () => {
-    // Clear questions from chat meta
+    // Clear questions from chat meta without adding messages
     send({
       type: 'update_chat_meta',
       data: { chatId, updates: { questions: [] } },
@@ -237,6 +230,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
 
   const handleAgentModeChange = (agentMode: 'plan' | 'default' | undefined) => {
     send({ type: 'update_chat_meta', data: { chatId, updates: { agentMode } } });
+  };
+
+  const handleToolsetChange = (toolset: string | null) => {
+    send({ type: 'update_chat_meta', data: { chatId, updates: { toolset: toolset || undefined } } });
   };
 
   const handleAssistantChange = (assistant: string) => {
@@ -496,6 +493,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
               <AgentModeSelector
                 agentMode={chatMeta.agentMode || 'default'}
                 onChange={handleAgentModeChange}
+              />
+              <ToolsetSelector
+                toolset={chatMeta.toolset}
+                onChange={handleToolsetChange}
               />
               <Button
                 variant="ghost"

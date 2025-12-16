@@ -708,6 +708,148 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           });
           break;
         }
+        case 'submit_question_answers': {
+          const { chatId, questionAnswers, questionCustomAnswers } = message.data;
+          withChatFile(chatId, async (chatFile, chatMeta, config) => {
+            if (!chatMeta.questions || chatMeta.questions.length === 0) {
+              sendMessage({
+                type: 'error',
+                data: { message: 'No questions to answer' },
+              });
+              return;
+            }
+
+            // Format answers as markdown (matching CLI behavior)
+            let questionText = '## Questions\n';
+            let answerText = '## Answers\n';
+
+            for (let i = 0; i < chatMeta.questions.length; i++) {
+              const question = chatMeta.questions[i];
+              const selections = new Set(questionAnswers[i] || []);
+              const customAnswer = questionCustomAnswers[i];
+
+              answerText += `**${question.name}:**\n`;
+              questionText += `**${question.name}:** ${question.min === question.max ? `(choose ${question.min})` : `(choose ${question.min}-${question.max})`}\n`;
+
+              for (const option of question.options) {
+                questionText += `- ${option.label}?\n`;
+              }
+
+              if (selections.size > 0) {
+                Array.from(selections).forEach((optionIndex) => {
+                  if (optionIndex < question.options.length) {
+                    answerText += `- ${question.options[optionIndex].label}\n`;
+                  }
+                });
+              }
+
+              if (customAnswer) {
+                answerText += `- ${customAnswer}\n`;
+              }
+
+              if (selections.size === 0 && !customAnswer) {
+                answerText += `- (no answer provided)\n`;
+              }
+
+              if (question.custom) {
+                questionText += `- *${question.customLabel || 'Other'}?*\n`;
+              }
+
+              answerText += '\n';
+              questionText += '\n';
+            }
+
+            // Clear questions from chat meta
+            await withConfigUpdate(async (config) => {
+              const chats = config.getChats();
+              const chatIndex = chats.findIndex(c => c.id === chatId);
+              if (chatIndex !== -1) {
+                chats[chatIndex].questions = [];
+                await config.updateChat(chatId, { questions: [] });
+              }
+            });
+
+            // Add the formatted questions as an assistant message
+            const questionMessage: Message = {
+              role: 'assistant',
+              name: chatMeta.assistant,
+              content: [{ type: 'text', content: questionText.trim() }],
+              created: Date.now(),
+              operations: [],
+            };
+
+            await chatFile.addMessage(questionMessage);
+            sendMessage({
+              type: 'message_added',
+              data: { message: questionMessage },
+            });
+
+            // Add the formatted answer as a user message
+            const answerMessage: Message = {
+              role: 'user',
+              name: config.getData().user.name,
+              content: [{ type: 'text', content: answerText.trim() }],
+              created: Date.now(),
+            };
+
+            await chatFile.addMessage(answerMessage);
+            sendMessage({
+              type: 'message_added',
+              data: { message: answerMessage },
+            });
+
+            // Send updated chat meta
+            sendMessage({
+              type: 'chat_updated',
+              data: { chat: { ...chatMeta, questions: [] } },
+            });
+
+            // Ensure AI and chat agent are loaded
+            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
+
+            // Run orchestrator
+            abortController = new AbortController();
+
+            // Clear usage before running orchestrator
+            const clearUsage = () => {
+              const defaultContext = aiInstance.config.defaultContext;
+              if (defaultContext && defaultContext.usage) {
+                defaultContext.usage.accumulated = {};
+                defaultContext.usage.accumulatedCost = 0;
+              }
+            };
+
+            // Get current usage
+            const getUsage = () => {
+              const defaultContext = aiInstance.config.defaultContext;
+              if (defaultContext && defaultContext.usage) {
+                return {
+                  accumulated: defaultContext.usage.accumulated,
+                  accumulatedCost: defaultContext.usage.accumulatedCost,
+                };
+              }
+              return { accumulated: {}, accumulatedCost: 0 };
+            };
+
+            // Run orchestrator with updated chat file
+            await runChatOrchestrator({
+              chatAgent: chatAgentInstance,
+              messages: chatFile.getMessages(),
+              chatMeta: { ...chatMeta, questions: [] },
+              config,
+              chatData: chatFile,
+              signal: abortController?.signal,
+              clearUsage,
+              getUsage,
+            }, (event) => {
+              handleOrchestratorEvent(event, chatFile);
+            }).then(() => {
+              // Clear abort controller
+              abortController = null;
+            });
+          });
+          break;
+        }
         default:
           sendMessage({
             type: 'error',

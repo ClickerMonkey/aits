@@ -1,6 +1,6 @@
 import React from 'react';
-import { Select, SelectOption } from './ui/select';
 import { AgentMode } from '../../schemas';
+import { cn } from '../lib/utils';
 
 interface AgentModeSelectorProps {
   agentMode: AgentMode;
@@ -8,30 +8,39 @@ interface AgentModeSelectorProps {
   disabled?: boolean;
 }
 
-const AGENT_MODE_OPTIONS: SelectOption<AgentMode>[] = [
-  {
-    value: 'default',
-    label: 'Run Mode',
-    description: 'All toolsets available',
-  },
-  {
-    value: 'plan',
-    label: 'Plan Mode',
-    description: 'Only planning related tools',
-  },
-];
-
 export const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({ agentMode, onChange, disabled }) => {
+  const currentMode = agentMode || 'default';
+
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm text-muted-foreground">Agent:</label>
-      <Select
-        value={agentMode || 'default'}
-        options={AGENT_MODE_OPTIONS}
-        onChange={value => onChange(value as AgentMode)}
+    <div className="flex items-center gap-1 rounded-md border border-border bg-muted/30 p-1">
+      <button
+        onClick={() => onChange('default')}
         disabled={disabled}
-        className="min-w-[140px]"
-      />
+        className={cn(
+          'px-3 py-1 text-sm rounded transition-colors',
+          currentMode === 'default'
+            ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+        title="Run Mode - All toolsets available"
+      >
+        Run
+      </button>
+      <button
+        onClick={() => onChange('plan')}
+        disabled={disabled}
+        className={cn(
+          'px-3 py-1 text-sm rounded transition-colors',
+          currentMode === 'plan'
+            ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+        title="Plan Mode - Only planning related tools"
+      >
+        Plan
+      </button>
     </div>
   );
 };

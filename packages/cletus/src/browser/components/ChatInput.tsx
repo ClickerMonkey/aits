@@ -6,19 +6,6 @@ import type { ChatMeta, MessageContent, Config } from '../../schemas';
 import type { ClientMessage, ServerMessage } from '../websocket-types';
 import { sendClientMessage } from '../websocket-types';
 
-const MODETEXT: Record<string, string> = {
-  none: 'local allowed',
-  read: 'read allowed',
-  create: 'create allowed',
-  update: 'update allowed',
-  delete: 'delete allowed',
-};
-
-const AGENTMODETEXT: Record<string, string> = {
-  default: 'run mode',
-  plan: 'plan mode',
-};
-
 interface ChatInputProps {
   chatId: string;
   chatMeta: ChatMeta;
@@ -116,10 +103,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         />
         <div className="flex items-center justify-between">
           <div className="text-xs flex items-center gap-2 flex-wrap flex-1">
-            <span className="px-2 py-1 rounded bg-muted text-muted-foreground">
-              {chatMeta.mode}
-            </span>
-            <span className="text-muted-foreground">│</span>
             <span
               className="text-foreground cursor-pointer hover:text-neon-cyan transition-colors"
               onClick={onModelClick}
@@ -127,16 +110,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             >
               {chatMeta.model || config.user.models?.chat || 'no model'}
             </span>
-            {chatMeta.assistant && (
-              <>
-                <span className="text-muted-foreground">│</span>
-                <span className="text-muted-foreground">{chatMeta.assistant}</span>
-              </>
-            )}
-            <span className="text-muted-foreground">│</span>
-            <span className="text-muted-foreground">{MODETEXT[chatMeta.mode] || chatMeta.mode}</span>
-            <span className="text-muted-foreground">│</span>
-            <span className="text-muted-foreground">{AGENTMODETEXT[chatMeta.agentMode || 'default']}</span>
             <span className="text-muted-foreground">│</span>
             <span className="text-muted-foreground">{chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'}</span>
             <span className="text-muted-foreground">│</span>
