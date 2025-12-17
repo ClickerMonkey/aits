@@ -1,30 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MainPage } from './pages/MainPage';
-import { ChatPage } from './pages/ChatPage';
+import { UnifiedLayout } from './pages/UnifiedLayout';
 import { InitPage } from './pages/InitPage';
-import type { ChatMeta, Config } from '../schemas';
+import type { Config } from '../schemas';
 
-type AppView = 'loading' | 'init' | 'main' | 'chat';
+type AppView = 'loading' | 'init' | 'main';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<Config | null>(null);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname;
-      if (path === '/' || path === '/settings') {
-        setView('main');
-        setSelectedChatId(null);
-      } else if (path.startsWith('/chat/')) {
-        const chatId = path.split('/')[2];
-        setSelectedChatId(chatId);
-        setView('chat');
-      }
+      // Unified layout handles routing internally
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -48,39 +38,11 @@ const App: React.FC = () => {
       switch (message.type) {
         case 'config':
           setConfig(message.data);
-
-          // Check URL to determine initial view
-          const path = window.location.pathname;
-          if (path.startsWith('/chat/')) {
-            const chatId = path.split('/')[2];
-            // Verify the chat exists in the config
-            const chatExists = message.data.chats.some((c: ChatMeta) => c.id === chatId);
-            if (chatExists) {
-              setSelectedChatId(chatId);
-              setView('chat');
-            } else {
-              // Chat doesn't exist, redirect to main
-              window.history.replaceState({}, '', '/');
-              setView('main');
-            }
-          } else if (path === '/settings') {
-            setView('main'); // MainPage handles settings view internally
-          } else {
-            setView('main');
-          }
+          setView('main');
           break;
 
         case 'config_not_found':
           setView('init');
-          break;
-
-        case 'chat_created':
-          // Reload config after chat creation
-          ws.send(JSON.stringify({ type: 'get_config' }));
-          if (message.data.chatId) {
-            setSelectedChatId(message.data.chatId);
-            setView('chat');
-          }
           break;
 
         case 'error':
@@ -130,30 +92,10 @@ const App: React.FC = () => {
     );
   }
 
-  if (view === 'chat' && selectedChatId && config) {
-    return (
-      <ChatPage
-        chatId={selectedChatId}
-        config={config}
-        onBack={() => {
-          setView('main');
-          setSelectedChatId(null);
-          window.history.pushState({}, '', '/');
-        }}
-        onConfigChange={reloadConfig}
-      />
-    );
-  }
-
   if (view === 'main' && config) {
     return (
-      <MainPage
+      <UnifiedLayout
         config={config}
-        onChatSelect={(chatId) => {
-          setSelectedChatId(chatId);
-          setView('chat');
-          window.history.pushState({}, '', `/chat/${chatId}`);
-        }}
         onConfigChange={reloadConfig}
       />
     );

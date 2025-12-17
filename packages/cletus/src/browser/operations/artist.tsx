@@ -1,29 +1,13 @@
-import React from 'react';
-import { Operation } from '../../schemas';
 import { abbreviate } from '../../shared';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
-import { OperationRendererProps } from './types';
+import { createRenderer } from './render';
 
-function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | React.ReactNode | null) {
-  return (props: OperationRendererProps) => {
-    const { operation } = props;
-    const label = getLabel(operation);
-    const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
+const renderer = createRenderer({
+  borderColor: "border-neon-pink/30",
+  bgColor: "bg-neon-pink/5",
+  labelColor: "text-neon-pink",
+});
 
-    return (
-      <BaseOperationDisplay
-        {...props}
-        label={label}
-        summary={summary}
-        borderColor="border-neon-pink/30"
-        bgColor="bg-neon-pink/5"
-        labelColor="text-neon-pink"
-      />
-    );
-  };
-}
-
-export const image_generate = createRenderer(
+export const image_generate = renderer<'image_generate'>(
   (op) => `ImageGenerate("${abbreviate(op.input.prompt, 30)}", n=${op.input.n || 1})`,
   (op) => {
     if (op.output) {
@@ -47,7 +31,7 @@ export const image_generate = createRenderer(
   }
 );
 
-export const image_edit = createRenderer(
+export const image_edit = renderer<'image_edit'>(
   (op) => `ImageEdit("${op.input.path}", "${abbreviate(op.input.prompt, 20)}")`,
   (op) => {
     if (op.output) {
@@ -66,10 +50,10 @@ export const image_edit = createRenderer(
   }
 );
 
-export const image_analyze = createRenderer(
+export const image_analyze = renderer<'image_analyze'>(
   (op) => {
     const pathCount = op.input.paths?.length || 1;
-    const firstPath = op.input.paths?.[0] || op.input.path || '';
+    const firstPath = op.input.paths?.[0] || '';
     const label = pathCount === 1 ? firstPath : `${pathCount} images`;
     return `ImageAnalyze(${label}, "${abbreviate(op.input.prompt, 20)}")`;
   },
@@ -81,7 +65,7 @@ export const image_analyze = createRenderer(
   }
 );
 
-export const image_describe = createRenderer(
+export const image_describe = renderer<'image_describe'>(
   (op) => `ImageDescribe("${op.input.path}")`,
   (op) => {
     if (op.output) {
@@ -91,7 +75,7 @@ export const image_describe = createRenderer(
   }
 );
 
-export const image_find = createRenderer(
+export const image_find = renderer<'image_find'>(
   (op) => `ImageFind("${abbreviate(op.input.query, 50)}", "${op.input.glob}")`,
   (op) => {
     if (op.output) {
@@ -103,7 +87,7 @@ export const image_find = createRenderer(
   }
 );
 
-export const image_attach = createRenderer(
+export const image_attach = renderer<'image_attach'>(
   (op) => `ImageAttach("${op.input.path}")`,
   (op) => {
     if (op.output?.attached) {

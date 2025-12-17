@@ -15,9 +15,9 @@ import * as secretary from './secretary';
 /**
  * Registry of operation renderers
  */
-const OperationRenderers: Partial<Record<OperationKind, React.FC<{
+const OperationRenderers: Record<OperationKind, React.FC<{
   operation: Operation;
-}>>> = {
+}>> = {
   // Clerk operations
   ...clerk,
 

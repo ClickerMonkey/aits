@@ -1765,7 +1765,7 @@ export const shell = operationOf<
             </>
           )}
           <Text color={exitCode === 0 ? 'green' : exitCode !== null ? 'red' : 'yellow'}>
-            {lineCount} {lineCount === 1 ? 'line' : 'lines'} • {statusText}
+            {pluralize(lineCount, 'line')} • {statusText}
           </Text>
         </Box>
       );

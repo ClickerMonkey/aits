@@ -311,7 +311,7 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
   );
 };
 
-interface BaseOperationDisplayProps {
+export interface BaseOperationDisplayProps {
   operation: Operation;
   label: string;
   summary?: React.ReactNode | string | null;

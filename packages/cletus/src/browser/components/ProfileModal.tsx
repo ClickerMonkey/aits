@@ -17,10 +17,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
     name: user.name || '',
     pronouns: user.pronouns || '',
     globalPrompt: user.globalPrompt || '',
-    debug: user.debug ?? true,
-    showInput: user.showInput ?? false,
-    showOutput: user.showOutput ?? false,
-    showSystemMessages: user.showSystemMessages ?? true,
     adaptiveTools: user.adaptiveTools ?? 14,
     maxQuerySchemaTypes: user.maxQuerySchemaTypes ?? 5,
     maxIterations: user.autonomous?.maxIterations ?? 10,
@@ -34,10 +30,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
       name: formData.name.trim() || user.name,
       pronouns: formData.pronouns.trim() || undefined,
       globalPrompt: formData.globalPrompt.trim() || undefined,
-      debug: formData.debug,
-      showInput: formData.showInput,
-      showOutput: formData.showOutput,
-      showSystemMessages: formData.showSystemMessages,
       adaptiveTools: formData.adaptiveTools,
       maxQuerySchemaTypes: formData.maxQuerySchemaTypes,
       autonomous: {
@@ -105,55 +97,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
                   className="w-full min-h-[100px] px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground resize-y"
                   placeholder="Add a global prompt that will be included in all chats..."
                 />
-              </div>
-            </div>
-
-            {/* Display Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold neon-text-cyan">Display Settings</h3>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="debug"
-                  checked={formData.debug}
-                  onCheckedChange={(checked) => setFormData({ ...formData, debug: checked as boolean })}
-                />
-                <Label htmlFor="debug" className="cursor-pointer">
-                  Debug Mode
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="showInput"
-                  checked={formData.showInput}
-                  onCheckedChange={(checked) => setFormData({ ...formData, showInput: checked as boolean })}
-                />
-                <Label htmlFor="showInput" className="cursor-pointer">
-                  Show Input Details
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="showOutput"
-                  checked={formData.showOutput}
-                  onCheckedChange={(checked) => setFormData({ ...formData, showOutput: checked as boolean })}
-                />
-                <Label htmlFor="showOutput" className="cursor-pointer">
-                  Show Output Details
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="showSystemMessages"
-                  checked={formData.showSystemMessages}
-                  onCheckedChange={(checked) => setFormData({ ...formData, showSystemMessages: checked as boolean })}
-                />
-                <Label htmlFor="showSystemMessages" className="cursor-pointer">
-                  Show System Messages
-                </Label>
               </div>
             </div>
 

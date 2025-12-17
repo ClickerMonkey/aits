@@ -5,8 +5,6 @@ import { Operation } from '../../schemas';
  */
 export interface OperationRendererProps {
   operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
   operationIndex?: number;
   onApprove?: (index: number) => void;
   onReject?: (index: number) => void;

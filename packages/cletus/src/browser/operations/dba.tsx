@@ -2,30 +2,28 @@ import React from 'react';
 import { Operation } from '../../schemas';
 import { BaseOperationDisplay } from './BaseOperationDisplay';
 import { formatName, abbreviate } from '../../shared';
+import { createRenderer } from './render';
 
-interface OperationRendererProps {
-  operation: Operation;
-  showInput?: boolean;
-  showOutput?: boolean;
-}
 
-export const data_index: React.FC<OperationRendererProps> = ({ operation }) => {
-  const typeName = operation.cache?.typeName || formatName(operation.input.type);
-  const summary = operation.output?.libraryKnowledgeUpdated
-    ? `Knowledge updated for type: ${typeName}`
-    : operation.analysis;
+const renderer = createRenderer({
+  borderColor: "border-neon-blue/30",
+  bgColor: "bg-neon-blue/5",
+  labelColor: "text-neon-blue",
+});
 
-  return (
-    <BaseOperationDisplay
-      operation={operation}
-      label={`${typeName}Index()`}
-      summary={summary}
-      borderColor="border-neon-blue/30"
-      bgColor="bg-neon-blue/5"
-      labelColor="text-neon-blue"
-    />
-  );
-};
+export const data_index = renderer<'data_index'>(
+  (op) => {
+    const typeName = op.cache?.typeName || op.input.type;
+    return `${formatName(typeName)}Index()`;
+  },
+  (op) => {
+    const typeName = op.cache?.typeName || op.input.type;
+    if (op.output?.libraryKnowledgeUpdated) {
+      return `Knowledge updated for type: ${typeName}`;
+    }
+    return null;
+  }
+);
 
 export const data_import: React.FC<OperationRendererProps> = ({ operation }) => {
   const typeName = operation.cache?.typeName || formatName(operation.input.type);

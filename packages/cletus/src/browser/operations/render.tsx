@@ -1,6 +1,7 @@
 import React from 'react';
-import { Operation } from '../../schemas';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
+import { Operation, OperationKind } from '../../schemas';
+import { OperationDataFor, OperationFor } from '../../operations/types';
+import { BaseOperationDisplay, BaseOperationDisplayProps } from './BaseOperationDisplay';
 
 /**
  * Get status color and label for an operation status
@@ -38,7 +39,7 @@ export function getElapsedTime(op: Operation): string {
   return `${Math.floor(duration / 60000)}m ${Math.round((duration % 60000) / 1000)}s`;
 }
 
-interface OperationDisplayProps {
+export interface OperationDisplayProps {
   operation: Operation;
   operationIndex?: number;
   onApprove?: (index: number) => void;
@@ -58,3 +59,37 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => (
     summary={props.operation.analysis}
   />
 );
+
+/**
+ * Create a renderer for a specific operation kind
+ * @param common 
+ * @returns 
+ */
+export const createRenderer = (common: Partial<BaseOperationDisplayProps> = {}) => {
+  return <K extends OperationKind>(
+    getLabel: (op: OperationDataFor<K>) => string, 
+    getSummary?: (op: OperationDataFor<K>) => string | React.ReactNode | null,
+    getProps?: (op: OperationDataFor<K>) => Partial<BaseOperationDisplayProps>
+  ) => {
+    return (props: OperationDisplayProps) => {
+      const operation = props.operation as any as OperationDataFor<K>;
+      const label = getLabel(operation);
+      const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
+      const additionalProps = getProps ? getProps(operation) : {};
+
+      return (
+        <BaseOperationDisplay
+          {...common}
+          {...additionalProps}
+          operation={operation}
+          label={label}
+          summary={summary}
+        />
+      );
+    };
+  }
+};
+
+export function linkFile(path: string) {
+  return path;
+}
