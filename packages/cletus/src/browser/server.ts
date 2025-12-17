@@ -10,7 +10,7 @@ import type { Message, ChatMeta, MessageContent } from '../schemas';
 import type { ClientMessage, ServerMessage } from './websocket-types';
 import { OperationManager } from '../operations/manager';
 import { CletusAI, createCletusAI } from '../ai';
-import { CletusChatAgent, createChatAgent } from '../agents/chat-agent';
+import { CletusChatAgent, createChatAgent, initTools } from '../agents/chat-agent';
 import { OrchestratorEvent, runChatOrchestrator } from '../agents/chat-orchestrator';
 
 const __serverFilename = fileURLToPath(import.meta.url);
@@ -170,6 +170,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         throw new Error('Config not available');
       }
       ai = createCletusAI(config);
+      await initTools(ai);
       chatAgent = createChatAgent(ai);
     }
     return { ai, chatAgent };
@@ -517,6 +518,17 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
                 chat: updatedChat,
                 cwd: ai?.config.defaultContext?.cwd
               },
+            });
+          });
+          break;
+        }
+        case 'update_user': {
+          const { updates } = message.data;
+          withConfigUpdate(async (config) => {
+            await config.updateUser(updates);
+            sendMessage({
+              type: 'config',
+              data: config.getData(),
             });
           });
           break;

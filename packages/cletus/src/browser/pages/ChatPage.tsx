@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckSquare, Settings, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Settings, Trash2, User } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import type { ChatMeta, ChatMode, Config, Message, MessageContent } from '../../schemas';
 import { AgentModeSelector } from '../components/AgentModeSelector';
@@ -9,6 +9,7 @@ import { CommandsPanel } from '../components/CommandsPanel';
 import { MessageList } from '../components/MessageList';
 import { ModelSelector } from '../components/ModelSelector';
 import { ModeSelector } from '../components/ModeSelector';
+import { ProfileModal } from '../components/ProfileModal';
 import { QuestionsModal } from '../components/QuestionsModal';
 import { TodosModal } from '../components/TodosModal';
 import { ToolsetSelector } from '../components/ToolsetSelector';
@@ -43,6 +44,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   const [cwd, setCwd] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
@@ -233,7 +235,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
   };
 
   const handleToolsetChange = (toolset: string | null) => {
-    send({ type: 'update_chat_meta', data: { chatId, updates: { toolset: toolset || undefined } } });
+    send({ type: 'update_chat_meta', data: { chatId, updates: { toolset: toolset } } });
   };
 
   const handleAssistantChange = (assistant: string) => {
@@ -404,6 +406,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
     handleOperationApproval(lastMessage, approved, rejected);
   };
 
+  const handleProfileSave = (updates: Partial<Config['user']>) => {
+    send({ type: 'update_user', data: { updates } });
+  };
+
   // Check if there are any messages with operations needing approval
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const lastMessagePendingOps = lastMessage?.role === 'assistant'
@@ -522,6 +528,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
               >
                 <Trash2 className="w-5 h-5" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowProfile(true)}
+                title="Profile Settings"
+              >
+                <User className="w-5 h-5" />
+              </Button>
             </div>
           </div>
         </div>
@@ -611,6 +625,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({ chatId, config, onBack, onCo
           questions={chatMeta.questions}
           onSubmit={handleQuestionsSubmit}
           onCancel={handleQuestionsCancel}
+        />
+      )}
+
+      {/* Profile Modal */}
+      {showProfile && (
+        <ProfileModal
+          user={config.user}
+          onSave={handleProfileSave}
+          onClose={() => setShowProfile(false)}
         />
       )}
 

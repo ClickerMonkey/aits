@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { MessageSquare, Settings, Plus, Sparkles } from 'lucide-react';
+import { MessageSquare, Settings, Plus, Sparkles, User } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { ChatList } from '../components/ChatList';
 import { SettingsView } from '../components/SettingsView';
+import { ProfileModal } from '../components/ProfileModal';
 import type { Config } from '../../schemas';
+import { sendClientMessage } from '../websocket-types';
 
 interface MainPageProps {
   config: Config;
@@ -17,6 +19,27 @@ type MainView = 'chats' | 'settings';
 export const MainPage: React.FC<MainPageProps> = ({ config, onChatSelect, onConfigChange }) => {
   const [view, setView] = useState<MainView>('chats');
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const handleProfileSave = (updates: Partial<Config['user']>) => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+    ws.onopen = () => {
+      sendClientMessage(ws, { type: 'update_user', data: { updates } });
+    };
+
+    ws.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'config') {
+        await onConfigChange();
+        ws.close();
+      } else if (message.type === 'error') {
+        console.error('Failed to update user:', message.data.message);
+        ws.close();
+      }
+    };
+  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -27,8 +50,19 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onChatSelect, onConf
             <Sparkles className="w-8 h-8 text-neon-cyan" />
             <h1 className="text-2xl font-bold neon-text-purple">Cletus</h1>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Welcome, <span className="text-neon-cyan font-semibold">{config.user.name}</span>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Welcome, <span className="text-neon-cyan font-semibold">{config.user.name}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowProfile(true)}
+              title="Profile Settings"
+              className="h-8 w-8"
+            >
+              <User className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
@@ -96,10 +130,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onChatSelect, onConf
           {view === 'chats' ? (
             <ChatList
               config={config}
-              onChatSelect={(chatId) => {
-                window.history.pushState({}, '', `/chat/${chatId}`);
-                onChatSelect(chatId);
-              }}
+              onChatSelect={onChatSelect}
               onConfigChange={onConfigChange}
               forceShowCreate={showNewChat}
               onCreateClose={() => setShowNewChat(false)}
@@ -109,6 +140,15 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onChatSelect, onConf
           )}
         </ScrollArea>
       </div>
+
+      {/* Profile Modal */}
+      {showProfile && (
+        <ProfileModal
+          user={config.user}
+          onSave={handleProfileSave}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
     </div>
   );
 };

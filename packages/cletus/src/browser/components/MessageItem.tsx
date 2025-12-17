@@ -3,6 +3,7 @@ import { User, Bot, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { OperationDisplay } from '../operations';
+import { TypingIndicator } from './TypingIndicator';
 import { cn } from '../lib/utils';
 import type { Message } from '../../schemas';
 
@@ -77,7 +78,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         {/* Content and Operations in order */}
         <div className={cn('flex-1 space-y-2', isUser && 'flex flex-col items-end')}>
-          {visibleContent.map((item, index) => {
+          {visibleContent.length === 0 && isAssistant ? (
+            <div className="rounded-lg bg-card p-2">
+              <TypingIndicator />
+            </div>
+          ) : (
+            visibleContent.map((item, index) => {
             // Render operation if this content item has an operation
             if (item.operation && item.operationIndex !== undefined) {
               const opIdx = item.operationIndex;
@@ -145,7 +151,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </ReactMarkdown>
               </div>
             );
-          })}
+            })
+          )}
         </div>
 
         {/* Timestamp */}

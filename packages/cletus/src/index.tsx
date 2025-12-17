@@ -129,6 +129,9 @@ async function main() {
   const { profile, browser, port } = parseArgs();
   setProfile(profile);
 
+  // Initialize embed worker (don't await - let it init in background)
+  initWorker();
+
   // If browser mode, start HTTP server instead of CLI
   if (browser) {
     const { startBrowserServer } = await import('./browser/server');
@@ -140,9 +143,6 @@ async function main() {
 
   // Clear screen and move cursor to top
   process.stdout.write('\x1Bc');
-
-  // Initialize embed worker (don't await - let it init in background)
-  initWorker();
 
   const { waitUntilExit } = render(React.createElement(App), {
     exitOnCtrlC: false,

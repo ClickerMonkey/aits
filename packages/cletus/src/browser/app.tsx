@@ -152,6 +152,7 @@ const App: React.FC = () => {
         onChatSelect={(chatId) => {
           setSelectedChatId(chatId);
           setView('chat');
+          window.history.pushState({}, '', `/chat/${chatId}`);
         }}
         onConfigChange={reloadConfig}
       />

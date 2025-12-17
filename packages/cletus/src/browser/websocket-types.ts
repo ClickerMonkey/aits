@@ -13,6 +13,7 @@ export type ClientMessage =
   | { type: 'send_message'; data: { chatId: string; content: Message['content'] } }
   | { type: 'cancel'; data?: never }
   | { type: 'update_chat_meta'; data: { chatId: string; updates: Partial<ChatMeta>; cwd?: string } }
+  | { type: 'update_user'; data: { updates: Partial<Config['user']> } }
   | { type: 'add_todo'; data: { chatId: string; todo: string } }
   | { type: 'toggle_todo'; data: { chatId: string; index: number } }
   | { type: 'remove_todo'; data: { chatId: string; index: number } }

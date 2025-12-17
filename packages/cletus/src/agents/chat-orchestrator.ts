@@ -6,14 +6,14 @@ import { AUTONOMOUS } from '../constants';
 import { logger } from '../logger';
 import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, Operation } from '../schemas';
-import { createChatAgent } from './chat-agent';
+import { CletusChatAgent } from './chat-agent';
 import { CletusAIContext } from '../ai';
 
 /**
  * Options for running the chat orchestrator
  */
 export interface OrchestratorOptions {
-  chatAgent: ReturnType<typeof createChatAgent>;
+  chatAgent: CletusChatAgent;
   messages: Message[];
   chatMeta: ChatMeta;
   config: ConfigFile;
@@ -96,7 +96,7 @@ export async function runChatOrchestrator(
   let messageUsage: Usage = {};
   let messageCost = 0;
   let toolTokens = 0;
-  let lastTextIndex = -1; // Track which content entry has the accumulated text
+  let lastTextIndex = -1; // Track wich content entry has the accumulated text
 
   const updateUsageEvent = () => {
     const accumulated = getUsage();
@@ -224,13 +224,14 @@ export async function runChatOrchestrator(
       let stackTrace: any;
 
       // Run chat agent
-      const chatContext = {
+      const chatContext: Partial<CletusAIContext> = {
         ops,
         chat: chatMeta,
         chatData,
         chatMessage: pending,
         config,
         signal,
+        persistentTools: new Set<string>(),
         messages: currentMessages,
         chatStatus: (status: string) => onEvent({ type: 'status', status }),
         chatInterrupt: () => {
@@ -323,7 +324,14 @@ export async function runChatOrchestrator(
                 // This ensures content from different tool iterations doesn't get mixed
                 // Force creation of new text entry on next text event
                 getLastTextContent(true);
-                onEvent({ type: 'pendingUpdate', pending });
+                onEvent({ type: 'pendingUpdate', pending }); 
+              }
+              break;
+
+            case 'toolParseName': 
+              {
+                // Track recent tool usage in context so tools don't leave view
+                chatContext.persistentTools!.add(chunk.tool.name);
               }
               break;
 
