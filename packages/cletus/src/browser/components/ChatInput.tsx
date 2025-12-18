@@ -19,6 +19,7 @@ interface ChatInputProps {
   onModelClick?: () => void;
   hasMultiplePendingOperations?: boolean;
   allOperationsDecided?: boolean;
+  hasOperationsProcessing?: boolean;
   onApproveAll?: () => void;
   onRejectAll?: () => void;
   onSubmitDecisions?: () => void;
@@ -37,6 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onModelClick,
   hasMultiplePendingOperations = false,
   allOperationsDecided = false,
+  hasOperationsProcessing = false,
   onApproveAll,
   onRejectAll,
   onSubmitDecisions,
@@ -132,17 +134,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={onApproveAll}
-                  className="text-green-400 border-green-400/30 hover:bg-green-400/10"
+                  disabled={hasOperationsProcessing}
+                  className="text-green-400 border-green-400/30 hover:bg-green-400/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-1" />
-                  Approve All
+                  {hasOperationsProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      Approve All
+                    </>
+                  )}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={onRejectAll}
-                  className="text-red-400 border-red-400/30 hover:bg-red-400/10"
+                  disabled={hasOperationsProcessing}
+                  className="text-red-400 border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <XCircle className="w-4 h-4 mr-1" />
                   Reject All
@@ -152,9 +165,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="neon"
                   size="sm"
                   onClick={onSubmitDecisions}
-                  disabled={!allOperationsDecided}
+                  disabled={!allOperationsDecided || hasOperationsProcessing}
+                  className="disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit
+                  {hasOperationsProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
                 </Button>
               </>
             )}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Operation } from '../../schemas';
 import { cn } from '../lib/utils';
 import { getStatusInfo, getElapsedTime } from './render';
@@ -177,14 +177,15 @@ const renderJsonAsHtml = (data: any, depth: number = 0): React.ReactNode => {
  * Expandable details component with tabs
  */
 const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => {
-  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'inputJson' | 'outputJson' | 'analysis'>('input');
+  const [activeTab, setActiveTab] = useState<'input' | 'output' | 'inputJson' | 'outputJson' | 'cacheJson' | 'analysis'>('input');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const hasInput = operation.input !== undefined && operation.input !== null;
   const hasOutput = operation.output !== undefined && operation.output !== null;
+  const hasCache = operation.cache !== undefined && operation.cache !== null && Object.keys(operation.cache).length > 0;
   const hasAnalysis = operation.analysis !== undefined && operation.analysis !== null && operation.analysis.trim().length > 0;
 
-  if (!hasInput && !hasOutput && !hasAnalysis) {
+  if (!hasInput && !hasOutput && !hasCache && !hasAnalysis) {
     return null;
   }
 
@@ -194,12 +195,15 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
     (activeTab === 'output' && hasOutput) ||
     (activeTab === 'inputJson' && hasInput) ||
     (activeTab === 'outputJson' && hasOutput) ||
+    (activeTab === 'cacheJson' && hasCache) ||
     (activeTab === 'analysis' && hasAnalysis)
       ? activeTab
       : hasInput
       ? 'input'
       : hasOutput
       ? 'output'
+      : hasCache
+      ? 'cacheJson'
       : 'analysis';
 
   return (
@@ -258,6 +262,19 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
             Output (JSON)
           </button>
         )}
+        {hasCache && (
+          <button
+            onClick={() => setActiveTab('cacheJson')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
+              effectiveTab === 'cacheJson'
+                ? 'bg-muted text-foreground border-b-2 border-neon-cyan'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            Cache (JSON)
+          </button>
+        )}
         {hasAnalysis && (
           <button
             onClick={() => setActiveTab('analysis')}
@@ -297,6 +314,8 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
               ? JSON.stringify(operation.input, null, 2)
               : effectiveTab === 'outputJson'
               ? JSON.stringify(operation.output, null, 2)
+              : effectiveTab === 'cacheJson'
+              ? JSON.stringify(operation.cache, null, 2)
               : operation.analysis || ''
           }
           className={cn(
@@ -353,6 +372,7 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
   const displaySummary = operation.error ? operation.error : summary;
 
   const needsApproval = operation.status === 'analyzed';
+  const isOperationProcessing = operation.status === 'doing';
 
   // Debug logging
   if (needsApproval) {
@@ -411,16 +431,27 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onApprove(operationIndex)}
-                className="bg-green-500/10 text-green-400 border-green-400/30 hover:bg-green-400/20"
+                disabled={isOperationProcessing}
+                className="bg-green-500/10 text-green-400 border-green-400/30 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Approve
+                {isOperationProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Approve
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onReject(operationIndex)}
-                className="bg-red-500/10 text-red-400 border-red-400/30 hover:bg-red-400/20"
+                disabled={isOperationProcessing}
+                className="bg-red-500/10 text-red-400 border-red-400/30 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <XCircle className="w-4 h-4 mr-2" />
                 Reject
@@ -434,20 +465,33 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'approve')}
+                  disabled={isOperationProcessing}
                   className={cn(
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'approve'
                       ? 'bg-green-500/20 text-green-400 border-green-400 hover:bg-green-500/30'
                       : 'text-green-400/50 border-green-400/30 hover:bg-green-400/10'
                   )}
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Approve
+                  {isOperationProcessing && approvalDecision === 'approve' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Approve
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'reject')}
+                  disabled={isOperationProcessing}
                   className={cn(
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'reject'
                       ? 'bg-red-500/20 text-red-400 border-red-400 hover:bg-red-500/30'
                       : 'text-red-400/50 border-red-400/30 hover:bg-red-400/10'

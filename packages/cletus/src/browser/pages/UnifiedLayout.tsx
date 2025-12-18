@@ -362,6 +362,23 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
 
   const handleOperationApproval = (message: Message, approved: number[], rejected: number[]) => {
     if (!selectedChatId) return;
+
+    // Update local state immediately to show visual feedback
+    setMessages(prev => prev.map(msg => {
+      if (msg.created === message.created) {
+        const updatedOperations = (msg.operations || []).map((op, idx) => {
+          if (approved.includes(idx)) {
+            return { ...op, status: 'doing' as const };
+          } else if (rejected.includes(idx)) {
+            return { ...op, status: 'rejected' as const };
+          }
+          return op;
+        });
+        return { ...msg, operations: updatedOperations };
+      }
+      return msg;
+    }));
+
     send({
       type: 'handle_operations',
       data: {
@@ -372,6 +389,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       },
     });
     setOperationDecisions(new Map());
+    setIsProcessing(true);
+    setStatus('Executing operations...');
   };
 
   const handleToggleOperationDecision = (idx: number, decision: 'approve' | 'reject') => {
@@ -441,6 +460,9 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
   const allOperationsDecided = lastMessagePendingOps.every((_op, idx) =>
     operationDecisions.has(idx)
   );
+  const hasOperationsProcessing = lastMessage?.role === 'assistant'
+    ? (lastMessage.operations || []).some(op => op.status === 'doing')
+    : false;
 
   // Empty state when no chat is selected
   if (!selectedChatId || !chatMeta) {
@@ -620,6 +642,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
                 onModelClick={() => setShowModelSelector(true)}
                 hasMultiplePendingOperations={hasMultiplePendingOps}
                 allOperationsDecided={allOperationsDecided}
+                hasOperationsProcessing={hasOperationsProcessing}
                 onApproveAll={handleApproveAllOperations}
                 onRejectAll={handleRejectAllOperations}
                 onSubmitDecisions={handleSubmitOperationDecisions}
