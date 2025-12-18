@@ -50,17 +50,6 @@ export interface OperationDisplayProps {
 }
 
 /**
- * Default operation renderer - delegates to BaseOperationDisplay
- */
-export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => (
-  <BaseOperationDisplay
-    {...props}
-    label={props.operation.type}
-    summary={props.operation.analysis}
-  />
-);
-
-/**
  * Create a renderer for a specific operation kind
  * @param common 
  * @returns 
@@ -80,8 +69,8 @@ export const createRenderer = (common: Partial<BaseOperationDisplayProps> = {}) 
       return (
         <BaseOperationDisplay
           {...common}
+          {...props}
           {...additionalProps}
-          operation={operation}
           label={label}
           summary={summary}
         />

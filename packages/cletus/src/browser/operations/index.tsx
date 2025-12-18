@@ -1,6 +1,6 @@
 import React from 'react';
 import { Operation, OperationKind } from '../../schemas';
-import { OperationDisplay as DefaultOperationDisplay } from './render';
+import { OperationDisplayProps } from './render';
 
 // Import operation-specific renderers
 import * as clerk from './clerk';
@@ -43,26 +43,11 @@ const OperationRenderers: Record<OperationKind, React.FC<{
   ...secretary,
 };
 
-interface OperationDisplayProps {
-  operation: Operation;
-  operationIndex?: number;
-  onApprove?: (index: number) => void;
-  onReject?: (index: number) => void;
-  approvalDecision?: 'approve' | 'reject';
-  onToggleDecision?: (index: number, decision: 'approve' | 'reject') => void;
-  hasMultipleOperations?: boolean;
-}
-
 /**
  * Main operation display component that delegates to specific renderers
  */
 export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => {
-  const Renderer = OperationRenderers[props.operation.type as OperationKind] as any;
+  const Renderer = OperationRenderers[props.operation.type];
 
-  if (Renderer) {
-    return <Renderer {...props} />;
-  }
-
-  // Fall back to default renderer
-  return <DefaultOperationDisplay {...props} />;
+  return <Renderer {...props} />;
 };

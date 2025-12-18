@@ -315,6 +315,52 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     }
   };
 
+  const runChat = async (chatFile: ChatFile, chatMeta: ChatMeta, config: ConfigFile) => {
+    // Ensure AI and chat agent are loaded
+    const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
+
+    // Run orchestrator
+    abortController = new AbortController();
+
+    // Clear usage before running orchestrator
+    const clearUsage = () => {
+      const defaultContext = aiInstance.config.defaultContext;
+      if (defaultContext && defaultContext.usage) {
+        defaultContext.usage.accumulated = {};
+        defaultContext.usage.accumulatedCost = 0;
+      }
+    };
+
+    // Get current usage
+    const getUsage = () => {
+      const defaultContext = aiInstance.config.defaultContext;
+      if (defaultContext && defaultContext.usage) {
+        return {
+          accumulated: defaultContext.usage.accumulated,
+          accumulatedCost: defaultContext.usage.accumulatedCost,
+        };
+      }
+      return { accumulated: {}, accumulatedCost: 0 };
+    };
+
+    // Run orchestrator with updated chat file
+    await runChatOrchestrator({
+      chatAgent: chatAgentInstance,
+      messages: chatFile.getMessages(),
+      chatMeta: { ...chatMeta, questions: [] },
+      config,
+      chatData: chatFile,
+      signal: abortController?.signal,
+      clearUsage,
+      getUsage,
+    }, (event) => {
+      handleOrchestratorEvent(event, chatFile);
+    }).then(() => {
+      // Clear abort controller
+      abortController = null;
+    });
+  };
+
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString()) as ClientMessage;
@@ -429,46 +475,8 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               data: { message: { ...userMessage, created: Date.now() } as Message },
             });
 
-            // Process AI response
-            abortController = new AbortController();
-
-            // Ensure AI and chat agent are loaded
-            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
-
-            const clearUsage = () => {
-              const defaultContext = aiInstance.config.defaultContext;
-              if (defaultContext && defaultContext.usage) {
-                defaultContext.usage.accumulated = {};
-                defaultContext.usage.accumulatedCost = 0;
-              }
-            };
-
-            const getUsage = () => {
-              const defaultContext = aiInstance.config.defaultContext;
-              if (defaultContext && defaultContext.usage) {
-                return {
-                  accumulated: defaultContext.usage.accumulated,
-                  accumulatedCost: defaultContext.usage.accumulatedCost,
-                };
-              }
-              return { accumulated: {}, accumulatedCost: 0 };
-            };
-
-            await runChatOrchestrator({
-              chatAgent: chatAgentInstance,
-              messages: chatFile.getMessages(),
-              chatMeta: chat,
-              config,
-              chatData: chatFile,
-              signal: abortController.signal,
-              clearUsage,
-              getUsage,
-            }, (event) => {
-              handleOrchestratorEvent(event, chatFile);
-            }).then(() => {
-              // Clear abort controller
-              abortController = null;
-            });
+            // Run the chat
+            await runChat(chatFile, chat, config);
           });
           break;
         }
@@ -632,8 +640,20 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               return;
             }
 
+            const broadcastMessageUpdate = () => {
+              sendMessage({
+                type: 'message_updated',
+                data: { message: targetMessage },
+              });
+            };
+
             const operations = targetMessage.operations;
-            const manager = new OperationManager('none', operations);
+            const manager = new OperationManager(
+              'none', 
+              operations,
+              () => {},
+              (op, opIndex) => broadcastMessageUpdate(),
+            );
 
             // Mark rejected operations
             for (const idx of rejected) {
@@ -669,53 +689,12 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             });
 
             // Send updated message back to client
-            sendMessage({
-              type: 'message_updated',
-              data: { message: targetMessage },
-            });
+            broadcastMessageUpdate();
 
             // If operations were executed, continue with the orchestrator
             if (hasExecutedOperations) {
-              // Process AI response
-              abortController = new AbortController();
-
-              // Clear usage before running orchestrator
-              const clearUsage = () => {
-                const defaultContext = aiInstance.config.defaultContext;
-                if (defaultContext && defaultContext.usage) {
-                  defaultContext.usage.accumulated = {};
-                  defaultContext.usage.accumulatedCost = 0;
-                }
-              };
-
-              // Get current usage
-              const getUsage = () => {
-                const defaultContext = aiInstance.config.defaultContext;
-                if (defaultContext && defaultContext.usage) {
-                  return {
-                    accumulated: defaultContext.usage.accumulated,
-                    accumulatedCost: defaultContext.usage.accumulatedCost,
-                  };
-                }
-                return { accumulated: {}, accumulatedCost: 0 };
-              };
-
-              // Run orchestrator with updated chat file
-              await runChatOrchestrator({
-                chatAgent: chatAgentInstance,
-                messages: chatFile.getMessages(),
-                chatMeta: chatMeta,
-                config,
-                chatData: chatFile,
-                signal: abortController?.signal,
-                clearUsage,
-                getUsage,
-              }, (event) => {
-                handleOrchestratorEvent(event, chatFile);
-              }).then(() => {
-                // Clear abort controller
-                abortController = null;
-              });
+              // Run the chat
+              await runChat(chatFile, chatMeta, config);
             }
           });
           break;
@@ -816,49 +795,8 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               data: { chat: { ...chatMeta, questions: [] } },
             });
 
-            // Ensure AI and chat agent are loaded
-            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
-
-            // Run orchestrator
-            abortController = new AbortController();
-
-            // Clear usage before running orchestrator
-            const clearUsage = () => {
-              const defaultContext = aiInstance.config.defaultContext;
-              if (defaultContext && defaultContext.usage) {
-                defaultContext.usage.accumulated = {};
-                defaultContext.usage.accumulatedCost = 0;
-              }
-            };
-
-            // Get current usage
-            const getUsage = () => {
-              const defaultContext = aiInstance.config.defaultContext;
-              if (defaultContext && defaultContext.usage) {
-                return {
-                  accumulated: defaultContext.usage.accumulated,
-                  accumulatedCost: defaultContext.usage.accumulatedCost,
-                };
-              }
-              return { accumulated: {}, accumulatedCost: 0 };
-            };
-
-            // Run orchestrator with updated chat file
-            await runChatOrchestrator({
-              chatAgent: chatAgentInstance,
-              messages: chatFile.getMessages(),
-              chatMeta: { ...chatMeta, questions: [] },
-              config,
-              chatData: chatFile,
-              signal: abortController?.signal,
-              clearUsage,
-              getUsage,
-            }, (event) => {
-              handleOrchestratorEvent(event, chatFile);
-            }).then(() => {
-              // Clear abort controller
-              abortController = null;
-            });
+            // Run the chat
+            await runChat(chatFile, chatMeta, config);
           });
           break;
         }
