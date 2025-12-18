@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import { MessageItem } from './MessageItem';
 import type { Message } from '../../schemas';
 
 interface MessageListProps {
   messages: Message[];
+  loading?: boolean;
   operationDecisions?: Map<number, 'approve' | 'reject'>;
   onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
   onApproveOperation?: (message: Message, idx: number) => void;
@@ -12,6 +14,7 @@ interface MessageListProps {
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
+  loading = false,
   operationDecisions,
   onToggleOperationDecision,
   onApproveOperation,
@@ -28,7 +31,14 @@ export const MessageList: React.FC<MessageListProps> = ({
     <div className="flex-1 overflow-auto">
       {messages.length === 0 ? (
         <div className="text-center text-muted-foreground mt-8">
-          <p>No messages yet. Start a conversation!</p>
+          {loading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <p>Loading messages...</p>
+            </div>
+          ) : (
+            <p>No messages yet. Start a conversation!</p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -40,7 +50,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
             return (
               <MessageItem
-                key={index}
+                key={message.created}
                 message={message}
                 operationDecisions={operationDecisions}
                 onToggleOperationDecision={onToggleOperationDecision}

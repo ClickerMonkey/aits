@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
-import { MessageSquare, Clock, Plus, ChevronLeft, ChevronRight, User, Sparkles } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ScrollArea } from './ui/scroll-area';
+import { ChevronLeft, ChevronRight, Clock, MessageSquare, Plus, Sparkles, User } from 'lucide-react';
+import React from 'react';
 import type { Config } from '../../schemas';
+import { Button } from './ui/button';
+import { ScrollArea } from './ui/scroll-area';
 
 interface ChatSidebarProps {
   config: Config;
@@ -12,8 +10,8 @@ interface ChatSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onChatSelect: (chatId: string) => void;
-  onConfigChange: () => Promise<void>;
   onProfileClick: () => void;
+  onCreateChat?: () => void;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -22,44 +20,15 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
   onChatSelect,
-  onConfigChange,
   onProfileClick,
+  onCreateChat,
 }) => {
   const chats = config.chats;
   const sortedChats = [...chats].sort((a, b) => b.updated - a.updated);
 
-  const handleCreateChat = async () => {
-    // Generate timestamp-based name
-    const now = new Date();
-    const day = now.getDate();
-    const month = now.getMonth() + 1; // 0-indexed
-    const year = now.getFullYear();
-    const newChatName = `New Chat on ${day}/${month}/${year}`;
-
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}`);
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          type: 'create_chat',
-          data: { name: newChatName.trim() },
-        }));
-      };
-
-      ws.onmessage = async (event) => {
-        const message = JSON.parse(event.data);
-        if (message.type === 'chat_created') {
-          await onConfigChange();
-          onChatSelect(message.data.chatId);
-          ws.close();
-        } else if (message.type === 'error') {
-          console.error('Failed to create chat:', message.data.message);
-          ws.close();
-        }
-      };
-    } catch (error) {
-      console.error('Failed to create chat:', error);
+  const handleCreateChat = () => {
+    if (onCreateChat) {
+      onCreateChat();
     }
   };
 

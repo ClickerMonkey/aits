@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X, CheckCircle2, XCircle } from 'lucide-react';
+import { Send, Loader2, X, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import type { ChatMeta, MessageContent, Config } from '../../schemas';
@@ -184,11 +184,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <Button
                 type="button"
                 variant="destructive"
+                size="icon"
                 onClick={onCancel}
-                className="gap-2"
+                title="Stop"
               >
-                <X className="w-4 h-4" />
-                Cancel
+                <StopCircle className="w-5 h-5" />
               </Button>
             )}
             <Button

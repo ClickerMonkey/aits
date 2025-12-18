@@ -42,7 +42,8 @@ export type ServerMessage =
   | { type: 'usage_update'; data: { accumulated: any; accumulatedCost: number; current: any } }
   | { type: 'elapsed_update'; data: { ms: number } }
   | { type: 'chat_deleted'; data: { chatId: string } }
-  | { type: 'error'; data: { message: string } };
+  | { type: 'error'; data: { message: string } }
+  | { type: 'processing'; data: boolean };
 
 /**
  * Type-safe WebSocket client interface

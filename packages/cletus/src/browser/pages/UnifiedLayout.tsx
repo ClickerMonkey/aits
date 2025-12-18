@@ -29,6 +29,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingMessage, setPendingMessage] = useState<Message | null>(null);
+  const [temporaryUserMessage, setTemporaryUserMessage] = useState<Message | null>(null);
+  const [temporaryAssistantMessage, setTemporaryAssistantMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showChatSettings, setShowChatSettings] = useState(false);
@@ -49,6 +51,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
     resolve: (models: any[]) => void;
     reject: (error: Error) => void;
   } | null>(null);
+  const pendingChatSelectRef = useRef<string | null>(null);
 
   const chatMeta = chatMetaState || config.chats.find((c) => c.id === selectedChatId);
 
@@ -58,10 +61,34 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       const lastChat = [...config.chats].sort((a, b) => b.updated - a.updated)[0];
       if (lastChat) {
         setSelectedChatId(lastChat.id);
+        setLoading(true);
         window.history.replaceState({}, '', `/chat/${lastChat.id}`);
       }
     }
   }, [config.chats, selectedChatId]);
+
+  // Handle pending chat selection after config updates
+  useEffect(() => {
+    console.log('[UnifiedLayout] Effect fired, pendingChatSelectRef:', pendingChatSelectRef.current, 'config.chats.length:', config.chats.length);
+    if (pendingChatSelectRef.current) {
+      const chatToSelect = pendingChatSelectRef.current;
+
+      console.log('[UnifiedLayout] Attempting to select chat:', chatToSelect);
+      // Check if chat exists in config
+      const chatExists = config.chats.find(c => c.id === chatToSelect);
+      console.log('[UnifiedLayout] Chat exists in config:', !!chatExists);
+
+      if (chatExists) {
+        // Chat is in config, select it now
+        pendingChatSelectRef.current = null;
+        console.log('[UnifiedLayout] Calling handleChatSelect');
+        handleChatSelect(chatToSelect);
+      } else {
+        // Chat not in config yet, keep waiting for next config update
+        console.log('[UnifiedLayout] Chat not found, waiting for next config update');
+      }
+    }
+  }, [config.chats]);
 
   // WebSocket connection
   useEffect(() => {
@@ -106,12 +133,16 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         break;
 
       case 'message_added':
+        // Clear temporary user message when real message is added
+        setTemporaryUserMessage(null);
         if (wsRef.current && selectedChatId) {
           sendClientMessage(wsRef.current, { type: 'get_messages', data: { chatId: selectedChatId } });
         }
         break;
 
       case 'pending_update':
+        // Clear temporary assistant message when real pending message arrives
+        setTemporaryAssistantMessage(null);
         setPendingMessage(message.data.pending);
         break;
 
@@ -129,6 +160,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
 
       case 'response_complete':
         setPendingMessage(null);
+        setTemporaryAssistantMessage(null);
         setIsProcessing(false);
         setStatus('');
         if (message.data.message) {
@@ -159,6 +191,13 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       case 'elapsed_update':
         break;
 
+      case 'processing':
+        setIsProcessing(message.data);
+        if (!message.data) {
+          setStatus('');
+        }
+        break;
+
       case 'models':
         if (modelsResolverRef.current) {
           modelsResolverRef.current.resolve(message.data.models || []);
@@ -166,7 +205,36 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         }
         break;
 
+      case 'chat_created':
+        console.log('[UnifiedLayout] Received chat_created:', message.data.chatId);
+        // Store the chat to select after config updates
+        if (message.data.chatId) {
+          pendingChatSelectRef.current = message.data.chatId;
+          console.log('[UnifiedLayout] Set pendingChatSelectRef to:', message.data.chatId);
+        }
+        // Refresh config - the effect will handle selection
+        console.log('[UnifiedLayout] Calling onConfigChange');
+        onConfigChange().then(() => {
+          // If chat still not found after first reload, try again
+          console.log('[UnifiedLayout] First config reload complete');
+          if (pendingChatSelectRef.current) {
+            console.log('[UnifiedLayout] Chat still pending, reloading config again after delay');
+            setTimeout(() => onConfigChange(), 200);
+          }
+        });
+        break;
+
       case 'chat_deleted':
+        // Clear selection if deleted chat was selected
+        if (message.data.chatId === selectedChatId) {
+          setSelectedChatId(null);
+          setMessages([]);
+          setPendingMessage(null);
+          setTemporaryUserMessage(null);
+          setTemporaryAssistantMessage(null);
+        }
+        // Refresh config - auto-select effect will handle selecting another chat
+        onConfigChange();
         break;
 
       case 'error':
@@ -197,24 +265,41 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
     setSelectedChatId(chatId);
     setMessages([]);
     setPendingMessage(null);
+    setTemporaryUserMessage(null);
+    setTemporaryAssistantMessage(null);
     setLoading(true);
     window.history.pushState({}, '', `/chat/${chatId}`);
   };
 
   const handleSendMessage = (content: MessageContent[]) => {
     if (!selectedChatId) return;
+
+    // Create temporary user message for immediate display
+    const tempUserMsg: Message = {
+      role: 'user',
+      content,
+      created: Date.now(),
+    };
+    setTemporaryUserMessage(tempUserMsg);
+
+    // Create temporary assistant message placeholder
+    const tempAssistantMsg: Message = {
+      role: 'assistant',
+      content: [],
+      created: Date.now() + 1,
+    };
+    setTemporaryAssistantMessage(tempAssistantMsg);
+
     send({
       type: 'send_message',
       data: { chatId: selectedChatId, content },
     });
-    setIsProcessing(true);
-    setStatus('Processing...');
+    // Server will send 'processing' message to update isProcessing state
   };
 
   const handleCancel = () => {
     send({ type: 'cancel' });
-    setIsProcessing(false);
-    setStatus('');
+    // Server will send 'processing' message to update isProcessing state
   };
 
   const handleQuestionsSubmit = (questionAnswers: Record<number, Set<number>>, questionCustomAnswers: Record<number, string>) => {
@@ -228,8 +313,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       type: 'submit_question_answers',
       data: { chatId: selectedChatId, questionAnswers: answersArray, questionCustomAnswers },
     });
-    setIsProcessing(true);
-    setStatus('Processing answers...');
+    // Server will send 'processing' message to update isProcessing state
   };
 
   const handleQuestionsCancel = () => {
@@ -363,8 +447,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
   const handleOperationApproval = (message: Message, approved: number[], rejected: number[]) => {
     if (!selectedChatId) return;
 
-    // Update local state immediately to show visual feedback
-    setMessages(prev => prev.map(msg => {
+    // Helper function to update operations in a message
+    const updateMessageOperations = (msg: Message) => {
       if (msg.created === message.created) {
         const updatedOperations = (msg.operations || []).map((op, idx) => {
           if (approved.includes(idx)) {
@@ -377,7 +461,13 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         return { ...msg, operations: updatedOperations };
       }
       return msg;
-    }));
+    };
+
+    // Update local state immediately to show visual feedback
+    setMessages(prev => prev.map(updateMessageOperations));
+
+    // Also update pending message if it matches
+    setPendingMessage(prev => prev ? updateMessageOperations(prev) : null);
 
     send({
       type: 'handle_operations',
@@ -389,8 +479,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       },
     });
     setOperationDecisions(new Map());
-    setIsProcessing(true);
-    setStatus('Executing operations...');
+    // Server will send 'processing' message to update isProcessing state
   };
 
   const handleToggleOperationDecision = (idx: number, decision: 'approve' | 'reject') => {
@@ -450,8 +539,38 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
     send({ type: 'update_user', data: { updates } });
   };
 
-  // Get the actual last message being rendered (including pending)
-  const allMessages = pendingMessage ? [...messages, pendingMessage] : messages;
+  const handleCreateChat = () => {
+    // Generate timestamp-based name
+    const now = new Date();
+    const day = now.getDate();
+    const month = now.getMonth() + 1; // 0-indexed
+    const year = now.getFullYear();
+    const name = `New Chat on ${day}/${month}/${year}`;
+
+    send({
+      type: 'create_chat',
+      data: { name },
+    });
+  };
+
+  // Get the actual last message being rendered (including pending and temporary)
+  let allMessages = [...messages];
+
+  // Add temporary user message if it exists
+  if (temporaryUserMessage) {
+    allMessages.push(temporaryUserMessage);
+  }
+
+  // Add temporary assistant message if it exists (and no real pending message yet)
+  if (temporaryAssistantMessage && !pendingMessage) {
+    allMessages.push(temporaryAssistantMessage);
+  }
+
+  // Add pending message if it exists (replaces temporary assistant message)
+  if (pendingMessage) {
+    allMessages.push(pendingMessage);
+  }
+
   const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
   const lastMessagePendingOps = lastMessage?.role === 'assistant'
     ? (lastMessage.operations || []).filter(op => op.status === 'analyzed')
@@ -474,8 +593,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onChatSelect={handleChatSelect}
-          onConfigChange={onConfigChange}
           onProfileClick={() => setShowProfile(true)}
+          onCreateChat={handleCreateChat}
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-6">
@@ -510,8 +629,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         onChatSelect={handleChatSelect}
-        onConfigChange={onConfigChange}
         onProfileClick={() => setShowProfile(true)}
+        onCreateChat={handleCreateChat}
       />
 
       {/* Main Chat Area */}
@@ -607,49 +726,41 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="spinner mx-auto"></div>
-              <p className="text-muted-foreground">Loading messages...</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-6">
-              <MessageList
-                messages={pendingMessage ? [...messages, pendingMessage] : messages}
-                operationDecisions={operationDecisions}
-                onToggleOperationDecision={handleToggleOperationDecision}
-                onApproveOperation={(msg, idx) => handleOperationApproval(msg, [idx], [])}
-                onRejectOperation={(msg, idx) => handleOperationApproval(msg, [], [idx])}
-              />
-            </ScrollArea>
+        <>
+          {/* Messages Area */}
+          <ScrollArea className="flex-1 p-6">
+            <MessageList
+              messages={allMessages}
+              loading={loading}
+              operationDecisions={operationDecisions}
+              onToggleOperationDecision={handleToggleOperationDecision}
+              onApproveOperation={(msg, idx) => handleOperationApproval(msg, [idx], [])}
+              onRejectOperation={(msg, idx) => handleOperationApproval(msg, [], [idx])}
+            />
+          </ScrollArea>
 
-            {/* Input Area */}
-            <div className="border-t border-border bg-card/30 backdrop-blur-sm">
-              <ChatInput
-                chatId={selectedChatId}
-                chatMeta={chatMeta}
-                config={config}
-                messageCount={messages.length}
-                totalCost={totalCost}
-                status={status}
-                isProcessing={isProcessing}
-                onSendMessage={handleSendMessage}
-                onCancel={handleCancel}
-                onModelClick={() => setShowModelSelector(true)}
-                hasMultiplePendingOperations={hasMultiplePendingOps}
-                allOperationsDecided={allOperationsDecided}
-                hasOperationsProcessing={hasOperationsProcessing}
-                onApproveAll={handleApproveAllOperations}
-                onRejectAll={handleRejectAllOperations}
-                onSubmitDecisions={handleSubmitOperationDecisions}
-              />
-            </div>
-          </>
-        )}
+          {/* Input Area */}
+          <div className="border-t border-border bg-card/30 backdrop-blur-sm">
+            <ChatInput
+              chatId={selectedChatId}
+              chatMeta={chatMeta}
+              config={config}
+              messageCount={messages.length}
+              totalCost={totalCost}
+              status={status}
+              isProcessing={isProcessing}
+              onSendMessage={handleSendMessage}
+              onCancel={handleCancel}
+              onModelClick={() => setShowModelSelector(true)}
+              hasMultiplePendingOperations={hasMultiplePendingOps}
+              allOperationsDecided={allOperationsDecided}
+              hasOperationsProcessing={hasOperationsProcessing}
+              onApproveAll={handleApproveAllOperations}
+              onRejectAll={handleRejectAllOperations}
+              onSubmitDecisions={handleSubmitOperationDecisions}
+            />
+          </div>
+        </>
       </div>
 
       {/* Modals */}

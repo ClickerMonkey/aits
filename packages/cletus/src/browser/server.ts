@@ -12,6 +12,7 @@ import { OperationManager } from '../operations/manager';
 import { CletusAI, createCletusAI } from '../ai';
 import { CletusChatAgent, createChatAgent, initTools } from '../agents/chat-agent';
 import { OrchestratorEvent, runChatOrchestrator } from '../agents/chat-orchestrator';
+import { send } from 'process';
 
 const __serverFilename = fileURLToPath(import.meta.url);
 const __serverDirname = path.dirname(__serverFilename);
@@ -147,6 +148,21 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
   // Type-safe message sender
   const sendMessage = (message: ServerMessage) => {
     ws.send(JSON.stringify(message));
+  };
+
+  // Helper to run interruptible operations
+  const startProcessing = <T>(fn: (signal: AbortSignal) => Promise<T>) => {
+    if (abortController) {
+      throw new Error('Another operation is already in progress');
+    }
+    abortController = new AbortController();
+    try {
+      sendMessage({ type: 'processing', data: true });
+      return fn(abortController.signal);
+    } finally {
+      sendMessage({ type: 'processing', data: false });
+      abortController = null;
+    }
   };
 
   // Helper to send errors
@@ -291,11 +307,14 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
       case 'pendingUpdate':
         // Save pending message immediately to chat file so it persists
         // This ensures messages are never lost due to errors or cancellations
-        fireAndForget(saveOrUpdateMessage(chatFile, event.pending));
-
-        sendMessage({
-          type: 'pending_update',
-          data: { pending: event.pending },
+        // We MUST await this to prevent race conditions where the user approves
+        // operations before the message is saved
+        fireAndForget(async () => {
+          await saveOrUpdateMessage(chatFile, event.pending);
+          sendMessage({
+            type: 'pending_update',
+            data: { pending: event.pending },
+          });
         });
         break;
       case 'update':
@@ -366,9 +385,6 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     // Ensure AI and chat agent are loaded
     const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
 
-    // Run orchestrator
-    abortController = new AbortController();
-
     // Clear usage before running orchestrator
     const clearUsage = () => {
       const defaultContext = aiInstance.config.defaultContext;
@@ -391,20 +407,19 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     };
 
     // Run orchestrator with updated chat file
-    await runChatOrchestrator({
-      chatAgent: chatAgentInstance,
-      messages: chatFile.getMessages(),
-      chatMeta: { ...chatMeta, questions: [] },
-      config,
-      chatData: chatFile,
-      signal: abortController?.signal,
-      clearUsage,
-      getUsage,
-    }, (event) => {
-      handleOrchestratorEvent(event, chatFile);
-    }).then(() => {
-      // Clear abort controller
-      abortController = null;
+    await startProcessing(async (signal)  => {
+      await runChatOrchestrator({
+        chatAgent: chatAgentInstance,
+        messages: chatFile.getMessages(),
+        chatMeta: { ...chatMeta, questions: [] },
+        config,
+        chatData: chatFile,
+        signal,
+        clearUsage,
+        getUsage,
+      }, (event) => {
+        handleOrchestratorEvent(event, chatFile);
+      });
     });
   };
 
@@ -699,8 +714,27 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               'none', 
               operations,
               () => {},
-              (op, opIndex) => broadcastMessageUpdate(),
+              (op, opIndex) => {
+                // Update the message content when operation is executed.
+                // Move to end of message content array to ensure visibility.
+                const contentIndex = targetMessage.content.findIndex((c) => c.operationIndex === opIndex);
+                if (contentIndex !== -1) {
+                  const content = targetMessage.content.splice(contentIndex, 1)[0];
+                  content.content = op.message || '';
+                  targetMessage.content.push(content);
+                  
+                  chatFile.updateMessage(targetMessage);
+                  broadcastMessageUpdate();
+                }
+              },
             );
+
+            // Mark approved operations as 'doing' immediately
+            for (const idx of approved) {
+              if (operations[idx]) {
+                operations[idx].status = 'doing';
+              }
+            }
 
             // Mark rejected operations
             for (const idx of rejected) {
@@ -710,33 +744,40 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               }
             }
 
+            // Save and broadcast the updated operation statuses immediately
+            await chatFile.updateMessage(targetMessage);
+            broadcastMessageUpdate();
+
             // Ensure AI and chat agent are loaded
             const { ai: aiInstance } = await ensureAI();
 
             // Execute approved operations
             let hasExecutedOperations = false;
             if (approved.length > 0) {
-              const ctx = await aiInstance.buildContext({
-                chat: chatMeta,
-                chatData: chatFile,
-                chatMessage: targetMessage,
-              });
+              await startProcessing(async (signal) => {
+                const ctx = await aiInstance.buildContext({
+                  ops: manager,
+                  chat: chatMeta,
+                  chatData: chatFile,
+                  chatMessage: targetMessage,
+                  config,
+                  signal,
+                  chatStatus: (status) => {
+                    sendMessage({
+                      type: 'status_update',
+                      data: { status },
+                    });
+                  },
+                });
 
-              for (const idx of approved) {
-                if (operations[idx]) {
-                  await manager.execute(operations[idx], true, ctx);
-                  hasExecutedOperations = true;
+                for (const idx of approved) {
+                  if (operations[idx]) {
+                    await manager.execute(operations[idx], true, ctx);
+                    hasExecutedOperations = true;
+                  }
                 }
-              }
+              });
             }
-
-            // Save updated message
-            await chatFile.save(d => {
-              d.messages = messages.map(m => m.created === messageCreated ? targetMessage : m);
-            });
-
-            // Send updated message back to client
-            broadcastMessageUpdate();
 
             // If operations were executed, continue with the orchestrator
             if (hasExecutedOperations) {
