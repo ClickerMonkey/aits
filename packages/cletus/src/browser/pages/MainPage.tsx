@@ -17,14 +17,15 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
 import type { ServerMessage } from '../websocket-types';
-import { sendClientMessage } from '../websocket-types';
+import { useWebSocket } from '../WebSocketContext';
 
-interface UnifiedLayoutProps {
+interface MainPageProps {
   config: Config;
   onConfigChange: () => Promise<void>;
 }
 
-export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigChange }) => {
+export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) => {
+  const { ws, isConnected } = useWebSocket();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,7 +47,6 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
   const [cwd, setCwd] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
     reject: (error: Error) => void;
@@ -69,61 +69,36 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
 
   // Handle pending chat selection after config updates
   useEffect(() => {
-    console.log('[UnifiedLayout] Effect fired, pendingChatSelectRef:', pendingChatSelectRef.current, 'config.chats.length:', config.chats.length);
     if (pendingChatSelectRef.current) {
       const chatToSelect = pendingChatSelectRef.current;
 
-      console.log('[UnifiedLayout] Attempting to select chat:', chatToSelect);
       // Check if chat exists in config
       const chatExists = config.chats.find(c => c.id === chatToSelect);
-      console.log('[UnifiedLayout] Chat exists in config:', !!chatExists);
-
       if (chatExists) {
         // Chat is in config, select it now
         pendingChatSelectRef.current = null;
-        console.log('[UnifiedLayout] Calling handleChatSelect');
         handleChatSelect(chatToSelect);
-      } else {
-        // Chat not in config yet, keep waiting for next config update
-        console.log('[UnifiedLayout] Chat not found, waiting for next config update');
       }
     }
   }, [config.chats]);
 
-  // WebSocket connection
+  // Request messages when chat is selected and WebSocket is connected
   useEffect(() => {
-    if (!selectedChatId) return;
+    if (!selectedChatId || !isConnected || !ws) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    ws.send({ type: 'get_messages', data: { chatId: selectedChatId } });
+  }, [selectedChatId, isConnected, ws]);
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      sendClientMessage(ws, { type: 'get_messages', data: { chatId: selectedChatId } });
-    };
+  // Listen for WebSocket messages
+  useEffect(() => {
+    if (!ws) return;
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data) as ServerMessage;
+    const unsubscribe = ws.onMessage((message) => {
       handleServerMessage(message);
-    };
+    });
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setLoading(false);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket closed');
-    };
-
-    wsRef.current = ws;
-
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    };
-  }, [selectedChatId]);
+    return unsubscribe;
+  }, [ws]);
 
   const handleServerMessage = (message: ServerMessage) => {
     switch (message.type) {
@@ -135,8 +110,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
       case 'message_added':
         // Clear temporary user message when real message is added
         setTemporaryUserMessage(null);
-        if (wsRef.current && selectedChatId) {
-          sendClientMessage(wsRef.current, { type: 'get_messages', data: { chatId: selectedChatId } });
+        if (ws && selectedChatId) {
+          ws.send({ type: 'get_messages', data: { chatId: selectedChatId } });
         }
         break;
 
@@ -205,23 +180,17 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         }
         break;
 
+      case 'config':
+        // Config received
+        break;
+
       case 'chat_created':
-        console.log('[UnifiedLayout] Received chat_created:', message.data.chatId);
         // Store the chat to select after config updates
         if (message.data.chatId) {
           pendingChatSelectRef.current = message.data.chatId;
-          console.log('[UnifiedLayout] Set pendingChatSelectRef to:', message.data.chatId);
         }
         // Refresh config - the effect will handle selection
-        console.log('[UnifiedLayout] Calling onConfigChange');
-        onConfigChange().then(() => {
-          // If chat still not found after first reload, try again
-          console.log('[UnifiedLayout] First config reload complete');
-          if (pendingChatSelectRef.current) {
-            console.log('[UnifiedLayout] Chat still pending, reloading config again after delay');
-            setTimeout(() => onConfigChange(), 200);
-          }
-        });
+        onConfigChange();
         break;
 
       case 'chat_deleted':
@@ -254,8 +223,8 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
   };
 
   const send = (message: any) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      sendClientMessage(wsRef.current, message);
+    if (ws && ws.isOpen()) {
+      ws.send(message);
     } else {
       console.error('WebSocket not connected');
     }
@@ -352,7 +321,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
 
   const handleFetchModels = async (): Promise<any[]> => {
     return new Promise((resolve, reject) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      if (!ws || !ws.isOpen()) {
         reject(new Error('WebSocket not connected'));
         return;
       }
@@ -366,7 +335,7 @@ export const UnifiedLayout: React.FC<UnifiedLayoutProps> = ({ config, onConfigCh
         }
       }, 10000);
 
-      sendClientMessage(wsRef.current, { type: 'get_models' });
+      ws.send({ type: 'get_models' });
     });
   };
 

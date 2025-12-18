@@ -50,8 +50,9 @@ export type ServerMessage =
  */
 export interface TypedWebSocket {
   send(message: ClientMessage): void;
-  onMessage(handler: (message: ServerMessage) => void): void;
+  onMessage(handler: (message: ServerMessage) => void): () => void;
   close(): void;
+  isOpen(): boolean;
 }
 
 /**
@@ -72,13 +73,27 @@ export function createTypedWebSocket(url: string): TypedWebSocket {
 
   return {
     send(message: ClientMessage) {
-      ws.send(JSON.stringify(message));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+      } else {
+        console.error('WebSocket is not open. ReadyState:', ws.readyState);
+      }
     },
-    onMessage(handler: (message: ServerMessage) => void) {
+    onMessage(handler: (message: ServerMessage) => void): () => void {
       messageHandlers.push(handler);
+      // Return unsubscribe function
+      return () => {
+        const index = messageHandlers.indexOf(handler);
+        if (index > -1) {
+          messageHandlers.splice(index, 1);
+        }
+      };
     },
     close() {
       ws.close();
+    },
+    isOpen() {
+      return ws.readyState === WebSocket.OPEN;
     },
   };
 }

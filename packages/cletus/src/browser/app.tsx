@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { UnifiedLayout } from './pages/UnifiedLayout';
+import { MainPage } from './pages/MainPage';
 import { InitPage } from './pages/InitPage';
+import { WebSocketProvider, useWebSocket } from './WebSocketContext';
 import type { Config } from '../schemas';
 
 type AppView = 'loading' | 'init' | 'main';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [view, setView] = useState<AppView>('loading');
   const [config, setConfig] = useState<Config | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const { ws, isConnected } = useWebSocket();
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -21,55 +22,39 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Request config when WebSocket connects
   useEffect(() => {
-    // Connect to WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    if (!isConnected || !ws) return;
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      // Request config
-      ws.send(JSON.stringify({ type: 'get_config' }));
-    };
+    console.log('[App] WebSocket connected, requesting config');
+    ws.send({ type: 'get_config' });
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-
+    // Listen for config-related messages
+    const unsubscribe = ws.onMessage((message) => {
       switch (message.type) {
         case 'config':
+          console.log('[App] Received config');
           setConfig(message.data);
           setView('main');
           break;
 
         case 'config_not_found':
+          console.log('[App] Config not found, showing init page');
           setView('init');
           break;
 
         case 'error':
-          console.error('WebSocket error:', message.data.message);
+          console.error('[App] WebSocket error:', message.data.message);
           break;
       }
-    };
+    });
 
-    ws.onerror = (error) => {
-      console.error('WebSocket connection error:', error);
-      setView('init');
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-
-    wsRef.current = ws;
-
-    return () => {
-      ws.close();
-    };
-  }, []);
+    return unsubscribe;
+  }, [isConnected, ws]);
 
   const reloadConfig = async () => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'get_config' }));
+    if (ws && isConnected) {
+      ws.send({ type: 'get_config' });
     }
   };
 
@@ -94,7 +79,7 @@ const App: React.FC = () => {
 
   if (view === 'main' && config) {
     return (
-      <UnifiedLayout
+      <MainPage
         config={config}
         onConfigChange={reloadConfig}
       />
@@ -106,6 +91,14 @@ const App: React.FC = () => {
       <div className="spinner"></div>
       <p className="neon-text-cyan">Loading...</p>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <WebSocketProvider>
+      <AppContent />
+    </WebSocketProvider>
   );
 };
 

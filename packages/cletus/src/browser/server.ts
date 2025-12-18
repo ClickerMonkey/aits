@@ -430,11 +430,9 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
       switch (message.type) {
         case 'get_config':
           withConfig((config) => {
-            const configData = config.getData();
-
             sendMessage({
               type: 'config',
-              data: configData,
+              data: config.getData(),
             });
           });
           break;
