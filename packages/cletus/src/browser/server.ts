@@ -100,6 +100,19 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
     console.log('  ⌨️  Press Ctrl+C to exit\n');
   });
 
+  // Handle & log these to avoid silent crashes
+  process.on('uncaughtException', (err => {
+    console.error('Uncaught exception:', err);
+  }));
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled promise rejection:', reason);
+  });
+
+  process.on('warning', (warning) => {
+    console.warn('Process warning:', warning);
+  });
+
   // Handle graceful shutdown
   process.on('SIGINT', () => {
     console.log('\n\nShutting down...');
@@ -257,10 +270,29 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     });
   };
 
+  /**
+   * Save or update a message in the chat file.
+   * If message exists (by created timestamp), update it. Otherwise, add it.
+   */
+  const saveOrUpdateMessage = async (chatFile: ChatFile, message: Message) => {
+    const messages = chatFile.getMessages();
+    const existingMessage = messages.find(m => m.created === message.created);
+
+    if (existingMessage) {
+      await chatFile.updateMessage(message);
+    } else {
+      await chatFile.addMessage(message);
+    }
+  };
+
   const handleOrchestratorEvent = (event: OrchestratorEvent, chatFile: ChatFile) => {
     // Handle orchestrator events
     switch (event.type) {
       case 'pendingUpdate':
+        // Save pending message immediately to chat file so it persists
+        // This ensures messages are never lost due to errors or cancellations
+        fireAndForget(saveOrUpdateMessage(chatFile, event.pending));
+
         sendMessage({
           type: 'pending_update',
           data: { pending: event.pending },
@@ -296,10 +328,13 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         });
         break;
       case 'complete':
-        // Add the complete message to chat file (like CLI does)
-        if (event.message.content.length > 0) {
-          fireAndForget(chatFile.addMessage(event.message))
-        }
+        // Update the message if it exists (from pending), or add it if it doesn't
+        fireAndForget(async () => {
+          if (event.message.content.length > 0) {
+            await saveOrUpdateMessage(chatFile, event.message);
+          }
+        });
+
         // Send the complete message
         sendMessage({
           type: 'response_complete',
@@ -307,6 +342,18 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
         });
         break;
       case 'error':
+        // Try to save any pending message state before reporting error
+        // This ensures partial progress isn't lost when errors occur
+        fireAndForget(async () => {
+          const messages = chatFile.getMessages();
+          // Find the most recent assistant message that might be pending
+          const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
+          if (lastAssistantMsg) {
+            // Update the message to persist any partial progress
+            await chatFile.updateMessage(lastAssistantMsg);
+          }
+        });
+
         sendMessage({
           type: 'error',
           data: { message: event.error },
@@ -664,7 +711,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             }
 
             // Ensure AI and chat agent are loaded
-            const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
+            const { ai: aiInstance } = await ensureAI();
 
             // Execute approved operations
             let hasExecutedOperations = false;
@@ -869,7 +916,10 @@ async function serveStaticFile(url: string, res: http.ServerResponse): Promise<v
   }
 }
 
-function fireAndForget<T>(promise: Promise<T>): void {
+function fireAndForget<T>(promise: Promise<T> | (() => Promise<T>)): void {
+  if (typeof promise === 'function') {
+    promise = promise();
+  }
   promise.catch((error) => {
     console.error('Uncaught error:', error);
   });

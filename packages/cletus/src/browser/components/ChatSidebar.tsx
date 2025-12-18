@@ -115,7 +115,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Sparkles className="w-6 h-6 text-neon-cyan" />
-          <h2 className="text-lg font-bold neon-text-purple">Chats</h2>
+          <h2 className="text-lg font-bold neon-text-purple">Cletus</h2>
         </div>
         <div className="flex items-center gap-1">
           <Button
