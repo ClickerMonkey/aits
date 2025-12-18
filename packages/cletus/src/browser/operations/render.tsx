@@ -1,6 +1,6 @@
 import React from 'react';
 import { Operation, OperationKind } from '../../schemas';
-import { OperationDataFor, OperationFor } from '../../operations/types';
+import { OperationDataFor } from '../../operations/types';
 import { BaseOperationDisplay, BaseOperationDisplayProps } from './BaseOperationDisplay';
 
 /**

@@ -1,4 +1,4 @@
-import { abbreviate } from '../../shared';
+import { abbreviate, pluralize } from '../../shared';
 import { createRenderer } from './render';
 
 const renderer = createRenderer({
@@ -25,7 +25,7 @@ export const image_generate = renderer<'image_generate'>(
           </div>
         );
       }
-      return `Generated ${count} image${count !== 1 ? 's' : ''}`;
+      return `Generated ${pluralize(count, 'image')}`;
     }
     return null;
   }
@@ -81,7 +81,7 @@ export const image_find = renderer<'image_find'>(
     if (op.output) {
       const resultCount = op.output.results.length;
       const searched = op.output.searched;
-      return `Found ${resultCount} matching image${resultCount !== 1 ? 's' : ''} (searched ${searched})`;
+      return `Found ${pluralize(resultCount, 'matching image')} (searched ${searched})`;
     }
     return null;
   }

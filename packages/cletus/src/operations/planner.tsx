@@ -1,4 +1,4 @@
-import { abbreviate } from "../common";
+import { abbreviate, pluralize } from "../common";
 import { renderOperation } from "../helpers/render";
 import type { TodoItem } from "../schemas";
 import { operationOf } from "./types";
@@ -60,8 +60,7 @@ export const todos_list = operationOf<{}, { todos: TodoItem[] }>({
     'TodosList()',
     (op) => {
       if (op.output) {
-        const count = op.output.todos.length;
-        return `${count} todo${count !== 1 ? 's' : ''}`;
+        return pluralize(op.output.todos.length, 'todo');
       }
       return null;
     }

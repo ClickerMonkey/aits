@@ -1,10 +1,7 @@
 import React from 'react';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
-import { OperationRendererProps } from './types';
-import { cn } from '../lib/utils';
-import { createRenderer, linkFile } from './render';
-import { abbreviate, chunk, paginateText, pluralize } from '../../shared';
 import { CONSTS } from '../../constants';
+import { abbreviate, chunk, paginateText, pluralize } from '../../shared';
+import { createRenderer, linkFile } from './render';
 
 
 const renderer = createRenderer({
@@ -226,32 +223,7 @@ export const file_edit = renderer<'file_edit'>(
       </React.Fragment>
     ));
 
-    /* Ink version
-      const fullPath = path.resolve(ai.config.defaultContext!.cwd!, op.input.path);
-      const url = fileProtocol(fullPath);
-
-      const boxStyle = op.output
-        ? {}
-        : op.status === 'rejected'
-          ? { borderStyle: 'round', borderColor: 'gray' } as const
-          : { borderStyle: 'round', borderColor: lineStyles['+'].backgroundColor } as const;
-
-      return (
-        <Box {...boxStyle} flexDirection="column" flexGrow={1}>
-          <Box marginLeft={2} flexGrow={1}>
-            <Text>{'→ '}</Text>
-            <Text>{op.output ? 'Updated ' : op.analysis ? 'Edit ' : 'Analyzing '}</Text>
-            <Link url={url}>{op.input.path}</Link>
-            {diff && (
-              <Text> with {pluralize(additions, 'addition')} and {pluralize(subtractions, 'removal')}</Text>
-            )}
-          </Box>
-          {changeSetsGrouped}
-        </Box>
-      );
-    */
-    
-      // React Web Version:
+    // React Web Version:
     return (
       <div>
         <span className="text-foreground">→ </span>

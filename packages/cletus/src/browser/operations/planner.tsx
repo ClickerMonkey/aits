@@ -1,27 +1,12 @@
-import React from 'react';
 import { Operation } from '../../schemas';
-import { abbreviate } from '../../shared';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
-import { OperationRendererProps } from './types';
+import { abbreviate, pluralize } from '../../shared';
+import { createRenderer } from './render';
 
-function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | null) {
-  return (props: OperationRendererProps) => {
-    const { operation } = props;
-    const label = getLabel(operation);
-    const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
-
-    return (
-      <BaseOperationDisplay
-        {...props}
-        label={label}
-        summary={summary}
-        borderColor="border-neon-purple/30"
-        bgColor="bg-neon-purple/5"
-        labelColor="text-neon-purple"
-      />
-    );
-  };
-}
+const renderer = createRenderer({
+  borderColor: "border-neon-purple/30",
+  bgColor: "bg-neon-purple/5",
+  labelColor: "text-neon-purple",
+});
 
 // Helper to extract todo name from analysis
 function getTodoName(op: Operation): string | null {
@@ -31,18 +16,17 @@ function getTodoName(op: Operation): string | null {
   return match ? match[1] : null;
 }
 
-export const todos_list = createRenderer(
+export const todos_list = renderer<'todos_list'>(
   (op) => 'TodosList()',
   (op) => {
     if (op.output) {
-      const count = op.output.todos.length;
-      return `${count} todo${count !== 1 ? 's' : ''}`;
+      return pluralize(op.output.todos.length, 'todo');
     }
     return null;
   }
 );
 
-export const todos_add = createRenderer(
+export const todos_add = renderer<'todos_add'>(
   (op) => `TodosAdd("${abbreviate(op.input.name, 64)}")`,
   (op) => {
     if (op.output) {
@@ -52,7 +36,7 @@ export const todos_add = createRenderer(
   }
 );
 
-export const todos_done = createRenderer(
+export const todos_done = renderer<'todos_done'>(
   (op) => {
     const todoName = getTodoName(op);
     return todoName ? `TodosDone("${abbreviate(todoName, 64)}")` : `TodosDone("${abbreviate(op.input.id, 64)}")`;
@@ -65,7 +49,7 @@ export const todos_done = createRenderer(
   }
 );
 
-export const todos_get = createRenderer(
+export const todos_get = renderer<'todos_get'>(
   (op) => {
     const todoName = getTodoName(op);
     return todoName ? `TodosGet("${abbreviate(todoName, 64)}")` : `TodosGet("${abbreviate(op.input.id, 64)}")`;
@@ -78,7 +62,7 @@ export const todos_get = createRenderer(
   }
 );
 
-export const todos_remove = createRenderer(
+export const todos_remove = renderer<'todos_remove'>(
   (op) => {
     const todoName = getTodoName(op);
     return todoName ? `TodosRemove("${abbreviate(todoName, 64)}")` : `TodosRemove("${abbreviate(op.input.id, 64)}")`;
@@ -91,7 +75,7 @@ export const todos_remove = createRenderer(
   }
 );
 
-export const todos_replace = createRenderer(
+export const todos_replace = renderer<'todos_replace'>(
   (op) => `TodosReplace(${op.input.todos.length} todos)`,
   (op) => {
     if (op.output) {
@@ -101,7 +85,7 @@ export const todos_replace = createRenderer(
   }
 );
 
-export const todos_clear = createRenderer(
+export const todos_clear = renderer<'todos_clear'>(
   (op) => 'TodosClear()',
   (op) => {
     if (op.output) {

@@ -1,7 +1,6 @@
 import { Box, Text } from 'ink';
 import React from 'react';
-import { ConfigFile } from '../config';
-import { COLORS } from '../constants';
+import { COLORS } from '../theme';
 import { Operations } from '../operations/types';
 import type { Message } from '../schemas';
 import { Markdown } from './Markdown';

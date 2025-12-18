@@ -415,8 +415,7 @@ export const data_search = operationOf<
       `${formatName(typeName)}Search("${abbreviate(op.input.query, 20)}")`,
       (op) => {
         if (op.output) {
-          const count = op.output.results.length;
-          return `Found ${count} result${count !== 1 ? 's' : ''}`;
+          return `Found ${pluralize(op.output.results.length, 'result')}`;
         }
         return null;
       },

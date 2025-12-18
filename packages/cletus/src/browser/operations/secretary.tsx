@@ -1,55 +1,41 @@
 import React from 'react';
 import { Operation } from '../../schemas';
-import { abbreviate } from '../../shared';
+import { abbreviate, pluralize } from '../../shared';
 import { BaseOperationDisplay } from './BaseOperationDisplay';
-import { OperationRendererProps } from './types';
+import { createRenderer } from './render';
 
-function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | null) {
-  return (props: OperationRendererProps) => {
-    const { operation } = props;
-    const label = getLabel(operation);
-    const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
+const renderer = createRenderer({
+  borderColor: "border-yellow-400/30",
+  bgColor: "bg-yellow-400/5",
+  labelColor: "text-yellow-400",
+});
 
-    return (
-      <BaseOperationDisplay
-        {...props}
-        label={label}
-        summary={summary}
-        borderColor="border-yellow-400/30"
-        bgColor="bg-yellow-400/5"
-        labelColor="text-yellow-400"
-      />
-    );
-  };
-}
-
-export const assistant_switch = createRenderer(
+export const assistant_switch = renderer<'assistant_switch'>(
   (op) => `AssistantSwitch("${op.input.name}")`,
   (op) => op.output ? `Switched to assistant: ${op.input.name}` : null
 );
 
-export const assistant_update = createRenderer(
+export const assistant_update = renderer<'assistant_update'>(
   (op) => `AssistantUpdate("${op.input.name}")`,
   (op) => op.output ? `Updated assistant: ${op.input.name}` : null
 );
 
-export const assistant_add = createRenderer(
+export const assistant_add = renderer<'assistant_add'>(
   (op) => `AssistantAdd("${op.input.name}")`,
   (op) => op.output ? `Created assistant: ${op.input.name}` : null
 );
 
-export const memory_list = createRenderer(
+export const memory_list = renderer<'memory_list'>(
   (op) => 'MemoryList()',
   (op) => {
     if (op.output) {
-      const count = op.output.memories.length;
-      return `${count} memor${count !== 1 ? 'ies' : 'y'}`;
+      return pluralize(op.output.memories.length, 'memory', 'memories');
     }
     return null;
   }
 );
 
-export const memory_update = createRenderer(
+export const memory_update = renderer<'memory_update'>(
   (op) => `MemoryUpdate("${abbreviate(op.input.content, 30)}")`,
   (op) => op.output ? `Added: "${abbreviate(op.input.content, 50)}"` : null
 );

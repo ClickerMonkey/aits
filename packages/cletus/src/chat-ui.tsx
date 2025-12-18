@@ -18,7 +18,7 @@ import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent';
 import { runChatOrchestrator } from './agents/chat-orchestrator';
 import { getAltKeyLabel } from './common';
-import { COLORS } from './constants';
+import { COLORS } from './theme';
 import { fileIsDirectory } from './helpers/files';
 import { useAdaptiveDebounce, useSyncedState } from './hooks';
 import { logger } from './logger';

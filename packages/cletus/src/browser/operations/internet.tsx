@@ -1,45 +1,29 @@
-import React from 'react';
-import { Operation } from '../../schemas';
-import { abbreviate } from '../../shared';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
-import { OperationRendererProps } from './types';
+import { abbreviate, pluralize } from '../../shared';
+import { createRenderer } from './render';
 
-function createRenderer(getLabel: (op: Operation) => string, getSummary?: (op: Operation) => string | null) {
-  return (props: OperationRendererProps) => {
-    const { operation } = props;
-    const label = getLabel(operation);
-    const summary = operation.error || (getSummary ? getSummary(operation) : null) || operation.analysis;
+const renderer = createRenderer({
+  borderColor: "border-neon-green/30",
+  bgColor: "bg-neon-green/5",
+  labelColor: "text-neon-green",
+});
 
-    return (
-      <BaseOperationDisplay
-        {...props}
-        label={label}
-        summary={summary}
-        borderColor="border-neon-green/30"
-        bgColor="bg-neon-green/5"
-        labelColor="text-neon-green"
-      />
-    );
-  };
-}
-
-export const web_search = createRenderer(
+export const web_search = renderer<'web_search'>(
   (op) => `WebSearch("${abbreviate(op.input.query, 30)}")`,
   (op) => {
     if (op.output) {
-      return `Found ${op.output.results.length} result${op.output.results.length !== 1 ? 's' : ''}`;
+      return `Found ${pluralize(op.output.results.length, 'result')}`;
     }
     return null;
   }
 );
 
-export const web_get_page = createRenderer(
+export const web_get_page = renderer<'web_get_page'>(
   (op) => `WebGetPage("${abbreviate(op.input.url, 30)}", ${op.input.type})`,
   (op) => {
     if (op.output) {
-      const parts: string[] = [`${op.output.totalLines} lines`];
+      const parts: string[] = [pluralize(op.output.totalLines, 'line')];
       if (op.output.matches) {
-        parts.push(`${op.output.matches.length} matches`);
+        parts.push(pluralize(op.output.matches.length, 'match', 'matches'));
       }
       return parts.join(', ');
     }
@@ -47,7 +31,7 @@ export const web_get_page = createRenderer(
   }
 );
 
-export const web_api_call = createRenderer(
+export const web_api_call = renderer<'web_api_call'>(
   (op) => `WebApiCall(${op.input.method} "${abbreviate(op.input.url, 60)}")`,
   (op) => {
     if (op.output) {
@@ -57,7 +41,7 @@ export const web_api_call = createRenderer(
   }
 );
 
-export const web_download = createRenderer(
+export const web_download = renderer<'web_download'>(
   (op) => `WebDownload("${abbreviate(op.input.url, 30)}")`,
   (op) => {
     if (op.output) {

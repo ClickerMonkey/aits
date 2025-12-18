@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { COLORS } from "../constants";
-import { abbreviate, formatTime, formatValue as formatValueText } from "../common";
+import { COLORS } from "../theme";
+import { formatTime, formatValue as formatValueText } from "../common";
 import { Operation } from "../schemas";
 import { Markdown } from "../components/Markdown";
 

@@ -1,4 +1,4 @@
-import { abbreviate } from "../common";
+import { abbreviate, pluralize } from "../common";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
 
@@ -172,8 +172,7 @@ export const memory_list = operationOf<
     'MemoryList()',
     (op) => {
       if (op.output) {
-        const count = op.output.memories.length;
-        return `${count} memor${count !== 1 ? 'ies' : 'y'}`;
+        return pluralize(op.output.memories.length, 'memory', 'memories');
       }
       return null;
     },

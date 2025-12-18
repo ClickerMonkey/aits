@@ -8,7 +8,7 @@ import type { ChatMeta } from '../schemas';
 import { InkSettingsTabView } from './InkSettingsTabView';
 import Gradient from 'ink-gradient';
 import BigText from 'ink-big-text';
-import { COLORS } from '../constants';
+import { COLORS } from '../theme';
 import packageJson from '../../package.json';
 
 type MainMenuView = 'menu' | 'settings' | 'create-chat-assistant' | 'create-chat-prompt' | 'create-chat-mode';

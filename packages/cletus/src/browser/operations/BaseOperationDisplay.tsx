@@ -368,7 +368,7 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
   }
 
   return (
-    <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border border-yellow-500/30' : bgColor)}>
+    <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border ' + borderColor : bgColor)}>
       {/* Header - Clickable */}
       <div
         className="flex items-center gap-2 mb-2 cursor-pointer hover:opacity-80 transition-opacity"
