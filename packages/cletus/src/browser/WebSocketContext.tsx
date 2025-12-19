@@ -6,14 +6,11 @@ interface WebSocketContextType {
   isConnected: boolean;
 }
 
-const WebSocketContext = createContext<WebSocketContextType>({
-  ws: null,
-  isConnected: false,
-});
+const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export const useWebSocket = () => {
   const context = useContext(WebSocketContext);
-  if (!context.ws) {
+  if (context === undefined) {
     throw new Error('useWebSocket must be used within a WebSocketProvider');
   }
   return context;
@@ -24,20 +21,20 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+  const [ws, setWs] = useState<TypedWebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const wsRef = useRef<TypedWebSocket | null>(null);
 
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = `${protocol}//${window.location.host}`;
 
     console.log('[WebSocketContext] Connecting to:', url);
-    const ws = createTypedWebSocket(url);
-    wsRef.current = ws;
+    const websocket = createTypedWebSocket(url);
+    setWs(websocket);
 
     // Wait for connection to open
     const checkConnection = setInterval(() => {
-      if (ws.isOpen()) {
+      if (websocket.isOpen()) {
         console.log('[WebSocketContext] Connected');
         setIsConnected(true);
         clearInterval(checkConnection);
@@ -48,14 +45,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return () => {
       clearInterval(checkConnection);
       console.log('[WebSocketContext] Closing connection');
-      ws.close();
-      wsRef.current = null;
+      websocket.close();
+      setWs(null);
       setIsConnected(false);
     };
   }, []);
 
   return (
-    <WebSocketContext.Provider value={{ ws: wsRef.current, isConnected }}>
+    <WebSocketContext.Provider value={{ ws, isConnected }}>
       {children}
     </WebSocketContext.Provider>
   );
