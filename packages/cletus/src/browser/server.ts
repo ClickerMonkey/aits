@@ -69,6 +69,12 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
     const url = req.url || '/';
 
     try {
+      // Handle file serving route
+      if (url.startsWith('/file?')) {
+        await serveLocalFile(url, res);
+        return;
+      }
+
       // Serve static files only
       await serveStaticFile(url, res);
     } catch (error) {
@@ -900,6 +906,79 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
       abortController.abort();
     }
   });
+}
+
+async function serveLocalFile(url: string, res: http.ServerResponse): Promise<void> {
+  try {
+    // Parse query string to get path parameter
+    const queryStart = url.indexOf('?');
+    if (queryStart === -1) {
+      res.writeHead(400);
+      res.end('Bad request: missing query string');
+      return;
+    }
+
+    const queryString = url.slice(queryStart + 1);
+    const params = new URLSearchParams(queryString);
+    const encodedPath = params.get('path');
+
+    if (!encodedPath) {
+      res.writeHead(400);
+      res.end('Bad request: missing path parameter');
+      return;
+    }
+
+    // Decode the path
+    const filePath = decodeURIComponent(encodedPath);
+
+    // Resolve to absolute path
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
+
+    // Read the file
+    const content = await fs.readFile(absolutePath);
+
+    // Determine content type based on file extension
+    const ext = path.extname(absolutePath).toLowerCase();
+    const contentTypes: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.htm': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.json': 'application/json',
+      '.xml': 'application/xml',
+      '.txt': 'text/plain; charset=utf-8',
+      '.md': 'text/markdown; charset=utf-8',
+      // Images
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.bmp': 'image/bmp',
+      // Other
+      '.pdf': 'application/pdf',
+      '.zip': 'application/zip',
+    };
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.writeHead(200);
+    res.end(content);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      res.writeHead(404);
+      res.end('File not found');
+    } else if ((error as NodeJS.ErrnoException).code === 'EACCES') {
+      res.writeHead(403);
+      res.end('Access denied');
+    } else {
+      console.error('Error serving file:', error);
+      res.writeHead(500);
+      res.end('Internal server error');
+    }
+  }
 }
 
 async function serveStaticFile(url: string, res: http.ServerResponse): Promise<void> {

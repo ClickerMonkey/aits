@@ -1,6 +1,7 @@
 import React from 'react';
 import { abbreviate, pluralize } from '../../shared';
 import { createRenderer } from './render';
+import { ClickableImage } from '../components/ImageViewer';
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -20,7 +21,12 @@ export const image_generate = renderer<'image_generate'>(
             <div className="text-sm mb-2">Generated {count} image{count !== 1 ? 's' : ''}</div>
             <div className="flex gap-2 flex-wrap">
               {op.output.images.map((img: string, i: number) => (
-                <img key={i} src={img} alt="Generated" className="max-w-sm rounded border border-neon-pink/30" />
+                <ClickableImage
+                  key={i}
+                  src={`/file?path=${encodeURIComponent(img)}`}
+                  alt="Generated"
+                  className="max-w-sm rounded border border-neon-pink/30"
+                />
               ))}
             </div>
           </div>
@@ -41,7 +47,11 @@ export const image_edit = renderer<'image_edit'>(
         return (
           <div className="ml-6 mt-2">
             <div className="text-sm mb-2">Edited image saved</div>
-            <img src={op.output.editedLink} alt="Edited" className="max-w-sm rounded border border-neon-pink/30" />
+            <ClickableImage
+              src={`/file?path=${encodeURIComponent(op.output.editedLink)}`}
+              alt="Edited"
+              className="max-w-sm rounded border border-neon-pink/30"
+            />
           </div>
         );
       }

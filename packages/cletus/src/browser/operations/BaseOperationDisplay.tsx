@@ -402,7 +402,7 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap max-h-[5rem] overflow-y-auto', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap max-h-[8rem] overflow-y-auto', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>
