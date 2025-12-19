@@ -1,3 +1,4 @@
+import React from 'react';
 import { abbreviate, pluralize } from '../../shared';
 import { createRenderer } from './render';
 
@@ -9,7 +10,7 @@ const renderer = createRenderer({
 
 export const image_generate = renderer<'image_generate'>(
   (op) => `ImageGenerate("${abbreviate(op.input.prompt, 30)}", n=${op.input.n || 1})`,
-  (op) => {
+  (op): string | React.ReactNode | null => {
     if (op.output) {
       const count = op.output.count;
       // For browser, we can show the image inline if we have URLs
@@ -33,7 +34,7 @@ export const image_generate = renderer<'image_generate'>(
 
 export const image_edit = renderer<'image_edit'>(
   (op) => `ImageEdit("${op.input.path}", "${abbreviate(op.input.prompt, 20)}")`,
-  (op) => {
+  (op): string | React.ReactNode | null => {
     if (op.output) {
       // For browser, we can show the edited image inline if we have a URL
       if (op.output.editedLink) {

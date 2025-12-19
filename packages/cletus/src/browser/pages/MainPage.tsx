@@ -108,11 +108,12 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         break;
 
       case 'message_added':
-        // Clear temporary user message when real message is added
-        setTemporaryUserMessage(null);
-        if (ws && selectedChatId) {
-          ws.send({ type: 'get_messages', data: { chatId: selectedChatId } });
+        // Clear temporary user message when real user message is added
+        if (message.data.message.role === 'user') {
+          setTemporaryUserMessage(null);
         }
+        // Add the message to the messages array
+        setMessages(prev => [...prev, message.data.message]);
         break;
 
       case 'pending_update':
@@ -139,7 +140,12 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         setIsProcessing(false);
         setStatus('');
         if (message.data.message) {
-          setMessages(prev => [...prev, message.data.message]);
+          setMessages(prev => {
+            if (!prev.find(m => m.created === message.data.message.created)) {
+              return [...prev, message.data.message];
+            }
+            return prev;
+          });
         }
         break;
 
@@ -189,6 +195,14 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         if (message.data.chatId) {
           pendingChatSelectRef.current = message.data.chatId;
         }
+        
+        // Clear data immediately, once config with new chat is refreshed it will be populated.
+        setMessages([]);
+        setPendingMessage(null);
+        setTemporaryUserMessage(null);
+        setTemporaryAssistantMessage(null);
+        setStatus('');
+
         // Refresh config - the effect will handle selection
         onConfigChange();
         break;
@@ -243,11 +257,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
   const handleSendMessage = (content: MessageContent[]) => {
     if (!selectedChatId) return;
 
+    const now = Date.now();
+
     // Create temporary user message for immediate display
     const tempUserMsg: Message = {
       role: 'user',
       content,
-      created: Date.now(),
+      created: now-2,
     };
     setTemporaryUserMessage(tempUserMsg);
 
@@ -255,7 +271,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
     const tempAssistantMsg: Message = {
       role: 'assistant',
       content: [],
-      created: Date.now() + 1,
+      created: now-1,
     };
     setTemporaryAssistantMessage(tempAssistantMsg);
 

@@ -1,7 +1,4 @@
-import React from 'react';
-import { Operation } from '../../schemas';
 import { abbreviate, pluralize } from '../../shared';
-import { BaseOperationDisplay } from './BaseOperationDisplay';
 import { createRenderer } from './render';
 
 const renderer = createRenderer({

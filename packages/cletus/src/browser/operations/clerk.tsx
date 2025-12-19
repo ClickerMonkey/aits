@@ -142,7 +142,7 @@ export const file_read = renderer<'file_read'>(
 
 export const file_edit = renderer<'file_edit'>(
   (op) => `Edit("${paginateText(op.input.path, 100, -100)}")`,
-  (op) => {
+  (op): string | React.ReactNode | null => {
     if (op.cache?.changed === false) {
       return 'No changes';
     }
@@ -307,7 +307,7 @@ const processShellOutput = (stdout: string, stderr: string) => {
 
 export const shell = renderer<'shell'>(
   (op) => `Shell("${op.input.command}")`,
-  (op) => {
+  (op): string | React.ReactNode | null => {
     if (!op.output) {
       return 'Executing...';
     }

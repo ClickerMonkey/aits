@@ -524,15 +524,16 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             }
 
             // Add user message with proper typing
-            const userMessage: Omit<Message, 'created'> = {
+            const userMessage: Message = {
               role: 'user',
               content: content as MessageContent[],
+              created: Date.now(),
             };
             await chatFile.addMessage(userMessage);
 
             sendMessage({
               type: 'message_added',
-              data: { message: { ...userMessage, created: Date.now() } as Message },
+              data: { message: userMessage },
             });
 
             // Run the chat
@@ -726,13 +727,6 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
                 }
               },
             );
-
-            // Mark approved operations as 'doing' immediately
-            for (const idx of approved) {
-              if (operations[idx]) {
-                operations[idx].status = 'doing';
-              }
-            }
 
             // Mark rejected operations
             for (const idx of rejected) {
