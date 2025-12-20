@@ -6,7 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { configExists } from '../file-manager';
 import { ConfigFile } from '../config';
 import { ChatFile } from '../chat';
-import type { Message, ChatMeta, MessageContent } from '../schemas';
+import type { Message, ChatMeta, MessageContent, OperationStatus } from '../schemas';
 import type { ClientMessage, ServerMessage } from './websocket-types';
 import { OperationManager } from '../operations/manager';
 import { CletusAI, createCletusAI } from '../ai';
@@ -762,17 +762,26 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
                 manager.updateMessage(operations[idx]);
               }
             }
+            
+            // Emit fake doing for now
+            const previousStatus: Record<number, OperationStatus> = {};
+            for (const idx of approved) {
+              if (operations[idx]) {
+                previousStatus[idx] = operations[idx].status;
+                operations[idx].status = 'doing';
+              }
+            }
 
             // Save and broadcast the updated operation statuses immediately
-            await chatFile.updateMessage(targetMessage);
+            chatFile.updateMessage(targetMessage);
             broadcastMessageUpdate();
-
-            // Ensure AI and chat agent are loaded
-            const { ai: aiInstance } = await ensureAI();
 
             // Execute approved operations
             let hasExecutedOperations = false;
             if (approved.length > 0) {
+              // Ensure AI and chat agent are loaded
+              const { ai: aiInstance } = await ensureAI();
+
               // Start operation for this chat
               const abortController = chatOperationManager.startOperation(chatId);
 
@@ -800,6 +809,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
                 for (const idx of approved) {
                   if (operations[idx]) {
+                    operations[idx].status = previousStatus[idx] || 'analyzed';
                     await manager.execute(operations[idx], true, ctx);
                     hasExecutedOperations = true;
                   }

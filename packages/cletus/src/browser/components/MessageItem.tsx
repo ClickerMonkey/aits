@@ -12,8 +12,8 @@ interface MessageItemProps {
   message: Message;
   operationDecisions?: Map<number, 'approve' | 'reject'>;
   onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
-  onApproveOperation?: (message: Message, idx: number) => void;
-  onRejectOperation?: (message: Message, idx: number) => void;
+  onApproveOperation: (message: Message, idx: number) => void;
+  onRejectOperation: (message: Message, idx: number) => void;
   hasMultiplePendingOps?: boolean;
 }
 
@@ -88,7 +88,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             // Render operation if this content item has an operation
             if (item.operation && item.operationIndex !== undefined) {
               const opIdx = item.operationIndex;
-              const needsApproval = item.operation.status === 'analyzed';
 
               return (
                 <OperationDisplay
@@ -96,9 +95,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   operation={item.operation}
                   operationIndex={opIdx}
                   approvalDecision={operationDecisions?.get(opIdx)}
-                  onToggleDecision={needsApproval && hasMultiplePendingOps ? onToggleOperationDecision : undefined}
-                  onApprove={needsApproval && !hasMultiplePendingOps && onApproveOperation ? (idx) => onApproveOperation(message, idx) : undefined}
-                  onReject={needsApproval && !hasMultiplePendingOps && onRejectOperation ? (idx) => onRejectOperation(message, idx) : undefined}
+                  onToggleDecision={onToggleOperationDecision}
+                  onApprove={() => onApproveOperation(message, opIdx)}
+                  onReject={() => onRejectOperation(message, opIdx)}
                   hasMultipleOperations={hasMultiplePendingOps}
                 />
               );

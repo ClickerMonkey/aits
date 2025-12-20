@@ -4,8 +4,44 @@ import remarkGfm from 'remark-gfm';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Operation } from '../../schemas';
 import { cn } from '../lib/utils';
-import { getStatusInfo, getElapsedTime } from './render';
-import { Button } from '../components/ui/button';
+import { Button } from './ui/button';
+
+
+/**
+ * Get status color and label for an operation status
+ */
+export function getStatusInfo(status: Operation['status']): { color: string; label: string } {
+  switch (status) {
+    case 'done':
+      return { color: 'text-green-400', label: 'completed' };
+    case 'doing':
+      return { color: 'text-orange-400', label: 'in progress' };
+    case 'analyzed':
+      return { color: 'text-yellow-400', label: 'pending approval' };
+    case 'doneError':
+      return { color: 'text-red-400', label: 'error' };
+    case 'analyzeError':
+      return { color: 'text-red-400', label: 'analysis error' };
+    case 'analyzedBlocked':
+      return { color: 'text-red-400', label: 'blocked' };
+    case 'rejected':
+      return { color: 'text-red-400', label: 'rejected' };
+    default:
+      return { color: 'text-muted-foreground', label: status };
+  }
+}
+
+/**
+ * Calculate elapsed time for an operation
+ */
+export function getElapsedTime(op: Operation): string {
+  if (!op.start) return '';
+  const duration = op.end ? op.end - op.start : Date.now() - op.start;
+
+  if (duration < 1000) return `${Math.round(duration)}ms`;
+  if (duration < 60000) return `${(duration / 1000).toFixed(1)}s`;
+  return `${Math.floor(duration / 60000)}m ${Math.round((duration % 60000) / 1000)}s`;
+}
 
 /**
  * Checks if an array can be rendered as a table
@@ -330,7 +366,7 @@ const OperationDetails: React.FC<{ operation: Operation }> = ({ operation }) => 
   );
 };
 
-export interface BaseOperationDisplayProps {
+export interface OperationDisplayProps {
   operation: Operation;
   label: string;
   summary?: React.ReactNode | string | null;
@@ -349,7 +385,7 @@ export interface BaseOperationDisplayProps {
 /**
  * Base operation display component with consistent styling
  */
-export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
+export const OperationDisplay: React.FC<OperationDisplayProps> = ({
   operation,
   label,
   summary,
@@ -373,19 +409,6 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
 
   const needsApproval = operation.status === 'analyzed';
   const isOperationProcessing = operation.status === 'doing';
-
-  // Debug logging
-  if (needsApproval) {
-    console.log('Operation needs approval:', {
-      label,
-      operationIndex,
-      hasMultipleOperations,
-      hasOnApprove: !!onApprove,
-      hasOnReject: !!onReject,
-      hasOnToggle: !!onToggleDecision,
-      status: operation.status,
-    });
-  }
 
   return (
     <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border ' + borderColor : bgColor)}>
@@ -422,7 +445,7 @@ export const BaseOperationDisplay: React.FC<BaseOperationDisplayProps> = ({
       )}
 
       {/* Approval Buttons */}
-      {needsApproval && operationIndex !== undefined && (
+      {(needsApproval || isOperationProcessing) && operationIndex !== undefined && (
         <div className="ml-6 mb-2">
           {!hasMultipleOperations && onApprove && onReject ? (
             // Single operation: immediate approve/reject

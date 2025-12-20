@@ -1,6 +1,6 @@
 import React from 'react';
 import { Operation, OperationKind } from '../../schemas';
-import { OperationDisplayProps } from './render';
+import { RendererDisplayProps } from './render';
 
 // Import operation-specific renderers
 import * as clerk from './clerk';
@@ -46,7 +46,7 @@ const OperationRenderers: Record<OperationKind, React.FC<{
 /**
  * Main operation display component that delegates to specific renderers
  */
-export const OperationDisplay: React.FC<OperationDisplayProps> = (props) => {
+export const OperationDisplay: React.FC<RendererDisplayProps> = (props) => {
   const Renderer = OperationRenderers[props.operation.type];
 
   return <Renderer {...props} />;

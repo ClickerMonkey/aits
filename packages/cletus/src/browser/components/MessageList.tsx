@@ -8,8 +8,8 @@ interface MessageListProps {
   loading?: boolean;
   operationDecisions?: Map<number, 'approve' | 'reject'>;
   onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
-  onApproveOperation?: (message: Message, idx: number) => void;
-  onRejectOperation?: (message: Message, idx: number) => void;
+  onApproveOperation: (message: Message, idx: number) => void;
+  onRejectOperation: (message: Message, idx: number) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -46,7 +46,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             // Check if this is the last message with pending operations
             // const isLastMessage = index === messages.length - 1;
             // const hasPendingOps = message.operations?.some(op => op.status === 'analyzed');
-            const pendingOpCount = message.operations?.filter(op => op.status === 'analyzed').length || 0;
+            const pendingOpCount = message.operations?.filter(op => op.status === 'analyzed' || op.status === 'doing').length || 0;
 
             return (
               <MessageItem
