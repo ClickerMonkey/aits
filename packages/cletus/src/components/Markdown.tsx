@@ -1,9 +1,8 @@
 import { Box, BoxProps, Text, TextProps } from "ink";
 import { highlight, supportsLanguage } from "cli-highlight";
 import React from 'react';
-import { COLORS } from "../constants";
+import { COLORS } from "../theme";
 import { Link } from "./Link";
-import { logger } from "../logger";
 
 type LineSegment = { text: string;  url?: string; styles?: { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; backgroundColor?: string, color?: string; } };
 

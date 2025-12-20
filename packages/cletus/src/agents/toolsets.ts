@@ -10,6 +10,7 @@ import { createInternetTools } from '../tools/internet';
 import { createLibrarianTools } from '../tools/librarian';
 import { createPlannerTools } from '../tools/planner';
 import { createSecretaryTools } from '../tools/secretary';
+import { createUtilityTools } from '../tools/utility';
 
 
 /**
@@ -24,6 +25,7 @@ export function createToolsets(ai: CletusAI) {
   const artistTools = createArtistTools(ai);
   const internetTools = createInternetTools(ai);
   const dbaTools = createDBATools(ai);
+  const utilityTools = createUtilityTools(ai);
 
   return {
     plannerTools,
@@ -34,6 +36,7 @@ export function createToolsets(ai: CletusAI) {
     artistTools,
     internetTools,
     dbaTools,
+    utilityTools,
   };
 }
 

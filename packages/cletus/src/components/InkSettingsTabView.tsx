@@ -230,7 +230,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
     } else if (editField === 'addApiKey') {
       if (editValue.trim() && providerKey) {
         await config.save((data) => {
-          data.providers[providerKey!] = { apiKey: editValue };
+          data.providers[providerKey!] = { apiKey: editValue } as any;
         });
         setMessage(`✓ ${providerKey} configured!`);
         setSubView(null);

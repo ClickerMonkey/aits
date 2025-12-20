@@ -194,6 +194,7 @@ export type PromptToolEvents<TTools extends Tuple<AnyTool>> =
  * The events emitted during prompt execution/streaming.
  */
 export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
+  { type: 'request', request: Request, iterations: number } |
   { type: 'textPartial', content: string, request: Request } |
   { type: 'text', content: string, request: Request } |
   { type: 'refusal', content: string, request: Request } |
@@ -628,6 +629,8 @@ export class Prompt<
         ...(this.input.metadata || {} as TMetadata),
         ...(await this.metadataFn(input, ctx) || {}),
       };
+
+      yield emit({ type: 'request', request, iterations });
 
       const stream = streamer(request, ctx, metadata, streamController.signal);
 

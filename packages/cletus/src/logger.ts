@@ -83,9 +83,11 @@ export const logger = {
   },
 };
 
-// Override console methods to use the logger
-console.log = (...args: any[]) => logger.log(args);
-console.error = (...args: any[]) => logger.log(args);
-console.debug = (...args: any[]) => logger.log(args);
-console.warn = (...args: any[]) => logger.log(args);
-console.info = (...args: any[]) => logger.log(args);
+export function interceptConsoleLogs(): void {
+  // Override console methods to use the logger
+  console.log = (...args: any[]) => logger.log(args);
+  console.error = (...args: any[]) => logger.log(args);
+  console.debug = (...args: any[]) => logger.log(args);
+  console.warn = (...args: any[]) => logger.log(args);
+  console.info = (...args: any[]) => logger.log(args);
+}

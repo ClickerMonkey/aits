@@ -1,5 +1,5 @@
 import { getModel } from "@aeye/core";
-import { abbreviate } from "../common";
+import { abbreviate, pluralize } from "../common";
 import { KnowledgeFile } from "../knowledge";
 import { operationOf } from "./types";
 import { renderOperation } from "../helpers/render";
@@ -46,8 +46,7 @@ export const knowledge_search = operationOf<
     `KnowledgeSearch("${abbreviate(op.input.query, 25)}")`,
     (op) => {
       if (op.output) {
-        const count = op.output.results.length;
-        return `Found ${count} result${count !== 1 ? 's' : ''}`;
+        return `Found ${pluralize(op.output.results.length, 'result')}`;
       }
       return null;
     },
@@ -84,8 +83,7 @@ export const knowledge_sources = operationOf<{}, { sources: string[] }>({
     'KnowledgeSources()',
     (op) => {
       if (op.output) {
-        const count = op.output.sources.length;
-        return `Listed ${count} source${count !== 1 ? 's' : ''}`;
+        return `Listed ${pluralize(op.output.sources.length, 'source')}`;
       }
       return null;
     },
@@ -221,7 +219,7 @@ export const knowledge_delete = operationOf<
     `KnowledgeDelete("${op.input.sourcePattern}")`,
     (op) => {
       if (op.output) {
-        return `Deleted ${op.output.deletedCount} entr${op.output.deletedCount !== 1 ? 'ies' : 'y'}`;
+        return `Deleted ${pluralize(op.output.deletedCount, 'entry', 'entries')}`;
       }
       return null;
     },

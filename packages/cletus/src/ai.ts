@@ -1,4 +1,4 @@
-import { AI, ContextInfer } from '@aeye/ai';
+import { AI, ContextInfer, ToolInfer } from '@aeye/ai';
 import { models, replicateTransformers } from '@aeye/models';
 import { OpenAIProvider } from '@aeye/openai';
 import { OpenRouterProvider } from '@aeye/openrouter';
@@ -13,7 +13,7 @@ import { ChatMeta, Message, TypeDefinition } from './schemas';
 import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
 import z from 'zod';
 import { loadPromptFiles } from './prompt-loader';
-import { Usage, accumulateUsage, toJSONSchema } from '@aeye/core';
+import { ToolCompatible, Usage, accumulateUsage, toJSONSchema } from '@aeye/core';
 
 /**
  * Cletus AI Context
@@ -27,6 +27,7 @@ export interface CletusContext {
   chatMessage?: Message;
   cwd: string;
   cache: Record<string, any>;
+  persistentTools?: Set<string>;
   log: (msg: any) => void;
   chatStatus: (status: string) => void;
   chatInterrupt?: () => void;
@@ -44,11 +45,12 @@ export interface CletusContext {
  * Cletus AI Metadata
  */
 export interface CletusMetadata {
-  // Model selection metadata can go here
   /** Whether this tool should always be visible/available regardless of toolset or adaptive selection */
   alwaysVisible?: boolean;
   /** Whether this tool should be included in the default tool selection when no user messages exist yet */
   defaultVisible?: boolean;
+  /** Whether this tool should be included based on which client is running Cletus */
+  onlyClient?: 'browser' | 'cli';
 }
 
 /**
@@ -277,15 +279,9 @@ export function createCletusAI(configFile: ConfigFile) {
   return ai;
 }
 
-export function createCletusTypeAI(ai: CletusAI) {
-  return ai.extend<{ type: TypeDefinition }>();
-}
-
 export type CletusAI = ReturnType<typeof createCletusAI>;
 export type CletusAIContext = ContextInfer<CletusAI>;
-
-export type CletusTypeAI = ReturnType<typeof createCletusTypeAI>;
-export type CletusTypeAIContext = ContextInfer<CletusTypeAI>;
+export type CletusTool = ToolInfer<CletusAI>;
 
 // Global tool properties - useful for debugging
 export const globalToolProperties = {

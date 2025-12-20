@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
 import { finished } from 'stream/promises';
-import { abbreviate, linkFile } from '../common';
+import { abbreviate, linkFile, pluralize } from '../common';
 import { operationOf } from './types';
 import { renderOperation } from '../helpers/render';
 import { detectExtension, fileExists, fileIsDirectory, fileIsWritable } from '../helpers/files';
@@ -69,7 +69,7 @@ export const web_search = operationOf<
     `WebSearch("${abbreviate(op.input.query, 30)}")`,
     (op) => {
       if (op.output) {
-        return `Found ${op.output.results.length} result${op.output.results.length !== 1 ? 's' : ''}`;
+        return `Found ${pluralize(op.output.results.length, 'result')}`;
       }
       return null;
     },
@@ -245,9 +245,9 @@ export const web_get_page = operationOf<
     `WebGetPage("${abbreviate(op.input.url, 30)}", ${op.input.type})`,
     (op) => {
       if (op.output) {
-        const parts: string[] = [`${op.output.totalLines} lines`];
+        const parts: string[] = [pluralize(op.output.totalLines, 'line')];
         if (op.output.matches) {
-          parts.push(`${op.output.matches.length} matches`);
+          parts.push(pluralize(op.output.matches.length, 'match', 'matches'));
         }
         return parts.join(', ');
       }

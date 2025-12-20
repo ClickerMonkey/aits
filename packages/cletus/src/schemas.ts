@@ -1,6 +1,5 @@
 import { any, z } from 'zod';
 import { AUTONOMOUS } from './constants';
-import { cache } from 'sharp';
 
 // ============================================================================
 // User Schema
@@ -198,7 +197,7 @@ export const ChatMetaSchema = z.object({
   mode: ChatModeSchema.default('none'),
   agentMode: AgentModeSchema.default('default'),
   model: z.string().optional(),
-  toolset: z.string().optional(),
+  toolset: z.string().optional().nullable(),
   created: z.number(),
   updated: z.number(),
   todos: z.array(TodoItemSchema).default([]),

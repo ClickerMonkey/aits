@@ -196,6 +196,15 @@ export class ConfigFile extends JsonFile<Config> {
   }
 
   /**
+   * Update user settings
+   */
+  async updateUser(updates: Partial<Config['user']>): Promise<void> {
+    await this.save((config) => {
+      Object.assign(config.user, updates);
+    });
+  }
+
+  /**
    * Delete a chat
    */
   async deleteChat(chatId: string): Promise<void> {

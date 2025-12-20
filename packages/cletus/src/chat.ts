@@ -29,12 +29,24 @@ export class ChatFile extends JsonFile<ChatMessages> {
   /**
    * Add a message to the chat
    */
-  async addMessage(message: Omit<Message, 'created'>): Promise<void> {
+  async addMessage(message: Omit<Message, 'created'> & { created?: number }): Promise<void> {
     await this.save((chat) => {
       chat.messages.push({
-        ...message,
         created: Date.now(),
+        ...message,
       });
+    });
+  }
+
+  /**
+   * Update a message in the chat
+   */
+  async updateMessage(message: Message): Promise<void> {
+    await this.save((chat) => {
+      const index = chat.messages.findIndex((m) => m.created === message.created);
+      if (index !== -1) {
+        chat.messages[index] = message;
+      }
     });
   }
 

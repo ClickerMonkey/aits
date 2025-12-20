@@ -164,6 +164,13 @@ export const Operations = {
 // Operation type for a specific operation kind
 export type OperationFor<K extends OperationKind> = typeof Operations[K];
 
+// Full operation data (input, output, cache) for a specific operation kind
+export type OperationDataFor<K extends OperationKind> = OperationOf<
+  OperationInputFor<K>,
+  OperationOutputFor<K>,
+  OperationCacheFor<K>
+>;
+
 // Operation input and output types for a specific operation kind
 export type OperationInputFor<K extends OperationKind> = OperationFor<K> extends OperationDefinition<infer I, infer O, infer C> ? I : never;
 

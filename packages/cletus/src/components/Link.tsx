@@ -1,6 +1,6 @@
 import { Text } from 'ink';
 import React from 'react';
-import { COLORS } from '../constants';
+import { COLORS } from '../theme';
 
 const openLink = `\x1b]8;;`;
 const delimiter = `\x07`;

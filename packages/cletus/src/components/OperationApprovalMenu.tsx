@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { CletusAI } from '../ai';
 import { ChatFile } from '../chat';
 import { formatName, formatTime, pluralize } from '../common';
-import { COLORS } from '../constants';
+import { COLORS } from '../theme';
 import { logger } from '../logger';
 import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, Operation } from '../schemas';

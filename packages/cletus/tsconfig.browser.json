@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react"
+  },
+  "include": [
+    "src/browser/**/*"
+  ],
+  "exclude": [
+    "src/browser/server.ts",
+    "src/browser/**/__tests__",
+    "src/browser/**/*.test.ts",
+    "src/browser/**/*.test.tsx"
+  ]
+}

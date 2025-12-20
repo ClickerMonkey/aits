@@ -415,8 +415,7 @@ export const data_search = operationOf<
       `${formatName(typeName)}Search("${abbreviate(op.input.query, 20)}")`,
       (op) => {
         if (op.output) {
-          const count = op.output.results.length;
-          return `Found ${count} result${count !== 1 ? 's' : ''}`;
+          return `Found ${pluralize(op.output.results.length, 'result')}`;
         }
         return null;
       },
@@ -427,7 +426,7 @@ export const data_search = operationOf<
 
 export const data_get = operationOf<
   { type: string; offset?: number; limit?: number },
-  { records: Array<{ id: string; created: number; updated: number; fields: Record<string, any> }>; total: number },
+  { records: Array<Record<string, any>>; total: number },
   {},
   { typeName: string }
 >({
@@ -453,7 +452,7 @@ export const data_get = operationOf<
       id: record.id,
       created: record.created,
       updated: record.updated,
-      fields: record.fields,
+      ...record.fields,
     }));
 
     return { records, total };

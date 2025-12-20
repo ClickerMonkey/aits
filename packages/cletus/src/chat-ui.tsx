@@ -1,8 +1,8 @@
+import { getTotalTokens } from '@aeye/core';
+import events from 'events';
 import { Box, Static, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import path from 'path';
-import fs from 'fs';
-import events from 'events'
 import React, { useEffect, useRef, useState } from 'react';
 import { createCletusAI } from './ai';
 import { ChatFile } from './chat';
@@ -11,16 +11,14 @@ import { MessageDisplay } from './components/MessageDisplay';
 import { ModelSelector } from './components/ModelSelector';
 import { CompletionResult, OperationApprovalMenu } from './components/OperationApprovalMenu';
 import { ConfigFile } from './config';
-import { getChatPath } from './file-manager';
 import type { AgentMode, ChatMeta, ChatMode, Message } from './schemas';
-import { getTotalTokens } from '@aeye/core';
 // @ts-ignore
 import mic from 'mic';
 import { Writer } from 'wav';
 import { createChatAgent } from './agents/chat-agent';
 import { runChatOrchestrator } from './agents/chat-orchestrator';
-import { COLORS } from './constants';
 import { getAltKeyLabel } from './common';
+import { COLORS } from './theme';
 import { fileIsDirectory } from './helpers/files';
 import { useAdaptiveDebounce, useSyncedState } from './hooks';
 import { logger } from './logger';
