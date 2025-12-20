@@ -1,3 +1,5 @@
+
+import { EChartsOption } from 'echarts';
 import { z } from 'zod';
 
 // ============================================================================
@@ -17,7 +19,7 @@ export const PartToWholeChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points showing parts of a whole'),
   variantOptions: z.record(
     z.enum(['pie', 'donut', 'treemap', 'sunburst']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['pie', 'donut', 'treemap', 'sunburst']).optional().describe('Default variant to display'),
 });
@@ -28,7 +30,7 @@ export const CategoryComparisonChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points for category comparison'),
   variantOptions: z.record(
     z.enum(['bar', 'horizontalBar', 'pictorialBar']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['bar', 'horizontalBar', 'pictorialBar']).optional().describe('Default variant to display'),
 });
@@ -39,7 +41,7 @@ export const TimeSeriesChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of time-series data points'),
   variantOptions: z.record(
     z.enum(['line', 'area', 'step', 'smoothLine']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['line', 'area', 'step', 'smoothLine']).optional().describe('Default variant to display'),
 });
@@ -50,7 +52,7 @@ export const DistributionChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points for distribution analysis'),
   variantOptions: z.record(
     z.enum(['histogram', 'boxplot']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['histogram', 'boxplot']).optional().describe('Default variant to display'),
 });
@@ -61,7 +63,7 @@ export const CorrelationChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points for correlation analysis'),
   variantOptions: z.record(
     z.enum(['scatter', 'effectScatter', 'heatmap']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['scatter', 'effectScatter', 'heatmap']).optional().describe('Default variant to display'),
 });
@@ -72,7 +74,7 @@ export const RankingChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points to rank'),
   variantOptions: z.record(
     z.enum(['orderedBar', 'horizontalOrderedBar']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['orderedBar', 'horizontalOrderedBar']).optional().describe('Default variant to display'),
 });
@@ -83,7 +85,7 @@ export const HierarchicalChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of hierarchical data points'),
   variantOptions: z.record(
     z.enum(['treemap', 'sunburst', 'tree']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['treemap', 'sunburst', 'tree']).optional().describe('Default variant to display'),
 });
@@ -94,7 +96,7 @@ export const FlowChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of flow/funnel data points'),
   variantOptions: z.record(
     z.enum(['sankey', 'funnel']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['sankey', 'funnel']).optional().describe('Default variant to display'),
 });
@@ -105,7 +107,7 @@ export const GeospatialChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of geographic data points'),
   variantOptions: z.record(
     z.enum(['map']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['map']).optional().describe('Default variant to display'),
 });
@@ -116,7 +118,7 @@ export const MultivariateComparisonChartSchema = z.object({
   data: z.array(ChartDataPointSchema).describe('Array of data points for multivariate comparison'),
   variantOptions: z.record(
     z.enum(['groupedBar', 'stackedBar', 'radar', 'parallel']),
-    z.record(z.unknown())
+    z.record(z.string(), z.unknown())
   ).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['groupedBar', 'stackedBar', 'radar', 'parallel']).optional().describe('Default variant to display'),
 });
@@ -136,3 +138,68 @@ export const ChartConfigSchema = z.union([
 ]);
 
 export type ChartConfig = z.infer<typeof ChartConfigSchema>;
+
+
+// ============================================================================
+// Chart Display Types
+// ============================================================================
+
+export type ChartGroup = 
+  | 'partToWhole'
+  | 'categoryComparison'
+  | 'timeSeries'
+  | 'distribution'
+  | 'correlation'
+  | 'ranking'
+  | 'hierarchical'
+  | 'flow'
+  | 'geospatial'
+  | 'multivariateComparison';
+
+export type ChartVariant = 
+  // partToWhole
+  | 'pie' | 'donut' | 'treemap' | 'sunburst'
+  // categoryComparison
+  | 'bar' | 'horizontalBar' | 'pictorialBar'
+  // timeSeries
+  | 'line' | 'area' | 'step' | 'smoothLine'
+  // distribution
+  | 'histogram' | 'boxplot'
+  // correlation
+  | 'scatter' | 'effectScatter' | 'heatmap'
+  // ranking
+  | 'orderedBar' | 'horizontalOrderedBar'
+  // hierarchical (overlaps with partToWhole)
+  | 'tree'
+  // flow
+  | 'sankey' | 'funnel'
+  // geospatial
+  | 'map'
+  // multivariateComparison
+  | 'groupedBar' | 'stackedBar' | 'radar' | 'parallel';
+
+export const ChartGroupVariants: Record<ChartGroup, ChartVariant[]> = {
+  partToWhole: ['pie', 'donut', 'treemap', 'sunburst'],
+  categoryComparison: ['bar', 'horizontalBar', 'pictorialBar'],
+  timeSeries: ['line', 'area', 'step', 'smoothLine'],
+  distribution: ['histogram', 'boxplot'],
+  correlation: ['scatter', 'effectScatter', 'heatmap'],
+  ranking: ['orderedBar', 'horizontalOrderedBar'],
+  hierarchical: ['treemap', 'sunburst', 'tree'],
+  flow: ['sankey', 'funnel'],
+  geospatial: ['map'], // Removed scatter to avoid duplication with correlation group
+  multivariateComparison: ['groupedBar', 'stackedBar', 'radar', 'parallel'],
+};
+
+export type ChartDisplayInput = {
+  chart: ChartConfig;
+};
+
+export type ChartDisplayOutput = {
+  chartGroup: ChartGroup;
+  availableVariants: ChartVariant[];
+  currentVariant: ChartVariant;
+  option: EChartsOption;
+  data: ChartDataPoint[];
+  variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
+};

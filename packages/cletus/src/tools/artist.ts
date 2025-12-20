@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { getOperationInput } from '../operations/types';
-import { ChartConfigSchema } from './artist_schemas';
+import { ChartConfigSchema } from '../helpers/artist';
 
 /**
  * Create artist tools for image operations

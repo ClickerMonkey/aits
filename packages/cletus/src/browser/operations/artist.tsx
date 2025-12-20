@@ -1,10 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { abbreviate, deepMerge, isObject, pluralize } from '../../shared';
-import { createRenderer } from './render';
-import { ClickableImage } from '../components/ImageViewer';
 import * as echarts from 'echarts';
-import type { ChartVariant, EChartsOption } from '../../operations/artist';
-import type { ChartDataPoint } from '../../tools/artist_schemas';
+import React, { useEffect, useRef, useState } from 'react';
+import { abbreviate, deepMerge, pluralize } from '../../shared';
+import { ClickableImage } from '../components/ImageViewer';
+import { createRenderer } from './render';
+import { ChartDataPoint, ChartVariant } from '../../helpers/artist';
+import { type EChartsOption } from 'echarts';
+
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -377,7 +378,7 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
 // ============================================================================
 
 export const chart_display = renderer<'chart_display'>(
-  (op) => `ChartDisplay(${op.input.chartGroup}, ${op.input.data?.length || 0} points)`,
+  (op) => `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
   (op): string | React.ReactNode | null => {
     if (op.output) {
       return (

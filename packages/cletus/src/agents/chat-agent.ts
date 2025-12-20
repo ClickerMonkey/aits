@@ -153,7 +153,6 @@ export function createChatAgent(ai: CletusAI) {
         continue; // Skip utility, it's always available
       }
       
-      // All toolsets including DBA
       const tools = toolRegistry.getToolset(name);
       const toolSignatures = tools
         .map(t => {

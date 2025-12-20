@@ -8,7 +8,9 @@ import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
-import type { ChartConfig, ChartDataPoint } from "../tools/artist_schemas";
+import { ChartDataPoint, ChartDisplayInput, ChartDisplayOutput, ChartGroupVariants, ChartVariant } from "../helpers/artist";
+import type { EChartsOption } from "echarts";
+
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
@@ -482,73 +484,6 @@ export const image_attach = operationOf<
 });
 
 // ============================================================================
-// Chart Display Types
-// ============================================================================
-
-export type ChartGroup = 
-  | 'partToWhole'
-  | 'categoryComparison'
-  | 'timeSeries'
-  | 'distribution'
-  | 'correlation'
-  | 'ranking'
-  | 'hierarchical'
-  | 'flow'
-  | 'geospatial'
-  | 'multivariateComparison';
-
-export type ChartVariant = 
-  // partToWhole
-  | 'pie' | 'donut' | 'treemap' | 'sunburst'
-  // categoryComparison
-  | 'bar' | 'horizontalBar' | 'pictorialBar'
-  // timeSeries
-  | 'line' | 'area' | 'step' | 'smoothLine'
-  // distribution
-  | 'histogram' | 'boxplot'
-  // correlation
-  | 'scatter' | 'effectScatter' | 'heatmap'
-  // ranking
-  | 'orderedBar' | 'horizontalOrderedBar'
-  // hierarchical (overlaps with partToWhole)
-  | 'tree'
-  // flow
-  | 'sankey' | 'funnel'
-  // geospatial
-  | 'map'
-  // multivariateComparison
-  | 'groupedBar' | 'stackedBar' | 'radar' | 'parallel';
-
-export const ChartGroupVariants: Record<ChartGroup, ChartVariant[]> = {
-  partToWhole: ['pie', 'donut', 'treemap', 'sunburst'],
-  categoryComparison: ['bar', 'horizontalBar', 'pictorialBar'],
-  timeSeries: ['line', 'area', 'step', 'smoothLine'],
-  distribution: ['histogram', 'boxplot'],
-  correlation: ['scatter', 'effectScatter', 'heatmap'],
-  ranking: ['orderedBar', 'horizontalOrderedBar'],
-  hierarchical: ['treemap', 'sunburst', 'tree'],
-  flow: ['sankey', 'funnel'],
-  geospatial: ['map'], // Removed scatter to avoid duplication with correlation group
-  multivariateComparison: ['groupedBar', 'stackedBar', 'radar', 'parallel'],
-};
-
-// ECharts option type (simplified - in reality it's much more complex)
-export type EChartsOption = Record<string, unknown>;
-
-export type ChartDisplayInput = {
-  chart: ChartConfig;
-};
-
-export type ChartDisplayOutput = {
-  chartGroup: ChartGroup;
-  availableVariants: ChartVariant[];
-  currentVariant: ChartVariant;
-  option: EChartsOption;
-  data: ChartDataPoint[];
-  variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
-};
-
-// ============================================================================
 // Chart Display Operation
 // ============================================================================
 
@@ -570,7 +505,7 @@ export const chart_display = operationOf<
     const { chartGroup, data, title, variantOptions, defaultVariant } = input.chart;
     const availableVariants = ChartGroupVariants[chartGroup];
     const currentVariant = defaultVariant || availableVariants[0];
-    const variantOpts = variantOptions || {};
+    const variantOpts = (variantOptions || {}) as Partial<Record<ChartVariant, Partial<EChartsOption>>>;
 
     // Build base option from input
     const baseOption: EChartsOption = {
@@ -751,7 +686,7 @@ function applyVariantToOption(
     case 'parallel':
       // Use the variant name directly as ECharts type (these are already correct)
       option.series = [{
-        type: variant,
+        type: variant as any,
         data,
       }];
       break;

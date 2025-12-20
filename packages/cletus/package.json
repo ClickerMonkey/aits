@@ -75,7 +75,6 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tavily/core": "^0.5.13",
     "@types/diff": "^7.0.2",
-    "@types/echarts": "^4.9.22",
     "@types/file-type": "^10.6.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.9.1",
