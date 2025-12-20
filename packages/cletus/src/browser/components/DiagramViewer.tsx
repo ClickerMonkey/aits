@@ -23,16 +23,9 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ spec, isOpen, onCl
     mermaid.initialize({
       startOnLoad: false,
       theme: 'dark',
-      securityLevel: 'loose',
+      securityLevel: 'strict',
     });
   }, []);
-
-  // Render diagram when spec changes or when opened
-  useEffect(() => {
-    if (isOpen && spec) {
-      renderDiagram();
-    }
-  }, [isOpen, spec]);
 
   const renderDiagram = async () => {
     try {
@@ -44,6 +37,13 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ spec, isOpen, onCl
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
   };
+
+  // Render diagram when spec changes or when opened
+  useEffect(() => {
+    if (isOpen && spec) {
+      renderDiagram();
+    }
+  }, [isOpen, spec]);
 
   // Reset state when opening
   useEffect(() => {
@@ -224,16 +224,9 @@ export const ClickableDiagram: React.FC<ClickableDiagramProps> = ({ spec, classN
     mermaid.initialize({
       startOnLoad: false,
       theme: 'dark',
-      securityLevel: 'loose',
+      securityLevel: 'strict',
     });
   }, []);
-
-  // Render diagram
-  useEffect(() => {
-    if (spec) {
-      renderDiagram();
-    }
-  }, [spec]);
 
   const renderDiagram = async () => {
     try {
@@ -245,6 +238,13 @@ export const ClickableDiagram: React.FC<ClickableDiagramProps> = ({ spec, classN
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
   };
+
+  // Render diagram
+  useEffect(() => {
+    if (spec) {
+      renderDiagram();
+    }
+  }, [spec]);
 
   if (error) {
     return (
