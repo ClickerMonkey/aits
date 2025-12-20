@@ -5,6 +5,7 @@ import { ClickableImage } from '../components/ImageViewer';
 import { createRenderer } from './render';
 import { ChartDataPoint, ChartVariant } from '../../helpers/artist';
 import { type EChartsOption } from 'echarts';
+import { ClickableDiagram } from '../components/DiagramViewer';
 
 
 const renderer = createRenderer({
@@ -390,6 +391,24 @@ export const chart_display = renderer<'chart_display'>(
           data={op.output.data}
           variantOptions={op.output.variantOptions}
         />
+      );
+    }
+    return null;
+  }
+);
+
+export const diagram_show = renderer<'diagram_show'>(
+  (op) => `DiagramShow()`,
+  (op): string | React.ReactNode | null => {
+    if (op.output?.spec) {
+      return (
+        <div className="ml-6 mt-2">
+          <div className="text-sm mb-2">Mermaid Diagram</div>
+          <ClickableDiagram
+            spec={op.output.spec}
+            className="max-w-full rounded border border-neon-pink/30 bg-background p-4"
+          />
+        </div>
       );
     }
     return null;

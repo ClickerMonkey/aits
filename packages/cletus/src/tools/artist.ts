@@ -154,6 +154,24 @@ Example: Display market share as a pie chart:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'chart_display', input }, ctx),
   });
 
+  const diagramShow = ai.tool({
+    name: 'diagram_show',
+    description: 'Display a Mermaid diagram in the chat (browser only)',
+    instructions: `Use this to render and display Mermaid diagrams in the browser. This tool is browser-only and will render the diagram inline with a clickable preview for full-screen viewing.
+
+Example: Show a flowchart:
+{ "spec": "graph TD\\n  A[Start] --> B[Process]\\n  B --> C[End]" }
+ 
+{{modeInstructions}}`,
+    schema: z.object({
+      spec: z.string().describe('Mermaid diagram specification string'),
+      ...globalToolProperties,
+    }),
+    metadata: { onlyClient: 'browser' },
+    input: getOperationInput('diagram_show'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'diagram_show', input }, ctx),
+  });
+
   return [
     imageGenerate,
     imageEdit,
@@ -162,6 +180,7 @@ Example: Display market share as a pie chart:
     imageFind,
     imageAttach,
     chartDisplay,
+    diagramShow,
   ] as [
     typeof imageGenerate,
     typeof imageEdit,
@@ -170,5 +189,6 @@ Example: Display market share as a pie chart:
     typeof imageFind,
     typeof imageAttach,
     typeof chartDisplay,
+    typeof diagramShow,
   ];
 }
