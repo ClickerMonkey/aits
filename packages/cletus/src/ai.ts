@@ -1,4 +1,4 @@
-import { AI, ContextInfer } from '@aeye/ai';
+import { AI, ContextInfer, ToolInfer } from '@aeye/ai';
 import { models, replicateTransformers } from '@aeye/models';
 import { OpenAIProvider } from '@aeye/openai';
 import { OpenRouterProvider } from '@aeye/openrouter';
@@ -45,11 +45,12 @@ export interface CletusContext {
  * Cletus AI Metadata
  */
 export interface CletusMetadata {
-  // Model selection metadata can go here
   /** Whether this tool should always be visible/available regardless of toolset or adaptive selection */
   alwaysVisible?: boolean;
   /** Whether this tool should be included in the default tool selection when no user messages exist yet */
   defaultVisible?: boolean;
+  /** Whether this tool should be included based on which client is running Cletus */
+  onlyClient?: 'browser' | 'cli';
 }
 
 /**
@@ -280,6 +281,7 @@ export function createCletusAI(configFile: ConfigFile) {
 
 export type CletusAI = ReturnType<typeof createCletusAI>;
 export type CletusAIContext = ContextInfer<CletusAI>;
+export type CletusTool = ToolInfer<CletusAI>;
 
 // Global tool properties - useful for debugging
 export const globalToolProperties = {

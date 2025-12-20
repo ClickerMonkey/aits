@@ -5,7 +5,7 @@
  * Provides type-safe, scoped access to AI capabilities with hooks and context injection.
  */
 
-import { accumulateUsage, Agent, Events, Extend, FnResolved, MessageContentType, Prompt, resolveFn, RetoolResult, Tool, ToolCompatible, Tuple } from '@aeye/core';
+import { accumulateUsage, Agent, Events, Extend, Fn, FnResolved, MessageContentType, Prompt, resolveFn, RetoolResult, Tool, ToolCompatible, Tuple } from '@aeye/core';
 import { ChatAPI } from './apis/chat';
 import { EmbedAPI } from './apis/embed';
 import { ImageAPI } from './apis/image';
@@ -48,6 +48,57 @@ import type {
   Usage
 } from './types';
 
+// Helper types for AI components
+
+type AIToolInput<
+  T extends AIBaseTypes,
+  TName extends string = string,
+  TParams extends object = {},
+  TOutput = unknown,
+  TRefs extends Tuple<ComponentFor<T>> = []
+> = Omit<ToolInput<
+  AIContext<T>,
+  AIMetadata<T>,
+  TName,
+  TParams,
+  TOutput,
+  // @ts-ignore
+  TRefs
+>, 'types'>;
+
+type AIPromptInput<
+  T extends AIBaseTypes,
+  TName extends string = string,
+  TInput extends object = {},
+  TOutput extends object | string = string,
+  TTools extends Tuple<ToolCompatible<AIContextRequired<T>, AIMetadataRequired<T>>> = []
+> = Omit<PromptInput<
+  AIContext<T>,
+  AIMetadata<T>,
+  TName,
+  TInput,
+  TOutput,
+  // @ts-ignore
+  TTools
+>, 'types' | 'retool'> & {
+  retool?: Fn<RetoolResult<AIContextRequired<T>, AIMetadataRequired<T>, TTools>, [TInput | undefined, Context<T>]>;
+};
+
+type AIAgentInput<
+  T extends AIBaseTypes,
+  TName extends string = string,
+  TInput extends object = {},
+  TOutput = unknown,
+  TRefs extends Tuple<ComponentFor<T>> = []
+> = Omit<AgentInput<
+  AIContext<T>,
+  AIMetadata<T>,
+  TName,
+  TInput,
+  TOutput,
+  // @ts-ignore
+  TRefs
+>, 'types'>;
 
 /**
  * AI Class
@@ -728,15 +779,7 @@ export class AI<T extends AIBaseTypes> {
     TOutput extends object | string = string,
     TTools extends Tuple<ToolCompatible<AIContextRequired<T>, AIMetadataRequired<T>>> = []
   >(
-    options: Omit<PromptInput<
-      AIContext<T>,
-      AIMetadata<T>,
-      TName,
-      TInput,
-      TOutput,
-      // @ts-ignore
-      TTools
-    >, 'types'>
+    options: AIPromptInput<T, TName, TInput, TOutput, TTools>
   ) {
     const { input, schema, config, reconfig, retool, validate, applicable, metadataFn, ...rest } = options;
 
@@ -829,15 +872,7 @@ export class AI<T extends AIBaseTypes> {
     TOutput = unknown,
     TRefs extends Tuple<ComponentFor<T>> = []
   >(
-    options: Omit<ToolInput<
-      AIContext<T>,
-      AIMetadata<T>,
-      TName,
-      TParams,
-      TOutput,
-      // @ts-ignore
-      TRefs
-    >, 'types'>
+    options: AIToolInput<T, TName, TParams, TOutput, TRefs>
   ) {
     const { input, schema, call, validate, applicable, ...rest } = options;
 
@@ -900,15 +935,7 @@ export class AI<T extends AIBaseTypes> {
     TOutput = unknown,
     TRefs extends Tuple<ComponentFor<T>> = []
   >(
-    options: Omit<AgentInput<
-      AIContext<T>,
-      AIMetadata<T>,
-      TName,
-      TInput,
-      TOutput,
-      // @ts-ignore
-      TRefs
-    >, 'types'>
+    options: AIAgentInput<T, TName, TInput, TOutput, TRefs>
   ) {
     const { call, applicable, metadataFn, ...rest } = options;
 

@@ -81,7 +81,6 @@ const AppContent: React.FC = () => {
     return (
       <MainPage
         config={config}
-        onConfigChange={reloadConfig}
       />
     );
   }

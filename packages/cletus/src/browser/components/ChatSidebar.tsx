@@ -12,6 +12,7 @@ interface ChatSidebarProps {
   onChatSelect: (chatId: string) => void;
   onProfileClick: () => void;
   onCreateChat?: () => void;
+  isCreatingChat?: boolean;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -22,6 +23,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onChatSelect,
   onProfileClick,
   onCreateChat,
+  isCreatingChat = false,
 }) => {
   const chats = config.chats;
   const sortedChats = [...chats].sort((a, b) => b.updated - a.updated);
@@ -62,6 +64,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           size="icon"
           onClick={handleCreateChat}
           title="New Chat"
+          disabled={isCreatingChat}
         >
           <Plus className="w-5 h-5" />
         </Button>
@@ -112,9 +115,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           variant="neon"
           className="w-full gap-2"
           onClick={handleCreateChat}
+          disabled={isCreatingChat}
         >
           <Plus className="w-4 h-4" />
-          New Chat
+          {isCreatingChat ? 'Creating...' : 'New Chat'}
         </Button>
       </div>
 

@@ -21,10 +21,9 @@ import { useWebSocket } from '../WebSocketContext';
 
 interface MainPageProps {
   config: Config;
-  onConfigChange: () => Promise<void>;
 }
 
-export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) => {
+export const MainPage: React.FC<MainPageProps> = ({ config }) => {
   const { ws, isConnected } = useWebSocket();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -47,6 +46,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
   const [cwd, setCwd] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
     reject: (error: Error) => void;
@@ -78,15 +78,26 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         // Chat is in config, select it now
         pendingChatSelectRef.current = null;
         handleChatSelect(chatToSelect);
+        // Clear creating state when chat is selected
+        setIsCreatingChat(false);
       }
     }
   }, [config.chats]);
 
-  // Request messages when chat is selected and WebSocket is connected
+  // Subscribe to chat when selected or when reconnecting
   useEffect(() => {
     if (!selectedChatId || !isConnected || !ws) return;
 
+    // Subscribe to the chat (will receive operation_state and messages)
+    ws.send({ type: 'subscribe_chat', data: { chatId: selectedChatId } });
     ws.send({ type: 'get_messages', data: { chatId: selectedChatId } });
+
+    // Cleanup: unsubscribe when effect re-runs or component unmounts
+    return () => {
+      if (ws && ws.isOpen()) {
+        ws.send({ type: 'unsubscribe_chat', data: { chatId: selectedChatId } });
+      }
+    };
   }, [selectedChatId, isConnected, ws]);
 
   // Listen for WebSocket messages
@@ -100,7 +111,30 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
     return unsubscribe;
   }, [ws]);
 
+  // State that changes and the handler function needs
+  const getHandlerState = () => ({
+    selectedChatId,
+    isCreatingChat,
+  });
+  const handleState = useRef(getHandlerState())
+  useEffect(() => {
+    handleState.current = getHandlerState();
+  });
+
+  // Handle incoming server messages
   const handleServerMessage = (message: ServerMessage) => {
+    const { isCreatingChat, selectedChatId } = handleState.current;
+
+    const isChatCreation = isCreatingChat && message.type === 'chat_created';
+    const isAnotherChat = 'chatId' in message.data && message.data.chatId !== selectedChatId;
+
+    if (!isChatCreation && isAnotherChat) {
+      console.log('[MainPage] Ignoring message for different chat:', { selectedChatId, message, isCreatingChat });
+
+      // This event is for a different chat, ignore it
+      return;
+    }
+
     switch (message.type) {
       case 'messages':
         setMessages(message.data.messages || []);
@@ -158,7 +192,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
       case 'chat_updated':
         if (message.data.chat) {
           setChatMetaState(message.data.chat);
-          onConfigChange();
+          send({ type: 'get_config' });
         }
         if (message.data.cwd !== undefined) {
           setCwd(message.data.cwd);
@@ -169,14 +203,23 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         setStatus(message.data.status);
         break;
 
-      case 'elapsed_update':
-        break;
-
       case 'processing':
-        setIsProcessing(message.data);
-        if (!message.data) {
+        setIsProcessing(message.data.isProcessing);
+        if (!message.data.isProcessing) {
           setStatus('');
         }
+        break;
+
+      case 'operation_state':
+        // Sync operation state when subscribing to a chat
+        setIsProcessing(message.data.status === 'processing');
+        if (message.data.pendingMessage) {
+          setPendingMessage(message.data.pendingMessage);
+        }
+        break;
+
+      case 'chat_subscribed':
+        // Chat subscription confirmed
         break;
 
       case 'models':
@@ -195,16 +238,9 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         if (message.data.chatId) {
           pendingChatSelectRef.current = message.data.chatId;
         }
-        
-        // Clear data immediately, once config with new chat is refreshed it will be populated.
-        setMessages([]);
-        setPendingMessage(null);
-        setTemporaryUserMessage(null);
-        setTemporaryAssistantMessage(null);
-        setStatus('');
 
         // Refresh config - the effect will handle selection
-        onConfigChange();
+        send({ type: 'get_config' });
         break;
 
       case 'chat_deleted':
@@ -217,12 +253,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
           setTemporaryAssistantMessage(null);
         }
         // Refresh config - auto-select effect will handle selecting another chat
-        onConfigChange();
+        send({ type: 'get_config' });
         break;
 
       case 'error':
         console.error('Server error:', message.data.message);
         setIsProcessing(false);
+        setIsCreatingChat(false); // Clear creating state on error
         setStatus('Error: ' + message.data.message);
         if (modelsResolverRef.current) {
           modelsResolverRef.current.reject(new Error(message.data.message));
@@ -245,13 +282,24 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
   };
 
   const handleChatSelect = (chatId: string) => {
+    // Unsubscribe from previous chat
+    if (selectedChatId && ws) {
+      send({ type: 'unsubscribe_chat', data: { chatId: selectedChatId } });
+    }
+
     setSelectedChatId(chatId);
     setMessages([]);
     setPendingMessage(null);
     setTemporaryUserMessage(null);
     setTemporaryAssistantMessage(null);
+    setStatus(''); // Clear any previous error or status messages
     setLoading(true);
     window.history.pushState({}, '', `/chat/${chatId}`);
+
+    // Subscribe to new chat (will receive operation_state)
+    if (ws) {
+      send({ type: 'subscribe_chat', data: { chatId } });
+    }
   };
 
   const handleSendMessage = (content: MessageContent[]) => {
@@ -283,7 +331,8 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
   };
 
   const handleCancel = () => {
-    send({ type: 'cancel' });
+    if (!selectedChatId) return;
+    send({ type: 'cancel', data: { chatId: selectedChatId } });
     // Server will send 'processing' message to update isProcessing state
   };
 
@@ -425,7 +474,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
       send({ type: 'delete_chat', data: { chatId: selectedChatId } });
       setSelectedChatId(null);
       setMessages([]);
-      setTimeout(() => onConfigChange(), 500);
+      setTimeout(() => send({ type: 'get_config' }), 500);
     }
   };
 
@@ -525,6 +574,9 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
   };
 
   const handleCreateChat = () => {
+    // Set loading state immediately
+    setIsCreatingChat(true);
+
     // Generate timestamp-based name
     const now = new Date();
     const day = now.getDate();
@@ -580,6 +632,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
           onChatSelect={handleChatSelect}
           onProfileClick={() => setShowProfile(true)}
           onCreateChat={handleCreateChat}
+          isCreatingChat={isCreatingChat}
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-6">
@@ -616,6 +669,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config, onConfigChange }) =>
         onChatSelect={handleChatSelect}
         onProfileClick={() => setShowProfile(true)}
         onCreateChat={handleCreateChat}
+        isCreatingChat={isCreatingChat}
       />
 
       {/* Main Chat Area */}

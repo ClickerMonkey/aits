@@ -1,9 +1,10 @@
-import { AnyTool, Message, resolveFn } from '@aeye/core';
+import { Message, resolveFn } from '@aeye/core';
+import { CletusAIContext, CletusTool } from './ai';
 import { cosineSimilarity, pluralize } from './common';
 import { ADAPTIVE_TOOLING } from './constants';
 import { embed } from './embed';
-import { CletusAIContext } from './ai';
 import { getCachedVector, setCachedVector } from './embedding-cache';
+
 
 /**
  * Registered tool with embedded instructions for semantic search
@@ -14,7 +15,7 @@ export interface RegisteredTool {
   /** Toolset this tool belongs to */
   toolset: string;
   /** Tool reference */
-  tool: AnyTool;
+  tool: CletusTool;
   /** Embedded instruction vector (null if not yet embedded) */
   vector: number[] | null;
   /** Instructions text used for embedding */
@@ -31,7 +32,7 @@ export class ToolRegistry {
   /**
    * Register a tool with its toolset
    */
-  async register(toolset: string, tool: AnyTool, instructions: string): Promise<void> {
+  async register(toolset: string, tool: CletusTool, instructions: string): Promise<void> {
     const name = tool.name;
 
     const existing = this.tools.get(name);
@@ -55,7 +56,7 @@ export class ToolRegistry {
   /**
    * Register multiple tools from a toolset
    */
-  async registerToolset(toolset: string, tools: AnyTool[], getInstructions: (tool: AnyTool) => Promise<string>): Promise<void> {
+  async registerToolset(toolset: string, tools: CletusTool[], getInstructions: (tool: CletusTool) => Promise<string>): Promise<void> {
     for (const tool of tools) {
       await this.register(toolset, tool, await getInstructions(tool));
     }
@@ -234,7 +235,7 @@ export type StaticToolsetName = typeof STATIC_TOOLSETS[number] | 'utility';
 /**
  * Extract instructions from a tool (uses instructions first, falls back to description)
  */
-export async function getToolInstructions(tool: AnyTool, ctx?: CletusAIContext): Promise<string> {
+export async function getToolInstructions(tool: CletusTool, ctx?: CletusAIContext): Promise<string> {
   const input = tool.input;
   // Use instructions first if available, then fall back to description
   const instructions = input.instructionsFn && ctx

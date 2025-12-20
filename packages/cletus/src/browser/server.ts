@@ -12,6 +12,9 @@ import { OperationManager } from '../operations/manager';
 import { CletusAI, createCletusAI } from '../ai';
 import { CletusChatAgent, createChatAgent, initTools } from '../agents/chat-agent';
 import { OrchestratorEvent, runChatOrchestrator } from '../agents/chat-orchestrator';
+import { ChatOperationManager } from './chat-operation-manager';
+import { ConnectionRegistry } from './connection-registry';
+import { BroadcastManager } from './broadcast-manager';
 import { send } from 'process';
 
 const __serverFilename = fileURLToPath(import.meta.url);
@@ -63,6 +66,14 @@ function removeChat(chatId: string): void {
 
 // Run cleanup every 15 minutes
 setInterval(cleanupExpiredChats, 15 * 60 * 1000);
+
+// Server-level state (shared across all connections)
+const connectionRegistry = new ConnectionRegistry();
+const chatOperationManager = new ChatOperationManager();
+const broadcastManager = new BroadcastManager(connectionRegistry, chatOperationManager);
+
+// Periodic cleanup of old completed operations
+setInterval(() => chatOperationManager.cleanup(), 5 * 60 * 1000);
 
 export async function startBrowserServer(port: number = 3000): Promise<void> {
   const server = http.createServer(async (req, res) => {
@@ -124,6 +135,22 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
   process.on('SIGINT', () => {
     console.log('\n\nShutting down...');
 
+    // Abort all ongoing operations
+    chatOperationManager.abortAll();
+
+    // Broadcast shutdown message to all clients
+    for (const connection of connectionRegistry.getAllConnections()) {
+      if (connection.activeChatId && connection.ws.readyState === 1) {
+        connection.ws.send(JSON.stringify({
+          type: 'error',
+          data: {
+            chatId: connection.activeChatId,
+            message: 'Server shutting down - operation cancelled'
+          }
+        } as ServerMessage));
+      }
+    }
+
     // Force close all WebSocket connections
     clients.forEach((ws) => {
       ws.close();
@@ -144,31 +171,18 @@ export async function startBrowserServer(port: number = 3000): Promise<void> {
 }
 
 async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
+  // Register this connection
+  const connectionId = connectionRegistry.registerConnection(ws);
+
   let config: ConfigFile | null = null;
   let configPromise: Promise<boolean> | null = null;
   let ai: CletusAI | null = null;
   let chatAgent: CletusChatAgent | null = null;
-  let abortController: AbortController | null = null;
   let configUpdateQueue: Promise<void> = Promise.resolve();
 
-  // Type-safe message sender
+  // Type-safe message sender for this connection
   const sendMessage = (message: ServerMessage) => {
-    ws.send(JSON.stringify(message));
-  };
-
-  // Helper to run interruptible operations
-  const startProcessing = <T>(fn: (signal: AbortSignal) => Promise<T>) => {
-    if (abortController) {
-      throw new Error('Another operation is already in progress');
-    }
-    abortController = new AbortController();
-    try {
-      sendMessage({ type: 'processing', data: true });
-      return fn(abortController.signal);
-    } finally {
-      sendMessage({ type: 'processing', data: false });
-      abortController = null;
-    }
+    broadcastManager.sendToConnection(connectionId, message);
   };
 
   // Helper to send errors
@@ -307,50 +321,18 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
     }
   };
 
-  const handleOrchestratorEvent = (event: OrchestratorEvent, chatFile: ChatFile) => {
+  const handleOrchestratorEvent = (chatId: string, event: OrchestratorEvent, chatFile: ChatFile) => {
     // Handle orchestrator events
     switch (event.type) {
       case 'pendingUpdate':
         // Save pending message immediately to chat file so it persists
         // This ensures messages are never lost due to errors or cancellations
-        // We MUST await this to prevent race conditions where the user approves
-        // operations before the message is saved
         fireAndForget(async () => {
           await saveOrUpdateMessage(chatFile, event.pending);
-          sendMessage({
-            type: 'pending_update',
-            data: { pending: event.pending },
-          });
         });
         break;
       case 'update':
         fireAndForget(chatFile.updateMessage(event.message));
-        sendMessage({
-          type: 'message_updated',
-          data: { message: event.message },
-        });
-        break;
-      case 'status':
-        sendMessage({
-          type: 'status_update',
-          data: { status: event.status },
-        });
-        break;
-      case 'usage':
-        sendMessage({
-          type: 'usage_update',
-          data: {
-            accumulated: event.accumulated,
-            accumulatedCost: event.accumulatedCost,
-            current: event.current,
-          },
-        });
-        break;
-      case 'elapsed':
-        sendMessage({
-          type: 'elapsed_update',
-          data: { ms: event.ms },
-        });
         break;
       case 'complete':
         // Update the message if it exists (from pending), or add it if it doesn't
@@ -358,12 +340,6 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           if (event.message.content.length > 0) {
             await saveOrUpdateMessage(chatFile, event.message);
           }
-        });
-
-        // Send the complete message
-        sendMessage({
-          type: 'response_complete',
-          data: { message: event.message },
         });
         break;
       case 'error':
@@ -378,16 +354,16 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             await chatFile.updateMessage(lastAssistantMsg);
           }
         });
-
-        sendMessage({
-          type: 'error',
-          data: { message: event.error },
-        });
         break;
     }
+
+    // Broadcast event to all clients watching this chat
+    broadcastManager.broadcastOperationEvent(chatId, event);
   };
 
   const runChat = async (chatFile: ChatFile, chatMeta: ChatMeta, config: ConfigFile) => {
+    const chatId = chatMeta.id;
+
     // Ensure AI and chat agent are loaded
     const { ai: aiInstance, chatAgent: chatAgentInstance } = await ensureAI();
 
@@ -412,21 +388,48 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
       return { accumulated: {}, accumulatedCost: 0 };
     };
 
-    // Run orchestrator with updated chat file
-    await startProcessing(async (signal)  => {
+    // Start operation for this chat (get chat-scoped abort controller)
+    const abortController = chatOperationManager.startOperation(chatId);
+
+    // Broadcast processing start to all clients watching this chat
+    broadcastManager.broadcastToChat(chatId, {
+      type: 'processing',
+      data: { chatId, isProcessing: true },
+    });
+
+    try {
+      // Run orchestrator with updated chat file
       await runChatOrchestrator({
         chatAgent: chatAgentInstance,
         messages: chatFile.getMessages(),
         chatMeta: { ...chatMeta, questions: [] },
         config,
         chatData: chatFile,
-        signal,
+        signal: abortController.signal,
         clearUsage,
         getUsage,
       }, (event) => {
-        handleOrchestratorEvent(event, chatFile);
+        handleOrchestratorEvent(chatId, event, chatFile);
       });
-    });
+
+      // Mark operation as complete
+      chatOperationManager.completeOperation(chatId);
+    } catch (error: any) {
+      // Mark operation as complete even on error
+      chatOperationManager.completeOperation(chatId);
+
+      // Broadcast error to all clients
+      broadcastManager.broadcastToChat(chatId, {
+        type: 'error',
+        data: { chatId, message: error.message || 'Unknown error' },
+      });
+    } finally {
+      // Broadcast processing end to all clients watching this chat
+      broadcastManager.broadcastToChat(chatId, {
+        type: 'processing',
+        data: { chatId, isProcessing: false },
+      });
+    }
   };
 
   ws.on('message', async (data) => {
@@ -480,30 +483,6 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           });
           break;
         }
-        case 'init_chat': {
-          const { chatId } = message.data;
-          await withChatFile(chatId, async (chatFile, _, config) => {
-            // Initialize AI to get default cwd
-            await ensureAI();
-
-            sendMessage({
-              type: 'chat_initialized',
-              data: {
-                messages: chatFile.getMessages(),
-                chat: config.getChats().find(c => c.id === chatId),
-              },
-            });
-
-            // Send current cwd
-            sendMessage({
-              type: 'chat_updated',
-              data: {
-                cwd: ai?.config.defaultContext?.cwd
-              },
-            });
-          });
-          break;
-        }
         case 'get_messages': {
           const { chatId } = message.data;
           await withChatFile(chatId, async (chatFile) => {
@@ -511,7 +490,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
             sendMessage({
               type: 'messages',
-              data: { messages },
+              data: { chatId, messages },
             });
           });
           break;
@@ -539,7 +518,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
             sendMessage({
               type: 'message_added',
-              data: { message: userMessage },
+              data: { chatId, message: userMessage },
             });
 
             // Run the chat
@@ -547,12 +526,45 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           });
           break;
         }
-        case 'cancel':
-          if (abortController) {
-            abortController.abort();
-            abortController = null;
+        case 'cancel': {
+          const { chatId } = message.data;
+          chatOperationManager.cancelOperation(chatId);
+
+          // Broadcast cancellation to all clients watching this chat
+          broadcastManager.broadcastToChat(chatId, {
+            type: 'processing',
+            data: { chatId, isProcessing: false },
+          });
+          break;
+        }
+
+        case 'subscribe_chat': {
+          const { chatId } = message.data;
+
+          // Register this connection as watching this chat
+          connectionRegistry.setActiveChat(connectionId, chatId);
+
+          // Send confirmation
+          sendMessage({
+            type: 'chat_subscribed',
+            data: { chatId },
+          });
+
+          // Send current operation state for this chat
+          broadcastManager.sendOperationState(connectionId, chatId);
+          break;
+        }
+
+        case 'unsubscribe_chat': {
+          const { chatId } = message.data;
+
+          // Unregister this connection from watching this chat
+          const currentChatId = connectionRegistry.getActiveChat(connectionId);
+          if (currentChatId === chatId) {
+            connectionRegistry.setActiveChat(connectionId, null);
           }
           break;
+        }
 
         case 'get_models':
           try {
@@ -590,6 +602,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             sendMessage({
               type: 'chat_updated',
               data: {
+                chatId,
                 chat: updatedChat,
                 cwd: ai?.config.defaultContext?.cwd
               },
@@ -618,7 +631,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
-                data: { chat: updatedChat },
+                data: { chatId, chat: updatedChat },
               });
             }
           });
@@ -634,7 +647,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
-                data: { chat: updatedChat },
+                data: { chatId, chat: updatedChat },
               });
             }
           });
@@ -650,7 +663,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               const updatedChat = config.getChats().find(c => c.id === chatId);
               sendMessage({
                 type: 'chat_updated',
-                data: { chat: updatedChat },
+                data: { chatId, chat: updatedChat },
               });
             }
           });
@@ -663,7 +676,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             const updatedChat = config.getChats().find(c => c.id === chatId);
             sendMessage({
               type: 'chat_updated',
-              data: { chat: updatedChat },
+              data: { chatId, chat: updatedChat },
             });
           });
           break;
@@ -676,20 +689,28 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             });
             sendMessage({
               type: 'messages_updated',
-              data: { messages: [] },
+              data: { chatId, messages: [] },
             });
           });
           break;
         }
         case 'delete_chat': {
           const { chatId } = message.data;
+
+          // Abort any ongoing operation for this chat
+          chatOperationManager.cancelOperation(chatId);
+
           withConfigUpdate(async (config) => {
             await config.deleteChat(chatId);
             removeChat(chatId); // Remove from cache
-            sendMessage({
-              type: 'chat_deleted',
-              data: { chatId },
-            });
+
+            // Broadcast deletion to all clients (not just those watching this chat)
+            for (const connection of connectionRegistry.getAllConnections()) {
+              broadcastManager.sendToConnection(connection.connectionId, {
+                type: 'chat_deleted',
+                data: { chatId },
+              });
+            }
           });
           break;
         }
@@ -702,21 +723,21 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             if (!targetMessage || !targetMessage.operations) {
               sendMessage({
                 type: 'error',
-                data: { message: 'Message or operations not found' },
+                data: { chatId, message: 'Message or operations not found' },
               });
               return;
             }
 
             const broadcastMessageUpdate = () => {
-              sendMessage({
+              broadcastManager.broadcastToChat(chatId, {
                 type: 'message_updated',
-                data: { message: targetMessage },
+                data: { chatId, message: targetMessage },
               });
             };
 
             const operations = targetMessage.operations;
             const manager = new OperationManager(
-              'none', 
+              'none',
               operations,
               () => {},
               (op, opIndex) => {
@@ -727,7 +748,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
                   const content = targetMessage.content.splice(contentIndex, 1)[0];
                   content.content = op.message || '';
                   targetMessage.content.push(content);
-                  
+
                   chatFile.updateMessage(targetMessage);
                   broadcastMessageUpdate();
                 }
@@ -752,18 +773,27 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             // Execute approved operations
             let hasExecutedOperations = false;
             if (approved.length > 0) {
-              await startProcessing(async (signal) => {
+              // Start operation for this chat
+              const abortController = chatOperationManager.startOperation(chatId);
+
+              // Broadcast processing start
+              broadcastManager.broadcastToChat(chatId, {
+                type: 'processing',
+                data: { chatId, isProcessing: true },
+              });
+
+              try {
                 const ctx = await aiInstance.buildContext({
                   ops: manager,
                   chat: chatMeta,
                   chatData: chatFile,
                   chatMessage: targetMessage,
                   config,
-                  signal,
+                  signal: abortController.signal,
                   chatStatus: (status) => {
-                    sendMessage({
+                    broadcastManager.broadcastToChat(chatId, {
                       type: 'status_update',
-                      data: { status },
+                      data: { chatId, status },
                     });
                   },
                 });
@@ -774,7 +804,21 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
                     hasExecutedOperations = true;
                   }
                 }
-              });
+
+                chatOperationManager.completeOperation(chatId);
+              } catch (error: any) {
+                chatOperationManager.completeOperation(chatId);
+                broadcastManager.broadcastToChat(chatId, {
+                  type: 'error',
+                  data: { chatId, message: error.message || 'Operation execution failed' },
+                });
+              } finally {
+                // Broadcast processing end
+                broadcastManager.broadcastToChat(chatId, {
+                  type: 'processing',
+                  data: { chatId, isProcessing: false },
+                });
+              }
             }
 
             // If operations were executed, continue with the orchestrator
@@ -858,7 +902,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             await chatFile.addMessage(questionMessage);
             sendMessage({
               type: 'message_added',
-              data: { message: questionMessage },
+              data: { chatId, message: questionMessage },
             });
 
             // Add the formatted answer as a user message
@@ -872,13 +916,13 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             await chatFile.addMessage(answerMessage);
             sendMessage({
               type: 'message_added',
-              data: { message: answerMessage },
+              data: { chatId, message: answerMessage },
             });
 
             // Send updated chat meta
             sendMessage({
               type: 'chat_updated',
-              data: { chat: { ...chatMeta, questions: [] } },
+              data: { chatId, chat: { ...chatMeta, questions: [] } },
             });
 
             // Run the chat
@@ -902,9 +946,8 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
   });
 
   ws.on('close', () => {
-    if (abortController) {
-      abortController.abort();
-    }
+    connectionRegistry.unregisterConnection(connectionId);
+    // Note: Operations continue running even after client disconnects!
   });
 }
 

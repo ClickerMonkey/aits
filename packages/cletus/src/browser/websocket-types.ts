@@ -9,9 +9,10 @@ export type ClientMessage =
   | { type: 'get_config'; data?: never }
   | { type: 'create_chat'; data: { name: string } }
   | { type: 'get_messages'; data: { chatId: string } }
-  | { type: 'init_chat'; data: { chatId: string } }
   | { type: 'send_message'; data: { chatId: string; content: Message['content'] } }
-  | { type: 'cancel'; data?: never }
+  | { type: 'cancel'; data: { chatId: string } }
+  | { type: 'subscribe_chat'; data: { chatId: string } }
+  | { type: 'unsubscribe_chat'; data: { chatId: string } }
   | { type: 'update_chat_meta'; data: { chatId: string; updates: Partial<ChatMeta>; cwd?: string } }
   | { type: 'update_user'; data: { updates: Partial<Config['user']> } }
   | { type: 'add_todo'; data: { chatId: string; todo: string } }
@@ -29,21 +30,21 @@ export type ServerMessage =
   | { type: 'config'; data: Config }
   | { type: 'config_not_found'; data: Record<string, never> }
   | { type: 'chat_created'; data: { chatId: string } }
-  | { type: 'chat_initialized'; data: { messages: Message[]; chat?: ChatMeta } }
-  | { type: 'messages'; data: { messages: Message[] } }
-  | { type: 'message_added'; data: { message: Message } }
-  | { type: 'message_updated'; data: { message: Message } }
-  | { type: 'pending_update'; data: { pending: Message } }
-  | { type: 'messages_updated'; data: { messages: Message[] } }
-  | { type: 'response_complete'; data: { message: Message } }
-  | { type: 'chat_updated'; data: { chat?: ChatMeta; cwd?: string } }
+  | { type: 'chat_subscribed'; data: { chatId: string } }
+  | { type: 'messages'; data: { chatId: string; messages: Message[] } }
+  | { type: 'message_added'; data: { chatId: string; message: Message } }
+  | { type: 'message_updated'; data: { chatId: string; message: Message } }
+  | { type: 'pending_update'; data: { chatId: string; pending: Message } }
+  | { type: 'messages_updated'; data: { chatId: string; messages: Message[] } }
+  | { type: 'response_complete'; data: { chatId: string; message: Message } }
+  | { type: 'chat_updated'; data: { chatId: string; chat?: ChatMeta; cwd?: string } }
   | { type: 'models'; data: { models: any[] } }
-  | { type: 'status_update'; data: { status: string } }
-  | { type: 'usage_update'; data: { accumulated: any; accumulatedCost: number; current: any } }
-  | { type: 'elapsed_update'; data: { ms: number } }
+  | { type: 'status_update'; data: { chatId: string; status: string } }
+  | { type: 'usage_update'; data: { chatId: string; accumulated: any; accumulatedCost: number; current: any } }
+  | { type: 'operation_state'; data: { chatId: string; status: 'idle' | 'processing' | 'waiting_approval'; pendingMessage: Message | null; startTime: number | null } }
   | { type: 'chat_deleted'; data: { chatId: string } }
-  | { type: 'error'; data: { message: string } }
-  | { type: 'processing'; data: boolean };
+  | { type: 'error'; data: { chatId?: string; message: string } }
+  | { type: 'processing'; data: { chatId: string; isProcessing: boolean } };
 
 /**
  * Type-safe WebSocket client interface

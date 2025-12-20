@@ -28,6 +28,7 @@ import type {
   Response,
   Simplify,
   Streamer,
+  ToolCompatible,
   ToolInput,
   Usage,
 } from '@aeye/core';
@@ -550,12 +551,28 @@ export type Context<T extends AIBaseTypes> = CoreContext<
 export type ContextInfer<A> = A extends AI<infer T> ? Context<T> : never;
 
 /**
+ * Infers the component context type with required fields from an AI instance
+ */
+export type ComponentInfer<A> = A extends AI<infer T> ? ComponentCompatible<
+  AIContextRequired<T>,
+  AIMetadataRequired<T>
+> : never;
+
+/**
  * Component type for AI instance
  */
 export type ComponentFor<T extends AIBaseTypes> = ComponentCompatible<
   AIContextRequired<T>,
   AIMetadataRequired<T>
 >;
+
+/**
+ * Tool type for AI instance
+ */
+export type ToolInfer<A> = A extends AI<infer T> ? ToolCompatible<
+  AIContextRequired<T>,
+  AIMetadataRequired<T>
+> : never;
 
 // ============================================================================
 // Request/Response Types for Capabilities

@@ -1,5 +1,5 @@
 import { AnyTool, Tuple } from '@aeye/core';
-import type { CletusAI, CletusAIContext } from '../ai';
+import type { CletusAI, CletusAIContext, CletusTool } from '../ai';
 import { ADAPTIVE_TOOLING } from '../constants';
 import { Operations } from '../operations/types';
 import {
@@ -27,7 +27,7 @@ async function initializeToolRegistry(ai: CletusAI, toolsets: ReturnType<typeof 
   } = toolsets;
 
   const ctx = await ai.buildContext({});
-  const instruct = (tool: AnyTool) => getToolInstructions(tool, ctx);
+  const instruct = (tool: CletusTool) => getToolInstructions(tool, ctx);
 
     // Register toolsets
   await toolRegistry.registerToolset('planner', plannerTools, instruct);
@@ -219,14 +219,15 @@ Tools:
 </rules>
 
 <importantRules>
-- Don't present the results of an operation in <input> or <output> tags - those are only for your internal processing.
-- Past tool call results will be formatted in <input>, <analysis>, and <output> tags automatically. This is not a formatting you need to do yourself - you need to make tool calls to get actual results.
+- Assistant messages with <input> & <analysis> tags are preliminary tool outputs that is awaiting user approval or rejection before producing output. Do NOT treat these as final outputs. You will be notified when the user approves or rejects them.
+- Assistant messages with <output> tags are final results from approved operations. These can be presented to the user directly.
+- Don't present anything in <input>, <analysis>, or <output> tags - those are produced by the Cletus system and not by you even though they are marked as Assistant messages.
 - Don't ask for permission to perform operations - if you need to do something, just do it. The user will be asked for approval automatically if needed.
 - Todos are exclusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should be assumed to be a separate data type.
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.
 </importantRules>
 `,
-    tools: toolRegistry.getAllTools().map(t => t.tool) as Tuple<AnyTool>,
+    tools: toolRegistry.getAllTools().map(t => t.tool) as Tuple<CletusTool>,
     // Dynamic tools based on adaptive selection using retool
     retool: async (_, ctx) => {
       const activeTools = await getActiveTools(ctx);
