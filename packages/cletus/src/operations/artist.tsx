@@ -560,7 +560,7 @@ export const chart_display = operationOf<
   ChartDisplayOutput
 >({
   mode: 'local',
-  signature: 'chart_display(chartGroup: string, title?: string, data: any[], variantOptions?: object, defaultVariant?: string)',
+  signature: 'chart_display(chartGroup, title?, data, variantOptions?, defaultVariant?)',
   status: (input) => `Displaying ${input.chartGroup} chart`,
   analyze: async ({ input }) => {
     // Local operation, no analysis needed

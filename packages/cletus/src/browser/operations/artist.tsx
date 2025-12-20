@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { abbreviate, deepMerge, isObject, pluralize } from '../../shared';
 import { createRenderer } from './render';
 import { ClickableImage } from '../components/ImageViewer';
@@ -122,12 +122,12 @@ const ChartDisplay: React.FC<{
   data: any[];
   variantOptions: any;
 }> = ({ chartGroup, availableVariants, currentVariant: initialVariant, option: initialOption, data, variantOptions }) => {
-  const chartRef = React.useRef<HTMLDivElement>(null);
-  const chartInstanceRef = React.useRef<echarts.ECharts | null>(null);
-  const [currentVariant, setCurrentVariant] = React.useState(initialVariant);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const [currentVariant, setCurrentVariant] = useState(initialVariant);
 
   // Initialize chart
-  React.useEffect(() => {
+  useEffect(() => {
     if (!chartRef.current) return;
 
     const chart = echarts.init(chartRef.current);
@@ -147,7 +147,7 @@ const ChartDisplay: React.FC<{
   }, []);
 
   // Update chart when variant changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (!chartInstanceRef.current) return;
 
     const newOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
