@@ -2,6 +2,7 @@ import React from 'react';
 import { abbreviate, pluralize } from '../../shared';
 import { createRenderer } from './render';
 import { ClickableImage } from '../components/ImageViewer';
+import { ClickableDiagram } from '../components/DiagramViewer';
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -103,6 +104,24 @@ export const image_attach = renderer<'image_attach'>(
   (op) => {
     if (op.output?.attached) {
       return `Attached image: ${op.output.fullPath}`;
+    }
+    return null;
+  }
+);
+
+export const diagram_show = renderer<'diagram_show'>(
+  (op) => `DiagramShow()`,
+  (op): string | React.ReactNode | null => {
+    if (op.output?.spec) {
+      return (
+        <div className="ml-6 mt-2">
+          <div className="text-sm mb-2">Mermaid Diagram</div>
+          <ClickableDiagram
+            spec={op.output.spec}
+            className="max-w-full rounded border border-neon-pink/30 bg-background p-4"
+          />
+        </div>
+      );
     }
     return null;
   }

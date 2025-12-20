@@ -116,6 +116,23 @@ Example: Attach an image file:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_attach', input }, ctx),
   });
 
+  const diagramShow = ai.tool({
+    name: 'diagram_show',
+    description: 'Display a Mermaid diagram in the chat (browser only)',
+    instructions: `Use this to render and display Mermaid diagrams in the browser. This tool is browser-only and will render the diagram inline with a clickable preview for full-screen viewing.
+
+Example: Show a flowchart:
+{ "spec": "graph TD\\n  A[Start] --> B[Process]\\n  B --> C[End]" }
+ 
+{{modeInstructions}}`,
+    schema: z.object({
+      spec: z.string().describe('Mermaid diagram specification string'),
+      ...globalToolProperties,
+    }),
+    input: getOperationInput('diagram_show'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'diagram_show', input }, ctx),
+  });
+
   return [
     imageGenerate,
     imageEdit,
@@ -123,6 +140,7 @@ Example: Attach an image file:
     imageDescribe,
     imageFind,
     imageAttach,
+    diagramShow,
   ] as [
     typeof imageGenerate,
     typeof imageEdit,
@@ -130,5 +148,6 @@ Example: Attach an image file:
     typeof imageDescribe,
     typeof imageFind,
     typeof imageAttach,
+    typeof diagramShow,
   ];
 }
