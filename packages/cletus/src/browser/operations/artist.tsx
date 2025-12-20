@@ -1,5 +1,5 @@
 import React from 'react';
-import { abbreviate, pluralize } from '../../shared';
+import { abbreviate, deepMerge, isObject, pluralize } from '../../shared';
 import { createRenderer } from './render';
 import { ClickableImage } from '../components/ImageViewer';
 import * as echarts from 'echarts';
@@ -316,55 +316,52 @@ function buildOptionForVariant(variant: ChartVariant, data: any[], variantOption
     case 'scatter':
     case 'effectScatter':
     case 'heatmap':
-    case 'orderedBar':
-    case 'horizontalOrderedBar':
     case 'tree':
     case 'sankey':
     case 'funnel':
     case 'map':
-    case 'groupedBar':
-    case 'stackedBar':
     case 'radar':
     case 'parallel':
-      // For now, use sensible defaults for other chart types
+      // Use the variant name directly as ECharts type (these are already correct)
       baseOption.series = [{
-        type: variant.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, ''),
+        type: variant,
         data,
+      }];
+      break;
+      
+    case 'orderedBar':
+    case 'horizontalOrderedBar':
+      // Ordered bars are just bars with sorted data
+      const sortedData = [...data].sort((a: any, b: any) => b.value - a.value);
+      if (variant === 'horizontalOrderedBar') {
+        baseOption.yAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
+        baseOption.xAxis = { type: 'value' };
+      } else {
+        baseOption.xAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
+        baseOption.yAxis = { type: 'value' };
+      }
+      baseOption.series = [{
+        type: 'bar',
+        data: sortedData.map((d: any) => d.value),
+      }];
+      break;
+      
+    case 'groupedBar':
+    case 'stackedBar':
+      // Grouped and stacked bars need multiple series
+      // For now, treat as regular bar - requires more complex data structure
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+        stack: variant === 'stackedBar' ? 'total' : undefined,
       }];
       break;
   }
 
   // Deep merge variant-specific options
   return deepMerge(baseOption, variantOption);
-}
-
-/**
- * Deep merge two objects
- */
-function deepMerge(target: any, source: any): any {
-  if (!source) return target;
-  
-  const output = { ...target };
-  
-  if (isObject(target) && isObject(source)) {
-    Object.keys(source).forEach(key => {
-      if (isObject(source[key])) {
-        if (!(key in target)) {
-          output[key] = source[key];
-        } else {
-          output[key] = deepMerge(target[key], source[key]);
-        }
-      } else {
-        output[key] = source[key];
-      }
-    });
-  }
-  
-  return output;
-}
-
-function isObject(item: any): boolean {
-  return item && typeof item === 'object' && !Array.isArray(item);
 }
 
 // ============================================================================

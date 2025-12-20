@@ -368,3 +368,43 @@ export function paginateText(
     return text.slice(start, end);
   }
 }
+
+/**
+ * Deep merge two objects. This is useful for combining options objects.
+ * Arrays are replaced, not merged.
+ *
+ * @param target - target object
+ * @param source - source object to merge into target
+ * @returns merged object
+ */
+export function deepMerge<T = any>(target: any, source: any): T {
+  if (!source) return target;
+  
+  const output = { ...target };
+  
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          output[key] = source[key];
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        output[key] = source[key];
+      }
+    });
+  }
+  
+  return output;
+}
+
+/**
+ * Check if a value is a plain object (not an array, not null, not a function).
+ *
+ * @param item - value to check
+ * @returns true if the value is a plain object
+ */
+export function isObject(item: any): boolean {
+  return item && typeof item === 'object' && !Array.isArray(item);
+}

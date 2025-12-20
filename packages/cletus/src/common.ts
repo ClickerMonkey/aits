@@ -23,6 +23,8 @@ export {
   normalizeNewlines,
   convertNewlines,
   paginateText,
+  deepMerge,
+  isObject,
   type NewlineType,
 } from './shared';
 
