@@ -129,6 +129,7 @@ Example: Show a flowchart:
       spec: z.string().describe('Mermaid diagram specification string'),
       ...globalToolProperties,
     }),
+    metadata: { onlyClient: 'browser' },
     input: getOperationInput('diagram_show'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'diagram_show', input }, ctx),
   });
