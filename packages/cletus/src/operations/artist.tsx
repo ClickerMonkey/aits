@@ -480,3 +480,37 @@ export const image_attach = operationOf<
   ),
 });
 
+export const diagram_show = operationOf<
+  { spec: string },
+  { spec: string }
+>({
+  mode: 'local',
+  signature: 'diagram_show(spec: string)',
+  status: () => `Displaying diagram`,
+  analyze: async ({ input }, ctx) => {
+    // For browser-only operations with mode='local', analysis is minimal
+    // The diagram will be entirely handled in the browser render
+    return {
+      analysis: `This will display a Mermaid diagram in the browser.`,
+      doable: true,
+      done: true,
+      output: { spec: input.spec },
+    };
+  },
+  do: async ({ input }, ctx) => {
+    // Browser-only operation, no actual execution needed
+    return { spec: input.spec };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `DiagramShow()`,
+    (op) => {
+      if (op.output) {
+        return `Diagram displayed`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
