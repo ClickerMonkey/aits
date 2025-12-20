@@ -175,6 +175,13 @@ const ChartDisplay: React.FC<{
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [currentVariant, setCurrentVariant] = useState(initialVariant);
 
+  // Extract global options (title, etc.) from initial option to preserve across variants
+  const globalOptions = useRef<Partial<EChartsOption>>({
+    title: initialOption.title,
+    grid: initialOption.grid,
+    backgroundColor: initialOption.backgroundColor,
+  });
+
   // Initialize chart
   useEffect(() => {
     if (!chartRef.current) return;
@@ -199,7 +206,9 @@ const ChartDisplay: React.FC<{
   useEffect(() => {
     if (!chartInstanceRef.current) return;
 
-    const newOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
+    const variantSpecificOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
+    // Merge global options (title, etc.) with variant-specific options
+    const newOption = deepMerge(variantSpecificOption, globalOptions.current);
     chartInstanceRef.current.setOption(newOption, true);
   }, [currentVariant, data, variantOptions]);
 
