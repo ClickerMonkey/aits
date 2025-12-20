@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Operation } from '../../schemas';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
+import { MarkdownContent } from './Markdown';
 
 
 /**
@@ -431,14 +432,9 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  p: ({ children }) => <span>{children}</span>,
-                }}
-              >
-                {displaySummary}
-              </ReactMarkdown>
+              <MarkdownContent
+                content={displaySummary}
+              />
             </>
           ) : (
             displaySummary

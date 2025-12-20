@@ -44,6 +44,6 @@ export const createRenderer = (common: Partial<OperationDisplayProps> = {}) => {
   }
 };
 
-export function linkFile(path: string) {
-  return path;
+export function linkFile(filepath: string, filename: string = filepath.match(/[\\/]([^\\/]+)$/)?.[1] || filepath) {
+  return `[${filename}](${filepath})`;
 }

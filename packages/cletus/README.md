@@ -53,10 +53,12 @@ Here are some examples of what you can do with Cletus:
 - "Show me all my pending todos"
 - "Mark the first todo as done"
 
-**Image Operations:**
+**Graphic Operations:**
 - "Generate an image of a sunset over mountains"
 - "Find all images I've generated that contain trees"
 - "Analyze this screenshot and describe what you see"
+- "Generate a chart with this data"
+- "Create a diagram that visualizes this process"
 
 **Web Research:**
 - "Search the web for the latest TypeScript features"
