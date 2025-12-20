@@ -8,6 +8,7 @@ import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
+import type { ChartConfig, ChartDataPoint } from "../tools/artist_schemas";
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
@@ -532,14 +533,10 @@ export const ChartGroupVariants: Record<ChartGroup, ChartVariant[]> = {
 };
 
 // ECharts option type (simplified - in reality it's much more complex)
-export type EChartsOption = Record<string, any>;
+export type EChartsOption = Record<string, unknown>;
 
 export type ChartDisplayInput = {
-  chartGroup: ChartGroup;
-  title?: string;
-  data: any[];
-  variantOptions?: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
-  defaultVariant?: ChartVariant;
+  chart: ChartConfig;
 };
 
 export type ChartDisplayOutput = {
@@ -547,7 +544,7 @@ export type ChartDisplayOutput = {
   availableVariants: ChartVariant[];
   currentVariant: ChartVariant;
   option: EChartsOption;
-  data: any[];
+  data: ChartDataPoint[];
   variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
 };
 
@@ -560,44 +557,45 @@ export const chart_display = operationOf<
   ChartDisplayOutput
 >({
   mode: 'local',
-  signature: 'chart_display(chartGroup, title?, data, variantOptions?, defaultVariant?)',
-  status: (input) => `Displaying ${input.chartGroup} chart`,
+  signature: 'chart_display(chart)',
+  status: (input) => `Displaying ${input.chart.chartGroup} chart`,
   analyze: async ({ input }) => {
     // Local operation, no analysis needed
     return {
-      analysis: `This will display a ${input.chartGroup} chart with ${input.data?.length || 0} data points`,
+      analysis: `This will display a ${input.chart.chartGroup} chart with ${input.chart.data?.length || 0} data points`,
       doable: true,
     };
   },
   do: async ({ input }) => {
-    const availableVariants = ChartGroupVariants[input.chartGroup];
-    const currentVariant = input.defaultVariant || availableVariants[0];
-    const variantOptions = input.variantOptions || {};
+    const { chartGroup, data, title, variantOptions, defaultVariant } = input.chart;
+    const availableVariants = ChartGroupVariants[chartGroup];
+    const currentVariant = defaultVariant || availableVariants[0];
+    const variantOpts = variantOptions || {};
 
     // Build base option from input
     const baseOption: EChartsOption = {
-      title: input.title ? { text: input.title, left: 'center' } : undefined,
+      title: title ? { text: title, left: 'center' } : undefined,
       tooltip: { trigger: 'item' },
       legend: {},
       series: [],
     };
 
     // Apply variant-specific options
-    const variantOption = variantOptions[currentVariant] || {};
-    const option = applyVariantToOption(baseOption, currentVariant, input.data, variantOption);
+    const variantOption = variantOpts[currentVariant] || {};
+    const option = applyVariantToOption(baseOption, currentVariant, data, variantOption);
 
     return {
-      chartGroup: input.chartGroup,
+      chartGroup,
       availableVariants,
       currentVariant,
       option,
-      data: input.data,
-      variantOptions,
+      data,
+      variantOptions: variantOpts,
     };
   },
   render: (op, ai, showInput, showOutput) => renderOperation(
     op,
-    `ChartDisplay(${op.input.chartGroup}, ${op.input.data?.length || 0} points)`,
+    `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
     (op) => {
       if (op.output) {
         return `Displaying ${op.output.chartGroup} chart as ${op.output.currentVariant}`;
@@ -621,7 +619,7 @@ export const chart_display = operationOf<
 function applyVariantToOption(
   baseOption: EChartsOption,
   variant: ChartVariant,
-  data: any[],
+  data: ChartDataPoint[],
   variantOption: Partial<EChartsOption>
 ): EChartsOption {
   const option = { ...baseOption };

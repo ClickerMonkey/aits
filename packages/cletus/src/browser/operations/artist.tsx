@@ -3,7 +3,8 @@ import { abbreviate, deepMerge, isObject, pluralize } from '../../shared';
 import { createRenderer } from './render';
 import { ClickableImage } from '../components/ImageViewer';
 import * as echarts from 'echarts';
-import type { ChartVariant } from '../../operations/artist';
+import type { ChartVariant, EChartsOption } from '../../operations/artist';
+import type { ChartDataPoint } from '../../tools/artist_schemas';
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -118,9 +119,9 @@ const ChartDisplay: React.FC<{
   chartGroup: string;
   availableVariants: ChartVariant[];
   currentVariant: ChartVariant;
-  option: any;
-  data: any[];
-  variantOptions: any;
+  option: EChartsOption;
+  data: ChartDataPoint[];
+  variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
 }> = ({ chartGroup, availableVariants, currentVariant: initialVariant, option: initialOption, data, variantOptions }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
@@ -197,8 +198,8 @@ const ChartDisplay: React.FC<{
  * 
  * If making changes here, ensure the same changes are made in operations/artist.tsx
  */
-function buildOptionForVariant(variant: ChartVariant, data: any[], variantOption: any): any {
-  const baseOption: any = {
+function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], variantOption: Partial<EChartsOption>): EChartsOption {
+  const baseOption: EChartsOption = {
     tooltip: { trigger: 'item' },
     legend: {},
     series: [],
