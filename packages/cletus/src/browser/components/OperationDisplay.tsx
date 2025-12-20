@@ -428,7 +428,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 flex', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>
