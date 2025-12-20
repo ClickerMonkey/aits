@@ -1,7 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import mermaid from 'mermaid';
+
+// Initialize mermaid once globally
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'strict',
+});
 
 interface DiagramViewerProps {
   spec: string;
@@ -18,16 +25,7 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ spec, isOpen, onCl
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize mermaid
-  useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      securityLevel: 'strict',
-    });
-  }, []);
-
-  const renderDiagram = async () => {
+  const renderDiagram = useCallback(async () => {
     try {
       setError(null);
       const { svg } = await mermaid.render(`mermaid-fullscreen-${Date.now()}`, spec);
@@ -36,14 +34,14 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ spec, isOpen, onCl
       console.error('Mermaid render error:', err);
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
-  };
+  }, [spec]);
 
   // Render diagram when spec changes or when opened
   useEffect(() => {
     if (isOpen && spec) {
       renderDiagram();
     }
-  }, [isOpen, spec]);
+  }, [isOpen, spec, renderDiagram]);
 
   // Reset state when opening
   useEffect(() => {
@@ -219,16 +217,7 @@ export const ClickableDiagram: React.FC<ClickableDiagramProps> = ({ spec, classN
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize mermaid
-  useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      securityLevel: 'strict',
-    });
-  }, []);
-
-  const renderDiagram = async () => {
+  const renderDiagram = useCallback(async () => {
     try {
       setError(null);
       const { svg } = await mermaid.render(`mermaid-preview-${Date.now()}`, spec);
@@ -237,14 +226,14 @@ export const ClickableDiagram: React.FC<ClickableDiagramProps> = ({ spec, classN
       console.error('Mermaid render error:', err);
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
-  };
+  }, [spec]);
 
   // Render diagram
   useEffect(() => {
     if (spec) {
       renderDiagram();
     }
-  }, [spec]);
+  }, [spec, renderDiagram]);
 
   if (error) {
     return (
