@@ -9,6 +9,7 @@ import {
   toolRegistry
 } from '../tool-registry';
 import { createToolsets } from './toolsets';
+import { OperationKind } from '../schemas';
 
 /**
  * Initialize the tool registry with all static tools
@@ -63,9 +64,26 @@ export async function initTools(ai: CletusAI) {
 async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
   const toolset = ctx.chat?.toolset;
 
+  const matchesPlan = ctx.chat?.agentMode === 'plan'
+    ? (tool: CletusTool) => {
+      const op = Operations[tool.name as OperationKind];
+      if (!op || !op.mode) {
+        return true;
+      }
+      const mode = typeof op.mode === 'function' ? op.mode({}, ctx) : op.mode;
+      return mode === 'local' || mode === 'read';
+    }
+    : () => true;
+
+  const matchesClient = (tool: CletusTool) => {
+    return (tool.metadata().onlyClient || ctx.client) === ctx.client; 
+  };
+
   // Get all tools with alwaysVisible metadata
   // OR were marked as persistent in the AI context
   const alwaysVisibleTools = toolRegistry.getAllTools().filter(t => 
+    matchesPlan(t.tool) &&
+    matchesClient(t.tool) &&
     t.tool.input.metadata?.alwaysVisible === true ||
     ctx.persistentTools?.has(t.name)
   );
@@ -77,36 +95,42 @@ async function getActiveTools(ctx: CletusAIContext): Promise<RegisteredTool[]> {
 
   if (toolset) {
     // Use specific toolset, but exclude tools already in alwaysVisible
-    selectedTools = toolRegistry.getToolset(toolset).filter(t => !toolNames.has(t.name));
+    selectedTools = toolRegistry.getToolset(toolset).filter(t => 
+      matchesPlan(t.tool) &&
+      matchesClient(t.tool) &&
+      !toolNames.has(t.name)
+    );
   } else {
     // Adaptive selection: use embeddings of recent user messages
     const query = buildToolSelectionQuery(ctx.messages || []);
-    if (!query) {
-      // No user messages yet, return default visible tools
-      const defaultVisibleTools = toolRegistry.getAllTools().filter(t => 
-        t.tool.input.metadata?.defaultVisible === true && !toolNames.has(t.name)
+    if (query) {
+      // Select tools based on semantic similarity, excluding alwaysVisible tools
+      const adaptiveToolsCount = ctx.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
+
+      selectedTools = await toolRegistry.selectTools(
+        query,
+        adaptiveToolsCount,
+        alwaysVisibleTools.map(t => t.name),
+        ctx,
+        ({ tool }) => matchesPlan(tool) && matchesClient(tool),
       );
       
-      return [...alwaysVisibleTools, ...defaultVisibleTools];
-    }
+      // Trim to ensure we don't exceed the total count
+      const maxSelectedTools = adaptiveToolsCount - alwaysVisibleTools.length;
+      if (selectedTools.length > maxSelectedTools) {
+        selectedTools = selectedTools.slice(0, maxSelectedTools);
+      }
+    } else {
+      // No user messages yet, return default visible tools
+      const defaultVisibleTools = toolRegistry.getAllTools().filter(t => 
+        matchesPlan(t.tool) &&
+        matchesClient(t.tool) &&
+        t.tool.input.metadata?.defaultVisible === true && 
+        !toolNames.has(t.name)
+      );
 
-    // Select tools based on semantic similarity, excluding alwaysVisible tools
-    const adaptiveToolsCount = ctx.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
-    const allSelectedTools = await toolRegistry.selectTools(
-      query,
-      adaptiveToolsCount,
-      alwaysVisibleTools.map(t => t.name),
-      ctx,
-    );
-    
-    // Filter out tools that are already in alwaysVisible (redundant but safe)
-    selectedTools = allSelectedTools.filter(t => !toolNames.has(t.name));
-    
-    // Trim to ensure we don't exceed the total count
-    const maxSelectedTools = adaptiveToolsCount - alwaysVisibleTools.length;
-    if (selectedTools.length > maxSelectedTools) {
-      selectedTools = selectedTools.slice(0, maxSelectedTools);
-    }
+      selectedTools = defaultVisibleTools;
+    } 
   }
 
   return [...alwaysVisibleTools, ...selectedTools];

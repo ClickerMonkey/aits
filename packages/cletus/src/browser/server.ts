@@ -218,7 +218,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
       if (!config) {
         throw new Error('Config not available');
       }
-      ai = createCletusAI(config);
+      ai = createCletusAI(config, 'browser');
       await initTools(ai);
       chatAgent = createChatAgent(ai);
     }

@@ -165,7 +165,8 @@ export class ToolRegistry {
     query: string,
     topN?: number,
     excludeToolNames?: string[],
-    ctx?: CletusAIContext
+    ctx?: CletusAIContext,
+    additionalToolFilter?: (tool: RegisteredTool) => boolean
   ): Promise<RegisteredTool[]> {
     // Use config value if available, otherwise fall back to constant
     const effectiveTopN = topN ?? ctx?.config?.getData().user.adaptiveTools ?? ADAPTIVE_TOOLING.TOP_TOOLS_TO_SELECT;
@@ -198,7 +199,12 @@ export class ToolRegistry {
         t.vector !== null && (!excludeToolNames || !excludeToolNames.includes(t.name))
       );
 
-    const toolsWithSimilarity = toolsWithVectors
+    // Apply additional tool filter if provided
+    const filteredTools = additionalToolFilter
+      ? toolsWithVectors.filter(additionalToolFilter)
+      : toolsWithVectors;
+
+    const toolsWithSimilarity = filteredTools
       .map(t => ({
         tool: t,
         similarity: cosineSimilarity(queryVector, t.vector),

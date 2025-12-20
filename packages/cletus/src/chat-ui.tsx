@@ -133,7 +133,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
   const chatFileRef = useRef<ChatFile>(new ChatFile(chat.id));
   const transcriptionAbortRef = useRef<AbortController | undefined>(undefined);
   const firstMessageRef = useRef<number>(Math.max(0, chatMessages.length - 20));
-  const [ai, _] = useState(() => createCletusAI(config));
+  const [ai, _] = useState(() => createCletusAI(config, 'cli'));
   const [chatAgent, __] = useState(() => createChatAgent(ai));
   
   // Convenience function to add message

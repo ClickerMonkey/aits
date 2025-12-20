@@ -1,24 +1,30 @@
 import { AI, ContextInfer, ToolInfer } from '@aeye/ai';
+import { AWSBedrockProvider } from '@aeye/aws';
+import { Usage, accumulateUsage, toJSONSchema } from '@aeye/core';
 import { models, replicateTransformers } from '@aeye/models';
 import { OpenAIProvider } from '@aeye/openai';
 import { OpenRouterProvider } from '@aeye/openrouter';
 import { ReplicateProvider } from '@aeye/replicate';
-import { AWSBedrockProvider } from '@aeye/aws';
 import Handlebars from 'handlebars';
+import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
+import z from 'zod';
 import { ChatFile } from './chat';
 import { ConfigFile } from './config';
 import { logger } from './logger';
 import { OperationManager } from './operations/manager';
-import { ChatMeta, Message, TypeDefinition } from './schemas';
-import { RetryContext, RetryEvents } from 'packages/openai/src/retry';
-import z from 'zod';
 import { loadPromptFiles } from './prompt-loader';
-import { ToolCompatible, Usage, accumulateUsage, toJSONSchema } from '@aeye/core';
+import { ChatMeta, Message } from './schemas';
+
+/**
+ * Cletus Client Types
+ */
+export type CletusClient = 'cli' | 'browser';
 
 /**
  * Cletus AI Context
  */
 export interface CletusContext {
+  client: CletusClient;
   config: ConfigFile;
   ops: OperationManager;
   userPrompt: string;
@@ -50,13 +56,13 @@ export interface CletusMetadata {
   /** Whether this tool should be included in the default tool selection when no user messages exist yet */
   defaultVisible?: boolean;
   /** Whether this tool should be included based on which client is running Cletus */
-  onlyClient?: 'browser' | 'cli';
+  onlyClient?: CletusClient;
 }
 
 /**
  * Create the Cletus AI instance
  */
-export function createCletusAI(configFile: ConfigFile) {
+export function createCletusAI(configFile: ConfigFile, client: CletusClient) {
   const config = configFile.getData();
 
   const retryEvents: RetryEvents = {
@@ -213,6 +219,7 @@ export function createCletusAI(configFile: ConfigFile) {
     .providers(providers)
     .create({
       defaultContext: {
+        client,
         config: configFile,
         cwd: process.cwd(),
         ops: new OperationManager('none'),

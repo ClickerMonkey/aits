@@ -330,7 +330,7 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
 
   // Model Selector
   if (subView === 'select-model' && selectedModelType) {
-    const ai = createCletusAI(config);
+    const ai = createCletusAI(config, 'cli');
     const currentModels = config.getData().user.models || {};
     const currentModelId = currentModels[selectedModelType];
 
