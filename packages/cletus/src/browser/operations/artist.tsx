@@ -40,7 +40,8 @@ export const image_generate = renderer<'image_generate'>(
       return `Generated ${pluralize(count, 'image')}`;
     }
     return null;
-  }
+  },
+  () => ({ summaryClasses: '' })
 );
 
 export const image_edit = renderer<'image_edit'>(
@@ -63,7 +64,8 @@ export const image_edit = renderer<'image_edit'>(
       return 'Edited image saved';
     }
     return null;
-  }
+  },
+  () => ({ summaryClasses: '' })
 );
 
 export const image_analyze = renderer<'image_analyze'>(
@@ -112,6 +114,50 @@ export const image_attach = renderer<'image_attach'>(
     return null;
   }
 );
+
+// ============================================================================
+// Chart Display Renderer
+// ============================================================================
+
+export const chart_display = renderer<'chart_display'>(
+  (op) => `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
+  (op): string | React.ReactNode | null => {
+    if (op.output) {
+      return (
+        <ChartDisplay
+          chartGroup={op.output.chartGroup}
+          availableVariants={op.output.availableVariants}
+          currentVariant={op.output.currentVariant}
+          option={op.output.option}
+          data={op.output.data}
+          variantOptions={op.output.variantOptions}
+        />
+      );
+    }
+    return null;
+  },
+  () => ({ summaryClasses: '' })
+);
+
+export const diagram_show = renderer<'diagram_show'>(
+  (op) => `DiagramShow()`,
+  (op): string | React.ReactNode | null => {
+    if (op.output?.spec) {
+      return (
+        <div className="ml-6 mt-2">
+          <div className="text-sm mb-2">Mermaid Diagram</div>
+          <ClickableDiagram
+            spec={op.output.spec}
+            className="max-w-full rounded border border-neon-pink/30 bg-background p-4"
+          />
+        </div>
+      );
+    }
+    return null;
+  },
+  () => ({ summaryClasses: '' })
+);
+
 
 // ============================================================================
 // Chart Display Component
@@ -164,7 +210,7 @@ const ChartDisplay: React.FC<{
   return (
     <div className="ml-6 mt-2">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-medium">Variant:</span>
+        <span className="text-sm font-medium">Type:</span>
         <div className="flex gap-1 flex-wrap">
           {availableVariants.map((variant) => (
             <button
@@ -373,44 +419,3 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
   // Deep merge variant-specific options
   return deepMerge(baseOption, variantOption);
 }
-
-// ============================================================================
-// Chart Display Renderer
-// ============================================================================
-
-export const chart_display = renderer<'chart_display'>(
-  (op) => `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
-  (op): string | React.ReactNode | null => {
-    if (op.output) {
-      return (
-        <ChartDisplay
-          chartGroup={op.output.chartGroup}
-          availableVariants={op.output.availableVariants}
-          currentVariant={op.output.currentVariant}
-          option={op.output.option}
-          data={op.output.data}
-          variantOptions={op.output.variantOptions}
-        />
-      );
-    }
-    return null;
-  }
-);
-
-export const diagram_show = renderer<'diagram_show'>(
-  (op) => `DiagramShow()`,
-  (op): string | React.ReactNode | null => {
-    if (op.output?.spec) {
-      return (
-        <div className="ml-6 mt-2">
-          <div className="text-sm mb-2">Mermaid Diagram</div>
-          <ClickableDiagram
-            spec={op.output.spec}
-            className="max-w-full rounded border border-neon-pink/30 bg-background p-4"
-          />
-        </div>
-      );
-    }
-    return null;
-  }
-);

@@ -17,10 +17,12 @@ export const PartToWholeChartSchema = z.object({
   chartGroup: z.literal('partToWhole'),
   title: z.string().optional().describe('Optional chart title'),
   data: z.array(ChartDataPointSchema).describe('Array of data points showing parts of a whole'),
-  variantOptions: z.record(
-    z.enum(['pie', 'donut', 'treemap', 'sunburst']),
-    z.record(z.string(), z.unknown())
-  ).optional().describe('Optional variant-specific ECharts options'),
+  variantOptions: z.object({
+    pie: z.record(z.string(), z.any()).optional(),
+    donut: z.record(z.string(), z.any()).optional(),
+    treemap: z.record(z.string(), z.any()).optional(),
+    sunburst: z.record(z.string(), z.any()).optional(),
+  }).optional().describe('Optional variant-specific ECharts options'),
   defaultVariant: z.enum(['pie', 'donut', 'treemap', 'sunburst']).optional().describe('Default variant to display'),
 });
 

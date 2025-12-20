@@ -370,6 +370,7 @@ export interface OperationDisplayProps {
   operation: Operation;
   label: string;
   summary?: React.ReactNode | string | null;
+  summaryClasses?: string;
   borderColor?: string;
   bgColor?: string;
   labelColor?: string;
@@ -390,6 +391,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
   label,
   summary,
   borderColor = 'border-border',
+  summaryClasses = 'max-h-[8rem] overflow-y-auto',
   bgColor = 'bg-card/50',
   labelColor = 'text-foreground',
   message,
@@ -425,7 +427,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap max-h-[8rem] overflow-y-auto', operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 whitespace-pre-wrap', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
               <span className="text-foreground">→ </span>

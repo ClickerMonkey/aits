@@ -2,6 +2,8 @@ import React from 'react';
 import { User, Bot, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { OperationDisplay } from '../operations';
 import { TypingIndicator } from './TypingIndicator';
 import { cn } from '../lib/utils';
@@ -15,7 +17,20 @@ interface MessageItemProps {
   onApproveOperation: (message: Message, idx: number) => void;
   onRejectOperation: (message: Message, idx: number) => void;
   hasMultiplePendingOps?: boolean;
+  isProcessing?: boolean;
 }
+
+// Preprocess content to convert LaTeX delimiters to markdown math delimiters
+const preprocessLatex = (text: string): string => {
+  // Convert \[...\] to $$...$$ (display math)
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (match, content) => `$$${content}$$`);
+  // Convert \(...\) to $...$ (inline math)
+  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (match, content) => `$${content}$`);
+  // Convert standalone [... ] patterns that look like display math (with array/equation content)
+  // Only convert if it contains LaTeX commands like \begin, \text, etc.
+  text = text.replace(/\[\s*(\\begin|\\text|\\frac|\\int|\\sum|\\prod)([\s\S]*?)\s*\]/g, (match, cmd, rest) => `$$${cmd}${rest}$$`);
+  return text;
+};
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
@@ -24,6 +39,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onApproveOperation,
   onRejectOperation,
   hasMultiplePendingOps = false,
+  isProcessing = false,
 }) => {
   const { role, name, content, operations = [] } = message;
 
@@ -79,11 +95,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         {/* Content and Operations in order */}
         <div className={cn('flex-1 space-y-2', isUser && 'flex flex-col items-end')}>
-          {visibleContent.length === 0 && isAssistant ? (
+          {visibleContent.length === 0 && isAssistant && isProcessing ? (
             <div className="rounded-lg bg-card p-2">
               <TypingIndicator />
             </div>
-          ) : (
+          ) : visibleContent.length === 0 && isAssistant ? null : (
             visibleContent.map((item, index) => {
             // Render operation if this content item has an operation
             if (item.operation && item.operationIndex !== undefined) {
@@ -122,7 +138,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 )}
               >
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
                   components={{
                     p: ({ children }) => <p className="text-foreground mb-2">{children}</p>,
                     ul: ({ children }) => <ul className="text-foreground list-disc ml-6 mb-2 space-y-1">{children}</ul>,
@@ -154,7 +171,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     },
                   }}
                 >
-                  {item.content}
+                  {preprocessLatex(item.content)}
                 </ReactMarkdown>
               </div>
             );

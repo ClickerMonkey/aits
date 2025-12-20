@@ -149,6 +149,7 @@ Example: Display market share as a pie chart:
       chart: ChartConfigSchema,
       ...globalToolProperties,
     }),
+    strict: false,
     metadata: { onlyClient: 'browser' },
     input: getOperationInput('chart_display'),
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'chart_display', input }, ctx),
