@@ -38,6 +38,8 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearConfirmText, setClearConfirmText] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [totalCost, setTotalCost] = useState(0);
@@ -292,6 +294,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
     setPendingMessage(null);
     setTemporaryUserMessage(null);
     setTemporaryAssistantMessage(null);
+    setChatMetaState(null); // Clear cached chat metadata when switching chats
     setStatus(''); // Clear any previous error or status messages
     setLoading(true);
     window.history.pushState({}, '', `/chat/${chatId}`);
@@ -460,7 +463,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
       return;
     }
     send({ type: 'update_chat_meta', data: { chatId: selectedChatId, updates: { title: editedTitle.trim() } } });
-    setIsEditingTitle(false);
+    handleCancelEditTitle();
   };
 
   const handleCancelEditTitle = () => {
@@ -470,12 +473,17 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
 
   const handleDeleteChat = () => {
     if (!selectedChatId || !chatMeta) return;
-    if (confirm(`Are you sure you want to delete "${chatMeta.title}"? This cannot be undone.`)) {
-      send({ type: 'delete_chat', data: { chatId: selectedChatId } });
-      setSelectedChatId(null);
-      setMessages([]);
-      setTimeout(() => send({ type: 'get_config' }), 500);
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedChatId || deleteConfirmText !== 'DELETE') return;
+    send({ type: 'delete_chat', data: { chatId: selectedChatId } });
+    setSelectedChatId(null);
+    setMessages([]);
+    setShowDeleteConfirm(false);
+    setDeleteConfirmText('');
+    setTimeout(() => send({ type: 'get_config' }), 500);
   };
 
   const handleOperationApproval = (message: Message, approved: number[], rejected: number[]) => {
@@ -900,6 +908,63 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
                 disabled={clearConfirmText !== 'CLEAR'}
               >
                 Clear Messages
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && chatMeta && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => {
+            setShowDeleteConfirm(false);
+            setDeleteConfirmText('');
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-card rounded-lg border border-border shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-destructive mb-4">Delete Chat</h2>
+            <p className="text-foreground mb-4">
+              Are you sure you want to delete <span className="font-semibold">"{chatMeta.title}"</span>? This will permanently delete all messages in this chat. This action cannot be undone.
+            </p>
+            <p className="text-muted-foreground mb-4">
+              Type <span className="font-mono font-bold text-foreground">DELETE</span> to confirm:
+            </p>
+            <Input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE"
+              className="mb-4 font-mono"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmDelete();
+                } else if (e.key === 'Escape') {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText('');
+                }
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirmText !== 'DELETE'}
+              >
+                Delete Chat
               </Button>
             </div>
           </div>

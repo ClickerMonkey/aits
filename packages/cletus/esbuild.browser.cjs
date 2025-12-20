@@ -28,6 +28,21 @@ async function build() {
     fs.writeFileSync(path.join(distDir, 'styles.css'), result.css);
     console.log('✓ Tailwind CSS built successfully');
 
+    // Copy KaTeX CSS
+    console.log('Copying KaTeX CSS...');
+    // Try to resolve katex CSS from node_modules (works with monorepo structure)
+    let katexCssPath = path.join(__dirname, 'node_modules/katex/dist/katex.min.css');
+    if (!fs.existsSync(katexCssPath)) {
+      // Try root node_modules for monorepo
+      katexCssPath = path.join(__dirname, '../../node_modules/katex/dist/katex.min.css');
+    }
+    if (fs.existsSync(katexCssPath)) {
+      fs.copyFileSync(katexCssPath, path.join(distDir, 'katex.min.css'));
+      console.log('✓ KaTeX CSS copied successfully');
+    } else {
+      console.warn('⚠ KaTeX CSS not found, skipping...');
+    }
+
     // Build the browser client
     console.log('Building browser client...');
     await esbuild.build({
@@ -52,10 +67,10 @@ async function build() {
       'utf-8'
     );
 
-    // Inject the CSS link into the HTML with absolute path
+    // Inject the CSS links into the HTML with absolute paths
     const updatedHtml = htmlContent.replace(
       '</head>',
-      '  <link rel="stylesheet" href="/styles.css">\n</head>'
+      '  <link rel="stylesheet" href="/styles.css">\n  <link rel="stylesheet" href="/katex.min.css">\n</head>'
     );
 
     fs.writeFileSync(

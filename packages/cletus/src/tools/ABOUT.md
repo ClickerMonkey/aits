@@ -17,7 +17,7 @@ Cletus is a sophisticated AI assistant that lives in your terminal. It combines:
 Cletus organizes its capabilities through specialized toolsets:
 
 - **Architect** - Manages custom data type definitions
-- **Artist** - Handles image generation, editing, analysis, and search
+- **Artist** - Handles image generation, editing, analysis, and search (browser client has charts and diagrams)
 - **Clerk** - Performs file operations, searching, and indexing
 - **DBA** - Database-like operations on typed data with full CRUD support
 - **Internet** - Web search, page scraping, and REST API calls

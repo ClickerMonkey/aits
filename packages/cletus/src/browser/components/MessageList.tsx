@@ -44,7 +44,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         <div className="space-y-4">
           {messages.map((message, index) => {
             // Check if this is the last message with pending operations
-            // const isLastMessage = index === messages.length - 1;
+            const isLastMessage = index === messages.length - 1;
             // const hasPendingOps = message.operations?.some(op => op.status === 'analyzed');
             const pendingOpCount = message.operations?.filter(op => op.status === 'analyzed' || op.status === 'doing').length || 0;
 
@@ -57,6 +57,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onApproveOperation={onApproveOperation}
                 onRejectOperation={onRejectOperation}
                 hasMultiplePendingOps={pendingOpCount > 1}
+                isProcessing={isLastMessage && loading}
               />
             );
           })}

@@ -2,12 +2,15 @@ import { ImageGenerationResponse } from "@aeye/ai";
 import fs from 'fs/promises';
 import path from 'path';
 import url from 'url';
-import { abbreviate, cosineSimilarity, linkFile, paginateText, pluralize } from "../common";
+import { abbreviate, cosineSimilarity, deepMerge, isObject, linkFile, paginateText, pluralize } from "../common";
 import { canEmbed, embed } from "../embed";
 import { getImagePath } from "../file-manager";
 import { fileIsReadable, searchFiles } from "../helpers/files";
 import { renderOperation } from "../helpers/render";
 import { operationOf } from "./types";
+import { ChartDataPoint, ChartDisplayInput, ChartDisplayOutput, ChartGroupVariants, ChartVariant } from "../helpers/artist";
+import type { EChartsOption } from "echarts";
+
 
 function resolveImage(cwd: string, imagePath: string): string {
   const [_, _filename, filepath] = imagePath.match(/^\[([^\]]+)\]\(([^)]+)\)$/) || [];
@@ -480,6 +483,60 @@ export const image_attach = operationOf<
   ),
 });
 
+export const chart_display = operationOf<
+  ChartDisplayInput,
+  ChartDisplayOutput
+>({
+  mode: 'local',
+  signature: 'chart_display(chart)',
+  status: (input) => `Displaying ${input.chart.chartGroup} chart`,
+  analyze: async ({ input }) => {
+    // Local operation, no analysis needed
+    return {
+      analysis: `This will display a ${input.chart.chartGroup} chart with ${input.chart.data?.length || 0} data points`,
+      doable: true,
+    };
+  },
+  do: async ({ input }) => {
+    const { chartGroup, data, title, variantOptions, defaultVariant } = input.chart;
+    const availableVariants = ChartGroupVariants[chartGroup];
+    const currentVariant = defaultVariant || availableVariants[0];
+    const variantOpts = (variantOptions || {}) as Partial<Record<ChartVariant, Partial<EChartsOption>>>;
+
+    // Build base option from input
+    const baseOption: EChartsOption = {
+      title: title ? { text: title, left: 'center' } : undefined,
+      tooltip: { trigger: 'item' },
+      legend: {},
+      series: [],
+    };
+
+    // Apply variant-specific options
+    const variantOption = variantOpts[currentVariant] || {};
+    const option = applyVariantToOption(baseOption, currentVariant, data, variantOption);
+
+    return {
+      chartGroup,
+      availableVariants,
+      currentVariant,
+      option,
+      data,
+      variantOptions: variantOpts,
+    };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
+    (op) => {
+      if (op.output) {
+        return `Displaying ${op.output.chartGroup} chart as ${op.output.currentVariant}`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
 export const diagram_show = operationOf<
   { spec: string },
   { spec: string }
@@ -513,4 +570,189 @@ export const diagram_show = operationOf<
     showInput, showOutput
   ),
 });
+
+/**
+ * Apply variant-specific transformations to the base option
+ * 
+ * Note: This function is duplicated in browser/operations/artist.tsx as buildOptionForVariant because:
+ * 1. The browser code cannot import from Node.js-specific files
+ * 2. Extracting to shared.ts would require moving all chart logic there
+ * 3. The logic needs to be in sync for server-side and client-side rendering
+ * 
+ * If making changes here, ensure the same changes are made in browser/operations/artist.tsx
+ */
+function applyVariantToOption(
+  baseOption: EChartsOption,
+  variant: ChartVariant,
+  data: ChartDataPoint[],
+  variantOption: Partial<EChartsOption>
+): EChartsOption {
+  const option = { ...baseOption };
+
+  // Apply variant-specific series configuration
+  switch (variant) {
+    case 'pie':
+      option.series = [{
+        type: 'pie',
+        radius: '50%',
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'donut':
+      option.series = [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'treemap':
+      option.series = [{
+        type: 'treemap',
+        data,
+      }];
+      break;
+
+    case 'sunburst':
+      option.series = [{
+        type: 'sunburst',
+        data,
+        radius: [0, '90%'],
+      }];
+      break;
+
+    case 'bar':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'horizontalBar':
+      option.yAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.xAxis = { type: 'value' };
+      option.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'pictorialBar':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'pictorialBar',
+        data: data.map((d: any) => d.value),
+        symbol: 'rect',
+      }];
+      break;
+
+    case 'line':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'area':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        areaStyle: {},
+      }];
+      break;
+
+    case 'step':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        step: 'start',
+      }];
+      break;
+
+    case 'smoothLine':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        smooth: true,
+      }];
+      break;
+
+    case 'histogram':
+    case 'boxplot':
+    case 'scatter':
+    case 'effectScatter':
+    case 'heatmap':
+    case 'tree':
+    case 'sankey':
+    case 'funnel':
+    case 'map':
+    case 'radar':
+    case 'parallel':
+      // Use the variant name directly as ECharts type (these are already correct)
+      option.series = [{
+        type: variant as any,
+        data,
+      }];
+      break;
+      
+    case 'orderedBar':
+    case 'horizontalOrderedBar':
+      // Ordered bars are just bars with sorted data
+      const sortedData = [...data].sort((a: any, b: any) => b.value - a.value);
+      if (variant === 'horizontalOrderedBar') {
+        option.yAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
+        option.xAxis = { type: 'value' };
+      } else {
+        option.xAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
+        option.yAxis = { type: 'value' };
+      }
+      option.series = [{
+        type: 'bar',
+        data: sortedData.map((d: any) => d.value),
+      }];
+      break;
+      
+    case 'groupedBar':
+    case 'stackedBar':
+      // Grouped and stacked bars need multiple series
+      // For now, treat as regular bar - requires more complex data structure
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+        stack: variant === 'stackedBar' ? 'total' : undefined,
+      }];
+      break;
+  }
+
+  // Merge variant-specific options
+  return deepMerge(option, variantOption);
+}
 

@@ -280,6 +280,7 @@ export const OperationKindSchema = z.enum([
   'image_describe',
   'image_find',
   'image_attach',
+  'chart_display',
   'diagram_show',
   // clerk
   'file_search',

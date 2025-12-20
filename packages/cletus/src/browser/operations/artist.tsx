@@ -1,8 +1,13 @@
-import React from 'react';
-import { abbreviate, pluralize } from '../../shared';
-import { createRenderer } from './render';
+import * as echarts from 'echarts';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { abbreviate, deepMerge, pluralize } from '../../shared';
 import { ClickableImage } from '../components/ImageViewer';
+import { createRenderer } from './render';
+import { ChartDataPoint, ChartVariant } from '../../helpers/artist';
+import { type EChartsOption } from 'echarts';
 import { ClickableDiagram } from '../components/DiagramViewer';
+import { ClickableChart } from '../components/ChartViewer';
+
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -36,7 +41,8 @@ export const image_generate = renderer<'image_generate'>(
       return `Generated ${pluralize(count, 'image')}`;
     }
     return null;
-  }
+  },
+  () => ({ summaryClasses: '' })
 );
 
 export const image_edit = renderer<'image_edit'>(
@@ -59,7 +65,8 @@ export const image_edit = renderer<'image_edit'>(
       return 'Edited image saved';
     }
     return null;
-  }
+  },
+  () => ({ summaryClasses: '' })
 );
 
 export const image_analyze = renderer<'image_analyze'>(
@@ -109,6 +116,30 @@ export const image_attach = renderer<'image_attach'>(
   }
 );
 
+// ============================================================================
+// Chart Display Renderer
+// ============================================================================
+
+export const chart_display = renderer<'chart_display'>(
+  (op) => `ChartDisplay(${op.input.chart.chartGroup}, ${op.input.chart.data?.length || 0} points)`,
+  (op): string | React.ReactNode | null => {
+    if (op.output) {
+      return (
+        <ChartDisplay
+          chartGroup={op.output.chartGroup}
+          availableVariants={op.output.availableVariants}
+          currentVariant={op.output.currentVariant}
+          option={op.output.option}
+          data={op.output.data}
+          variantOptions={op.output.variantOptions}
+        />
+      );
+    }
+    return null;
+  },
+  () => ({ summaryClasses: '' })
+);
+
 export const diagram_show = renderer<'diagram_show'>(
   (op) => `DiagramShow()`,
   (op): string | React.ReactNode | null => {
@@ -124,5 +155,277 @@ export const diagram_show = renderer<'diagram_show'>(
       );
     }
     return null;
-  }
+  },
+  () => ({ summaryClasses: '' })
 );
+
+
+// ============================================================================
+// Chart Display Component
+// ============================================================================
+
+const ChartDisplay: React.FC<{
+  chartGroup: string;
+  availableVariants: ChartVariant[];
+  currentVariant: ChartVariant;
+  option: EChartsOption;
+  data: ChartDataPoint[];
+  variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
+}> = ({ chartGroup, availableVariants, currentVariant: initialVariant, option: initialOption, data, variantOptions }) => {
+  const [currentVariant, setCurrentVariant] = useState(initialVariant);
+
+  // Extract global options (title, etc.) from initial option to preserve across variants
+  const globalOptions = useMemo<Partial<EChartsOption>>(() => ({
+    title: initialOption.title,
+    grid: initialOption.grid,
+    backgroundColor: initialOption.backgroundColor,
+  }), [initialOption.title, initialOption.grid, initialOption.backgroundColor]);
+
+  // Compute current option based on selected variant
+  const currentOption = useMemo(() => {
+    const variantSpecificOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
+    // Merge global options (title, etc.) with variant-specific options
+    return deepMerge(variantSpecificOption, globalOptions);
+  }, [currentVariant, data, variantOptions, globalOptions]);
+
+  const handleVariantChange = (variant: ChartVariant) => {
+    setCurrentVariant(variant);
+  };
+
+  return (
+    <div className="ml-6 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium">Type:</span>
+        <div className="flex gap-1 flex-wrap">
+          {availableVariants.map((variant) => (
+            <button
+              key={variant}
+              onClick={() => handleVariantChange(variant)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                currentVariant === variant
+                  ? 'bg-neon-pink text-black font-semibold'
+                  : 'bg-neon-pink/20 text-neon-pink hover:bg-neon-pink/30'
+              }`}
+            >
+              {variant}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ClickableChart
+        option={currentOption}
+        className="w-full border border-neon-pink/30 rounded bg-black/20"
+        style={{ height: '400px' }}
+        availableVariants={availableVariants}
+        currentVariant={currentVariant}
+        onVariantChange={handleVariantChange}
+      />
+    </div>
+  );
+};
+
+/**
+ * Build ECharts option for a specific variant
+ * 
+ * Note: This function is duplicated from operations/artist.tsx because:
+ * 1. The browser code cannot import from Node.js-specific files
+ * 2. Extracting to shared.ts would require moving all chart logic there
+ * 3. The logic needs to be in sync for server-side and client-side rendering
+ * 
+ * If making changes here, ensure the same changes are made in operations/artist.tsx
+ */
+function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], variantOption: Partial<EChartsOption>): EChartsOption {
+  // Dark mode axis styling
+  const axisStyle = {
+    axisLine: { lineStyle: { color: '#666' } },
+    axisLabel: { color: '#ffffff' },
+    splitLine: { lineStyle: { color: '#333' } },
+  };
+
+  const baseOption: EChartsOption = {
+    backgroundColor: 'transparent',
+    textStyle: {
+      color: '#ffffff',
+    },
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderColor: '#666',
+      textStyle: {
+        color: '#ffffff',
+      },
+    },
+    legend: {
+      textStyle: {
+        color: '#ffffff',
+      },
+    },
+    series: [],
+  };
+
+  // Apply variant-specific series configuration
+  switch (variant) {
+    case 'pie':
+      baseOption.series = [{
+        type: 'pie',
+        radius: '50%',
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'donut':
+      baseOption.series = [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'treemap':
+      baseOption.series = [{
+        type: 'treemap',
+        data,
+      }];
+      break;
+
+    case 'sunburst':
+      baseOption.series = [{
+        type: 'sunburst',
+        data,
+        radius: [0, '90%'],
+      }];
+      break;
+
+    case 'bar':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'horizontalBar':
+      baseOption.yAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.xAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'pictorialBar':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'pictorialBar',
+        data: data.map((d: any) => d.value),
+        symbol: 'rect',
+      }];
+      break;
+
+    case 'line':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'area':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        areaStyle: {},
+      }];
+      break;
+
+    case 'step':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        step: 'start',
+      }];
+      break;
+
+    case 'smoothLine':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        smooth: true,
+      }];
+      break;
+
+    case 'histogram':
+    case 'boxplot':
+    case 'scatter':
+    case 'effectScatter':
+    case 'heatmap':
+    case 'tree':
+    case 'sankey':
+    case 'funnel':
+    case 'map':
+    case 'radar':
+    case 'parallel':
+      // Use the variant name directly as ECharts type (these are already correct)
+      baseOption.series = [{
+        type: variant,
+        data,
+      }];
+      break;
+      
+    case 'orderedBar':
+    case 'horizontalOrderedBar':
+      // Ordered bars are just bars with sorted data
+      const sortedData = [...data].sort((a: any, b: any) => b.value - a.value);
+      if (variant === 'horizontalOrderedBar') {
+        baseOption.yAxis = { type: 'category', data: sortedData.map((d: any) => d.name), ...axisStyle };
+        baseOption.xAxis = { type: 'value', ...axisStyle };
+      } else {
+        baseOption.xAxis = { type: 'category', data: sortedData.map((d: any) => d.name), ...axisStyle };
+        baseOption.yAxis = { type: 'value', ...axisStyle };
+      }
+      baseOption.series = [{
+        type: 'bar',
+        data: sortedData.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'groupedBar':
+    case 'stackedBar':
+      // Grouped and stacked bars need multiple series
+      // For now, treat as regular bar - requires more complex data structure
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+        stack: variant === 'stackedBar' ? 'total' : undefined,
+      }];
+      break;
+  }
+
+  // Deep merge variant-specific options
+  return deepMerge(baseOption, variantOption);
+}

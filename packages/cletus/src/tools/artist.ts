@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { globalToolProperties, type CletusAI } from '../ai';
 import { getOperationInput } from '../operations/types';
+import { ChartConfigSchema } from '../helpers/artist';
 
 /**
  * Create artist tools for image operations
@@ -116,6 +117,44 @@ Example: Attach an image file:
     call: async (input, _, ctx) => ctx.ops.handle({ type: 'image_attach', input }, ctx),
   });
 
+  // Chart display schemas - moved outside function and exported above
+  
+  const chartDisplay = ai.tool({
+    name: 'chart_display',
+    description: 'Display data as an interactive chart in the browser UI',
+    instructions: `Use this to visualize data as a chart. This is browser-only and will display an interactive chart with variant switching capabilities.
+
+Chart groups and their available variants:
+- partToWhole: pie, donut, treemap, sunburst (for showing parts of a whole)
+- categoryComparison: bar, horizontalBar, pictorialBar (for comparing categories)
+- timeSeries: line, area, step, smoothLine (for data over time)
+- distribution: histogram, boxplot (for data distribution)
+- correlation: scatter, effectScatter, heatmap (for showing relationships)
+- ranking: orderedBar, horizontalOrderedBar (for ranked data)
+- hierarchical: treemap, sunburst, tree (for hierarchical data)
+- flow: sankey, funnel (for flow/process data)
+- geospatial: map (for geographic data)
+- multivariateComparison: groupedBar, stackedBar, radar, parallel (for comparing multiple variables)
+
+Data format: Provide an array of objects with 'name' and 'value' properties, e.g.:
+[{ "name": "Apple", "value": 28 }, { "name": "Samsung", "value": 22 }]
+
+The chart will be displayed in the browser with controls to switch between different variants of the same chart group.
+
+Example: Display market share as a pie chart:
+{ "chartGroup": "partToWhole", "title": "Market Share", "data": [{"name": "Apple", "value": 28}, {"name": "Samsung", "value": 22}], "defaultVariant": "pie" }
+ 
+{{modeInstructions}}`,
+    schema: z.object({
+      chart: ChartConfigSchema,
+      ...globalToolProperties,
+    }),
+    strict: false,
+    metadata: { onlyClient: 'browser' },
+    input: getOperationInput('chart_display'),
+    call: async (input, _, ctx) => ctx.ops.handle({ type: 'chart_display', input }, ctx),
+  });
+
   const diagramShow = ai.tool({
     name: 'diagram_show',
     description: 'Display a Mermaid diagram in the chat (browser only)',
@@ -141,6 +180,7 @@ Example: Show a flowchart:
     imageDescribe,
     imageFind,
     imageAttach,
+    chartDisplay,
     diagramShow,
   ] as [
     typeof imageGenerate,
@@ -149,6 +189,7 @@ Example: Show a flowchart:
     typeof imageDescribe,
     typeof imageFind,
     typeof imageAttach,
+    typeof chartDisplay,
     typeof diagramShow,
   ];
 }

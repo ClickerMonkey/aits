@@ -178,7 +178,7 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ spec, isOpen, onCl
         <div
           ref={containerRef}
           className={cn(
-            'relative max-w-[90vw] max-h-[90vh] overflow-hidden',
+            'relative w-full h-full overflow-hidden flex items-center justify-center',
             isDragging ? 'cursor-grabbing' : scale > 1 ? 'cursor-grab' : 'cursor-default'
           )}
           onWheel={handleWheel}
