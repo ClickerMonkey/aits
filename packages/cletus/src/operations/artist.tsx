@@ -527,7 +527,7 @@ export const ChartGroupVariants: Record<ChartGroup, ChartVariant[]> = {
   ranking: ['orderedBar', 'horizontalOrderedBar'],
   hierarchical: ['treemap', 'sunburst', 'tree'],
   flow: ['sankey', 'funnel'],
-  geospatial: ['map', 'scatter'],
+  geospatial: ['map'], // Removed scatter to avoid duplication with correlation group
   multivariateComparison: ['groupedBar', 'stackedBar', 'radar', 'parallel'],
 };
 
@@ -610,6 +610,13 @@ export const chart_display = operationOf<
 
 /**
  * Apply variant-specific transformations to the base option
+ * 
+ * Note: This function is duplicated in browser/operations/artist.tsx as buildOptionForVariant because:
+ * 1. The browser code cannot import from Node.js-specific files
+ * 2. Extracting to shared.ts would require moving all chart logic there
+ * 3. The logic needs to be in sync for server-side and client-side rendering
+ * 
+ * If making changes here, ensure the same changes are made in browser/operations/artist.tsx
  */
 function applyVariantToOption(
   baseOption: EChartsOption,

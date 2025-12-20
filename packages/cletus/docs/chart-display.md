@@ -61,7 +61,7 @@ Shows flow or funnel processes.
 
 ### Geospatial (`geospatial`)
 Displays geographic data.
-- **Variants**: `map`, `scatter`
+- **Variants**: `map`
 
 ### Multivariate Comparison (`multivariateComparison`)
 Compares multiple variables simultaneously.

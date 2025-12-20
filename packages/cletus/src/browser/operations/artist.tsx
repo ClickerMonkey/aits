@@ -189,6 +189,13 @@ const ChartDisplay: React.FC<{
 
 /**
  * Build ECharts option for a specific variant
+ * 
+ * Note: This function is duplicated from operations/artist.tsx because:
+ * 1. The browser code cannot import from Node.js-specific files
+ * 2. Extracting to shared.ts would require moving all chart logic there
+ * 3. The logic needs to be in sync for server-side and client-side rendering
+ * 
+ * If making changes here, ensure the same changes are made in operations/artist.tsx
  */
 function buildOptionForVariant(variant: ChartVariant, data: any[], variantOption: any): any {
   const baseOption: any = {

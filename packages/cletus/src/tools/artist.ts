@@ -130,7 +130,7 @@ Chart groups and their available variants:
 - ranking: orderedBar, horizontalOrderedBar (for ranked data)
 - hierarchical: treemap, sunburst, tree (for hierarchical data)
 - flow: sankey, funnel (for flow/process data)
-- geospatial: map, scatter (for geographic data)
+- geospatial: map (for geographic data)
 - multivariateComparison: groupedBar, stackedBar, radar, parallel (for comparing multiple variables)
 
 Data format: Provide an array of objects with 'name' and 'value' properties, e.g.:
