@@ -480,3 +480,312 @@ export const image_attach = operationOf<
   ),
 });
 
+// ============================================================================
+// Chart Display Types
+// ============================================================================
+
+export type ChartGroup = 
+  | 'partToWhole'
+  | 'categoryComparison'
+  | 'timeSeries'
+  | 'distribution'
+  | 'correlation'
+  | 'ranking'
+  | 'hierarchical'
+  | 'flow'
+  | 'geospatial'
+  | 'multivariateComparison';
+
+export type ChartVariant = 
+  // partToWhole
+  | 'pie' | 'donut' | 'treemap' | 'sunburst'
+  // categoryComparison
+  | 'bar' | 'horizontalBar' | 'pictorialBar'
+  // timeSeries
+  | 'line' | 'area' | 'step' | 'smoothLine'
+  // distribution
+  | 'histogram' | 'boxplot'
+  // correlation
+  | 'scatter' | 'effectScatter' | 'heatmap'
+  // ranking
+  | 'orderedBar' | 'horizontalOrderedBar'
+  // hierarchical (overlaps with partToWhole)
+  | 'tree'
+  // flow
+  | 'sankey' | 'funnel'
+  // geospatial
+  | 'map'
+  // multivariateComparison
+  | 'groupedBar' | 'stackedBar' | 'radar' | 'parallel';
+
+export const ChartGroupVariants: Record<ChartGroup, ChartVariant[]> = {
+  partToWhole: ['pie', 'donut', 'treemap', 'sunburst'],
+  categoryComparison: ['bar', 'horizontalBar', 'pictorialBar'],
+  timeSeries: ['line', 'area', 'step', 'smoothLine'],
+  distribution: ['histogram', 'boxplot'],
+  correlation: ['scatter', 'effectScatter', 'heatmap'],
+  ranking: ['orderedBar', 'horizontalOrderedBar'],
+  hierarchical: ['treemap', 'sunburst', 'tree'],
+  flow: ['sankey', 'funnel'],
+  geospatial: ['map', 'scatter'],
+  multivariateComparison: ['groupedBar', 'stackedBar', 'radar', 'parallel'],
+};
+
+// ECharts option type (simplified - in reality it's much more complex)
+export type EChartsOption = Record<string, any>;
+
+export type ChartDisplayInput = {
+  chartGroup: ChartGroup;
+  title?: string;
+  data: any[];
+  variantOptions?: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
+  defaultVariant?: ChartVariant;
+};
+
+export type ChartDisplayOutput = {
+  chartGroup: ChartGroup;
+  availableVariants: ChartVariant[];
+  currentVariant: ChartVariant;
+  option: EChartsOption;
+  data: any[];
+  variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
+};
+
+// ============================================================================
+// Chart Display Operation
+// ============================================================================
+
+export const chart_display = operationOf<
+  ChartDisplayInput,
+  ChartDisplayOutput
+>({
+  mode: 'local',
+  signature: 'chart_display(chartGroup: string, title?: string, data: any[], variantOptions?: object, defaultVariant?: string)',
+  status: (input) => `Displaying ${input.chartGroup} chart`,
+  analyze: async ({ input }) => {
+    // Local operation, no analysis needed
+    return {
+      analysis: `This will display a ${input.chartGroup} chart with ${input.data?.length || 0} data points`,
+      doable: true,
+    };
+  },
+  do: async ({ input }) => {
+    const availableVariants = ChartGroupVariants[input.chartGroup];
+    const currentVariant = input.defaultVariant || availableVariants[0];
+    const variantOptions = input.variantOptions || {};
+
+    // Build base option from input
+    const baseOption: EChartsOption = {
+      title: input.title ? { text: input.title, left: 'center' } : undefined,
+      tooltip: { trigger: 'item' },
+      legend: {},
+      series: [],
+    };
+
+    // Apply variant-specific options
+    const variantOption = variantOptions[currentVariant] || {};
+    const option = applyVariantToOption(baseOption, currentVariant, input.data, variantOption);
+
+    return {
+      chartGroup: input.chartGroup,
+      availableVariants,
+      currentVariant,
+      option,
+      data: input.data,
+      variantOptions,
+    };
+  },
+  render: (op, ai, showInput, showOutput) => renderOperation(
+    op,
+    `ChartDisplay(${op.input.chartGroup}, ${op.input.data?.length || 0} points)`,
+    (op) => {
+      if (op.output) {
+        return `Displaying ${op.output.chartGroup} chart as ${op.output.currentVariant}`;
+      }
+      return null;
+    },
+    showInput, showOutput
+  ),
+});
+
+/**
+ * Apply variant-specific transformations to the base option
+ */
+function applyVariantToOption(
+  baseOption: EChartsOption,
+  variant: ChartVariant,
+  data: any[],
+  variantOption: Partial<EChartsOption>
+): EChartsOption {
+  const option = { ...baseOption };
+
+  // Apply variant-specific series configuration
+  switch (variant) {
+    case 'pie':
+      option.series = [{
+        type: 'pie',
+        radius: '50%',
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'donut':
+      option.series = [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'treemap':
+      option.series = [{
+        type: 'treemap',
+        data,
+      }];
+      break;
+
+    case 'sunburst':
+      option.series = [{
+        type: 'sunburst',
+        data,
+        radius: [0, '90%'],
+      }];
+      break;
+
+    case 'bar':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'horizontalBar':
+      option.yAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.xAxis = { type: 'value' };
+      option.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'pictorialBar':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'pictorialBar',
+        data: data.map((d: any) => d.value),
+        symbol: 'rect',
+      }];
+      break;
+
+    case 'line':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'area':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        areaStyle: {},
+      }];
+      break;
+
+    case 'step':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        step: 'start',
+      }];
+      break;
+
+    case 'smoothLine':
+      option.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      option.yAxis = { type: 'value' };
+      option.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        smooth: true,
+      }];
+      break;
+
+    case 'histogram':
+    case 'boxplot':
+    case 'scatter':
+    case 'effectScatter':
+    case 'heatmap':
+    case 'orderedBar':
+    case 'horizontalOrderedBar':
+    case 'tree':
+    case 'sankey':
+    case 'funnel':
+    case 'map':
+    case 'groupedBar':
+    case 'stackedBar':
+    case 'radar':
+    case 'parallel':
+      // For now, use sensible defaults for other chart types
+      option.series = [{
+        type: variant.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, ''),
+        data,
+      }];
+      break;
+  }
+
+  // Merge variant-specific options
+  return deepMerge(option, variantOption);
+}
+
+/**
+ * Deep merge two objects
+ */
+function deepMerge(target: any, source: any): any {
+  if (!source) return target;
+  
+  const output = { ...target };
+  
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          output[key] = source[key];
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        output[key] = source[key];
+      }
+    });
+  }
+  
+  return output;
+}
+
+function isObject(item: any): boolean {
+  return item && typeof item === 'object' && !Array.isArray(item);
+}
+

@@ -2,6 +2,8 @@ import React from 'react';
 import { abbreviate, pluralize } from '../../shared';
 import { createRenderer } from './render';
 import { ClickableImage } from '../components/ImageViewer';
+import * as echarts from 'echarts';
+import type { ChartVariant } from '../../operations/artist';
 
 const renderer = createRenderer({
   borderColor: "border-neon-pink/30",
@@ -103,6 +105,286 @@ export const image_attach = renderer<'image_attach'>(
   (op) => {
     if (op.output?.attached) {
       return `Attached image: ${op.output.fullPath}`;
+    }
+    return null;
+  }
+);
+
+// ============================================================================
+// Chart Display Component
+// ============================================================================
+
+const ChartDisplay: React.FC<{
+  chartGroup: string;
+  availableVariants: ChartVariant[];
+  currentVariant: ChartVariant;
+  option: any;
+  data: any[];
+  variantOptions: any;
+}> = ({ chartGroup, availableVariants, currentVariant: initialVariant, option: initialOption, data, variantOptions }) => {
+  const chartRef = React.useRef<HTMLDivElement>(null);
+  const chartInstanceRef = React.useRef<echarts.ECharts | null>(null);
+  const [currentVariant, setCurrentVariant] = React.useState(initialVariant);
+
+  // Initialize chart
+  React.useEffect(() => {
+    if (!chartRef.current) return;
+
+    const chart = echarts.init(chartRef.current);
+    chartInstanceRef.current = chart;
+
+    // Set initial option
+    chart.setOption(initialOption);
+
+    // Handle resize
+    const handleResize = () => chart.resize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.dispose();
+    };
+  }, []);
+
+  // Update chart when variant changes
+  React.useEffect(() => {
+    if (!chartInstanceRef.current) return;
+
+    const newOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
+    chartInstanceRef.current.setOption(newOption, true);
+  }, [currentVariant, data, variantOptions]);
+
+  const handleVariantChange = (variant: ChartVariant) => {
+    setCurrentVariant(variant);
+  };
+
+  return (
+    <div className="ml-6 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium">Variant:</span>
+        <div className="flex gap-1 flex-wrap">
+          {availableVariants.map((variant) => (
+            <button
+              key={variant}
+              onClick={() => handleVariantChange(variant)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                currentVariant === variant
+                  ? 'bg-neon-pink text-black font-semibold'
+                  : 'bg-neon-pink/20 text-neon-pink hover:bg-neon-pink/30'
+              }`}
+            >
+              {variant}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div 
+        ref={chartRef} 
+        className="w-full border border-neon-pink/30 rounded bg-black/20"
+        style={{ height: '400px' }}
+      />
+    </div>
+  );
+};
+
+/**
+ * Build ECharts option for a specific variant
+ */
+function buildOptionForVariant(variant: ChartVariant, data: any[], variantOption: any): any {
+  const baseOption: any = {
+    tooltip: { trigger: 'item' },
+    legend: {},
+    series: [],
+  };
+
+  // Apply variant-specific series configuration
+  switch (variant) {
+    case 'pie':
+      baseOption.series = [{
+        type: 'pie',
+        radius: '50%',
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'donut':
+      baseOption.series = [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }];
+      break;
+
+    case 'treemap':
+      baseOption.series = [{
+        type: 'treemap',
+        data,
+      }];
+      break;
+
+    case 'sunburst':
+      baseOption.series = [{
+        type: 'sunburst',
+        data,
+        radius: [0, '90%'],
+      }];
+      break;
+
+    case 'bar':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'horizontalBar':
+      baseOption.yAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.xAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'bar',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'pictorialBar':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'pictorialBar',
+        data: data.map((d: any) => d.value),
+        symbol: 'rect',
+      }];
+      break;
+
+    case 'line':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+      }];
+      break;
+
+    case 'area':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        areaStyle: {},
+      }];
+      break;
+
+    case 'step':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        step: 'start',
+      }];
+      break;
+
+    case 'smoothLine':
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
+      baseOption.yAxis = { type: 'value' };
+      baseOption.series = [{
+        type: 'line',
+        data: data.map((d: any) => d.value),
+        smooth: true,
+      }];
+      break;
+
+    case 'histogram':
+    case 'boxplot':
+    case 'scatter':
+    case 'effectScatter':
+    case 'heatmap':
+    case 'orderedBar':
+    case 'horizontalOrderedBar':
+    case 'tree':
+    case 'sankey':
+    case 'funnel':
+    case 'map':
+    case 'groupedBar':
+    case 'stackedBar':
+    case 'radar':
+    case 'parallel':
+      // For now, use sensible defaults for other chart types
+      baseOption.series = [{
+        type: variant.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, ''),
+        data,
+      }];
+      break;
+  }
+
+  // Deep merge variant-specific options
+  return deepMerge(baseOption, variantOption);
+}
+
+/**
+ * Deep merge two objects
+ */
+function deepMerge(target: any, source: any): any {
+  if (!source) return target;
+  
+  const output = { ...target };
+  
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          output[key] = source[key];
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        output[key] = source[key];
+      }
+    });
+  }
+  
+  return output;
+}
+
+function isObject(item: any): boolean {
+  return item && typeof item === 'object' && !Array.isArray(item);
+}
+
+// ============================================================================
+// Chart Display Renderer
+// ============================================================================
+
+export const chart_display = renderer<'chart_display'>(
+  (op) => `ChartDisplay(${op.input.chartGroup}, ${op.input.data?.length || 0} points)`,
+  (op): string | React.ReactNode | null => {
+    if (op.output) {
+      return (
+        <ChartDisplay
+          chartGroup={op.output.chartGroup}
+          availableVariants={op.output.availableVariants}
+          currentVariant={op.output.currentVariant}
+          option={op.output.option}
+          data={op.output.data}
+          variantOptions={op.output.variantOptions}
+        />
+      );
     }
     return null;
   }
