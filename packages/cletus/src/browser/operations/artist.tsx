@@ -1,11 +1,12 @@
 import * as echarts from 'echarts';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { abbreviate, deepMerge, pluralize } from '../../shared';
 import { ClickableImage } from '../components/ImageViewer';
 import { createRenderer } from './render';
 import { ChartDataPoint, ChartVariant } from '../../helpers/artist';
 import { type EChartsOption } from 'echarts';
 import { ClickableDiagram } from '../components/DiagramViewer';
+import { ClickableChart } from '../components/ChartViewer';
 
 
 const renderer = createRenderer({
@@ -171,46 +172,21 @@ const ChartDisplay: React.FC<{
   data: ChartDataPoint[];
   variantOptions: Partial<Record<ChartVariant, Partial<EChartsOption>>>;
 }> = ({ chartGroup, availableVariants, currentVariant: initialVariant, option: initialOption, data, variantOptions }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [currentVariant, setCurrentVariant] = useState(initialVariant);
 
   // Extract global options (title, etc.) from initial option to preserve across variants
-  const globalOptions = useRef<Partial<EChartsOption>>({
+  const globalOptions = useMemo<Partial<EChartsOption>>(() => ({
     title: initialOption.title,
     grid: initialOption.grid,
     backgroundColor: initialOption.backgroundColor,
-  });
+  }), [initialOption.title, initialOption.grid, initialOption.backgroundColor]);
 
-  // Initialize chart
-  useEffect(() => {
-    if (!chartRef.current) return;
-
-    const chart = echarts.init(chartRef.current);
-    chartInstanceRef.current = chart;
-
-    // Set initial option
-    chart.setOption(initialOption);
-
-    // Handle resize
-    const handleResize = () => chart.resize();
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.dispose();
-    };
-  }, []);
-
-  // Update chart when variant changes
-  useEffect(() => {
-    if (!chartInstanceRef.current) return;
-
+  // Compute current option based on selected variant
+  const currentOption = useMemo(() => {
     const variantSpecificOption = buildOptionForVariant(currentVariant, data, variantOptions[currentVariant] || {});
     // Merge global options (title, etc.) with variant-specific options
-    const newOption = deepMerge(variantSpecificOption, globalOptions.current);
-    chartInstanceRef.current.setOption(newOption, true);
-  }, [currentVariant, data, variantOptions]);
+    return deepMerge(variantSpecificOption, globalOptions);
+  }, [currentVariant, data, variantOptions, globalOptions]);
 
   const handleVariantChange = (variant: ChartVariant) => {
     setCurrentVariant(variant);
@@ -236,10 +212,13 @@ const ChartDisplay: React.FC<{
           ))}
         </div>
       </div>
-      <div 
-        ref={chartRef} 
+      <ClickableChart
+        option={currentOption}
         className="w-full border border-neon-pink/30 rounded bg-black/20"
         style={{ height: '400px' }}
+        availableVariants={availableVariants}
+        currentVariant={currentVariant}
+        onVariantChange={handleVariantChange}
       />
     </div>
   );
@@ -256,9 +235,31 @@ const ChartDisplay: React.FC<{
  * If making changes here, ensure the same changes are made in operations/artist.tsx
  */
 function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], variantOption: Partial<EChartsOption>): EChartsOption {
+  // Dark mode axis styling
+  const axisStyle = {
+    axisLine: { lineStyle: { color: '#666' } },
+    axisLabel: { color: '#ffffff' },
+    splitLine: { lineStyle: { color: '#333' } },
+  };
+
   const baseOption: EChartsOption = {
-    tooltip: { trigger: 'item' },
-    legend: {},
+    backgroundColor: 'transparent',
+    textStyle: {
+      color: '#ffffff',
+    },
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderColor: '#666',
+      textStyle: {
+        color: '#ffffff',
+      },
+    },
+    legend: {
+      textStyle: {
+        color: '#ffffff',
+      },
+    },
     series: [],
   };
 
@@ -310,8 +311,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'bar':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'bar',
         data: data.map((d: any) => d.value),
@@ -319,8 +320,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'horizontalBar':
-      baseOption.yAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.xAxis = { type: 'value' };
+      baseOption.yAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.xAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'bar',
         data: data.map((d: any) => d.value),
@@ -328,8 +329,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'pictorialBar':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'pictorialBar',
         data: data.map((d: any) => d.value),
@@ -338,8 +339,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'line':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'line',
         data: data.map((d: any) => d.value),
@@ -347,8 +348,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'area':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'line',
         data: data.map((d: any) => d.value),
@@ -357,8 +358,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'step':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'line',
         data: data.map((d: any) => d.value),
@@ -367,8 +368,8 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       break;
 
     case 'smoothLine':
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'line',
         data: data.map((d: any) => d.value),
@@ -399,24 +400,24 @@ function buildOptionForVariant(variant: ChartVariant, data: ChartDataPoint[], va
       // Ordered bars are just bars with sorted data
       const sortedData = [...data].sort((a: any, b: any) => b.value - a.value);
       if (variant === 'horizontalOrderedBar') {
-        baseOption.yAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
-        baseOption.xAxis = { type: 'value' };
+        baseOption.yAxis = { type: 'category', data: sortedData.map((d: any) => d.name), ...axisStyle };
+        baseOption.xAxis = { type: 'value', ...axisStyle };
       } else {
-        baseOption.xAxis = { type: 'category', data: sortedData.map((d: any) => d.name) };
-        baseOption.yAxis = { type: 'value' };
+        baseOption.xAxis = { type: 'category', data: sortedData.map((d: any) => d.name), ...axisStyle };
+        baseOption.yAxis = { type: 'value', ...axisStyle };
       }
       baseOption.series = [{
         type: 'bar',
         data: sortedData.map((d: any) => d.value),
       }];
       break;
-      
+
     case 'groupedBar':
     case 'stackedBar':
       // Grouped and stacked bars need multiple series
       // For now, treat as regular bar - requires more complex data structure
-      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name) };
-      baseOption.yAxis = { type: 'value' };
+      baseOption.xAxis = { type: 'category', data: data.map((d: any) => d.name), ...axisStyle };
+      baseOption.yAxis = { type: 'value', ...axisStyle };
       baseOption.series = [{
         type: 'bar',
         data: data.map((d: any) => d.value),
