@@ -5,7 +5,7 @@ import { Box, Text } from "ink";
 import path from 'path';
 import React from 'react';
 import { CletusAI, describe, summarize, transcribe } from "../ai";
-import { abbreviate, chunk, convertNewlines, detectNewlineType, fileProtocol, linkFile, NewlineType, normalizeNewlines, paginateText, pluralize, formatSize } from "../common";
+import { abbreviate, chunk, convertNewlines, detectNewlineType, fileProtocol, linkFile, NewlineType, normalizeNewlines, paginateText, pluralize, formatSize, INPUT_END } from "../common";
 import { Link } from "../components/Link";
 import { CONSTS } from "../constants";
 import { canEmbed, embed } from "../embed";
@@ -823,8 +823,25 @@ export const file_edit = operationOf<
     const originalNewlineType = detectNewlineType(fileContent);
     const normalizedContent = normalizeNewlines(fileContent);
 
+
+
+    // Add a buffer
+    const paginatedLines = normalizedContent.split('\n').length;
+    const paginatedOffset = input.offset !== undefined
+      ? Math.max(input.offset >= 0 ? 0 : -paginatedLines, input.offset - CONSTS.EDIT_LINE_BUFFER) 
+      : input.offset
+    const paginatedLimit = input.limit !== undefined
+      ? input.limit + (CONSTS.EDIT_LINE_BUFFER * 2)
+      : input.limit;
+      
     // Paginate the text if offset/limit are provided (lines only)
-    const paginatedContent = paginateText(normalizedContent, input.limit, input.offset, 'lines');
+    const paginatedContent = paginateText(normalizedContent, paginatedLimit, paginatedOffset, 'lines');
+
+    // Describe it so the AI knows what part of the file it's working on
+    const actualStart = ((paginatedOffset || 0) + paginatedLines) % paginatedLines;
+    const actualEnd = Math.min(actualStart + (paginatedLimit || paginatedLines), paginatedLines);
+    const actualDescription = `The following is a portion of the file "${input.path}", from line ${actualStart + 1} to line ${actualEnd}:\n\n`;
+
 
     // Use AI to generate new content based on the request
     const models = ai.config.defaultContext!.config!.getData().user.models;
@@ -836,6 +853,9 @@ export const file_edit = operationOf<
         {
           role: 'system',
           content: `You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.
+          
+          ${actualDescription}
+
           <request>${input.request}</request>`
         },
         {

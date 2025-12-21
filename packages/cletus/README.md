@@ -5,7 +5,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ```bash
-npm install -g @aeye/cletus
+npm i -g @aeye/cletus
 ```
 
 For the best experience, configure what models are used for each use case. Use openai/gpt-4o for chat, google/nano-banana for image generation and editing, anthropic/claude-sonnet-4 for file editing, etc! If you don't specify then a model will be dynamically chosen based on configured weights and what can handle the request.
@@ -50,7 +50,7 @@ Here are some examples of what you can do with Cletus:
 
 **Task Planning:**
 - "Add a todo to implement user authentication"
-- "Show me all my pending todos"
+- "Show me all my pending todos" 
 - "Mark the first todo as done"
 
 **Graphic Operations:**

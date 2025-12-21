@@ -64,7 +64,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       </div>
 
       {/* Content */}
-      <div className={cn('flex-1 space-y-2', isUser && 'flex flex-col items-end')}>
+      <div className={cn('flex-1 space-y-2 min-w-0', isUser && 'flex flex-col items-end')}>
         {/* Header */}
         <div
           className={cn(

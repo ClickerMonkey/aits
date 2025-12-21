@@ -612,8 +612,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
   }
 
   // Add pending message if it exists (replaces temporary assistant message)
+  // Only add if it's not already in the messages array (check by created timestamp)
   if (pendingMessage) {
-    allMessages.push(pendingMessage);
+    const lastMessage = messages[messages.length - 1];
+    const isDuplicate = lastMessage && lastMessage.created === pendingMessage.created;
+    if (!isDuplicate) {
+      allMessages.push(pendingMessage);
+    }
   }
 
   const lastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
@@ -681,7 +686,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Chat Header */}
         <div className="relative z-10 border-b border-border bg-card/30 backdrop-blur-sm p-4">
           <div className="flex items-center gap-4">
@@ -775,7 +780,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
 
         <>
           {/* Messages Area */}
-          <ScrollArea className="flex-1 p-6">
+          <ScrollArea className="flex-1 p-6 min-w-0">
             <MessageList
               messages={allMessages}
               loading={loading}

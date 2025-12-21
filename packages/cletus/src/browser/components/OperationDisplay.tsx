@@ -428,16 +428,20 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
 
       {/* Summary */}
       {displaySummary && (
-        <div className={cn('ml-6 text-sm mb-2 flex', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
+        <div className={cn('ml-6 text-sm mb-2 flex min-w-0', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
-              <span className="text-foreground">→ </span>
-              <MarkdownContent
-                content={displaySummary}
-              />
+              <span className="text-foreground flex-shrink-0">→ </span>
+              <div className="min-w-0 flex-1">
+                <MarkdownContent
+                  content={displaySummary}
+                />
+              </div>
             </>
           ) : (
-            displaySummary
+            <div className="min-w-0 flex-1">
+              {displaySummary}
+            </div>
           )}
         </div>
       )}

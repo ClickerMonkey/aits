@@ -144,9 +144,9 @@ export const file_edit = renderer<'file_edit'>(
   (op) => `Edit("${paginateText(op.input.path, 100, -100)}")`,
   (op): string | React.ReactNode | null => {
     if (op.cache?.changed === false) {
-      return 'No changes';
+      return ' No changes';
     }
-    
+
     // diff format:
     // Index: [filename]
     // ===================================================================
@@ -156,9 +156,15 @@ export const file_edit = renderer<'file_edit'>(
     // [+- ]line
     // \ ignore
     const lineClasses = {
-      '+': 'bg-green-900/30 text-green-300',
-      '-': 'bg-red-900/30 text-red-300',
-      ' ': 'text-muted-foreground',
+      '+': 'bg-green-500/20 border-l-2 border-green-500',
+      '-': 'bg-red-500/20 border-l-2 border-red-500',
+      ' ': 'bg-muted/20',
+    } as const;
+
+    const lineTextClasses = {
+      '+': 'text-green-400',
+      '-': 'text-red-400',
+      ' ': 'text-foreground',
     } as const;
 
     // render format:
@@ -203,46 +209,74 @@ export const file_edit = renderer<'file_edit'>(
       }
 
       return (
-        <div key={setLinesIndex}>
-          {lines.map((line, lineIndex) => (
-            <div key={lineIndex} className=''>
-              <div color="gray">{lineNumbers[lineIndex]} </div>
-              <div className={lineClasses[line[0] as '+' | '-' | ' ']}>
-                {line}
+        <div key={setLinesIndex} className="rounded overflow-x-auto border border-border/50">
+          {lines.map((line, lineIndex) => {
+            const lineType = line[0] as '+' | '-' | ' ';
+            const lineContent = line.slice(1); // Remove the +/- prefix
+
+            return (
+              <div
+                key={lineIndex}
+                className={`flex font-mono text-sm ${lineClasses[lineType]}`}
+              >
+                <div className="flex-shrink-0 w-12 text-right pr-3 py-1 text-muted-foreground select-none bg-black/20 sticky left-0">
+                  {lineNumbers[lineIndex]}
+                </div>
+                <div className={`flex-1 py-1 px-2 ${lineTextClasses[lineType]}`}>
+                  <span className="inline-block w-4 flex-shrink-0 select-none font-bold">
+                    {lineType === '+' ? '+' : lineType === '-' ? '−' : ' '}
+                  </span>
+                  <span>{lineContent}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       );
     });
 
     const changeSetsGrouped = changeSets.map((set, index) => (
       <React.Fragment key={index}>
-        {index > 0 && (<div>...</div>)}
+        {index > 0 && (
+          <div className="flex items-center gap-2 my-3">
+            <div className="flex-1 h-px bg-border/50"></div>
+            <span className="text-xs text-muted-foreground font-mono px-2">···</span>
+            <div className="flex-1 h-px bg-border/50"></div>
+          </div>
+        )}
         {set}
       </React.Fragment>
     ));
 
     // React Web Version:
     return (
-      <div>
-        <span className="text-foreground">→ </span>
-        <span>
-          {op.output ? 'Updated ' : op.analysis ? 'Edit ' : 'Analyzing '}
-          <span className="text-neon-cyan">{op.input.path}</span>
+      <div className="space-y-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-foreground font-semibold">→</span>
+          <span className="text-foreground">
+            {op.output ? 'Updated' : op.analysis ? 'Edit' : 'Analyzing'}
+          </span>
+          <span className="text-neon-cyan font-mono">{op.input.path}</span>
           {diff && (additions + subtractions) > 0 && (
-            <span>
-              {' '}with {pluralize(additions, 'addition')} and {pluralize(subtractions, 'removal')}
+            <span className="text-sm text-muted-foreground">
+              (
+              {additions > 0 && <span className="text-green-400">+{additions}</span>}
+              {additions > 0 && subtractions > 0 && <span className="mx-1">·</span>}
+              {subtractions > 0 && <span className="text-red-400">−{subtractions}</span>}
+              )
             </span>
           )}
-        </span>
-        {changeSetsGrouped}
+        </div>
+        <div className="space-y-3 min-w-0">
+          {changeSetsGrouped}
+        </div>
       </div>
     );
   },
   (op) => ({
     borderColor: op.output ? 'border-border' : op.status === 'rejected' ? 'border-muted' : 'border-green-500/30',
     bgColor: op.output ? 'bg-card/50' : op.status === 'rejected' ? 'bg-muted/20' : 'bg-green-500/5',
+    summaryClasses: '',
   })
 );
 
