@@ -36,7 +36,7 @@
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ClickerMonkey/aeye.git"
+    "url": "git+https://github.com/ClickerMonkey/aeye.git"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
