@@ -881,13 +881,6 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
             />
           </ScrollArea>
 
-          {/* Drag-and-Drop Overlay */}
-          {isDragging && (
-            <div className="absolute inset-0 bg-neon-cyan/10 border-2 border-neon-cyan border-dashed rounded-lg flex items-center justify-center pointer-events-none">
-              <div className="text-neon-cyan text-xl font-bold">Drop files to attach</div>
-            </div>
-          )}
-
           {/* Input Area */}
           <div className="border-t border-border bg-card/30 backdrop-blur-sm">
             <ChatInput
@@ -912,6 +905,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
             />
           </div>
         </>
+
+        {/* Drag-and-Drop Overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 bg-neon-cyan/10 border-2 border-neon-cyan border-dashed rounded-lg flex items-center justify-center pointer-events-none">
+            <div className="text-neon-cyan text-xl font-bold">Drop files to attach</div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
