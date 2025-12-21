@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
@@ -167,7 +167,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ filepath, isOpen, onClose }) =>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen && filepath) {
       setLoading(true);
       setError(null);
@@ -189,7 +189,7 @@ const FileViewer: React.FC<FileViewerProps> = ({ filepath, isOpen, onClose }) =>
   }, [isOpen, filepath]);
 
   // Handle escape key
-  React.useEffect(() => {
+  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -298,7 +298,7 @@ const URLConfirmModal: React.FC<URLConfirmModalProps> = ({ url, isOpen, onClose 
   };
 
   // Handle escape key
-  React.useEffect(() => {
+  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();

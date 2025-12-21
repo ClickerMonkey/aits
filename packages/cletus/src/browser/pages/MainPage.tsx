@@ -18,6 +18,7 @@ import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
 import type { ServerMessage } from '../websocket-types';
 import { useWebSocket } from '../WebSocketContext';
+import { MessageContentType } from '@aeye/core';
 
 interface MainPageProps {
   config: Config;
@@ -49,6 +50,8 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
   const [status, setStatus] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; size: number; type: MessageContentType; content: string }>>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const modelsResolverRef = useRef<{
     resolve: (models: any[]) => void;
     reject: (error: Error) => void;
@@ -331,6 +334,9 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
       data: { chatId: selectedChatId, content },
     });
     // Server will send 'processing' message to update isProcessing state
+
+    // Clear attached files after sending
+    setAttachedFiles([]);
   };
 
   const handleCancel = () => {
@@ -598,6 +604,84 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
     });
   };
 
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) {
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const processedFiles = await Promise.all(
+      files.map(async (file) => {
+        const isText = file.type.startsWith('text/') || file.type === 'application/json' || file.type === 'application/xml';
+        if (isText) {
+          const content = await fileToText(file);
+          return {
+            name: file.name,
+            size: file.size,
+            type: 'text' as const,
+            content,
+          };
+        } else {
+          const content = await fileToBase64(file);
+          const isImage = file.type.startsWith('image/');
+          const isAudio = file.type.startsWith('audio/');
+          return {
+            name: file.name,
+            size: file.size,
+            type: (isImage ? 'image' : isAudio ? 'audio' : 'file') as MessageContentType,
+            content,
+          };
+        }
+      })
+    );
+
+    setAttachedFiles((prev) => [...prev, ...processedFiles]);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const fileToText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // Get the actual last message being rendered (including pending and temporary)
   let allMessages = [...messages];
 
@@ -686,7 +770,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div 
+        className="flex-1 flex flex-col min-w-0"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleFileDrop}
+      >
+
         {/* Chat Header */}
         <div className="relative z-10 border-b border-border bg-card/30 backdrop-blur-sm p-4">
           <div className="flex items-center gap-4">
@@ -780,7 +870,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
 
         <>
           {/* Messages Area */}
-          <ScrollArea className="flex-1 p-6 min-w-0">
+          <ScrollArea className="h-full p-6">
             <MessageList
               messages={allMessages}
               loading={loading}
@@ -790,6 +880,13 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
               onRejectOperation={(msg, idx) => handleOperationApproval(msg, [], [idx])}
             />
           </ScrollArea>
+
+          {/* Drag-and-Drop Overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 bg-neon-cyan/10 border-2 border-neon-cyan border-dashed rounded-lg flex items-center justify-center pointer-events-none">
+              <div className="text-neon-cyan text-xl font-bold">Drop files to attach</div>
+            </div>
+          )}
 
           {/* Input Area */}
           <div className="border-t border-border bg-card/30 backdrop-blur-sm">
@@ -801,6 +898,8 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
               totalCost={totalCost}
               status={status}
               isProcessing={isProcessing}
+              attachedFiles={attachedFiles}
+              onRemoveFile={handleRemoveFile}
               onSendMessage={handleSendMessage}
               onCancel={handleCancel}
               onModelClick={() => setShowModelSelector(true)}

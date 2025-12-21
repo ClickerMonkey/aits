@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, X, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
+import { Send, Loader2, X, CheckCircle2, XCircle, StopCircle, File, Image } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import type { ChatMeta, MessageContent, Config } from '../../schemas';
 import type { ClientMessage, ServerMessage } from '../websocket-types';
 import { sendClientMessage } from '../websocket-types';
+import { MessageContentType } from '@aeye/core';
 
 interface ChatInputProps {
   chatId: string;
@@ -14,6 +15,8 @@ interface ChatInputProps {
   totalCost: number;
   status: string;
   isProcessing: boolean;
+  attachedFiles?: Array<{ name: string; size: number; type: MessageContentType; content: string }>;
+  onRemoveFile?: (index: number) => void;
   onSendMessage: (content: MessageContent[]) => void;
   onCancel: () => void;
   onModelClick?: () => void;
@@ -33,6 +36,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   totalCost,
   status,
   isProcessing,
+  attachedFiles = [],
+  onRemoveFile,
   onSendMessage,
   onCancel,
   onModelClick,
@@ -58,15 +63,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() || isProcessing) {
+    if ((!input.trim() && attachedFiles.length === 0) || isProcessing) {
       return;
     }
 
-    // Send message with proper MessageContent[] format
-    const content: MessageContent[] = [{
-      type: 'text',
-      content: input.trim(),
-    }];
+    // Build message content array
+    const content: MessageContent[] = [];
+
+    // Add text content if present
+    if (input.trim()) {
+      content.push({
+        type: 'text',
+        content: input.trim(),
+      });
+    }
+
+    // Add attached files
+    attachedFiles.forEach((file) => {
+      content.push({
+        type: file.type,
+        content: file.content,
+      });
+    });
 
     onSendMessage(content);
     setInput('');
@@ -79,6 +97,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div className="p-4">
       {status && (
@@ -89,6 +113,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Attached Files */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 px-3 py-1.5 bg-card border border-border rounded-md text-sm"
+              >
+                {file.type === 'image' ? (
+                  <Image className="w-4 h-4 text-neon-cyan" />
+                ) : (
+                  <File className="w-4 h-4 text-neon-cyan" />
+                )}
+                <span className="text-foreground font-medium">{file.name}</span>
+                <span className="text-muted-foreground">({formatFileSize(file.size)})</span>
+                {onRemoveFile && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFile(index)}
+                    className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <Textarea
           ref={textareaRef}
           value={input}
@@ -194,7 +246,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <Button
               type="submit"
               variant="neon"
-              disabled={!input.trim() || isProcessing}
+              disabled={(!input.trim() && attachedFiles.length === 0) || isProcessing}
               className="gap-2"
             >
               {isProcessing ? (
