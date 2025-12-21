@@ -354,7 +354,7 @@ const URLConfirmModal: React.FC<URLConfirmModalProps> = ({ url, isOpen, onClose 
 };
 
 // Custom Link Component
-const CustomLink: React.FC<any> = (props) => {
+export const CustomLink: React.FC<{ href: string | undefined, children: React.ReactNode }> = (props) => {
   const { href, children } = props;
   const [showFileViewer, setShowFileViewer] = useState(false);
   const [showURLConfirm, setShowURLConfirm] = useState(false);
@@ -440,18 +440,48 @@ const markdownComponents: Components = {
   ul: ({ children }) => <ul className="text-foreground list-disc pl-5 mb-3">{children}</ul>,
   ol: ({ children }) => <ol className="text-foreground list-decimal pl-5 mb-3">{children}</ol>,
   li: ({ children }) => <li className="text-foreground mb-1">{children}</li>,
-  code: ({ inline, children, ...props }: any) => {
-    return inline ? (
-      <code className="text-foreground bg-muted px-1 py-0.5 rounded text-sm whitespace-normal" {...props}>
-        {children}
-      </code>
-    ) : (
-      <code className="text-foreground whitespace-pre" {...props}>
+  code: ({ inline, className, children, ...props }: any) => {
+    // Extract language from className (format: language-javascript)
+    const match = /language-(\w+)/.exec(className || '');
+    const language = match ? match[1] : '';
+
+    // If it has a language, it's a code block with syntax highlighting
+    if (language) {
+      return (
+        <SyntaxHighlighter
+          language={language}
+          style={vscDarkPlus}
+          customStyle={{
+            margin: '0 0 0.75rem 0',
+            borderRadius: '0.375rem',
+            fontSize: '0.875rem',
+            marginBottom: '0',
+          }}
+          wrapLongLines
+          PreTag="div"
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      );
+    }
+
+    // Otherwise treat as inline code (label-like)
+    return (
+      <code className="text-foreground bg-muted px-1.5 py-0.5 rounded text-sm font-mono whitespace-nowrap inline-block align-middle" {...props}>
         {children}
       </code>
     );
   },
-  pre: ({ children }) => <pre className="text-foreground bg-muted p-3 rounded mb-3 overflow-x-auto whitespace-pre">{children}</pre>,
+  pre: ({ children }) => {
+    // Check if the child is a code element with syntax highlighting
+    // If it is, just return the children (the code component handles the styling)
+    // Otherwise, wrap in a pre tag
+    const child = React.Children.only(children) as any;
+    if (child?.type === 'code' && child?.props?.className?.includes('language-')) {
+      return <>{children}</>;
+    }
+    return <pre className="text-foreground bg-muted p-3 rounded mb-3 overflow-x-auto whitespace-pre">{children}</pre>;
+  },
   a: ({ href, children }) => <CustomLink href={href}>{children}</CustomLink>,
   img: ({ src, alt, ...props }: any) => {
     // Transform local file paths to use the /file route

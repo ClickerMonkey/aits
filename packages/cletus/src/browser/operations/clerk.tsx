@@ -209,7 +209,7 @@ export const file_edit = renderer<'file_edit'>(
       }
 
       return (
-        <div key={setLinesIndex} className="rounded overflow-x-auto border border-border/50">
+        <div key={setLinesIndex} className="rounded border border-border/50">
           {lines.map((line, lineIndex) => {
             const lineType = line[0] as '+' | '-' | ' ';
             const lineContent = line.slice(1); // Remove the +/- prefix
@@ -226,7 +226,7 @@ export const file_edit = renderer<'file_edit'>(
                   <span className="inline-block w-4 flex-shrink-0 select-none font-bold">
                     {lineType === '+' ? '+' : lineType === '-' ? '−' : ' '}
                   </span>
-                  <span>{lineContent}</span>
+                  <span className="whitespace-pre-wrap">{lineContent}</span>
                 </div>
               </div>
             );

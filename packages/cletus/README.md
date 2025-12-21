@@ -33,6 +33,29 @@ You can also manually switch between specialized **toolsets** to focus on specif
 
 Use the `retool` tool to switch between adaptive mode and specific toolsets
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="25%"><a href="docs/browser_image_generate.png"><img src="docs/browser_image_generate.png" alt="Browser - Image Generation" /></a></td>
+    <td width="25%"><a href="docs/browser_chart_display.png"><img src="docs/browser_chart_display.png" alt="Browser - Chart Display" /></a></td>
+    <td width="25%"><a href="docs/browser_diagram_show.png"><img src="docs/browser_diagram_show.png" alt="Browser - Diagram Visualization" /></a></td>
+    <td width="25%"><a href="docs/browser_clerk.png"><img src="docs/browser_clerk.png" alt="Browser - File Operations" /></a></td>
+  </tr>
+  <tr>
+    <td width="25%"><a href="docs/browser_file_preview.png"><img src="docs/browser_file_preview.png" alt="Browser - File Preview" /></a></td>
+    <td width="25%"><a href="docs/browser_edit_approve.png"><img src="docs/browser_edit_approve.png" alt="Browser - Edit Approval" /></a></td>
+    <td width="25%"><a href="docs/browser_select_model.png"><img src="docs/browser_select_model.png" alt="Browser - Model Selection" /></a></td>
+    <td width="25%"><a href="docs/cli_edit_approve.png"><img src="docs/cli_edit_approve.png" alt="CLI - Edit Approval" /></a></td>
+  </tr>
+  <tr>
+    <td width="25%"><a href="docs/cli_librarian.png"><img src="docs/cli_librarian.png" alt="CLI - Librarian Tools" /></a></td>
+    <td width="25%"><a href="docs/cli_select_model.png"><img src="docs/cli_select_model.png" alt="CLI - Model Selection" /></a></td>
+    <td width="25%"><a href="docs/cli_ask.png"><img src="docs/cli_ask.png" alt="CLI - Interactive Questions" /></a></td>
+    <td width="25%"><a href="docs/browser_edit_approved.png"><img src="docs/browser_edit_approved.png" alt="Browser - Approved Edit" /></a></td>
+  </tr>
+</table>
+
 ### Examples
 
 Here are some examples of what you can do with Cletus:

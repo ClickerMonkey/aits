@@ -1,10 +1,12 @@
-import { Bot, Info, User } from 'lucide-react';
-import React from 'react';
+import { Bot, Info, User, Download } from 'lucide-react';
+import React, { useState } from 'react';
 import type { Message } from '../../schemas';
 import { cn } from '../lib/utils';
 import { OperationDisplay } from '../operations';
-import { MarkdownContent } from './Markdown';
+import { MarkdownContent, CustomLink } from './Markdown';
+import { ClickableImage } from './ImageViewer';
 import { TypingIndicator } from './TypingIndicator';
+import { ExpandableText } from './ExpandableText';
 
 interface MessageItemProps {
   message: Message;
@@ -37,10 +39,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     operation: c.operationIndex !== undefined ? operations[c.operationIndex] : undefined,
   }));
 
-  // Filter content: show text without operationIndex, and operations
+  // Filter content: show all non-empty content without operationIndex, and operations
   const visibleContent = mappedContent.filter(
-    (c) => (c.operationIndex === undefined && c.content.trim().length > 0 && c.type === 'text') || c.operation
+    (c) => (c.operationIndex === undefined && c.content.trim().length > 0) || c.operation
   );
+
+  const isUrl = (str: string): boolean => {
+    return str.startsWith('http://') || str.startsWith('https://') || str.startsWith('file://');
+  };
+
+  const downloadDataFile = (dataUrl: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   return (
     <div
@@ -103,26 +118,99 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               );
             }
 
-            // Render text content
+            // Render content based on type
+            if (item.type === 'image') {
+              const hasProtocol = item.content.startsWith('data:') || isUrl(item.content);
+              if (hasProtocol) {
+                return (
+                  <div key={index} className="max-w-3xl">
+                    <ClickableImage
+                      src={item.content}
+                      alt="Image"
+                      className="max-w-full rounded-lg"
+                    />
+                  </div>
+                );
+              }
+            }
+
+            if (item.type === 'audio') {
+              const hasProtocol = item.content.startsWith('data:') || isUrl(item.content);
+              if (hasProtocol) {
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      'rounded-lg p-4 max-w-3xl',
+                      isUser && 'bg-neon-purple/10 border border-neon-purple/30',
+                      isAssistant && 'bg-card',
+                      isSystem && 'bg-muted/50 border border-muted'
+                    )}
+                  >
+                    <audio controls className="w-full">
+                      <source src={item.content} />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                );
+              }
+            }
+
+            if (item.type === 'file') {
+              if (item.content.startsWith('data:')) {
+                // Extract filename from data URL or use default
+                const match = item.content.match(/data:([^;]+);/);
+                const mimeType = match ? match[1] : 'application/octet-stream';
+                const extension = mimeType.split('/')[1] || 'bin';
+                const filename = `file.${extension}`;
+
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      'rounded-lg p-4 max-w-3xl',
+                      isUser && 'bg-neon-purple/10 border border-neon-purple/30',
+                      isAssistant && 'bg-card',
+                      isSystem && 'bg-muted/50 border border-muted'
+                    )}
+                  >
+                    <button
+                      onClick={() => downloadDataFile(item.content, filename)}
+                      className="flex items-center gap-2 text-neon-cyan hover:underline cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download File
+                    </button>
+                  </div>
+                );
+              } else if (isUrl(item.content)) {
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      'rounded-lg p-4 max-w-3xl',
+                      isUser && 'bg-neon-purple/10 border border-neon-purple/30',
+                      isAssistant && 'bg-card',
+                      isSystem && 'bg-muted/50 border border-muted'
+                    )}
+                  >
+                    <CustomLink href={item.content}>
+                      {item.content}
+                    </CustomLink>
+                  </div>
+                );
+              }
+            }
+
+            // Render text content with expandable feature for user messages
             return (
-              <div
+              <ExpandableText
                 key={index}
-                className={cn(
-                  'rounded-lg p-4 max-w-3xl',
-                  'prose prose-invert prose-sm max-w-none',
-                  'prose-p:text-foreground prose-headings:text-foreground',
-                  'prose-strong:text-foreground prose-code:text-foreground',
-                  'prose-pre:bg-muted prose-pre:text-foreground',
-                  'prose-a:text-neon-cyan prose-a:no-underline hover:prose-a:underline',
-                  'prose-li:text-foreground prose-ul:text-foreground prose-ol:text-foreground',
-                  'text-foreground',
-                  isUser && 'bg-neon-purple/10 border border-neon-purple/30',
-                  isAssistant && 'bg-card',
-                  isSystem && 'bg-muted/50 border border-muted italic'
-                )}
-              >
-                <MarkdownContent content={item.content} />
-              </div>
+                content={item.content}
+                isUser={isUser}
+                isAssistant={isAssistant}
+                isSystem={isSystem}
+              />
             );
             })
           )}
