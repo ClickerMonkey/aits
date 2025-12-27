@@ -5,7 +5,7 @@ import type { ConfigFile } from '../config';
 import { AUTONOMOUS } from '../constants';
 import { logger } from '../logger';
 import { OperationManager } from '../operations/manager';
-import type { ChatMeta, Message, Operation } from '../schemas';
+import type { ChatMeta, Message, MessageContent, MessageContentType, Operation } from '../schemas';
 import { CletusChatAgent } from './chat-agent';
 import { CletusAIContext } from '../ai';
 
@@ -110,9 +110,9 @@ export async function runChatOrchestrator(
 
   try {
     // Convert messages to AI format
-    const currentMessages = await Promise.all(messages
+    const currentMessages = (await Promise.all(messages
       .filter((msg) => msg.role !== 'system')
-      .map(convertMessage));
+      .map(convertMessage))).flat();
 
     let loopIteration = 0;
     let chatInterrupted = false;
@@ -148,10 +148,10 @@ export async function runChatOrchestrator(
       };
 
       // Helper to get or create the last text content entry (not tied to an operation)
-      const getLastTextContent = (forceNew = false) => {
+      const getLastContent = (type: MessageContentType, forceNew = false): MessageContent => {
         // If forceNew, create a new entry
         if (forceNew) {
-          const newContent = { type: 'text' as const, content: '' };
+          const newContent = { type, content: '' };
           pending.content.push(newContent);
           lastTextIndex = pending.content.length - 1;
           return newContent;
@@ -159,13 +159,13 @@ export async function runChatOrchestrator(
 
         // Get the last entry - if it's text and not an operation, return it
         const last = pending.content[pending.content.length - 1];
-        if (last && last.type === 'text' && last.operationIndex === undefined) {
+        if (last && last.type === type && last.operationIndex === undefined) {
           lastTextIndex = pending.content.length - 1;
           return last;
         }
 
         // Create a new text content entry if none exists
-        const newContent = { type: 'text' as const, content: '' };
+        const newContent = { type: type, content: '' };
         pending.content.push(newContent);
         lastTextIndex = pending.content.length - 1;
         return newContent;
@@ -174,7 +174,7 @@ export async function runChatOrchestrator(
       // Helper function to estimate text output tokens from pending content
       const updateEstimatedTextOutputTokens = () => {
         const totalTextLength = pending.content
-          .filter(c => c.type === 'text' && c.operationIndex === undefined)
+          .filter(c => (c.type === 'text' || c.type === 'reasoning') && c.operationIndex === undefined)
           .reduce((sum, c) => sum + c.content.length, 0);
         const estimatedTokens = Math.ceil(totalTextLength / 4);
         
@@ -284,7 +284,7 @@ export async function runChatOrchestrator(
           switch (chunk.type) {
             case 'textPartial':
               {
-                const lastContent = getLastTextContent();
+                const lastContent = getLastContent('text');
                 lastContent.content += chunk.content;
 
                 // Estimate text output tokens
@@ -301,7 +301,7 @@ export async function runChatOrchestrator(
                 // text event contains complete content for this iteration
                 // If we haven't accumulated via textPartial, use it directly
                 // Otherwise, textPartial has already accumulated it, so skip
-                const lastContent = getLastTextContent();
+                const lastContent = getLastContent('text');
                 if (lastContent.content === '') {
                   // No textPartial events (non-streaming mode), use text content
                   lastContent.content = chunk.content;
@@ -318,12 +318,52 @@ export async function runChatOrchestrator(
               }
               break;
 
+            case 'reasonPartial':
+              {
+                const lastContent = getLastContent('reasoning');
+                lastContent.reasoning = chunk.reasoning;
+
+                const status = chunk.reasoning.details?.find(d => d.type === 'reasoning.summary')?.summary || 'Thinking...';
+                
+                onEvent({ type: 'pendingUpdate', pending });
+                onEvent({ type: 'status', status });
+              }
+              break;
+
+            case 'reason':
+              {
+                // Add reasoning token estimation to current usage
+                const reasoningTokens = Math.ceil((
+                   (chunk.reasoning.content?.length || 0) +
+                   (chunk.reasoning.details?.reduce((sum, d) => sum + (d.summary?.length || 0) + (d.text?.length || 0), 0) || 0)
+                ) / 4);
+                if (!currentUsage.reasoning) {
+                  currentUsage.reasoning = {};
+                }
+                currentUsage.reasoning.output = reasoningTokens;
+
+                let updatedPending = false;
+                const serializedContent = JSON.stringify(chunk.reasoning);
+                if (!pending.content.some(c => c.type === 'reasoning' && JSON.stringify(c.reasoning) === serializedContent)) {
+                  const lastContent = getLastContent('reasoning');
+                  lastContent.reasoning = chunk.reasoning;
+                  updatedPending = true;
+                }
+                
+                if (updatedPending) {
+                  updateEstimatedTextOutputTokens();
+                  onEvent({ type: 'pendingUpdate', pending });
+                }
+                updateUsageEvent();
+              }
+              break;
+
             case 'toolOutput':
               {
                 // After a tool completes, the next text should go into a new content entry
                 // This ensures content from different tool iterations doesn't get mixed
                 // Force creation of new text entry on next text event
-                getLastTextContent(true);
+                getLastContent('text', true);
                 onEvent({ type: 'pendingUpdate', pending }); 
               }
               break;
@@ -356,16 +396,6 @@ export async function runChatOrchestrator(
               updateUsageEvent();
               break;
 
-            case 'reason':
-              // Add reasoning token estimation to current usage
-              const reasoningTokens = Math.ceil(chunk.content.length / 4);
-              if (!currentUsage.reasoning) {
-                currentUsage.reasoning = {};
-              }
-              currentUsage.reasoning.output = reasoningTokens;
-              updateUsageEvent();
-              break;
-
             case 'toolStart':
               // Increment tool tokens for tool calls
               toolTokens += Math.ceil((chunk.tool.name.length + JSON.stringify(chunk.args).length) / 4);
@@ -393,18 +423,21 @@ export async function runChatOrchestrator(
       } finally {
         await chatResponse.return?.(undefined);
 
-        logger.log(`Cletus trace: ${JSON.stringify(stackTrace, (k, v) => {
-          if (k === 'context' || k === 'parent') {
-            return undefined
-          }
-          if (k === 'component') {
-            return v.name;
-          }
-          if ((k === 'started' || k === 'completed') && typeof v === 'number') {
-            return new Date(v).toISOString();
-          }
-          return v;
-        }, 2)}`);
+        if (stackTrace) {
+          logger.log(`Cletus trace: ${JSON.stringify(stackTrace, (k, v) => {
+            if (k === 'context' || k === 'parent') {
+              return undefined
+            }
+            if (k === 'component') {
+              return v.name;
+            }
+            if ((k === 'started' || k === 'completed') && typeof v === 'number') {
+              return new Date(v).toISOString();
+            }
+            return v;
+          }, 2)}`);
+        }
+        
 
         // Calculate message-specific usage and cost
         const endUsage = getUsage();
@@ -468,7 +501,7 @@ export async function runChatOrchestrator(
       }
 
       // Push pending to current messages for context, continue loop
-      currentMessages.push(await convertMessage(pending));
+      currentMessages.push(...await convertMessage(pending));
       loopIteration++;
       currentUsage = {};
     }
@@ -483,7 +516,7 @@ export async function runChatOrchestrator(
     if (error.message !== 'Aborted') {
       logger.log(`orchestrator: error - ${JSON.stringify(error)}`);
 
-      onEvent({ type: 'error', error: error.message });
+      onEvent({ type: 'error', error: error.error?.message || error.message || String(error) });
     }
   } finally {
     logger.log('orchestrator: finished');

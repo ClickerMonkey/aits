@@ -47,7 +47,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
   }
 
   const mappedContent = message.content.map((c) => ({ ...c, operation: c.operationIndex !== undefined ? message.operations?.[c.operationIndex] : undefined }));
-  const visibleContent = mappedContent.filter(c => (c.content.trim().length > 0 || c.operation) && c.type === 'text');
+  const visibleContent = mappedContent.filter(c => (c.content.trim().length > 0 || c.operation) && (c.type === 'text' || c.type === 'reasoning'));
 
   return (
     <Box flexDirection="column" marginBottom={1} flexGrow={1}>
@@ -86,6 +86,31 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
                   </Box>
                 );
               }
+            } else if (c.type === 'reasoning') {
+              const parts: string[] = [];
+              if (c.content) {
+                parts.push(c.content);
+              }
+              if (c.reasoning?.content) {
+                parts.push(c.reasoning.content);
+              }
+              if (c.reasoning?.details) {
+                for (const detail of c.reasoning.details) {
+                  if (detail.summary) {
+                    parts.push(detail.summary);
+                  }
+                  if (detail.text) {
+                    parts.push(detail.text);
+                  }
+                }
+              }
+              const content = parts.join('\n\n');
+
+              return (
+                <Box key={i} marginBottom={1} borderStyle="round" borderColor="yellow" paddingX={1}>
+                  <Markdown>{content}</Markdown>
+                </Box>
+              );
             } else {
               return (
                 <Markdown key={i} marginBottom={1} flexGrow={1}>{c.content}</Markdown>

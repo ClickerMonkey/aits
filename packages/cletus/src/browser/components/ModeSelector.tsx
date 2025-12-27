@@ -40,10 +40,10 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, onChange, disa
   return (
     <div className="flex items-center gap-2">
       <label className="text-sm text-muted-foreground">Mode:</label>
-      <Select
+      <Select<ChatMode>
         value={mode}
         options={MODE_OPTIONS}
-        onChange={value => onChange(value as ChatMode)}
+        onChange={value => onChange(value)}
         disabled={disabled}
         className="min-w-[140px]"
       />

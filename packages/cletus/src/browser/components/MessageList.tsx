@@ -6,6 +6,7 @@ import type { Message } from '../../schemas';
 interface MessageListProps {
   messages: Message[];
   loading?: boolean;
+  isProcessing?: boolean;
   operationDecisions?: Map<number, 'approve' | 'reject'>;
   onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
   onApproveOperation: (message: Message, idx: number) => void;
@@ -15,6 +16,7 @@ interface MessageListProps {
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   loading = false,
+  isProcessing = false,
   operationDecisions,
   onToggleOperationDecision,
   onApproveOperation,
@@ -46,7 +48,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             // Check if this is the last message with pending operations
             const isLastMessage = index === messages.length - 1;
             // const hasPendingOps = message.operations?.some(op => op.status === 'analyzed');
-            const pendingOpCount = message.operations?.filter(op => op.status === 'analyzed' || op.status === 'doing').length || 0;
+            const pendingCount = message.operations?.filter(op => op.status === 'analyzed' || op.status === 'doing').length || 0;
 
             return (
               <MessageItem
@@ -56,8 +58,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                 onToggleOperationDecision={onToggleOperationDecision}
                 onApproveOperation={onApproveOperation}
                 onRejectOperation={onRejectOperation}
-                hasMultiplePendingOps={pendingOpCount > 1}
-                isProcessing={isLastMessage && loading}
+                hasMultiplePendingOperations={pendingCount > 1}
+                isProcessing={isLastMessage && (loading || isProcessing)}
               />
             );
           })}

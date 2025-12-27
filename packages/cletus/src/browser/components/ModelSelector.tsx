@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from '../lib/utils';
+import { ModelCapability } from '@aeye/ai';
 
 interface ModelInfo {
   id: string;
@@ -12,8 +13,8 @@ interface ModelInfo {
   contextWindow?: number;
   maxOutputTokens?: number;
   tier?: string;
-  capabilities?: Set<string>;
-  supportedParameters?: Set<string>;
+  capabilities?: Set<ModelCapability>;
+  supportedParameters?: Set<ModelCapability>;
   pricing: {
     text?: { input?: number; output?: number; cached?: number };
     audio?: { input?: number; output?: number; perSecond?: number };
@@ -58,6 +59,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('score');
+  const [filterVision, setFilterVision] = useState(false);
+  const [filterReasoning, setFilterReasoning] = useState(false);
   const fetchIdRef = useRef(0);
 
   useEffect(() => {
@@ -141,16 +144,30 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       new Map(models.map(scored => [scored.model.id, scored])).values()
     );
 
-    // Filter by search
+    // Filter by search and capabilities
     const filtered = uniqueModels.filter((scored) => {
-      if (!search) return true;
       const model = scored.model;
-      const searchLower = search.toLowerCase();
-      return (
-        (model.id && model.id.toLowerCase().includes(searchLower)) ||
-        (model.name && model.name.toLowerCase().includes(searchLower)) ||
-        (model.provider && model.provider.toLowerCase().includes(searchLower))
-      );
+
+      // Search filter
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const matchesSearch = (
+          (model.id && model.id.toLowerCase().includes(searchLower)) ||
+          (model.name && model.name.toLowerCase().includes(searchLower)) ||
+          (model.provider && model.provider.toLowerCase().includes(searchLower))
+        );
+        if (!matchesSearch) return false;
+      }
+
+      // Capability filters
+      if (filterVision && !model.capabilities?.has('vision')) {
+        return false;
+      }
+      if (filterReasoning && !model.capabilities?.has('reasoning')) {
+        return false;
+      }
+
+      return true;
     });
 
     // Sort
@@ -212,7 +229,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
       return descending ? valueB - valueA : valueA - valueB;
     });
-  }, [models, search, sortMode]);
+  }, [models, search, sortMode, filterVision, filterReasoning]);
 
   const formatCost = (model: ModelInfo): string => {
     const costs: string[] = [];
@@ -331,6 +348,31 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 {label}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Filter by:</span>
+            <button
+              onClick={() => setFilterVision(!filterVision)}
+              className={cn(
+                'px-3 py-1 text-xs rounded-md transition-colors',
+                filterVision
+                  ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/50'
+                  : 'bg-muted text-foreground hover:bg-muted/80',
+              )}
+            >
+              👁️ Vision
+            </button>
+            <button
+              onClick={() => setFilterReasoning(!filterReasoning)}
+              className={cn(
+                'px-3 py-1 text-xs rounded-md transition-colors',
+                filterReasoning
+                  ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50'
+                  : 'bg-muted text-foreground hover:bg-muted/80',
+              )}
+            >
+              🧠 Reasoning
+            </button>
           </div>
           <div className="text-sm text-muted-foreground">
             Showing {filteredModels.length} model{filteredModels.length !== 1 ? 's' : ''}

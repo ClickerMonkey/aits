@@ -413,7 +413,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
     });
   };
 
-  const handleChatSettingsSave = (updates: { title?: string; prompt?: string; cwd?: string }) => {
+  const handleChatSettingsSave = (updates: Partial<ChatMeta> & { cwd?: string }) => {
     if (!selectedChatId) return;
     const { cwd: newCwd, ...metaUpdates } = updates;
     send({
@@ -874,6 +874,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
             <MessageList
               messages={allMessages}
               loading={loading}
+              isProcessing={isProcessing}
               operationDecisions={operationDecisions}
               onToggleOperationDecision={handleToggleOperationDecision}
               onApproveOperation={(msg, idx) => handleOperationApproval(msg, [idx], [])}
@@ -928,6 +929,7 @@ export const MainPage: React.FC<MainPageProps> = ({ config }) => {
         <ChatSettingsDialog
           title={chatMeta.title}
           prompt={chatMeta.prompt}
+          reasoning={chatMeta.reasoning}
           cwd={cwd}
           onSave={handleChatSettingsSave}
           onClose={() => setShowChatSettings(false)}

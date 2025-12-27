@@ -460,11 +460,49 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
 
     // USER TAB
     if (activeTab === 'user') {
+      if (subView === 'select-reasoning') {
+        const reasoningItems = [
+          { label: 'None', value: 'none' },
+          { label: 'Low', value: 'low' },
+          { label: 'Medium', value: 'medium' },
+          { label: 'High', value: 'high' },
+          { label: '← Cancel', value: '__cancel__' },
+        ];
+
+        return (
+          <Box flexDirection="column">
+            <Box marginBottom={1}>
+              <Text bold color="cyan">Select Reasoning Level</Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text dimColor>Controls the reasoning effort level for AI responses</Text>
+            </Box>
+            <SelectInput
+              items={reasoningItems}
+              isFocused={focusMode === 'content'}
+              onSelect={async (item) => {
+                if (item.value === '__cancel__') {
+                  setSubView(null);
+                  return;
+                }
+
+                await config.save((data) => {
+                  data.user.reasoning = item.value as 'none' | 'low' | 'medium' | 'high';
+                });
+                setMessage(`✓ Reasoning level set to: ${item.value}`);
+                setSubView(null);
+              }}
+            />
+          </Box>
+        );
+      }
+
       const userData = config.getData().user;
       const items = [
         { label: `Change name (${userData.name})`, value: 'name' },
         { label: `Change pronouns (${userData.pronouns || '(none)'})`, value: 'pronouns' },
         { label: 'Change global prompt', value: 'globalPrompt' },
+        { label: `Change reasoning level (${userData.reasoning || 'none'})`, value: 'reasoning' },
       ];
 
       return (
@@ -484,6 +522,8 @@ export const InkSettingsTabView: React.FC<InkSettingsTabViewProps> = ({ config, 
                 startEdit('pronouns', userData.pronouns || '');
               } else if (item.value === 'globalPrompt') {
                 startEdit('globalPrompt', userData.globalPrompt || '');
+              } else if (item.value === 'reasoning') {
+                setSubView('select-reasoning');
               }
             }}
           />

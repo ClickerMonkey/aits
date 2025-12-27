@@ -47,7 +47,8 @@ type CommandType =
   | '/transcribe'
   | '/cd'
   | '/debug'
-  | '/clear';
+  | '/clear'
+  | '/reasoning';
 
 
 interface Command {
@@ -66,6 +67,7 @@ const COMMANDS: Command[] = [
   { name: '/model', description: 'Select chat model', takesInput: false },
   { name: '/prompt', description: 'Set custom prompt', takesInput: true, placeholder: 'your prompt' },
   { name: '/title', description: 'Change chat title', takesInput: true, placeholder: 'new title' },
+  { name: '/reasoning', description: 'Set reasoning level', takesInput: true, optionalInput: true, placeholder: 'default|none|low|medium|high' },
   { name: '/todos', description: 'View todos', takesInput: false },
   { name: '/do', description: 'Add a todo', takesInput: true, placeholder: 'todo description' },
   { name: '/done', description: 'Mark a todo as done', takesInput: true, placeholder: 'todo number' },
@@ -489,6 +491,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
       return interceptInput();
     }
 
+    // Alt+R to cycle through reasoning levels
+    if (key.meta && input === 'r' && !isWaitingForResponse) {
+      const levels: (null | 'none' | 'low' | 'medium' | 'high')[] = [null, 'none', 'low', 'medium', 'high'];
+      const currentReasoning = chatMeta.reasoning;
+      const currentIndex = levels.indexOf(currentReasoning);
+      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % levels.length;
+      const newReasoning = levels[nextIndex];
+      onChatUpdate({ reasoning: newReasoning as any });
+      setChatMeta({ ...chatMeta, reasoning: newReasoning as any });
+      return interceptInput();
+    }
+
     // Alt+M to toggle agent mode
     if (key.meta && input === 'm' && !isWaitingForResponse) {
       const newAgentMode = chatMeta.agentMode === 'plan' ? 'default' : 'plan';
@@ -790,6 +804,7 @@ AVAILABLE COMMANDS:
 /model      - Select a different AI model for this chat
 /prompt     - View or set a custom system prompt
 /title      - Change the chat title
+/reasoning  - View or change the reasoning level (default/none/low/medium/high)
 /transcribe - Voice input (press ESC or wait for silence to stop)
 /todos      - View all todos
 /do         - Add a new todo
@@ -803,6 +818,7 @@ KEYBOARD SHORTCUTS:
 • Ctrl+C      - Exit chat
 • ESC         - Interrupt AI response or stop transcription
 • ${altKeyLabel}+C       - Cycle through chat modes
+• ${altKeyLabel}+R       - Cycle through reasoning levels
 • ${altKeyLabel}+T       - Start/stop voice transcription
 • ${altKeyLabel}+M       - Toggle agent mode (default/plan)
 • ${altKeyLabel}+I       - Toggle operation input details
@@ -951,6 +967,19 @@ TIP: Type '/' to see all available commands with descriptions!`,
       case '/clear':
         setShowClearConfirmation(true);
         setClearConfirmationIndex(0);
+        break;
+
+      case '/reasoning':
+        if (args && ['default', 'none', 'low', 'medium', 'high'].includes(args)) {
+          const reasoningValue = args === 'default' ? undefined : (args as 'none' | 'low' | 'medium' | 'high');
+          await onChatUpdate({ reasoning: reasoningValue as any });
+          setChatMeta({ ...chatMeta, reasoning: reasoningValue as any });
+          addSystemMessage(`✓ Reasoning level changed to: ${args}`);
+        } else if (args) {
+          addSystemMessage(`❌ Invalid reasoning level. Valid options: default, none, low, medium, high`);
+        } else {
+          addSystemMessage(`Current reasoning level: ${chatMeta.reasoning || 'default (user preference)'}. Valid options: default, none, low, medium, high`);
+        }
         break;
 
       default:
@@ -1664,6 +1693,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
               </Box>
               <Box flexDirection="column" marginLeft={2}>
                 <Text dimColor>{altKeyLabel}+C: cycle chat mode</Text>
+                <Text dimColor>{altKeyLabel}+R: cycle reasoning</Text>
                 <Text dimColor>{altKeyLabel}+T: transcribe</Text>
                 <Text dimColor>{altKeyLabel}+M: toggle agent mode</Text>
                 <Text dimColor>{altKeyLabel}+I: toggle inputs</Text>
@@ -1798,7 +1828,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
       <Box>
         <Text dimColor>
           {chatMeta.model || config.getData().user.models?.chat || 'no model'} │ {chatMeta.assistant ? `${chatMeta.assistant} │ ` : ''}
-          {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
+          {MODETEXT[chatMeta.mode]} │ {AGENTMODETEXT[chatMeta.agentMode || 'default']} │ reasoning: {chatMeta.reasoning === undefined ? 'default' : chatMeta.reasoning} │ {chatMeta.toolset ? `${chatMeta.toolset} toolset` : 'adaptive tools'} │ {chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''} │{' '}
           {chatMeta.todos.length ? `${chatMeta.todos.length} todo${chatMeta.todos.length !== 1 ? 's' : ''}` : 'no todos'}
           {totalMessageCost > 0 && (
             <>

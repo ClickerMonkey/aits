@@ -354,6 +354,38 @@ export type Resource =
 ;
 
 /**
+ * Reasoning details.
+ */
+export interface ReasoningDetail {
+  /** Unique identifier of the reasoning if any */
+  id: string | null;
+  /** The type of reasoning detail. */
+  type: string;
+  /** The format */
+  format: string;
+  /** The index */
+  index?: number;
+  /** The summary if the type is summary */
+  summary?: string;
+  /** The text if the type is text */
+  text?: string;
+  /** The optional signature if the type is text */
+  signature?: string;
+  /** The encrypted payload if the type is encryped */
+  data?: string;
+}
+
+/**
+ * Reasoning information.
+ */
+export interface Reasoning {
+  /** The accumulated reasoning */
+  content?: string;
+  /** Detailed reasoning steps */
+  details?: ReasoningDetail[];
+}
+
+/**
  * The role of a message in a conversation with an AI system.
  */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -378,6 +410,8 @@ export interface Message
   toolCalls?: ToolCall[];
   /** Used for refusals (when role='assistant') */
   refusal?: string;
+  /** Original reasoning in an assistant response */
+  reasoning?: Reasoning;
   /** Used to pass cache data along with the message */
   cache?: Record<string, any>;
 }
@@ -643,7 +677,7 @@ export interface Response extends BaseResponse
   /** Refusal reason if the model declined to respond */
   refusal?: string;
   /** Reasoning trace for reasoning-capable models */
-  reasoning?: string;
+  reasoning?: Reasoning;
 }
 
 /**
@@ -670,7 +704,7 @@ export interface Chunk extends BaseChunk
   /** Partial refusal reason */
   refusal?: string;
   /** Partial reasoning trace */
-  reasoning?: string;
+  reasoning?: Reasoning;
 }
 
 /**

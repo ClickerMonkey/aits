@@ -11,7 +11,8 @@ export type RendererDisplayProps = Pick<OperationDisplayProps,
   'onReject' |
   'approvalDecision' |
   'onToggleDecision' |
-  'hasMultipleOperations'
+  'hasMultipleOperations' | 
+  'isProcessing'
 >;
 
 /**

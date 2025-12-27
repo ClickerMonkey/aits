@@ -175,13 +175,12 @@ export type OpenRouterReasoning = {
  * OpenRouter reasoning detail
  */
 export type OpenRouterReasoningDetails = {
-  id?: string | null;
+  id: string | null;
   type: 'reasoning.encrypted' | 'reasoning.summary' | 'reasoning.text';
   format: 'unknown' | 'openai-responses-v1' | 'xai-responses-v1' | 'anthropic-claude-v1';
   index?: number;
   summary?: string;
   text?: string;
-  encrypted?: string;
   signature?: string;
   data?: string;
 }
@@ -191,8 +190,12 @@ export type OpenRouterReasoningDetails = {
 */
 export type OpenRouterChatChunk = 
   OpenAI.Chat.Completions.ChatCompletionChunk &
-  OpenRouterReasoning &
-  { usage?: OpenRouterUsage | null; };
+  { 
+    usage?: OpenRouterUsage | null;
+    choices?: Array<OpenAI.Chat.Completions.ChatCompletionChunk.Choice & {
+      delta: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & OpenRouterReasoning;
+    }>
+  };
 
 /**
 * OpenRouter response with extended usage info
@@ -201,6 +204,12 @@ export type OpenRouterChatResponse = OpenAI.Chat.ChatCompletion & {
   choices: OpenRouterChoice[];
   usage?: OpenRouterUsage;
 };
+
+/**
+ * OpenRouter message parameter with reasoning info
+ */
+export type OpenRouterRequestMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam & OpenRouterReasoning;
+
 
 /**
  * OpenRouter message with reasoning info

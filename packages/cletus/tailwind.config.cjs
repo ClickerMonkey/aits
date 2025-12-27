@@ -62,10 +62,15 @@ module.exports = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.8' },
         },
+        'shimmer': {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
       },
       animation: {
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'neon-flicker': 'neon-flicker 1.5s ease-in-out infinite',
+        'shimmer': 'shimmer 5s ease-in-out infinite',
       },
     },
   },

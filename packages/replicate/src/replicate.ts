@@ -27,7 +27,7 @@ import type {
   TranscriptionRequest,
   TranscriptionResponse,
 } from '@aeye/ai';
-import { BaseChunk, BaseRequest, BaseResponse, getModel, type Executor, type Request, type Streamer, type Response } from '@aeye/core';
+import { BaseChunk, BaseRequest, BaseResponse, getModel, type Executor, type Request, type Streamer, type Response, getResponseFromChunks } from '@aeye/core';
 import Replicate from 'replicate';
 
 // ============================================================================
@@ -558,15 +558,11 @@ export class ReplicateProvider implements Provider<ReplicateConfig> {
         yield chunk;
       }
 
-      return { 
-        model: request.model || chunks.find(c => c.model)?.model!,
-        content: chunks.map(c => c.content).join(''),
-        finishReason: chunks.find(c => c.finishReason)?.finishReason || 'stop',
-        usage: chunks.find(c => c.usage)?.usage,
-        reasoning: chunks.map(c => c.reasoning).filter(Boolean).join(''),
-        refusal: chunks.map(c => c.refusal).filter(Boolean).join(''),
-        toolCalls: chunks.map(c => c.toolCall).filter(tc => !!tc),
-      };
+      const response = getResponseFromChunks(chunks);
+      if (request.model) {
+        response.model = request.model;
+      }
+      return response;
     };
   }
 

@@ -1,4 +1,4 @@
-import { AnyTool, Tuple } from '@aeye/core';
+import { Request, Tuple } from '@aeye/core';
 import type { CletusAI, CletusAIContext, CletusTool } from '../ai';
 import { ADAPTIVE_TOOLING } from '../constants';
 import { Operations } from '../operations/types';
@@ -242,8 +242,8 @@ Tools:
 </rules>
 
 <importantRules>
-- Assistant messages with <input> & <analysis> tags are preliminary tool outputs that is awaiting user approval or rejection before producing output. Do NOT treat these as final outputs. You will be notified when the user approves or rejects them.
-- Assistant messages with <output> tags are final results from approved operations. These can be presented to the user directly.
+- You are strictly forbidden from typing the tags <input>, <analysis>, <output>, or <instructions>. These tags are injected by the SYSTEM after you have returned a valid tool call. If you type these tags yourself, the system will fail.
+- Assistant messages with <output> tags are final results from approved tool/operations. These are provided to you by the system and you can summarize them in a response in markdown or the format/mechanisms they request.
 - Don't present anything in <input>, <analysis>, or <output> tags - those are produced by the Cletus system and not by you even though they are marked as Assistant messages.
 - Don't ask for permission to perform operations - if you need to do something, just do it. The user will be asked for approval automatically if needed.
 - Todos are exclusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should be assumed to be a separate data type.
@@ -251,7 +251,6 @@ Tools:
 </importantRules>
 `,
     tools: toolRegistry.getAllTools().map(t => t.tool) as Tuple<CletusTool>,
-    // Dynamic tools based on adaptive selection using retool
     retool: async (_, ctx) => {
       const activeTools = await getActiveTools(ctx);
       return activeTools.map(t => t.tool);
@@ -264,6 +263,16 @@ Tools:
       },
     },
     dynamic: true,
+    config: (_, ctx) => {
+      const request: Partial<Request> = {};
+      const reasoning = ctx.chat?.reasoning || ctx.config.getData().user.reasoning || 'none';
+
+      if (reasoning !== 'none') {
+        request.reason = { effort: reasoning };
+      }
+
+      return request;
+    },
     metadataFn: (_, { config, chat }) => ({
       model: chat?.model || config.getData().user.models?.chat,
     }),

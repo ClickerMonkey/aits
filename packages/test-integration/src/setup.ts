@@ -41,8 +41,10 @@ export const hasAPIKey = (provider: string): boolean => {
 export const skipIfNoAPIKey = (provider: string) => {
   if (!hasAPIKey(provider)) {
     console.warn(`Skipping ${provider} tests - no API key found`);
+    // @ts-ignore
     return describe.skip;
   }
+  // @ts-ignore
   return describe;
 };
 
@@ -60,7 +62,9 @@ export const getAvailableProviders = (): string[] => {
 export const requireMinimumProviders = (minCount: number) => {
   const available = getAvailableProviders();
   if (available.length < minCount) {
+    // @ts-ignore
     return describe.skip;
   }
+  // @ts-ignore
   return describe;
 };

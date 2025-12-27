@@ -4,6 +4,15 @@ import type { OrchestratorEvent } from '../agents/chat-orchestrator';
 import { ConnectionRegistry } from './connection-registry';
 import { ChatOperationManager } from './chat-operation-manager';
 
+function serialize(obj: any): string {
+  return JSON.stringify(obj, (k, v) => {
+    if (v instanceof Set) {
+      return { __type: 'Set', values: Array.from(v) };
+    }
+    return v;
+  });
+}
+
 /**
  * Centralized message broadcasting with chat-scoped routing.
  *
@@ -21,7 +30,7 @@ export class BroadcastManager {
    */
   broadcastToChat(chatId: string, message: ServerMessage): void {
     const clients = this.registry.getClientsForChat(chatId);
-    const messageStr = JSON.stringify(message);
+    const messageStr = serialize(message);
 
     for (const ws of clients) {
       if (ws.readyState === 1) { // WebSocket.OPEN = 1
@@ -38,7 +47,8 @@ export class BroadcastManager {
     if (!connection) return;
 
     if (connection.ws.readyState === 1) { // WebSocket.OPEN = 1
-      connection.ws.send(JSON.stringify(message));
+      const serialized = serialize(message);
+      connection.ws.send(serialized);
     }
   }
 

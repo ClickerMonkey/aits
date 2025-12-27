@@ -5,6 +5,8 @@ import { AUTONOMOUS } from './constants';
 // User Schema
 // ============================================================================
 
+export const ReasoningLevelSchema = z.enum(['none', 'low', 'medium', 'high']);
+
 export const UserMemorySchema = z.object({
   text: z.string(),
   created: z.number(),
@@ -39,6 +41,7 @@ export const UserSchema = z.object({
   showInput: z.boolean().default(false),
   showOutput: z.boolean().default(false),
   showSystemMessages: z.boolean().default(true),
+  reasoning: ReasoningLevelSchema.default('none'),
 });
 
 // ============================================================================
@@ -202,6 +205,7 @@ export const ChatMetaSchema = z.object({
   updated: z.number(),
   todos: z.array(TodoItemSchema).default([]),
   questions: z.array(QuestionSchema).default([]),
+  reasoning: ReasoningLevelSchema.nullable().default(null),
 });
 
 // ============================================================================
@@ -347,9 +351,28 @@ export const OperationSchema = z.object({
 // Message Content Schema
 // ============================================================================
 
+export const ReasoningDetailSchema = z.object({
+  id: z.string().nullable(),
+  type: z.string(),
+  format: z.string(),
+  index: z.number().optional(),
+  summary: z.string().optional(),
+  text: z.string().optional(),
+  data: z.string().optional(),
+  signature: z.string().optional(),
+});
+
+export const ReasoningSchema = z.object({
+  content: z.string().optional(),
+  details: z.array(ReasoningDetailSchema).optional(),
+});
+
+export const MessageContentTypeSchema = z.enum(['text', 'image', 'file', 'audio', 'reasoning']);
+
 export const MessageContentSchema = z.object({
-  type: z.enum(['text', 'image', 'file', 'audio']),
+  type: MessageContentTypeSchema,
   content: z.string(),
+  reasoning: ReasoningSchema.optional(),
   operationIndex: z.number().optional(),
 });
 
@@ -465,3 +488,5 @@ export type ChatMessages = z.infer<typeof ChatMessagesSchema>;
 export type DataRecord = z.infer<typeof DataRecordSchema>;
 export type DataFile = z.infer<typeof DataFileSchema>;
 export type SelectRecord = z.infer<typeof SelectRecordSchema>;
+export type ReasoningLevel = z.infer<typeof ReasoningLevelSchema>;
+export type MessageContentType = z.infer<typeof MessageContentTypeSchema>;

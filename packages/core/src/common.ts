@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import url from 'url'
-import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage, Events, ComponentOutput, Resource } from "./types";
+import { Chunk, Instance, Model, ModelInput, Response, Runner, Usage, Events, ComponentOutput, Resource, Reasoning } from "./types";
 import { Readable } from 'stream';
 import { file, mime } from 'zod';
 import { is } from 'zod/locales';
@@ -728,7 +728,7 @@ export function getResponseFromChunks(chunks: Chunk[], model: ModelInput = 'unkn
       resp.finishReason = chunk.finishReason;
     }
     if (chunk.reasoning) {
-      resp.reasoning = (resp.reasoning || '') + chunk.reasoning;
+      resp.reasoning = accumulateReasoning(resp.reasoning, chunk.reasoning);
     }
     if (chunk.model) {
       resp.model = chunk.model;
@@ -747,6 +747,63 @@ export function getResponseFromChunks(chunks: Chunk[], model: ModelInput = 'unkn
   }
 
   return resp;
+}
+
+/**
+ * Accumulates reasoning data by merging an additional Reasoning object into a target Reasoning object.
+ * 
+ * @param target - The target Reasoning object to accumulate into.
+ * @param add - The Reasoning object to add from.
+ * @returns - The updated Reasoning object.
+ */
+export function accumulateReasoning(target: Reasoning | undefined, add?: Reasoning): Reasoning | undefined {
+  if (!target) {
+    return add;
+  }
+  if (!add) {
+    return target;
+  }
+
+  if (add.content) {
+    target.content = (target.content || '') + add.content;
+  }
+  if (add.details) {
+    target.details = target.details || [];
+
+    for (const detail of add.details) {
+      let existing = target.details.find(d => 
+        (detail.id && d.id && detail.id === d.id) ||
+        (detail.index !== undefined && d.index !== undefined && detail.index === d.index)
+      );
+
+      const missingIdentifiers = 
+        add.details.every(d => !d.id && d.index === undefined) && 
+        target.details.every(d => !d.id && d.index === undefined);
+
+      if (missingIdentifiers) {
+        existing = target.details.find(d => d.type === detail.type);
+      }
+
+      if (existing) {
+        if (detail.data) {
+          existing.data = (existing.data || '') + detail.data;
+        }
+        if (detail.text) {
+          existing.text = (existing.text || '') + detail.text;
+          if (detail.signature) {
+            existing.signature = detail.signature;
+          }
+        }
+        if (detail.summary) {
+          existing.summary = (existing.summary || '') + detail.summary;
+        }
+      } else {
+        target.details.push(detail);
+      }
+    }
+  }
+  
+  return target;
 }
 
 /**

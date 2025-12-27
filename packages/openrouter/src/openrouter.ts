@@ -4,13 +4,13 @@
  * Provider for OpenRouter API with provider-specific routing and fallback options.
  */
 
-import type { ModelCapability, ModelInfo, ModelParameter, ModelTokenizer, Provider } from '@aeye/ai';
+import type { Message, ModelCapability, ModelInfo, ModelParameter, ModelTokenizer, Provider } from '@aeye/ai';
 import { detectTier } from '@aeye/ai';
-import type { Chunk, Request, Response } from '@aeye/core';
+import { accumulateReasoning, type Chunk, type Request, type Response } from '@aeye/core';
 import { OpenAIConfig, OpenAIProvider } from '@aeye/openai';
 import OpenAI from 'openai';
 import { fetchModels, fetchZDRModels } from './source';
-import { OpenRouterChatChunk, OpenRouterChatRequest, OpenRouterChatResponse, OpenRouterModel } from './types';
+import { OpenRouterChatChunk, OpenRouterChatRequest, OpenRouterChatResponse, OpenRouterMessage, OpenRouterModel, OpenRouterReasoningDetails, OpenRouterRequestMessage } from './types';
 
 /**
  * OpenRouter provider configuration
@@ -279,13 +279,16 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
     const message = expected.choices?.[0]?.message;
     if (message) {
       if (message.reasoning) {
-        response.reasoning = message.reasoning;
-      } else if (message.reasoning_details) {
-        response.reasoning = message.reasoning_details
-          .map(rd => [rd.text, rd.summary])
-          .flat()
-          .filter(Boolean)
-          .join('\n');
+        if (!response.reasoning) {
+          response.reasoning = {};
+        }
+        response.reasoning.content = message.reasoning;
+      }
+      if (message.reasoning_details) {
+        if (!response.reasoning) {
+          response.reasoning = {};
+        }
+        response.reasoning.details = message.reasoning_details;
       }
     }
     const usage = expected.usage;
@@ -313,7 +316,6 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
     chunk: Chunk,
     config: OpenRouterConfig
   ) {
-    
     const usage = expected.usage;
     if (usage) {
       if (!chunk.usage) {
@@ -332,14 +334,25 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
         chunk.usage.cost = usage.cost;
       }
     }
-    if (expected.reasoning) {
-      chunk.reasoning = expected.reasoning;
-    } else if (expected.reasoning_details) {
-      chunk.reasoning = expected.reasoning_details
-        .map(rd => [rd.text, rd.summary])
-        .flat()
-        .filter(Boolean)
-        .join('\n');
+    const delta = expected.choices[0]?.delta;
+    if (delta?.reasoning || delta?.reasoning_details) {
+      chunk.reasoning = accumulateReasoning(chunk.reasoning, {
+        content: delta.reasoning,
+        details: delta.reasoning_details,
+      });
+    }
+  }
+
+  protected augmentChatMessage(
+      chatMessage: OpenRouterRequestMessage,
+      message: Message,
+      config: OpenRouterConfig,
+  ) {
+    if (message.reasoning?.content) {
+      chatMessage.reasoning = message.reasoning.content;
+    }
+    if (message.reasoning?.details) {
+      chatMessage.reasoning_details = message.reasoning.details as OpenRouterReasoningDetails[];
     }
   }
 

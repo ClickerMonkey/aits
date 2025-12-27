@@ -1,4 +1,4 @@
-import { Bot, Info, User, Download } from 'lucide-react';
+import { Bot, Info, User, Download, Brain } from 'lucide-react';
 import React, { useState } from 'react';
 import type { Message } from '../../schemas';
 import { cn } from '../lib/utils';
@@ -8,13 +8,56 @@ import { ClickableImage } from './ImageViewer';
 import { TypingIndicator } from './TypingIndicator';
 import { ExpandableText } from './ExpandableText';
 
+interface CollapsibleReasoningProps {
+  content: string;
+  isAnimated: boolean;
+  isUser: boolean;
+  isAssistant: boolean;
+  isSystem: boolean;
+}
+
+const CollapsibleReasoning: React.FC<CollapsibleReasoningProps> = ({
+  content,
+  isAnimated,
+  isUser,
+  isAssistant,
+  isSystem,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="w-full">
+      {/* Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 py-2 px-3 rounded-md hover:bg-yellow-500/10 transition-colors cursor-pointer group"
+      >
+        <Brain className="w-4 h-4 text-yellow-600 dark:text-yellow-500 flex-shrink-0" />
+        <span className={cn(
+          'text-sm font-medium text-yellow-600 dark:text-yellow-500',
+          isAnimated && 'animate-shimmer bg-gradient-to-r from-yellow-600/60 via-yellow-500 to-yellow-600/60 bg-[length:200%_100%] text-transparent bg-clip-text'
+        )}>
+          {isAnimated ? 'Reasoning...' : 'Reasoning'}
+        </span>
+      </button>
+
+      {/* Content */}
+      {isExpanded && (
+        <div className="pl-10 pr-3 py-2 text-yellow-600 dark:text-yellow-500 text-sm">
+          <MarkdownContent content={content} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface MessageItemProps {
   message: Message;
   operationDecisions?: Map<number, 'approve' | 'reject'>;
   onToggleOperationDecision?: (idx: number, decision: 'approve' | 'reject') => void;
   onApproveOperation: (message: Message, idx: number) => void;
   onRejectOperation: (message: Message, idx: number) => void;
-  hasMultiplePendingOps?: boolean;
+  hasMultiplePendingOperations?: boolean;
   isProcessing?: boolean;
 }
 
@@ -24,7 +67,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onToggleOperationDecision,
   onApproveOperation,
   onRejectOperation,
-  hasMultiplePendingOps = false,
+  hasMultiplePendingOperations: hasMultiplePendingOps = false,
   isProcessing = false,
 }) => {
   const { role, name, content, operations = [] } = message;
@@ -114,11 +157,45 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   onApprove={() => onApproveOperation(message, opIdx)}
                   onReject={() => onRejectOperation(message, opIdx)}
                   hasMultipleOperations={hasMultiplePendingOps}
+                  isProcessing={isProcessing}
                 />
               );
             }
 
             // Render content based on type
+            if (item.type === 'reasoning') {
+              const isLastContent = index === visibleContent.length - 1;
+              const parts: string[] = [];
+              if (item.content) {
+                parts.push(item.content);
+              }
+              if (item.reasoning?.content) {
+                parts.push(item.reasoning.content);
+              }
+              if (item.reasoning?.details) {
+                for (const detail of item.reasoning.details) {
+                  if (detail.summary) {
+                    parts.push(detail.summary);
+                  }
+                  if (detail.text) {
+                    parts.push(detail.text);
+                  }
+                }
+              }
+              const content = parts.join('\n\n');
+
+              return (
+                <CollapsibleReasoning
+                  key={index}
+                  content={content}
+                  isAnimated={isLastContent}
+                  isUser={isUser}
+                  isAssistant={isAssistant}
+                  isSystem={isSystem}
+                />
+              );
+            }
+
             if (item.type === 'image') {
               const hasProtocol = item.content.startsWith('data:') || isUrl(item.content);
               if (hasProtocol) {

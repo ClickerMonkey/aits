@@ -465,7 +465,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
 
       const result: Response = {
         content,
-        reasoning,
+        reasoning: { content: reasoning },
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         finishReason: this.mapAnthropicStopReason(responseBody.stop_reason),
         model,
@@ -535,7 +535,7 @@ export class AWSBedrockProvider implements Provider<AWSBedrockConfig> {
               case 'thinking_delta':
                 accumulatedReasoning += chunk.delta.thinking;
                 yield {
-                  reasoning: chunk.delta.thinking,
+                  reasoning: { content: chunk.delta.thinking },
                 };
                 break;
               case 'input_json_delta':

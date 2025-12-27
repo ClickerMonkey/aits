@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { CONSTS } from "./constants";
 import { Message, MessageContent } from "./schemas";
-import { Message as AIMessage, MessageContent as AIMessageContent } from "@aeye/core";
+import { Message as AIMessage, MessageContent as AIMessageContent, Reasoning, ToolCall } from "@aeye/core";
 import { detectMimeType } from "./helpers/files";
 
 // Re-export browser-safe functions from shared.ts
@@ -109,26 +109,133 @@ export function formatValueWithFormat(value: any, format: 'json' | 'yaml' = 'yam
  * @param msg 
  * @returns 
  */
-export async function convertMessage(msg: Message): Promise<AIMessage> {
-  const contents = msg.content.slice();
-  for (let i = 0; i < contents.length; i++) {
-    const content = contents[i];
-    if (content.operationIndex === undefined) {
-      continue;
-    }
-    const operation = msg.operations?.[content.operationIndex];
-    if (operation?.message) {
-      content.content = operation.message;
-    }
-    i++;
+export async function convertMessage(msg: Message): Promise<AIMessage[]> {
+  /**
+   * Example flows from a single assistant message:
+   *
+   * messageContent = { text, reasoning, op1-auto, op2-approved, op3-rejected, op4-pending, reasoning, text }
+   *
+   * Assistant: text
+   * Assistant: toolCalls (ops input), reasoning
+   * Tool: op1 output & instructions
+   * Assistant: "Approve tools"
+   * User: "Approves op2, Rejects op3"
+   * Tool: op2 output & instructions
+   * Tool: op3 analysis & rejected message
+   * Tool: op4 analysis & pending approval message
+   * Assistant: text, reasoning
+   *
+   * Rules:
+   * - Assistant follows tools
+   * - User follows assistant - approvals and rejections reference tool call Ids
+   *
+   * Non-assistant messages are simple - just convert content items directly like commented out below.
+   */
+
+  // For non-assistant messages, convert content directly
+  if (msg.role !== 'assistant') {
+    const content = await Promise.all(
+      msg.content.map(mc => convertMessageContent(mc, msg.created))
+    );
+    return [{
+      role: msg.role,
+      name: msg.name,
+      tokens: msg.tokens,
+      content,
+    }];
   }
 
-  return {
-    role: msg.role,
-    name: msg.name,
-    tokens: msg.tokens,
-    content: await Promise.all(contents.map((mc) => convertMessageContent(mc, msg.created))),
-  };
+  // For assistant messages, reconstruct the conversation flow
+  const messages: AIMessage[] = [];
+  let currentContent: AIMessageContent[] = [];
+  let currentReasoning: Reasoning | undefined = undefined;
+  let toolCallsCreated = false;
+
+  for (const content of msg.content) {
+    // Collect reasoning
+    if (content.reasoning) {
+      currentReasoning = content.reasoning;
+    }
+
+    // Handle operations
+    if (content.operationIndex !== undefined) {
+      const operation = msg.operations?.[content.operationIndex];
+      if (!operation) continue;
+
+      // If this is the first operation, create messages for content before operations and tool calls
+      if (!toolCallsCreated) {
+        // Output any text/reasoning before the tool calls
+        if (currentContent.length > 0) {
+          messages.push({
+            role: 'assistant',
+            name: msg.name,
+            content: currentContent,
+            reasoning: currentReasoning,
+          });
+          currentContent = [];
+          currentReasoning = undefined;
+        }
+
+        // Create assistant message with all tool calls
+        const toolCalls: ToolCall[] = [];
+        for (let i = 0; i < (msg.operations?.length || 0); i++) {
+          const op = msg.operations![i];
+          toolCalls.push({
+            id: `${msg.created}-${i}`,
+            name: op.type,
+            arguments: JSON.stringify(op.input),
+          });
+        }
+
+        messages.push({
+          role: 'assistant',
+          name: msg.name,
+          content: '',
+          toolCalls,
+          reasoning: currentReasoning,
+        });
+        currentReasoning = undefined;
+        toolCallsCreated = true;
+      }
+
+      // Create tool result message for this operation
+      const toolCallId = `${msg.created}-${content.operationIndex}`;
+      const toolContent = await convertMessageContent(content, msg.created);
+
+      messages.push({
+        role: 'tool',
+        toolCallId,
+        content: typeof toolContent.content === 'string'
+          ? toolContent.content
+          : JSON.stringify(toolContent.content),
+      });
+    } else {
+      // Regular text/image/file/audio content
+      const converted = await convertMessageContent(content, msg.created);
+      currentContent.push(converted);
+    }
+  }
+
+  // Output any remaining text content after operations
+  if (currentContent.length > 0 || currentReasoning) {
+    messages.push({
+      role: 'assistant',
+      name: msg.name,
+      content: currentContent,
+      reasoning: currentReasoning,
+    });
+  }
+
+  // If no messages were created (e.g., empty content), return a single empty assistant message
+  if (messages.length === 0) {
+    messages.push({
+      role: 'assistant',
+      name: msg.name,
+      content: '',
+    });
+  }
+
+  return messages;
 }
 
 export const INPUT_START = '\n\n<input>\n';
@@ -183,6 +290,14 @@ async function convertMessageContent(messageContent: MessageContent, messageTime
     }
     
     return { type, content };
+  }
+
+  // Handle reasoning
+  if (type === 'reasoning') {
+    return { 
+      type: 'text', 
+      content: `<reasoning-history>${content}</reasoning-history>`
+    };
   }
   
   // Handle image content

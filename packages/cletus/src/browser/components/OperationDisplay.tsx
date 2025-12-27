@@ -382,6 +382,7 @@ export interface OperationDisplayProps {
   approvalDecision?: 'approve' | 'reject';
   onToggleDecision?: (index: number, decision: 'approve' | 'reject') => void;
   hasMultipleOperations?: boolean;
+  isProcessing?: boolean;
 }
 
 /**
@@ -402,6 +403,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
   approvalDecision,
   onToggleDecision,
   hasMultipleOperations = false,
+  isProcessing = false,
 }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { color: statusColor, label: statusLabel } = getStatusInfo(operation.status);
@@ -412,6 +414,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
 
   const needsApproval = operation.status === 'analyzed';
   const isOperationProcessing = operation.status === 'doing';
+  const isDisabled = isProcessing || isOperationProcessing;
 
   return (
     <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border ' + borderColor : bgColor)}>
@@ -447,7 +450,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
       )}
 
       {/* Approval Buttons */}
-      {(needsApproval || isOperationProcessing) && operationIndex !== undefined && (
+      {(needsApproval || isDisabled) && operationIndex !== undefined && (
         <div className="ml-6 mb-2">
           {!hasMultipleOperations && onApprove && onReject ? (
             // Single operation: immediate approve/reject
@@ -456,10 +459,10 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onApprove(operationIndex)}
-                disabled={isOperationProcessing}
+                disabled={isDisabled}
                 className="bg-green-500/10 text-green-400 border-green-400/30 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isOperationProcessing ? (
+                {isDisabled ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
@@ -475,7 +478,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onReject(operationIndex)}
-                disabled={isOperationProcessing}
+                disabled={isDisabled}
                 className="bg-red-500/10 text-red-400 border-red-400/30 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <XCircle className="w-4 h-4 mr-2" />
@@ -490,7 +493,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'approve')}
-                  disabled={isOperationProcessing}
+                  disabled={isDisabled}
                   className={cn(
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'approve'
@@ -498,7 +501,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                       : 'text-green-400/50 border-green-400/30 hover:bg-green-400/10'
                   )}
                 >
-                  {isOperationProcessing && approvalDecision === 'approve' ? (
+                  {isDisabled && approvalDecision === 'approve' ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Processing...
@@ -514,7 +517,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'reject')}
-                  disabled={isOperationProcessing}
+                  disabled={isDisabled}
                   className={cn(
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'reject'

@@ -65,7 +65,13 @@ export function createTypedWebSocket(url: string): TypedWebSocket {
 
   ws.onmessage = (event) => {
     try {
-      const message = JSON.parse(event.data) as ServerMessage;
+      const message = JSON.parse(event.data, (k, v) => {
+        if (v && v.__type === 'Set' && Array.isArray(v.values)) {
+          return new Set(v.values);
+        }
+        return v;
+      }) as ServerMessage;
+      
       messageHandlers.forEach(handler => handler(message));
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error);

@@ -350,8 +350,24 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
           // Find the most recent assistant message that might be pending
           const lastAssistantMsg = messages.filter(m => m.role === 'assistant').pop();
           if (lastAssistantMsg) {
+            if (event.error) {
+              // Add the error info to the last message content
+              let lastText = lastAssistantMsg.content[lastAssistantMsg.content.length - 1];
+              if (!lastText || lastText.type !== 'text') {
+                lastText = { type: 'text', content: '' };
+                lastAssistantMsg.content.push(lastText);
+              }
+              lastText.content += `\n\n**Error:** ${event.error}`;
+            }
+            
             // Update the message to persist any partial progress
             await chatFile.updateMessage(lastAssistantMsg);
+
+            // Broadcast the updated message to all clients watching this chat
+            broadcastManager.broadcastToChat(chatId, {
+              type: 'message_updated',
+              data: { chatId, message: lastAssistantMsg },
+            });
           }
         });
         break;
@@ -452,7 +468,11 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
 
             // Generate chat ID and create new chat
             const now = Date.now();
-            const chatId = new Date(now).toISOString().replace(/[-:]/g, '').slice(0, 15);
+            const chatId = new Date(now)
+              .toISOString()
+              .replace(/[-:]/g, '')
+              .replace(/T/, '-')
+              .slice(0, 15);
             const newChat: ChatMeta = {
               id: chatId,
               title: name,
@@ -466,6 +486,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               questions: [],
               toolset: undefined,
               model: undefined,
+              reasoning: null,
             };
 
             await config.addChat(newChat);

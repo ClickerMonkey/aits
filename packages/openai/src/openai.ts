@@ -15,6 +15,7 @@ import type {
   ImageGenerationChunk,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  Message,
   ModelInfo,
   Provider,
   SpeechRequest,
@@ -24,7 +25,7 @@ import type {
   TranscriptionResponse
 } from '@aeye/ai';
 import { detectTier } from '@aeye/ai';
-import { toFile, BaseRequest, type Chunk, type Executor, type FinishReason, getModel, getResourceFormat, type MessageContent, ModelInput, type Request, Resource, type Response, type Streamer, toBase64, toJSONSchema, type ToolCall, toStream, toText, toURL, type Usage } from '@aeye/core';
+import { toFile, BaseRequest, type Chunk, type Executor, type FinishReason, getModel, getResourceFormat, type MessageContent, ModelInput, type Request, Resource, type Response, type Streamer, toBase64, toJSONSchema, type ToolCall, toStream, toText, toURL, type Usage, getResponseFromChunks } from '@aeye/core';
 import fs from 'fs';
 import OpenAI from 'openai';
 import { Stream } from 'openai/core/streaming';
@@ -518,6 +519,70 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
   }
 
   /**
+   * Augment chat message with provider-specific data.
+   * 
+   * @param chatMessage - OpenAI chat message
+   * @param message - Original @aeye message
+   * @param config - Provider configuration
+   */
+  protected augmentChatMessage<TMessage extends OpenAI.Chat.ChatCompletionMessageParam>(
+    chatMessage: TMessage,
+    message: Message,
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
+
+  /**
+   * Get augmented chat message with provider-specific data.
+   * 
+   * @param chatMessage - OpenAI chat message
+   * @param message - Original @aeye message
+   * @param config - Provider configuration
+   * @returns 
+   */
+  private getChatMessage<TMessage extends OpenAI.Chat.ChatCompletionMessageParam>(
+    chatMessage: TMessage,
+    message: Message,
+    config: TConfig,
+  ) {
+    this.augmentChatMessage(chatMessage, message, config);
+    return chatMessage;
+  }
+
+  /**
+   * Augment chat content part with provider-specific data.
+   * 
+   * @param chatContent - OpenAI chat content part
+   * @param content - Original @aeye message content
+   * @param config - Provider configuration
+   */
+  protected augmentChatContent<TContent extends OpenAI.Chat.Completions.ChatCompletionContentPart>(
+    chatContent: TContent,
+    content: MessageContent,
+    config: TConfig,
+  ) {
+    // No-op by default
+  }
+
+  /**
+   * Get augmented chat content part with provider-specific data.
+   * 
+   * @param chatContent - OpenAI chat content part
+   * @param content - Original @aeye message content
+   * @param config - Provider configuration
+   * @returns 
+   */
+  private getChatContent<TContent extends OpenAI.Chat.Completions.ChatCompletionContentPart>(
+    chatContent: TContent,
+    content: MessageContent,
+    config: TConfig,
+  ) {
+    this.augmentChatContent(chatContent, content, config);
+    return chatContent;
+  }
+
+  /**
    * Augment chat chunk with provider-specific data.
    * 
    * @param expected 
@@ -558,7 +623,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   protected convertContentText(
     x: string | MessageContent[],
-    name: string
+    name: string,
+    config: TConfig
   ): string | OpenAI.Chat.Completions.ChatCompletionContentPartText[] {
     if (typeof x === 'string') {
       return x;
@@ -570,15 +636,15 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     return x.map((part): OpenAI.Chat.Completions.ChatCompletionContentPartText => {
       if (part.type === 'text') {
-        return { type: 'text', text: String(part.content) };
+        return this.getChatContent({ type: 'text', text: String(part.content) }, part, config);
       } else if (part.type === 'image') {
-        return { type: 'text', text: `Image sent by ${name} not included in content.` };
+        return this.getChatContent({ type: 'text', text: `Image sent by ${name} not included in content.` }, part, config);
       } else if (part.type === 'file') {
-        return { type: 'text', text: `File sent by ${name} not included in content.` };
+        return this.getChatContent({ type: 'text', text: `File sent by ${name} not included in content.` }, part, config);
       } else if (part.type === 'audio') {
-        return { type: 'text', text: `Audio sent by ${name} not included in content.` };
+        return this.getChatContent({ type: 'text', text: `Audio sent by ${name} not included in content.` }, part, config);
       }
-      return { type: 'text', text: `Unsupported content type from ${name}.` };
+      return this.getChatContent({ type: 'text', text: `Unsupported content type from ${name}.` }, part, config);
     });
   }
 
@@ -590,77 +656,81 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    */
   protected async convertContent(
     x: string | MessageContent[],
-    name: string
+    name: string,
+    config: TConfig
   ): Promise<string | OpenAI.Chat.Completions.ChatCompletionContentPart[]> {
     if (typeof x === 'string') {
       return x;
     }
+
     return Promise.all(x.map(async (part): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart> => {
       switch (part.type) {
         case 'text': {
           const text = await toText(part.content).catch(() => `Text content sent by ${name} could not be converted to text.`);
-          return {
+          return this.getChatContent({
             type: 'text',
             text,
-          };
+          }, part, config);
         }
 
         case 'image': {
           const url = await toURL(part.content, part.format, 'INVALID').catch(() => 'INVALID');
           if (url === 'INVALID') {
-            return {
+            return this.getChatContent({
               type: 'text',
               text: `Image content sent by ${name} could not be converted to a URL.`,
-            };
+            }, part, config);
           }
 
-          return {
+          return this.getChatContent({
             type: 'image_url',
             image_url: { url },
-          };
+          }, part, config);
         }
 
         case 'audio': {
           // Convert audio content to base64 data
           const base64 = await toBase64(part.content, undefined, 'INVALID').catch(() => 'INVALID');
           if (base64 === 'INVALID') {
-            return {
+            return this.getChatContent({
               type: 'text',
               text: `Audio content sent by ${name} could not be converted to base64.`,
-            };
+            }, part, config);
           }
 
           const [, mimeType, data] = /^data:([^;]+);base64,(.+)$/.exec(base64) || [null, '', ''];
           const format = part.format || mimeType && mimeType.includes('wav') ? 'wav' : 'mp3';
-          return {
+          return this.getChatContent({
             type: 'input_audio',
             input_audio: { data, format },
-          };
+          }, part, config);
         }
 
         case 'file': {
           // Convert file content to base64 data (file IDs not supported)
           const fileData = await toBase64(part.content, part.format, 'INVALID').catch(() => 'INVALID');
           if (fileData === 'INVALID') {
-            return {
+            return this.getChatContent({
               type: 'text',
               text: `File content sent by ${name} could not be converted to base64.`,
-            };
+            }, part, config);
           }
 
-          return {
+          return this.getChatContent({
             type: 'file',
             file: {
               file_data: fileData,
+              // TODO add filename
+              filename: 'file' + (part.format ? `.${part.format}` : ''),
             },
-          };
+          }, part, config);
         }
 
         default:
-          return {
+          return this.getChatContent({
             type: 'text',
             text: `Unsupported content type from ${name}.`,
-          };
+          }, part, config);
       }
     }));
   }
@@ -706,57 +776,57 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
    * @param request @aeye request object
    * @returns Array of OpenAI-formatted messages
    */
-  protected async convertMessages(request: Request): Promise<OpenAI.Chat.ChatCompletionMessageParam[]> {
+  protected async convertMessages(request: Request, config: TConfig): Promise<OpenAI.Chat.ChatCompletionMessageParam[]> {
     return (await Promise.all(request.messages.map(async (msg): Promise<OpenAI.Chat.ChatCompletionMessageParam | OpenAI.Chat.ChatCompletionMessageParam[]> => {
       switch (msg.role) {
         case 'system':
-          return {
+          return this.getChatMessage({
             role: 'developer',
             name: this.convertName(msg.name),
-            content: this.convertContentText(msg.content, msg.name || 'system'),
-          };
+            content: this.convertContentText(msg.content, msg.name || 'system', config),
+          }, msg, config);
         case 'tool':
-          return {
+          return this.getChatMessage({
             role: 'tool',
             tool_call_id: msg.toolCallId!,
-            content: this.convertContentText(msg.content, msg.name || 'tool'),
-          };
+            content: this.convertContentText(msg.content, msg.name || 'tool', config),
+          }, msg, config);
         case 'assistant':
-          const content = await this.convertContent(msg.content, msg.name || 'assistant');
+          const content = await this.convertContent(msg.content, msg.name || 'assistant', config);
           if (!content || typeof content === 'string' || content.every(c => c.type === 'text')) {
-            return {
+            return this.getChatMessage({
               role: msg.role,
               name: this.convertName(msg.name),
               tool_calls: msg.toolCalls?.map((tc) => this.convertToolCall(tc)),
               content,
-            };
+            }, msg, config);
           } else {
             // Mixed content - need to split into multiple messages where non-text parts are separate messages
             // sent as user messages because assistent role cannot have non-text content
             const firstText = content.findIndex(c => c.type === 'text');
             return content.map((contentPart, index): OpenAI.Chat.ChatCompletionMessageParam => {
               if (contentPart.type === 'text') {
-                return {
+                return this.getChatMessage({
                   role: 'assistant',
                   name: this.convertName(msg.name),
                   tool_calls: index === firstText ? msg.toolCalls?.map((tc) => this.convertToolCall(tc)) : undefined,
                   content: [contentPart],
-                };
+                }, msg, config);
               } else {
-                return {
+                return this.getChatMessage({
                   role: 'user',
                   name: this.convertName(msg.name),
                   content: [contentPart],
-                };
+                }, msg, config);
               }
             });
           }
         case 'user':
-          return {
+          return this.getChatMessage({
             role: msg.role,
             name: this.convertName(msg.name),
-            content: await this.convertContent(msg.content, msg.name || 'user'),
-          };
+            content: await this.convertContent(msg.content, msg.name || 'user', config),
+          }, msg, config);
       }
     }))).flat();
   }
@@ -948,7 +1018,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     return async (request: Request, ctx: AIContextAny, metadata?: AIMetadataAny, requestSignal?: AbortSignal): Promise<Response> => {
       const { model, retry } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(request, requestSignal, ctx, effectiveConfig, 'chat', metadata?.model || effectiveConfig.defaultModels?.chat);
 
-      const messages = await this.convertMessages(request);
+      const messages = await this.convertMessages(request, effectiveConfig);
       const tools = this.convertTools(request);
       const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
       const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
@@ -1066,7 +1136,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
     ): AsyncGenerator<Chunk> {
       const { model, retry, signal } = this.getRequestData<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>>(request, requestSignal, ctx, effectiveConfig, 'streaming chat', metadata?.model || effectiveConfig.defaultModels?.chat);
 
-      const messages = await this.convertMessages(request);
+      const messages = await this.convertMessages(request, effectiveConfig);
       const tools = this.convertTools(request);
       const tool_choice = tools?.length ? this.convertToolChoice(request) : undefined;
       const parallel_tool_calls = tools?.length ? !request.toolsOneAtATime : undefined;
@@ -1147,9 +1217,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
       type ToolCallItem = { id: string; name: string; arguments: string, named: boolean, finished: boolean, updated: boolean };
       const toolCallsMap = new Map<number, ToolCallItem>();
       const toolCalls: ToolCallItem[] = [];
-      let accumulatedContent = '';
-      let finalUsage: any = undefined;
-      let finishReason: FinishReason | undefined = undefined;
+      const chunks: Chunk[] = [];
       
       try {
         for await (const chunk of stream) {
@@ -1166,17 +1234,6 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             refusal: delta?.refusal ?? undefined,
             usage: chunk.usage ? convertOpenAIUsage(chunk.usage) : undefined,
           };
-
-          // Track accumulated content and final data
-          if (delta?.content) {
-            accumulatedContent += delta.content;
-          }
-          if (chunk.usage) {
-            finalUsage = convertOpenAIUsage(chunk.usage);
-          }
-          if (choice?.finish_reason) {
-            finishReason = choice.finish_reason as FinishReason;
-          }
 
           // Handle tool calls
           for (const toolCall of toolCalls) {
@@ -1226,6 +1283,9 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
           // Augment chunk with provider-specific data
           this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
 
+          // Keep track of all chunks for post-processing if needed
+          chunks.push(yieldChunk);
+
           // Send it!
           yield yieldChunk;
         }
@@ -1248,13 +1308,8 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
         // Call post-request hook with accumulated response
         if (effectiveConfig.hooks?.chat?.afterRequest) {
-          const finalResponse: Response = {
-            content: accumulatedContent,
-            toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments })),
-            finishReason: toolCalls.length ? 'tool_calls' : finishReason || 'stop' as FinishReason,
-            model,
-            usage: finalUsage,
-          };
+          const finalResponse = getResponseFromChunks(chunks);
+          finalResponse.model = model;
           
           await effectiveConfig.hooks.chat.afterRequest(request, params, finalResponse, ctx, metadata);
         }
@@ -2149,7 +2204,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Construct the params that would be sent to OpenAI
     const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
-    const messages = await this.convertMessages(chatRequest);
+    const messages = await this.convertMessages(chatRequest, effectiveConfig);
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
       model: model.id,
       messages,
@@ -2224,7 +2279,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
 
     // Construct the params that would be sent to OpenAI
     const { model } = this.getRequestData<OpenAI.Chat.Completions.ChatCompletion>(chatRequest, undefined, ctx, effectiveConfig, 'analyze image stream', effectiveConfig.defaultModels?.imageAnalyze || 'gpt-4-vision-preview');
-    const messages = await this.convertMessages(chatRequest);
+    const messages = await this.convertMessages(chatRequest, effectiveConfig);
     const params: OpenAI.Chat.ChatCompletionCreateParams = {
       model: model.id,
       messages,

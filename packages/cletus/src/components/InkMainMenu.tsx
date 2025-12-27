@@ -181,6 +181,7 @@ export const InkMainMenu: React.FC<InkMainMenuProps> = ({ config, onChatSelect, 
               questions: [],
               toolset: undefined,
               model: undefined,
+              reasoning: null,
             };
 
             await config.addChat(newChat);

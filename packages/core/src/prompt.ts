@@ -1,9 +1,9 @@
 import Handlebars from "handlebars";
 import { ZodString, ZodType } from 'zod';
 
-import { accumulateUsage, Fn, getChunksFromResponse, getInputTokens, getModel, getOutputTokens, getTotalTokens, resolve, Resolved, resolveFn, yieldAll } from "./common";
+import { accumulateReasoning, accumulateUsage, Fn, getChunksFromResponse, getInputTokens, getModel, getOutputTokens, getTotalTokens, resolve, Resolved, resolveFn, yieldAll } from "./common";
 import { AnyTool, Tool, ToolCompatible, ToolInterrupt } from "./tool";
-import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
+import { Component, Context, Events, Executor, FinishReason, Message, Names, OptionalParams, Reasoning, Request, RequiredKeys, ResponseFormat, Streamer, ToolCall, ToolDefinition, Tuple, Usage } from "./types";
 import { strictify, toJSONSchema } from "./schema";
 
 /**
@@ -198,8 +198,8 @@ export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
   { type: 'textPartial', content: string, request: Request } |
   { type: 'text', content: string, request: Request } |
   { type: 'refusal', content: string, request: Request } |
-  { type: 'reason', content: string, request: Request } |
-  { type: 'reasonPartial', content: string, request: Request } |
+  { type: 'reason', reasoning: Reasoning, request: Request } |
+  { type: 'reasonPartial', reasoning: Reasoning, request: Request } |
   { type: 'toolParseName', tool: PromptTools<TTools>, request: Request } |
   { type: 'toolParseArguments', tool: PromptTools<TTools>, args: string, request: Request } |
   PromptToolEvents<TTools> |
@@ -616,7 +616,7 @@ export class Prompt<
 
       let finishReason: FinishReason | undefined = undefined;
       let refusal = '';
-      let reasoning = '';
+      let reasoning: Reasoning | undefined = undefined;
       let content = '';
       let disableTools = false;
 
@@ -659,8 +659,8 @@ export class Prompt<
         }
 
         if (chunk.reasoning) {
-          reasoning += chunk.reasoning;
-          yield emit({ type: 'reasonPartial', content: chunk.reasoning, request });
+          reasoning = accumulateReasoning(reasoning, chunk.reasoning)!;
+          yield emit({ type: 'reasonPartial', reasoning, request });
         }
 
         // Handle tool calls
@@ -729,7 +729,7 @@ export class Prompt<
 
       // If the model reasoned, yield it
       if (reasoning) {
-        yield emit({ type: 'reason', content: reasoning, request });
+        yield emit({ type: 'reason', reasoning, request });
       }
 
       // If the model refused to answer and stop
@@ -776,6 +776,7 @@ export class Prompt<
           role: 'assistant',
           content,
           toolCalls: toolExecutors.map(te => te.toolCall),
+          reasoning,
         });
 
         // If there are any error/invalid - just stop and add their errors and retry
@@ -870,6 +871,13 @@ export class Prompt<
             disableTools = true;
           }
         }
+      } else {
+        // No tool calls, just add the assistant response
+        request.messages.push({
+          role: 'assistant',
+          content,
+          reasoning,
+        });
       }
 
       const hadToolErrors = toolParseErrorsPrevious !== toolParseErrors;

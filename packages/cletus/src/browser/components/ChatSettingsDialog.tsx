@@ -4,24 +4,37 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { ScrollArea } from './ui/scroll-area';
+import { ChatMeta, ReasoningLevel } from '../../schemas';
+import { Select, SelectOption } from './ui/select';
 
 interface ChatSettingsDialogProps {
   title: string;
   prompt?: string;
+  reasoning?: ReasoningLevel | null;
   cwd?: string;
-  onSave: (updates: { title?: string; prompt?: string; cwd?: string }) => void;
+  onSave: (updates: Partial<ChatMeta> & { cwd?: string }) => void;
   onClose: () => void;
 }
+
+const reasoningOptions: SelectOption<ReasoningLevel | null>[] = [
+  { value: null, label: 'Default' },
+  { value: 'none', label: 'None' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 export const ChatSettingsDialog: React.FC<ChatSettingsDialogProps> = ({
   title: initialTitle,
   prompt: initialPrompt,
   cwd: initialCwd,
+  reasoning: initialReasoning,
   onSave,
   onClose,
 }) => {
   const [title, setTitle] = useState(initialTitle);
   const [prompt, setPrompt] = useState(initialPrompt || '');
+  const [reasoning, setReasoning] = useState<ReasoningLevel | null>(initialReasoning || null);
   const [cwd, setCwd] = useState(initialCwd || '');
 
   // Handle ESC key to close
@@ -36,7 +49,7 @@ export const ChatSettingsDialog: React.FC<ChatSettingsDialogProps> = ({
   }, [onClose]);
 
   const handleSave = () => {
-    const updates: { title?: string; prompt?: string; cwd?: string } = {};
+    const updates: Partial<ChatMeta> & { cwd?: string } = {};
 
     if (title !== initialTitle) {
       updates.title = title;
@@ -46,6 +59,9 @@ export const ChatSettingsDialog: React.FC<ChatSettingsDialogProps> = ({
     }
     if (cwd !== initialCwd) {
       updates.cwd = cwd || undefined;
+    }
+    if (reasoning !== initialReasoning) {
+      updates.reasoning = reasoning || null;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -104,6 +120,23 @@ export const ChatSettingsDialog: React.FC<ChatSettingsDialogProps> = ({
               />
               <p className="text-xs text-muted-foreground mt-2">
                 Override the default system prompt for this chat
+              </p>
+            </div>
+
+            {/* Reasoning */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Reasoning Level
+              </label>
+              <Select
+                value={reasoning}
+                options={reasoningOptions}
+                onChange={(value) => setReasoning(value)}
+                placeholder='Reasoning level'
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Set the reasoning effort level for the chat agent
               </p>
             </div>
 

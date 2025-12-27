@@ -186,10 +186,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={onApproveAll}
-                  disabled={hasOperationsProcessing}
+                  disabled={isProcessing || hasOperationsProcessing}
                   className="text-green-400 border-green-400/30 hover:bg-green-400/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {hasOperationsProcessing ? (
+                  {isProcessing || hasOperationsProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                       Processing...
@@ -206,7 +206,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={onRejectAll}
-                  disabled={hasOperationsProcessing}
+                  disabled={isProcessing || hasOperationsProcessing}
                   className="text-red-400 border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <XCircle className="w-4 h-4 mr-1" />
@@ -217,10 +217,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="neon"
                   size="sm"
                   onClick={onSubmitDecisions}
-                  disabled={!allOperationsDecided || hasOperationsProcessing}
+                  disabled={!allOperationsDecided || isProcessing || hasOperationsProcessing}
                   className="disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {hasOperationsProcessing ? (
+                  {isProcessing || hasOperationsProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                       Processing...

@@ -111,6 +111,7 @@ export class ConfigFile extends JsonFile<Config> {
         showInput: false,
         showOutput: false,
         showSystemMessages: true,
+        reasoning: 'none',
       },
       providers: {
         openai: null,

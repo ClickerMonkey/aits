@@ -2,30 +2,30 @@ import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { ChevronDown, Check } from 'lucide-react';
 
-export interface SelectOption<V extends string = string> {
+export interface SelectOption<V = string> {
   value: V;
   label: string;
   description?: string;
   disabled?: boolean;
 }
 
-export interface SelectProps {
-  value: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
+export interface SelectProps<V = string> {
+  value: V;
+  options: SelectOption<V>[];
+  onChange: (value: V) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
-export const Select: React.FC<SelectProps> = ({
+export const Select = <V extends any = string>({
   value,
   options,
   onChange,
   placeholder = 'Select...',
   className,
   disabled = false,
-}) => {
+}: SelectProps<V>) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +45,7 @@ export const Select: React.FC<SelectProps> = ({
     }
   }, [isOpen]);
 
-  const handleSelect = (optionValue: string) => {
+  const handleSelect = (optionValue: V) => {
     onChange(optionValue);
     setIsOpen(false);
   };
@@ -82,9 +82,9 @@ export const Select: React.FC<SelectProps> = ({
             'bg-card shadow-lg max-h-60 overflow-auto',
           )}
         >
-          {options.map((option) => (
+          {options.map((option, optionIndex) => (
             <button
-              key={option.value}
+              key={optionIndex}
               type="button"
               onClick={() => !option.disabled && handleSelect(option.value)}
               disabled={option.disabled}
@@ -97,7 +97,7 @@ export const Select: React.FC<SelectProps> = ({
               )}
             >
               <div className="flex-shrink-0 w-4 h-4 mt-0.5">
-                {value === option.value && <Check className="w-4 h-4 text-neon-cyan" />}
+                {equals(value, option.value) && <Check className="w-4 h-4 text-neon-cyan" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-foreground">{option.label}</div>
@@ -112,3 +112,12 @@ export const Select: React.FC<SelectProps> = ({
     </div>
   );
 };
+
+function equals(a: any, b: any): boolean {
+  if (typeof a !== typeof b) return false;
+  if (typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  return a === b;
+}

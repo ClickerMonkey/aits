@@ -4,13 +4,21 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import type { Config } from '../../schemas';
+import { ReasoningLevel, User, type Config } from '../../schemas';
+import { Select, SelectOption } from './ui/select';
 
 interface ProfileModalProps {
   user: Config['user'];
   onSave: (updates: Partial<Config['user']>) => void;
   onClose: () => void;
 }
+
+const reasoningOptions: SelectOption<ReasoningLevel>[] = [
+  { value: 'none', label: 'None' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClose }) => {
   const [formData, setFormData] = useState({
@@ -21,6 +29,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
     maxQuerySchemaTypes: user.maxQuerySchemaTypes ?? 5,
     maxIterations: user.autonomous?.maxIterations ?? 10,
     timeout: user.autonomous?.timeout ?? 600000,
+    reasoning: user.reasoning || 'none',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -32,6 +41,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
       globalPrompt: formData.globalPrompt.trim() || undefined,
       adaptiveTools: formData.adaptiveTools,
       maxQuerySchemaTypes: formData.maxQuerySchemaTypes,
+      reasoning: formData.reasoning,
       autonomous: {
         maxIterations: formData.maxIterations,
         timeout: formData.timeout,
@@ -67,7 +77,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               <h3 className="text-lg font-semibold neon-text-cyan">Basic Information</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name" className="text-white">Name *</Label>
                 <Input
                   id="name"
                   type="text"
@@ -78,7 +88,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pronouns">Pronouns</Label>
+                <Label htmlFor="pronouns" className="text-white">Pronouns</Label>
                 <Input
                   id="pronouns"
                   type="text"
@@ -89,7 +99,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="globalPrompt">Global Prompt</Label>
+                <Label htmlFor="globalPrompt" className="text-white">Global Prompt</Label>
                 <textarea
                   id="globalPrompt"
                   value={formData.globalPrompt}
@@ -105,7 +115,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               <h3 className="text-lg font-semibold neon-text-cyan">Advanced Settings</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="adaptiveTools">Adaptive Tools Limit</Label>
+                <Label htmlFor="reasoning" className="text-white">Reasoning Level</Label>
+                <Select<ReasoningLevel>
+                  value={formData.reasoning}
+                  options={reasoningOptions}
+                  onChange={(value) => setFormData({ ...formData, reasoning: value })}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Set your preferred reasoning level for chat
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adaptiveTools" className="text-white">Adaptive Tools Limit</Label>
                 <Input
                   id="adaptiveTools"
                   type="number"
@@ -119,7 +142,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="maxQuerySchemaTypes">Max Query Schema Types</Label>
+                <Label htmlFor="maxQuerySchemaTypes" className="text-white">Max Query Schema Types</Label>
                 <Input
                   id="maxQuerySchemaTypes"
                   type="number"
@@ -138,7 +161,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               <h3 className="text-lg font-semibold neon-text-cyan">Autonomous Mode</h3>
 
               <div className="space-y-2">
-                <Label htmlFor="maxIterations">Max Iterations</Label>
+                <Label htmlFor="maxIterations" className="text-white">Max Iterations</Label>
                 <Input
                   id="maxIterations"
                   type="number"
@@ -152,7 +175,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClos
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="timeout">Timeout (ms)</Label>
+                <Label htmlFor="timeout" className="text-white">Timeout (ms)</Label>
                 <Input
                   id="timeout"
                   type="number"
