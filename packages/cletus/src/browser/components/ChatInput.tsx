@@ -75,6 +75,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       content.push({
         type: 'text',
         content: input.trim(),
+        created: Date.now(),
       });
     }
 
@@ -83,6 +84,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       content.push({
         type: file.type,
         content: file.content,
+        created: Date.now(),
       });
     });
 

@@ -204,7 +204,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
 
   // Convenience function to add system message
   const addSystemMessage = (content: string) => {
-    addMessage({ role: 'system', content: [{ type: 'text', content }], created: Date.now() });
+    addMessage({ role: 'system', content: [{ type: 'text', content, created: Date.now() }], created: Date.now() });
   };
 
   // Function to submit question answers
@@ -267,7 +267,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     addMessage({
       role: 'assistant',
       name: chatMeta.assistant,
-      content: [{ type: 'text', content: questionText.trim() }],
+      content: [{ type: 'text', content: questionText.trim(), created: Date.now() }],
       created: Date.now(),
       operations: [],
     });
@@ -276,7 +276,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ chat, config, messages, onExit, 
     addMessage({
       role: 'user',
       name: config.getData().user.name,
-      content: [{ type: 'text', content: answerText.trim() }],
+      content: [{ type: 'text', content: answerText.trim(), created: Date.now() }],
       created: Date.now(),
     });
     
@@ -1314,7 +1314,7 @@ After installation and the SoX executable is in the path, restart Cletus and try
     addMessage({
       role: 'user',
       name: config.getData().user.name,
-      content: [{ type: 'text', content: inputValue }],
+      content: [{ type: 'text', content: inputValue, created: Date.now() }],
       created: Date.now(),
     });
 

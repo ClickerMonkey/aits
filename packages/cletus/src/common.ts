@@ -1,9 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { CONSTS } from "./constants";
-import { Message, MessageContent } from "./schemas";
+import { Message, MessageContent, Operation } from "./schemas";
 import { Message as AIMessage, MessageContent as AIMessageContent, Reasoning, ToolCall } from "@aeye/core";
 import { detectMimeType } from "./helpers/files";
+import { OperationDefinition, Operations } from "./operations/types";
+import { OperationManager } from "./operations/manager";
 
 // Re-export browser-safe functions from shared.ts
 export {
@@ -145,93 +147,194 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
     }];
   }
 
+  /** Algorithm: 
+   * Iterate through message content
+   * - If we hit reasoning, remember it
+   * - If we hit a non-operation message, send it and any reasoning collected so far (and clear it out)
+   * - If we hit an operation message, collect the next few contents that all have an operation index defined.
+   *  - Create a toolCalls message with all operation inputs and any reasoning collected so far (and clear it out)
+   *  - For each operation message:
+   *    - If auto-executed (no analysis), output operation.output/error & operation.instructions if defined as tool result
+   *    - If has analysis output operation.analysis. Add operation to list
+   *  - If any operations needed approval, insert approval flow messages:
+   *    - Assistant message asking for approval. Look at next 2 content after operation contents. It might be text content or reasoning followed by text. If not there just add a default message.
+   *    - User message with approvals/rejections. Use the tool call IDs explicitly when listing `Approved: ${approvedIds}` and `Rejected: ${rejectedIds}`
+   *    - For each approved/rejected/pending operation, output their respective content as tool results. Same logic as no-analysis operations
+   * If we hit the end with any pending reasoning, add the message with empty content
+   */
+
   // For assistant messages, reconstruct the conversation flow
   const messages: AIMessage[] = [];
-  let currentContent: AIMessageContent[] = [];
   let currentReasoning: Reasoning | undefined = undefined;
-  let toolCallsCreated = false;
 
-  for (const content of msg.content) {
-    // Collect reasoning
-    if (content.reasoning) {
-      currentReasoning = content.reasoning;
+  let i = 0;
+  while (i < msg.content.length) {
+    const messageContent = msg.content[i];
+
+    // If we hit reasoning, remember it
+    if (messageContent.type === 'reasoning') {
+      currentReasoning = messageContent.reasoning;
+      i++;
+      continue;
     }
 
-    // Handle operations
-    if (content.operationIndex !== undefined) {
-      const operation = msg.operations?.[content.operationIndex];
-      if (!operation) continue;
+    // If we hit an operation message, collect all consecutive operation contents
+    if (messageContent.operationIndex !== undefined) {
+      const operationIndices: number[] = [];
 
-      // If this is the first operation, create messages for content before operations and tool calls
-      if (!toolCallsCreated) {
-        // Output any text/reasoning before the tool calls
-        if (currentContent.length > 0) {
-          messages.push({
-            role: 'assistant',
-            name: msg.name,
-            content: currentContent,
-            reasoning: currentReasoning,
-          });
-          currentContent = [];
-          currentReasoning = undefined;
+      // Collect all consecutive operation contents
+      while (i < msg.content.length && msg.content[i].operationIndex !== undefined) {
+        operationIndices.push(msg.content[i].operationIndex!);
+        i++;
+      }
+
+      // Get the operations from msg.operations
+      const operations = operationIndices.map(idx => msg.operations?.[idx]) as Operation[];
+
+      // Create a toolCalls message with all operation inputs
+      const toolCalls: ToolCall[] = operations.map((op, idx) => ({
+        id: `${msg.created}-${operationIndices[idx]}-${op.type}`,
+        name: op.type,
+        arguments: JSON.stringify(op.input),
+      }));
+
+      messages.push({
+        role: 'assistant',
+        content: '',
+        toolCalls,
+        reasoning: currentReasoning,
+      });
+      currentReasoning = undefined;
+
+      // Separate operations into auto-executed and needing approval
+      const autoOperations: { operation: Operation; index: number; }[] = [];
+      const approvalOperations: { operation: Operation; index: number; }[] = [];
+
+      for (let j = 0; j < operations.length; j++) {
+        const operation = operations[j];
+        const index = operationIndices[j];
+
+        if (operation.analysis) {
+          approvalOperations.push({ operation, index });
+        } else {
+          autoOperations.push({ operation, index });
         }
+      }
 
-        // Create assistant message with all tool calls
-        const toolCalls: ToolCall[] = [];
-        for (let i = 0; i < (msg.operations?.length || 0); i++) {
-          const op = msg.operations![i];
-          toolCalls.push({
-            id: `${msg.created}-${i}`,
-            name: op.type,
-            arguments: JSON.stringify(op.input),
-          });
+      // Add output/analysis for operations
+      for (const index of operationIndices) {
+        const operation = msg.operations?.[index]!;
+        const toolCallId = `${msg.created}-${index}-${operation.type}`;
+        const content = OperationManager.getContent(operation, true);
+
+        messages.push({
+          role: 'tool',
+          content,
+          toolCallId,
+        });
+      }
+
+      // If any operations needed approval, insert approval flow messages
+      if (approvalOperations.length > 0) {
+        // Assistant message asking for approval
+        // Look at next 2 content after operation contents - might be text or reasoning followed by text
+        let approvalText = 'Please approve or reject the proposed operations.';
+        let reasoningAfterOps: Reasoning | undefined = undefined;
+
+        if (i < msg.content.length) {
+          const nextContent = msg.content[i];
+          if (nextContent.type === 'reasoning') {
+            reasoningAfterOps = nextContent.reasoning;
+            i++;
+            if (i < msg.content.length && msg.content[i].type === 'text') {
+              approvalText = msg.content[i].content;
+              i++;
+            }
+          } else if (nextContent.type === 'text') {
+            approvalText = nextContent.content;
+            i++;
+          }
         }
 
         messages.push({
           role: 'assistant',
-          name: msg.name,
-          content: '',
-          toolCalls,
-          reasoning: currentReasoning,
+          content: approvalText,
+          reasoning: reasoningAfterOps,
         });
-        currentReasoning = undefined;
-        toolCallsCreated = true;
+
+        // Separate operations by status
+        const approvedOps: { operation: Operation; index: number }[] = [];
+        const rejectedOps: { operation: Operation; index: number }[] = [];
+        const pendingOps: { operation: Operation; index: number }[] = [];
+
+        for (const { operation, index } of approvalOperations) {
+          if (operation.status === 'done' || operation.status === 'doneError') {
+            approvedOps.push({ operation, index });
+          } else if (operation.status === 'rejected') {
+            rejectedOps.push({ operation, index });
+          } else {
+            pendingOps.push({ operation, index });
+          }
+        }
+
+        // User message with approvals/rejections
+        const approvedIds = approvedOps.map(({ index }) => `${msg.created}-${index}`).join(', ');
+        const rejectedIds = rejectedOps.map(({ index }) => `${msg.created}-${index}`).join(', ');
+
+        let userContent = '';
+        if (approvedIds) {
+          userContent += `Approved: ${approvedIds}`;
+        }
+        if (rejectedIds) {
+          if (userContent) userContent += '\n';
+          userContent += `Rejected: ${rejectedIds}`;
+        }
+
+        if (userContent) {
+          messages.push({
+            role: 'user',
+            content: userContent,
+          });
+        }
+
+        // Output tool results for approved operations
+        for (const { operation, index } of approvedOps) {
+          const toolCallId = `${msg.created}-${index}-${operation.type}`;
+          const def = Operations[operation.type] as OperationDefinition<any, any, any>;
+          const content = OperationManager.getContent(operation);
+
+          messages.push({
+            role: 'tool',
+            content,
+            toolCallId,
+          });
+        }
       }
 
-      // Create tool result message for this operation
-      const toolCallId = `${msg.created}-${content.operationIndex}`;
-      const toolContent = await convertMessageContent(content, msg.created);
-
-      messages.push({
-        role: 'tool',
-        toolCallId,
-        content: typeof toolContent.content === 'string'
-          ? toolContent.content
-          : JSON.stringify(toolContent.content),
-      });
-    } else {
-      // Regular text/image/file/audio content
-      const converted = await convertMessageContent(content, msg.created);
-      currentContent.push(converted);
+      continue;
     }
-  }
 
-  // Output any remaining text content after operations
-  if (currentContent.length > 0 || currentReasoning) {
+    // Non-operation message: send it with any reasoning collected so far
+    const content = await convertMessageContent(messageContent, msg.created);
     messages.push({
-      role: 'assistant',
+      role: msg.role,
       name: msg.name,
-      content: currentContent,
+      tokens: msg.tokens,
+      content: [content],
       reasoning: currentReasoning,
     });
+    currentReasoning = undefined;
+    i++;
   }
 
-  // If no messages were created (e.g., empty content), return a single empty assistant message
-  if (messages.length === 0) {
+  // If we hit the end with any pending reasoning, add the message with empty content
+  if (currentReasoning) {
     messages.push({
-      role: 'assistant',
+      role: msg.role,
       name: msg.name,
+      tokens: msg.tokens,
       content: '',
+      reasoning: currentReasoning,
     });
   }
 
@@ -246,6 +349,9 @@ export const OUTPUT_START = '\n\n<output>\n';
 export const OUTPUT_END = '\n</output>';
 export const INSTRUCTIONS_START = '\n\n<instructions>\n';
 export const INSTRUCTIONS_END = '\n</instructions>';
+export const ANALYSIS_HEADER = 'Operation requires approval, the actual operation will be performed upon approval. No response after this is necessary, once approved it will be executed automatically and you will get the results then.';
+export const ERROR_HEADER = 'Operation failed:';
+export const OUTPUT_HEADER = 'Operation completed successfully:';
 
 /**
  * 

@@ -1,6 +1,6 @@
 
 import { CletusAIContext } from "../ai";
-import { ANALYSIS_END, ANALYSIS_START, formatName, formatValue, formatValueWithFormat, INPUT_END, INPUT_START, INSTRUCTIONS_END, INSTRUCTIONS_START, OUTPUT_END, OUTPUT_START } from "../common";
+import { ANALYSIS_END, ANALYSIS_HEADER, ANALYSIS_START, ERROR_HEADER, formatName, formatValue, formatValueWithFormat, INPUT_END, INPUT_START, INSTRUCTIONS_END, INSTRUCTIONS_START, OUTPUT_END, OUTPUT_HEADER, OUTPUT_START } from "../common";
 import { Operation, OperationKind } from "../schemas";
 import { OperationDefinition, OperationDefinitionFor, OperationInput, OperationMode, Operations } from "./types";
 
@@ -162,50 +162,42 @@ export class OperationManager {
    * @param op - Operation to update
    */
   public updateMessage(op: Operation): string {
-    const def = Operations[op.type] as OperationDefinition<any, any, any>;
+    const message = OperationManager.getContent(op);
 
-    // Check if operation definition has a custom content formatter
-    if (def.content) {
-      op.message = def.content(op);
-    } else {
-      // Default message formatting
-      op.message = op.status === 'doneError' || op.status === 'analyzeError'
-        ? `Operation ${op.type} failed: ${op.error}`
-        : op.status === 'done'
-          ? `Operation ${op.type} completed successfully:`
-          : op.status === 'analyzed'
-            ? `Operation ${op.type} requires approval, the actual operation will be performed upon approval. No response after this is necessary, once approved it will be executed automatically and you will get the results then.`
-            : op.status === 'rejected'
-              ? `Operation ${op.type} was rejected by the user.`
-              : `Operation ${op.type} cannot be performed:`;
+    if (message !== op.message) {  
+      op.message = message;
 
-      // Get format preferences from operation definition
-      const inputFormat = def.inputFormat || 'yaml';
-      const outputFormat = def.outputFormat || 'yaml';
-
-      // Add input details
-      if (op.input) {
-        op.message += `${INPUT_START}${formatValueWithFormat(op.input, inputFormat)}${INPUT_END}`;
-      }
-
-      // Add analysis details if available
-      if (op.analysis && !op.output) {
-        op.message += `${ANALYSIS_START}${formatValue(op.analysis)}${ANALYSIS_END}`;
-      }
-
-      // Add output details if available
-      if (op.output) {
-        op.message += `${OUTPUT_START}${formatValueWithFormat(op.output, outputFormat)}${OUTPUT_END}`;
-      }
+      this.onOperationUpdated?.(op, this.operations.indexOf(op));
     }
 
-    // Add instructions after the message if they exist
-    if (def.instructions) {
-      op.message += `${INSTRUCTIONS_START}${def.instructions}${INSTRUCTIONS_END}`;
-    }
-
-    this.onOperationUpdated?.(op, this.operations.indexOf(op));
-    
     return op.message;
+  }
+
+  /**
+   * Get the content for an operation based on its state.
+   * 
+   * @param op - Operation
+   * @param prioritizeAnalysis - Whether to prioritize analysis content
+   * @returns 
+   */
+  public static getContent(op: Operation, prioritizeAnalysis: boolean = false): string {
+    const def = Operations[op.type] as OperationDefinition<any, any, any>;
+    let content = '';
+
+    if (op.analysis && (prioritizeAnalysis || (!def.content && !op.error && op.output === undefined))) {
+      content = `${ANALYSIS_HEADER}${ANALYSIS_START}${formatValue(op.analysis)}${ANALYSIS_END}`;
+    } else if (def.content) {
+      content = def.content(op);
+    } else if (op.error) {
+      content = `${ERROR_HEADER}${op.error}`;
+    } else if (op.output !== undefined) {
+      const outputFormat = def.outputFormat || 'yaml';
+      content = `${OUTPUT_HEADER}${OUTPUT_START}${formatValueWithFormat(op.output, outputFormat)}${OUTPUT_END}`
+      if (def.instructions) {
+        content += `${INSTRUCTIONS_START}${def.instructions}${INSTRUCTIONS_END}`;
+      }
+    }
+
+    return content;
   }
 }

@@ -465,7 +465,7 @@ export const image_attach = operationOf<
 
     // Add image to the chat message
     if (chatMessage) {
-      chatMessage.content.push({ type: 'image', content: imageLink });
+      chatMessage.content.push({ type: 'image', content: imageLink, created: Date.now() });
     }
 
     return { fullPath, attached: true };

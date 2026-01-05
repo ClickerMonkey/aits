@@ -8,6 +8,7 @@ import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, MessageContent, MessageContentType, Operation } from '../schemas';
 import { CletusChatAgent } from './chat-agent';
 import { CletusAIContext } from '../ai';
+import { create } from 'handlebars';
 
 /**
  * Options for running the chat orchestrator
@@ -151,7 +152,7 @@ export async function runChatOrchestrator(
       const getLastContent = (type: MessageContentType, forceNew = false): MessageContent => {
         // If forceNew, create a new entry
         if (forceNew) {
-          const newContent = { type, content: '' };
+          const newContent = { type, content: '', created: Date.now() };
           pending.content.push(newContent);
           lastTextIndex = pending.content.length - 1;
           return newContent;
@@ -165,7 +166,7 @@ export async function runChatOrchestrator(
         }
 
         // Create a new text content entry if none exists
-        const newContent = { type: type, content: '' };
+        const newContent = { type: type, content: '', created: Date.now() };
         pending.content.push(newContent);
         lastTextIndex = pending.content.length - 1;
         return newContent;
@@ -194,7 +195,7 @@ export async function runChatOrchestrator(
         pending.operations!,
         (op, operationIndex) => {
           // Update pending message operation
-          pending.content.push({ type: 'text', content: op.message || '', operationIndex });
+          pending.content.push({ type: 'text', content: op.message || '', operationIndex, created: Date.now() });
           onEvent({ type: 'pendingUpdate', pending });
         },
         (op, operationIndex) => {

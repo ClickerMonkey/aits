@@ -374,6 +374,7 @@ export const MessageContentSchema = z.object({
   content: z.string(),
   reasoning: ReasoningSchema.optional(),
   operationIndex: z.number().optional(),
+  created: z.number().optional(), // ideally not optional - but for backwards compatibility
 });
 
 // Usage schema matching @aeye/core Usage interface
@@ -411,13 +412,6 @@ export const UsageSchema = z.object({
   cost: z.number().optional(),
 }).optional();
 
-export const AgentRequest = z.object({
-  agent: AgentNameSchema,
-  request: z.string(),
-  typeName: z.string().optional(),
-  simulateMode: OperationModeSchema.optional(),
-});
-
 export const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
   name: z.string().optional(),
@@ -429,7 +423,6 @@ export const MessageSchema = z.object({
   todo: z.string().optional(),
   operations: z.array(OperationSchema).optional(),
 });
-
 
 export const ChatMessagesSchema = z.object({
   updated: z.number(),

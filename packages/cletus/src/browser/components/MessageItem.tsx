@@ -171,8 +171,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               }
               if (item.reasoning?.content) {
                 parts.push(item.reasoning.content);
-              }
-              if (item.reasoning?.details) {
+              } else if (item.reasoning?.details) {
                 for (const detail of item.reasoning.details) {
                   if (detail.summary) {
                     parts.push(detail.summary);

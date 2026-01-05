@@ -853,7 +853,7 @@ export const file_edit = operationOf<
         {
           role: 'system',
           content: `You are a helpful assistant that edits file content. You will receive the current content and a request describing the changes. Respond with ONLY the new content, nothing else - no explanations, no markdown formatting, just the raw edited content.
-          
+
           ${actualDescription}
 
           <request>${input.request}</request>`
@@ -1651,9 +1651,9 @@ export const file_attach = operationOf<
     // Add file to the chat message
     if (chatMessage) {
       if (isAudio) {
-        chatMessage.content.push({ type: 'audio', content: fileLink });
+        chatMessage.content.push({ type: 'audio', content: fileLink, created: Date.now() });
       } else {
-        chatMessage.content.push({ type: 'file', content: fileLink });
+        chatMessage.content.push({ type: 'file', content: fileLink, created: Date.now() });
       }
     }
 

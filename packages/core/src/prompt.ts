@@ -203,6 +203,7 @@ export type PromptEvent<TOutput, TTools extends Tuple<AnyTool>> =
   { type: 'toolParseName', tool: PromptTools<TTools>, request: Request } |
   { type: 'toolParseArguments', tool: PromptTools<TTools>, args: string, request: Request } |
   PromptToolEvents<TTools> |
+  { type: 'message', message: Message, request: Request } |
   { type: 'textComplete', content: string, request: Request } |
   { type: 'complete', output: TOutput, request: Request } |
   { type: 'textReset', reason?: string, request: Request } |
@@ -606,6 +607,10 @@ export class Prompt<
         }
       : (ev: PromptEvent<TOutput, TTools>) => ev;
     const emitTool = (ev: PromptToolEvents<[AnyTool]>) => emit(ev as PromptEvent<TOutput, TTools>);
+    const emitMessage = (message: Message) => {
+      request.messages.push(message);
+      return emit({ type: 'message', message, request });
+    };
 
     // Main execution loop!
     while (iterations < maxIterations) {
@@ -772,7 +777,7 @@ export class Prompt<
       // We might not have a finish_reason if we got a bad tool name.
       if (finishReason === 'tool_calls' || toolExecutors.length) {
         // Add the assistant's response with tool calls to the conversation
-        request.messages.push({
+        yield emitMessage({
           role: 'assistant',
           content,
           toolCalls: toolExecutors.map(te => te.toolCall),
@@ -849,7 +854,7 @@ export class Prompt<
                 : JSON.stringify(toolExecutor.result)
               : '';
 
-          request.messages.push({
+          yield emitMessage({
             role: 'tool',
             content,
             toolCallId: toolExecutor.toolCall.id,
@@ -873,7 +878,7 @@ export class Prompt<
         }
       } else {
         // No tool calls, just add the assistant response
-        request.messages.push({
+        yield emitMessage({
           role: 'assistant',
           content,
           reasoning,
@@ -961,7 +966,7 @@ export class Prompt<
 
               yield emit({ type: 'textReset', reason: resetReason, request });
 
-              request.messages.push({
+              yield emitMessage({
                 role: 'user',
                 content: errorMessage,
               });

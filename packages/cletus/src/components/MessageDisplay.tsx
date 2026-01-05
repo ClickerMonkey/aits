@@ -93,8 +93,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
               }
               if (c.reasoning?.content) {
                 parts.push(c.reasoning.content);
-              }
-              if (c.reasoning?.details) {
+              } else if (c.reasoning?.details) {
                 for (const detail of c.reasoning.details) {
                   if (detail.summary) {
                     parts.push(detail.summary);

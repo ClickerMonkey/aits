@@ -354,7 +354,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
               // Add the error info to the last message content
               let lastText = lastAssistantMsg.content[lastAssistantMsg.content.length - 1];
               if (!lastText || lastText.type !== 'text') {
-                lastText = { type: 'text', content: '' };
+                lastText = { type: 'text', content: '', created: Date.now() };
                 lastAssistantMsg.content.push(lastText);
               }
               lastText.content += `\n\n**Error:** ${event.error}`;
@@ -925,7 +925,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             const questionMessage: Message = {
               role: 'assistant',
               name: chatMeta.assistant,
-              content: [{ type: 'text', content: questionText.trim() }],
+              content: [{ type: 'text', content: questionText.trim(), created: Date.now() }],
               created: Date.now(),
               operations: [],
             };
@@ -940,7 +940,7 @@ async function handleWebSocketConnection(ws: WebSocket): Promise<void> {
             const answerMessage: Message = {
               role: 'user',
               name: config.getData().user.name,
-              content: [{ type: 'text', content: answerText.trim() }],
+              content: [{ type: 'text', content: answerText.trim(), created: Date.now() }],
               created: Date.now(),
             };
 
