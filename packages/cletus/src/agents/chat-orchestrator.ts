@@ -1,4 +1,4 @@
-import { getInputTokens, getTotalTokens, Usage } from '@aeye/core';
+import { getInputTokens, getReasoningText, getTotalTokens, Usage } from '@aeye/core';
 import type { ChatFile } from '../chat';
 import { convertMessage, group } from '../common';
 import type { ConfigFile } from '../config';
@@ -8,7 +8,6 @@ import { OperationManager } from '../operations/manager';
 import type { ChatMeta, Message, MessageContent, MessageContentType, Operation } from '../schemas';
 import { CletusChatAgent } from './chat-agent';
 import { CletusAIContext } from '../ai';
-import { create } from 'handlebars';
 
 /**
  * Options for running the chat orchestrator
@@ -299,6 +298,7 @@ export async function runChatOrchestrator(
 
             case 'text':
               {
+                /*
                 // text event contains complete content for this iteration
                 // If we haven't accumulated via textPartial, use it directly
                 // Otherwise, textPartial has already accumulated it, so skip
@@ -316,23 +316,28 @@ export async function runChatOrchestrator(
 
                 onEvent({ type: 'pendingUpdate', pending });
                 updateUsageEvent();
+                */
               }
               break;
 
             case 'reasonPartial':
               {
-                const lastContent = getLastContent('reasoning');
-                lastContent.reasoning = chunk.reasoning;
+                const reasoningText = getReasoningText(chunk.reasoning);
+                if (!pending.content.some(c => c.type === 'reasoning' && getReasoningText(c.reasoning) === reasoningText)) {
+                  const lastContent = getLastContent('reasoning');
+                  lastContent.reasoning = chunk.reasoning;
 
-                const status = chunk.reasoning.details?.find(d => d.type === 'reasoning.summary')?.summary || 'Thinking...';
-                
-                onEvent({ type: 'pendingUpdate', pending });
-                onEvent({ type: 'status', status });
+                  const status = chunk.reasoning.details?.find(d => d.type === 'reasoning.summary')?.summary || 'Thinking...';
+                  
+                  onEvent({ type: 'pendingUpdate', pending });
+                  onEvent({ type: 'status', status });
+                }
               }
               break;
 
             case 'reason':
               {
+                /*
                 // Add reasoning token estimation to current usage
                 const reasoningTokens = Math.ceil((
                    (chunk.reasoning.content?.length || 0) +
@@ -356,16 +361,19 @@ export async function runChatOrchestrator(
                   onEvent({ type: 'pendingUpdate', pending });
                 }
                 updateUsageEvent();
+                */
               }
               break;
 
             case 'toolOutput':
               {
+                /*
                 // After a tool completes, the next text should go into a new content entry
                 // This ensures content from different tool iterations doesn't get mixed
                 // Force creation of new text entry on next text event
                 getLastContent('text', true);
                 onEvent({ type: 'pendingUpdate', pending }); 
+                */
               }
               break;
 

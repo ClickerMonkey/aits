@@ -55,6 +55,11 @@ async function build() {
       minify: true,
       sourcemap: true,
       logLevel: 'info',
+      conditions: ['browser'],
+      alias: {
+        // Use browser-safe entry point that excludes Node.js-only modules (fs, path, stream)
+        '@aeye/core': path.resolve(__dirname, '../core/src/browser.ts'),
+      },
       define: {
         'process.env.NODE_ENV': '"production"'
       },

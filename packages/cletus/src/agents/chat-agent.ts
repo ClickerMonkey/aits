@@ -242,9 +242,6 @@ Tools:
 </rules>
 
 <importantRules>
-- You are strictly forbidden from typing the tags <input>, <analysis>, <output>, or <instructions>. These tags are injected by the SYSTEM after you have returned a valid tool call. If you type these tags yourself, the system will fail.
-- Assistant messages with <output> tags are final results from approved tool/operations. These are provided to you by the system and you can summarize them in a response in markdown or the format/mechanisms they request.
-- Don't present anything in <input>, <analysis>, or <output> tags - those are produced by the Cletus system and not by you even though they are marked as Assistant messages.
 - Don't ask for permission to perform operations - if you need to do something, just do it. The user will be asked for approval automatically if needed.
 - Todos are exclusively for Cletus's internal management of user requests. They are only referred to as todos - anything else should be assumed to be a separate data type.
 - If you've executed ANY tools - DO NOT ask a question at the end of your response. You are either going to automatically continue your work OR the user will respond next. NEVER ask a question after executing tools. Only for clarifications.

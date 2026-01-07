@@ -1,3 +1,4 @@
+import { getReasoningText } from '@aeye/core';
 import { Bot, Info, User, Download, Brain } from 'lucide-react';
 import React, { useState } from 'react';
 import type { Message } from '../../schemas';
@@ -7,6 +8,7 @@ import { MarkdownContent, CustomLink } from './Markdown';
 import { ClickableImage } from './ImageViewer';
 import { TypingIndicator } from './TypingIndicator';
 import { ExpandableText } from './ExpandableText';
+
 
 interface CollapsibleReasoningProps {
   content: string;
@@ -84,7 +86,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // Filter content: show all non-empty content without operationIndex, and operations
   const visibleContent = mappedContent.filter(
-    (c) => (c.operationIndex === undefined && c.content.trim().length > 0) || c.operation
+    (c) => (c.operationIndex === undefined && (c.content.trim().length > 0 || getReasoningText(c.reasoning))) || c.operation
   );
 
   const isUrl = (str: string): boolean => {
@@ -165,23 +167,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             // Render content based on type
             if (item.type === 'reasoning') {
               const isLastContent = index === visibleContent.length - 1;
-              const parts: string[] = [];
-              if (item.content) {
-                parts.push(item.content);
-              }
-              if (item.reasoning?.content) {
-                parts.push(item.reasoning.content);
-              } else if (item.reasoning?.details) {
-                for (const detail of item.reasoning.details) {
-                  if (detail.summary) {
-                    parts.push(detail.summary);
-                  }
-                  if (detail.text) {
-                    parts.push(detail.text);
-                  }
-                }
-              }
-              const content = parts.join('\n\n');
+              const content = getReasoningText(item.reasoning)
 
               return (
                 <CollapsibleReasoning

@@ -335,7 +335,7 @@ export class OpenRouterProvider extends OpenAIProvider<OpenRouterConfig> impleme
       }
     }
     const delta = expected.choices[0]?.delta;
-    if (delta?.reasoning || delta?.reasoning_details) {
+    if (delta?.reasoning || delta?.reasoning_details?.length) {
       chunk.reasoning = accumulateReasoning(chunk.reasoning, {
         content: delta.reasoning,
         details: delta.reasoning_details,

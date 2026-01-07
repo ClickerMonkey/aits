@@ -6,6 +6,7 @@ import type { Message } from '../schemas';
 import { Markdown } from './Markdown';
 import { CletusAI } from '../ai';
 import { formatName } from '../common';
+import { getReasoningText } from '@aeye/core';
 
 
 interface MessageDisplayProps {
@@ -47,7 +48,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
   }
 
   const mappedContent = message.content.map((c) => ({ ...c, operation: c.operationIndex !== undefined ? message.operations?.[c.operationIndex] : undefined }));
-  const visibleContent = mappedContent.filter(c => (c.content.trim().length > 0 || c.operation) && (c.type === 'text' || c.type === 'reasoning'));
+  const visibleContent = mappedContent.filter(c => (c.content.trim().length > 0 || c.operation || !!getReasoningText(c.reasoning)) && (c.type === 'text' || c.type === 'reasoning'));
 
   return (
     <Box flexDirection="column" marginBottom={1} flexGrow={1}>
@@ -87,23 +88,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, ai, sho
                 );
               }
             } else if (c.type === 'reasoning') {
-              const parts: string[] = [];
-              if (c.content) {
-                parts.push(c.content);
-              }
-              if (c.reasoning?.content) {
-                parts.push(c.reasoning.content);
-              } else if (c.reasoning?.details) {
-                for (const detail of c.reasoning.details) {
-                  if (detail.summary) {
-                    parts.push(detail.summary);
-                  }
-                  if (detail.text) {
-                    parts.push(detail.text);
-                  }
-                }
-              }
-              const content = parts.join('\n\n');
+              const content = getReasoningText(c.reasoning);
 
               return (
                 <Box key={i} marginBottom={1} borderStyle="round" borderColor="yellow" paddingX={1}>

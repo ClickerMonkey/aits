@@ -189,44 +189,43 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
       }
 
       // Get the operations from msg.operations
-      const operations = operationIndices.map(idx => msg.operations?.[idx]) as Operation[];
+      const operations = operationIndices.map(index => ({
+        index, 
+        operation: msg.operations?.[index]!,
+        toolCallId: `${msg.created}-${index}-${msg.operations?.[index]!.type}`,
+      }));
 
       // Create a toolCalls message with all operation inputs
-      const toolCalls: ToolCall[] = operations.map((op, idx) => ({
-        id: `${msg.created}-${operationIndices[idx]}-${op.type}`,
-        name: op.type,
-        arguments: JSON.stringify(op.input),
+      const toolCalls: ToolCall[] = operations.map(({ toolCallId, operation }) => ({
+        id: toolCallId,
+        name: operation.type,
+        arguments: JSON.stringify(operation.input),
       }));
+
+        // Include reasoning in the toolCalls message as a separate message
+      if (currentReasoning) {
+        messages.push({
+          role: 'assistant',
+          name: msg.name,
+          content: '',
+          reasoning: currentReasoning,
+        });
+        currentReasoning = undefined;
+      }
 
       messages.push({
         role: 'assistant',
+        name: msg.name,
         content: '',
         toolCalls,
-        reasoning: currentReasoning,
       });
-      currentReasoning = undefined;
 
       // Separate operations into auto-executed and needing approval
-      const autoOperations: { operation: Operation; index: number; }[] = [];
-      const approvalOperations: { operation: Operation; index: number; }[] = [];
-
-      for (let j = 0; j < operations.length; j++) {
-        const operation = operations[j];
-        const index = operationIndices[j];
-
-        if (operation.analysis) {
-          approvalOperations.push({ operation, index });
-        } else {
-          autoOperations.push({ operation, index });
-        }
-      }
+      const approvalOperations = operations.filter(({ operation }) => operation.analysis);
 
       // Add output/analysis for operations
-      for (const index of operationIndices) {
-        const operation = msg.operations?.[index]!;
-        const toolCallId = `${msg.created}-${index}-${operation.type}`;
+      for (const { operation, toolCallId } of operations) {
         const content = OperationManager.getContent(operation, true);
-
         messages.push({
           role: 'tool',
           content,
@@ -234,17 +233,18 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
         });
       }
 
+      // METHOD #1
+      /*
       // If any operations needed approval, insert approval flow messages
       if (approvalOperations.length > 0) {
         // Assistant message asking for approval
         // Look at next 2 content after operation contents - might be text or reasoning followed by text
         let approvalText = 'Please approve or reject the proposed operations.';
-        let reasoningAfterOps: Reasoning | undefined = undefined;
 
         if (i < msg.content.length) {
           const nextContent = msg.content[i];
           if (nextContent.type === 'reasoning') {
-            reasoningAfterOps = nextContent.reasoning;
+            currentReasoning = nextContent.reasoning;
             i++;
             if (i < msg.content.length && msg.content[i].type === 'text') {
               approvalText = msg.content[i].content;
@@ -258,28 +258,19 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
 
         messages.push({
           role: 'assistant',
+          name: msg.name,
           content: approvalText,
-          reasoning: reasoningAfterOps,
+          reasoning: currentReasoning,
         });
+        currentReasoning = undefined;
 
         // Separate operations by status
-        const approvedOps: { operation: Operation; index: number }[] = [];
-        const rejectedOps: { operation: Operation; index: number }[] = [];
-        const pendingOps: { operation: Operation; index: number }[] = [];
-
-        for (const { operation, index } of approvalOperations) {
-          if (operation.status === 'done' || operation.status === 'doneError') {
-            approvedOps.push({ operation, index });
-          } else if (operation.status === 'rejected') {
-            rejectedOps.push({ operation, index });
-          } else {
-            pendingOps.push({ operation, index });
-          }
-        }
-
+        const approvedOps = operations.filter(({ operation }) => operation.status === 'done' || operation.status === 'doneError');
+        const rejectedOps = operations.filter(({ operation }) => operation.status === 'rejected');
+        
         // User message with approvals/rejections
-        const approvedIds = approvedOps.map(({ index }) => `${msg.created}-${index}`).join(', ');
-        const rejectedIds = rejectedOps.map(({ index }) => `${msg.created}-${index}`).join(', ');
+        const approvedIds = approvedOps.map(({ toolCallId }) => toolCallId).join(', ');
+        const rejectedIds = rejectedOps.map(({ toolCallId }) => toolCallId).join(', ');
 
         let userContent = '';
         if (approvedIds) {
@@ -292,23 +283,75 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
 
         if (userContent) {
           messages.push({
+            // name: ?
             role: 'user',
             content: userContent,
           });
         }
 
         // Output tool results for approved operations
-        for (const { operation, index } of approvedOps) {
-          const toolCallId = `${msg.created}-${index}-${operation.type}`;
-          const def = Operations[operation.type] as OperationDefinition<any, any, any>;
-          const content = OperationManager.getContent(operation);
-
+        if (approvedOps.length > 0) {
           messages.push({
-            role: 'tool',
-            content,
-            toolCallId,
+            role: 'assistant',
+            name: msg.name,
+            content: '',
+            toolCalls: approvedOps.map(({ operation, toolCallId }) => ({
+              id: toolCallId,
+              name: operation.type,
+              arguments: JSON.stringify(operation.input),
+            })),
           });
+          for (const { operation, toolCallId } of approvedOps) {
+            const content = OperationManager.getContent(operation);
+            messages.push({
+              role: 'tool',
+              content,
+              toolCallId,
+            });
+          }
         }
+      }
+      */
+
+      // METHOD #2
+      // If any operations got approval/rejection, put them as one big user message
+      if (approvalOperations.length > 0) {
+        // Assistant message asking for approval
+        // Look at next 2 content after operation contents - might be text or reasoning followed by text
+        let approvalText = 'Please approve or reject the proposed operations.';
+
+        if (i < msg.content.length) {
+          const nextContent = msg.content[i];
+          if (nextContent.type === 'reasoning') {
+            currentReasoning = nextContent.reasoning;
+            i++;
+            if (i < msg.content.length && msg.content[i].type === 'text') {
+              approvalText = msg.content[i].content;
+              i++;
+            }
+          } else if (nextContent.type === 'text') {
+            approvalText = nextContent.content;
+            i++;
+          }
+        }
+
+        messages.push({
+          role: 'assistant',
+          name: msg.name,
+          content: approvalText,
+          reasoning: currentReasoning,
+        });
+        currentReasoning = undefined;
+
+        messages.push({
+          role: 'user',
+          content: approvalOperations.map(({ operation, toolCallId}) => ({
+            type: 'text',
+            content: operation.status === 'rejected' 
+              ? `<rejected-operation id=${toolCallId} />`
+              : `<approved-operation id=${toolCallId}>\n${OperationManager.getContent(operation)}\n</approved-operation>`,
+          })),
+        });
       }
 
       continue;
@@ -341,6 +384,7 @@ export async function convertMessage(msg: Message): Promise<AIMessage[]> {
   return messages;
 }
 
+/*
 export const INPUT_START = '\n\n<input>\n';
 export const INPUT_END = '\n</input>';
 export const ANALYSIS_START = '\n\n<analysis>\n';
@@ -349,6 +393,17 @@ export const OUTPUT_START = '\n\n<output>\n';
 export const OUTPUT_END = '\n</output>';
 export const INSTRUCTIONS_START = '\n\n<instructions>\n';
 export const INSTRUCTIONS_END = '\n</instructions>';
+ */
+
+export const INPUT_START = '\n\nInput:\n';
+export const INPUT_END = '';
+export const ANALYSIS_START = '\n\nAnalysis:\n';
+export const ANALYSIS_END = '';
+export const OUTPUT_START = '';
+export const OUTPUT_END = '';
+export const INSTRUCTIONS_START = '\n\n<instructions>\n';
+export const INSTRUCTIONS_END = '\n</instructions>';
+
 export const ANALYSIS_HEADER = 'Operation requires approval, the actual operation will be performed upon approval. No response after this is necessary, once approved it will be executed automatically and you will get the results then.';
 export const ERROR_HEADER = 'Operation failed:';
 export const OUTPUT_HEADER = 'Operation completed successfully:';

@@ -352,7 +352,7 @@ export const OperationSchema = z.object({
 // ============================================================================
 
 export const ReasoningDetailSchema = z.object({
-  id: z.string().nullable(),
+  id: z.string().nullable().optional(),
   type: z.string(),
   format: z.string(),
   index: z.number().optional(),
@@ -363,7 +363,7 @@ export const ReasoningDetailSchema = z.object({
 });
 
 export const ReasoningSchema = z.object({
-  content: z.string().optional(),
+  content: z.string().optional().nullable(),
   details: z.array(ReasoningDetailSchema).optional(),
 });
 

@@ -358,7 +358,7 @@ export type Resource =
  */
 export interface ReasoningDetail {
   /** Unique identifier of the reasoning if any */
-  id: string | null;
+  id?: string | null;
   /** The type of reasoning detail. */
   type: string;
   /** The format */
@@ -380,7 +380,7 @@ export interface ReasoningDetail {
  */
 export interface Reasoning {
   /** The accumulated reasoning */
-  content?: string;
+  content?: string | null;
   /** Detailed reasoning steps */
   details?: ReasoningDetail[];
 }

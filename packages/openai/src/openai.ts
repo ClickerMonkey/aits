@@ -1302,7 +1302,7 @@ export class OpenAIProvider<TConfig extends OpenAIConfig = OpenAIConfig> impleme
             this.augmentChatChunk(chunk, yieldChunk, effectiveConfig);
 
             // Send it!
-            yield { toolCall };
+            yield yieldChunk;
           }
         }
 

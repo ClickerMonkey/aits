@@ -211,6 +211,9 @@ export function createCletusAI(configFile: ConfigFile, client: CletusClient) {
     if (value instanceof z.ZodType) {
       return toJSONSchema(value, true)
     }
+    if (value instanceof Set) {
+      return Array.from(value);
+    }
     return value;
   };
 

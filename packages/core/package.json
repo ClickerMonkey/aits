@@ -5,6 +5,18 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "browser": {
+        "import": "./dist/browser.js",
+        "types": "./dist/browser.d.ts"
+      },
+      "default": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",

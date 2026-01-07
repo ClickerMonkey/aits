@@ -61,6 +61,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [sortMode, setSortMode] = useState<SortMode>('score');
   const [filterVision, setFilterVision] = useState(false);
   const [filterReasoning, setFilterReasoning] = useState(false);
+  const [filterTools, setFilterTools] = useState(false);
   const fetchIdRef = useRef(0);
 
   useEffect(() => {
@@ -166,6 +167,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       if (filterReasoning && !model.capabilities?.has('reasoning')) {
         return false;
       }
+      if (filterTools && !model.capabilities?.has('tools')) {
+        return false;
+      }
 
       return true;
     });
@@ -229,7 +233,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
       return descending ? valueB - valueA : valueA - valueB;
     });
-  }, [models, search, sortMode, filterVision, filterReasoning]);
+  }, [models, search, sortMode, filterVision, filterReasoning, filterTools]);
 
   const formatCost = (model: ModelInfo): string => {
     const costs: string[] = [];
@@ -372,6 +376,17 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               )}
             >
               🧠 Reasoning
+            </button>
+            <button
+              onClick={() => setFilterTools(!filterTools)}
+              className={cn(
+                'px-3 py-1 text-xs rounded-md transition-colors',
+                filterTools
+                  ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50'
+                  : 'bg-muted text-foreground hover:bg-muted/80',
+              )}
+            >
+              🛠️ Tools
             </button>
           </div>
           <div className="text-sm text-muted-foreground">

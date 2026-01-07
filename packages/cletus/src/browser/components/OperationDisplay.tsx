@@ -412,9 +412,12 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
   // Determine summary to display
   const displaySummary = operation.error ? operation.error : summary;
 
-  const needsApproval = operation.status === 'analyzed';
-  const isOperationProcessing = operation.status === 'doing';
-  const isDisabled = isProcessing || isOperationProcessing;
+  const needsApproval = operation.status === 'analyzed' && !isProcessing;
+  const isOperationProcessing = operation.status === 'doing' || (!!operation.start && !operation.end);
+  // const isDisabled = isProcessing || isOperationProcessing;
+  const showOptions = needsApproval || isOperationProcessing;
+
+  console.log('Rendering OperationDisplay:', { operation: { ...operation }, isOperationProcessing, isProcessing });
 
   return (
     <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border ' + borderColor : bgColor)}>
@@ -450,7 +453,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
       )}
 
       {/* Approval Buttons */}
-      {(needsApproval || isDisabled) && operationIndex !== undefined && (
+      {showOptions && operationIndex !== undefined && (
         <div className="ml-6 mb-2">
           {!hasMultipleOperations && onApprove && onReject ? (
             // Single operation: immediate approve/reject
@@ -459,10 +462,10 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onApprove(operationIndex)}
-                disabled={isDisabled}
+                disabled={isOperationProcessing}
                 className="bg-green-500/10 text-green-400 border-green-400/30 hover:bg-green-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isDisabled ? (
+                {isOperationProcessing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
@@ -478,7 +481,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onReject(operationIndex)}
-                disabled={isDisabled}
+                disabled={isOperationProcessing}
                 className="bg-red-500/10 text-red-400 border-red-400/30 hover:bg-red-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <XCircle className="w-4 h-4 mr-2" />
@@ -493,7 +496,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'approve')}
-                  disabled={isDisabled}
+                  disabled={isOperationProcessing}
                   className={cn(
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'approve'
@@ -501,7 +504,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                       : 'text-green-400/50 border-green-400/30 hover:bg-green-400/10'
                   )}
                 >
-                  {isDisabled && approvalDecision === 'approve' ? (
+                  {isOperationProcessing && approvalDecision === 'approve' ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Processing...
@@ -517,7 +520,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => onToggleDecision(operationIndex, 'reject')}
-                  disabled={isDisabled}
+                  disabled={isOperationProcessing}
                   className={cn(
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     approvalDecision === 'reject'
