@@ -414,10 +414,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
 
   const needsApproval = operation.status === 'analyzed' && !isProcessing;
   const isOperationProcessing = operation.status === 'doing' || (!!operation.start && !operation.end);
-  // const isDisabled = isProcessing || isOperationProcessing;
   const showOptions = needsApproval || isOperationProcessing;
-
-  console.log('Rendering OperationDisplay:', { operation: { ...operation }, isOperationProcessing, isProcessing });
 
   return (
     <div className={cn('mb-3 rounded-lg p-3', needsApproval ? 'bg-yellow-500/5 border ' + borderColor : bgColor)}>
@@ -437,7 +434,7 @@ export const OperationDisplay: React.FC<OperationDisplayProps> = ({
         <div className={cn('ml-6 text-sm mb-2 flex min-w-0', summaryClasses, operation.error ? 'text-red-400' : 'text-muted-foreground')}>
           {typeof displaySummary === 'string' ? (
             <>
-              <span className="text-foreground flex-shrink-0">→ </span>
+              <span className="text-foreground flex-shrink-0">→&nbsp;</span>
               <div className="min-w-0 flex-1">
                 <MarkdownContent
                   content={displaySummary}

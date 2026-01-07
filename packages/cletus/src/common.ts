@@ -404,7 +404,7 @@ export const OUTPUT_END = '';
 export const INSTRUCTIONS_START = '\n\n<instructions>\n';
 export const INSTRUCTIONS_END = '\n</instructions>';
 
-export const ANALYSIS_HEADER = 'Operation requires approval, the actual operation will be performed upon approval. No response after this is necessary, once approved it will be executed automatically and you will get the results then.';
+export const ANALYSIS_HEADER = 'Operation requires approval, DO NOT respond after this. The user will approve/reject the operation and respond with the actual results. The initial analysis follows:';
 export const ERROR_HEADER = 'Operation failed:';
 export const OUTPUT_HEADER = 'Operation completed successfully:';
 

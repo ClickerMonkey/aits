@@ -486,7 +486,7 @@ const markdownComponents: Components = {
   img: ({ src, alt, ...props }: any) => {
     // Transform local file paths to use the /file route
     const imageSrc = src && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('data:')
-      ? `/file?path=${encodeURIComponent(src)}`
+      ? `/file?path=${encodeURIComponent(decodeURIComponent(src))}`
       : src;
     return <ClickableImage src={imageSrc} alt={alt} className="max-w-full rounded" {...props} />;
   },

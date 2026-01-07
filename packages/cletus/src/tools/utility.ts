@@ -335,7 +335,10 @@ Example usage for gathering project preferences:
   ]
 }
 
-The user's answers will be formatted and submitted as a message, triggering the chat orchestrator to continue.`,
+The user's answers will be formatted and submitted as a message, triggering the chat orchestrator to continue.
+
+DO NOT use this tool for single, simple questions - only use it when you need to gather multiple pieces of information at once.
+DO NOT use this tool to ask for approval of operations - there is a separate mechanism for that.`,
     schema: z.object({
       questions: z.array(z.object({
         name: z.string().describe('Short name for the question'),

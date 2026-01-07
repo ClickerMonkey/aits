@@ -84,7 +84,7 @@ export const data_index = renderer<'data_index'>(
 
 export const data_import = renderer<'data_import'>(
   (op) => {
-    const typeName = op.cache?.typeName || formatName(op.input.type);
+    const typeName = formatName(op.cache?.typeName || op.input.type);
     return `${typeName}Import("${op.input.glob}")`;
   },
   (op) => {
@@ -99,7 +99,7 @@ export const data_import = renderer<'data_import'>(
 
 export const data_search = renderer<'data_search'>(
   (op) => {
-    const typeName = op.cache?.typeName || formatName(op.input.type);
+    const typeName = formatName(op.cache?.typeName || op.input.type);
     const query = abbreviate(op.input.query, 20);
     return `${typeName}Search("${query}")`;
   },
@@ -113,7 +113,7 @@ export const data_search = renderer<'data_search'>(
 
 export const data_get = renderer<'data_get'>(
   (op) => {
-    const typeName = op.cache?.typeName || formatName(op.input.type);
+    const typeName = formatName(op.cache?.typeName || op.input.type);
     const offset = op.input.offset ?? 0;
     const limit = op.input.limit ?? 10;
     return `${typeName}Get(${offset}, ${limit})`;
